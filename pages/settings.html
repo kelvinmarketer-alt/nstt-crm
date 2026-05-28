@@ -1321,20 +1321,22 @@
   };
 
   window.tgSendDailyTest = async function () {
-    const cfg = window.STORE.get('int_telegram', {});
-    if (!cfg.botToken || !cfg.chatId) { window.toast('Cần token + chat ID', 'warn'); return; }
+    /* Dùng routing 'daily_report' để gửi đúng kênh user đã map.
+       Nếu chưa map → fallback chat mặc định. */
+    const ch = window.getTgChannel && window.getTgChannel('daily_report');
+    if (!ch) { window.toast('Chưa cấu hình Telegram (Cài đặt → Telegram Bot)', 'warn'); return; }
     /* Dùng builder customizable */
     const built = window.buildDailyReport();
     const msg = built.text;
     if (!built.metrics.length) { window.toast('Chưa chọn chỉ số nào — tick ít nhất 1 metric', 'warn'); return; }
     try {
-      const r = await fetch(`https://api.telegram.org/bot${cfg.botToken}/sendMessage`, {
+      const r = await fetch(`https://api.telegram.org/bot${ch.botToken}/sendMessage`, {
         method: 'POST', headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ chat_id: cfg.chatId, text: msg }),
+        body: JSON.stringify({ chat_id: ch.chatId, text: msg }),
       });
       const j = await r.json();
-      if (j.ok) window.toast('✅ Đã gửi báo cáo ngày TEST → group', 'success');
-      else window.toast('❌ ' + (j.description || 'fail'), 'danger');
+      if (j.ok) window.toast(`✅ Đã gửi báo cáo ngày TEST → ${ch.channelName}`, 'success');
+      else window.toast(`❌ ${ch.channelName}: ${j.description || 'fail'}`, 'danger');
     } catch (e) { window.toast('❌ ' + e.message, 'danger'); }
   };
 
