@@ -10,9 +10,8 @@ window.SUPABASE_CONFIG = {
 
   /* Chế độ vận hành.
      - 'localStorage': chạy bằng dữ liệu mock local (data/*.js) — tiện TEST & ĐIỀU CHỈNH offline.
-     - 'supabase': đồng bộ cloud (cần seed lại dữ liệu đã rebrand vào Supabase trước).
-     Đổi về 'supabase' SAU KHI đã chạy 4 file SQL trong supabase-nstt/ vào project NSTT. */
-  mode:    'localStorage',            // 'localStorage' | 'supabase'
+     - 'supabase': đồng bộ cloud — đang BẬT. DB đã có 120 SP + 28 KH + 706 đơn + 5 NV. */
+  mode:    'supabase',                // 'localStorage' | 'supabase'
 
   /* Mapping STORE keys → Supabase tables */
   tableMap: {
