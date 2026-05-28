@@ -64,18 +64,25 @@
               customer_id:'customerId' },
     },
     suppliers: {
-      to:   { contactPerson:'contact_person', supplyCategories:'supply_categories', paymentTerms:'payment_terms' },
-      from: { contact_person:'contactPerson', supply_categories:'supplyCategories', payment_terms:'paymentTerms' },
+      /* data/suppliers.js dùng: contact, category, paymentTerm, debt, totalSpend, rating, note */
+      to:   { paymentTerm:'payment_term', totalSpend:'total_spend',
+              /* fallback nếu code dùng camelCase mới */
+              contactPerson:'contact', supplyCategories:'category', paymentTerms:'payment_term' },
+      from: { payment_term:'paymentTerm', total_spend:'totalSpend',
+              contact_person:'contact', supply_categories:'category', payment_terms:'paymentTerm' },
     },
     shippers: {
       to:   { ordersToday:'orders_today', kpiTotal:'kpi_total' },
       from: { orders_today:'ordersToday', kpi_total:'kpiTotal' },
     },
     leads: {
-      to:   { estValue:'est_value', value:'est_value', lastContact:'last_contact', convertedTo:'converted_to',
-              lostReason:'lost_reason' },
-      from: { est_value:'estValue', last_contact:'lastContact', converted_to:'convertedTo',
-              lost_reason:'lostReason' },
+      /* data/leads.js dùng: contact, interest, note, lastTouch, createdAt, estValue */
+      to:   { estValue:'est_value', value:'est_value', lastTouch:'last_touch',
+              createdAt:'created_at_vn', lastContact:'last_touch',
+              convertedTo:'converted_to', lostReason:'lost_reason' },
+      from: { est_value:'estValue', last_touch:'lastTouch',
+              created_at_vn:'createdAt', last_contact:'lastContact',
+              converted_to:'convertedTo', lost_reason:'lostReason' },
     },
     staff: {
       to:   { hireDate:'hire_date', userId:'user_id' },
@@ -93,25 +100,64 @@
     },
   };
 
+  /* Convert ISO timestamp → format "dd/mm/yyyy hh:mm" hoặc "dd/mm/yyyy" cho display.
+     Postgres timestamps trở về dạng "2026-05-18T08:29:00+00:00",
+     app code (vd orders.js render) expect "18/05/2026 08:29". */
+  function isoToVN(s, withTime) {
+    if (!s) return s;
+    if (typeof s !== 'string') return s;
+    const m = s.match(/^(\d{4})-(\d{2})-(\d{2})(?:T(\d{2}):(\d{2}))?/);
+    if (!m) return s;
+    const d = `${m[3]}/${m[2]}/${m[1]}`;
+    return withTime && m[4] ? `${d} ${m[4]}:${m[5]}` : d;
+  }
+  /* Convert VN date → ISO khi save. "18/05/2026 08:29" → "2026-05-18T08:29:00" */
+  function vnToIso(s, withTime) {
+    if (!s) return s;
+    if (typeof s !== 'string') return s;
+    const m = s.match(/(\d{1,2})\/(\d{1,2})\/(\d{2,4})(?:\s+(\d{1,2}):(\d{1,2}))?/);
+    if (!m) return s;
+    const yr = m[3].length === 2 ? '20' + m[3] : m[3];
+    const d = `${yr}-${m[2].padStart(2,'0')}-${m[1].padStart(2,'0')}`;
+    return withTime && m[4] ? `${d}T${m[4].padStart(2,'0')}:${(m[5]||'00').padStart(2,'0')}:00` : d;
+  }
+  /* Fields cần convert ISO ↔ VN per table */
+  const DATE_FIELDS = {
+    orders:    { date: true, deliveredAt: true },                   // true = withTime
+    invoices:  { date: false, paidDate: false },                    // false = date only
+    customers: { created: false, lastOrder: false, lastContact: false },
+    cashEntries: { date: false },
+    leads:     { lastTouch: false, createdAt: false, lastContact: false },
+    staff:     { hireDate: false },
+  };
+
   function mapTo(table, obj) {
     if (!obj) return obj;
     const m = FIELD_MAP[table]?.to || {};
+    const df = DATE_FIELDS[table] || {};
     const result = {};
     for (const k of Object.keys(obj)) {
       const newKey = m[k] || k;
       if (newKey === null) continue;
-      result[newKey] = obj[k];
+      let v = obj[k];
+      /* Convert VN date → ISO before insert if this JS field is a date */
+      if (df[k] !== undefined) v = vnToIso(v, df[k]);
+      result[newKey] = v;
     }
     return result;
   }
   function mapFrom(table, obj) {
     if (!obj) return obj;
     const m = FIELD_MAP[table]?.from || {};
+    const df = DATE_FIELDS[table] || {};
     const result = {};
     for (const k of Object.keys(obj)) {
       const newKey = m[k] || k;
       if (newKey === null) continue;
-      result[newKey] = obj[k];
+      let v = obj[k];
+      /* Convert ISO → VN format for date fields */
+      if (df[newKey] !== undefined) v = isoToVN(v, df[newKey]);
+      result[newKey] = v;
     }
     return result;
   }

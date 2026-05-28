@@ -87,10 +87,39 @@
   /* Async load from Supabase, replace cache nếu DB có data */
   async function _preloadFromSupabase(key) {
     if (!isSupabaseMode()) return;
-    const table = TABLE_MAP[key];
-    if (!table) return;
     _preloaded.add(key);
     try {
+      /* Special-case: companyInfo & master_data (md_*) — không qua TABLE_MAP */
+      if (key === 'companyInfo') {
+        const info = await window.SB_DATA.getCompanyInfo();
+        if (info) {
+          /* Convert snake_case từ DB → camelCase JS */
+          const mapped = {
+            name: info.name, shortName: info.short_name, tax: info.tax,
+            address: info.address, director: info.director, hotline: info.hotline,
+            email: info.email, website: info.website, bank: info.bank,
+            bankOwner: info.bank_owner, logo: info.logo_url, slogan: info.slogan,
+          };
+          _data[key] = mapped;
+          try { localStorage.setItem(PREFIX + key, JSON.stringify(mapped)); } catch (e) {}
+          (_subs[key] || []).forEach(fn => fn(mapped));
+          console.log('[STORE] Synced companyInfo từ Supabase');
+        }
+        return;
+      }
+      if (key.startsWith('md_')) {
+        const items = await window.SB_DATA.getMasterData(key.slice(3));
+        if (Array.isArray(items) && items.length > 0) {
+          _data[key] = items;
+          try { localStorage.setItem(PREFIX + key, JSON.stringify(items)); } catch (e) {}
+          (_subs[key] || []).forEach(fn => fn(items));
+          console.log(`[STORE] Synced ${key}: ${items.length} items`);
+        }
+        return;
+      }
+      /* Bảng table-mapped: customers, orders, products, ... */
+      const table = TABLE_MAP[key];
+      if (!table) return;
       const data = await window.SB_DATA.getAll(table);
       /* Chỉ replace nếu Supabase có nhiều data hơn (tránh xoá local khi DB trống) */
       if (Array.isArray(data) && data.length > 0) {
@@ -108,8 +137,9 @@
     /* Lấy dữ liệu — sync, return cache instantly */
     get(key, fallback) {
       if (!(key in _data)) _data[key] = _load(key, fallback);
-      /* Fire-and-forget preload từ Supabase lần đầu */
-      if (isSupabaseMode() && TABLE_MAP[key] && !_preloaded.has(key)) {
+      /* Fire-and-forget preload từ Supabase lần đầu — TABLE_MAP keys + companyInfo + md_* */
+      if (isSupabaseMode() && !_preloaded.has(key) &&
+          (TABLE_MAP[key] || key === 'companyInfo' || key.startsWith('md_'))) {
         _preloadFromSupabase(key);
       }
       return _data[key];
