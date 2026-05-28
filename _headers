@@ -13,10 +13,11 @@
   Cache-Control: no-cache, no-store, must-revalidate
 
 # === HTML pages: short cache, vì có thể đổi text/UI ===
-/*.html
+# CHÚ Ý: chỉ match 1 trong 2 rule sau, không match cả 2 (gây duplicate header).
+/pages/*.html
   Cache-Control: public, max-age=300
 
-/pages/*
+/index.html
   Cache-Control: public, max-age=300
 
 # === Static assets: aggressive cache (1 ngày) ===
