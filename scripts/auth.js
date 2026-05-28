@@ -214,18 +214,24 @@
     return window.SUPABASE_CONFIG?.mode === 'supabase' && !!window.SB_AUTH;
   }
 
-  /* Lấy staff record từ Supabase qua user_id (đã link sẵn) */
+  /* Lấy staff record từ Supabase qua user_id (đã link sẵn).
+     Schema NSTT: column tên `perms` (KHÔNG phải `permissions`). */
   async function getStaffByUserId(userId) {
     if (!window.SB) return null;
     try {
       const { data, error } = await window.SB.from('staff').select('*').eq('user_id', userId).single();
       if (error) { console.warn('[AUTH] staff lookup', error.message); return null; }
+      /* Expand wildcard '*' (admin) → mọi quyền */
+      let perms = data.perms || data.permissions || [];
+      if (perms.includes('*') || perms.includes('all')) {
+        perms = ['all']; // hasPermission() check includes('all') để bypass tất cả
+      }
       return {
         staffId: data.id,
         name: data.name,
         role: data.role,
         dept: data.dept,
-        permissions: data.permissions || [],
+        permissions: perms,
         avatar: data.avatar || data.name.split(' ').map(x => x[0]).slice(-2).join(''),
         avatarColor: data.avatar_color || '#1B5E20',
       };
