@@ -2,5 +2,10 @@
 # Bấm vào "/" sẽ tự chuyển sang trang login
 /  /pages/login.html  302
 
-# Fallback cho mọi route không match → login (SPA-style)
-# /*  /pages/login.html  200
+# Phục vụ .html ĐÚNG NGUYÊN (status 200 = không redirect),
+# tắt hành vi auto-strip .html của CF Pages gây 308 chain rồi SW cache hỏng.
+/pages/*.html  /pages/:splat.html  200
+/index.html    /index.html         200
+
+# Bonus: /pages/orders (không .html) cũng serve file orders.html — bảo vệ link cũ
+/pages/:slug   /pages/:slug.html   200

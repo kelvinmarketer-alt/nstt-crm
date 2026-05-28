@@ -1,7 +1,7 @@
 /* =========================================================
    Nông Sản Tuấn Tú Hà Nội — Service Worker (PWA offline + cache)
    ========================================================= */
-const CACHE_VERSION = "nstt-v59";
+const CACHE_VERSION = "nstt-v60";
 const CORE_ASSETS = [
   '/',
   '/index.html',
@@ -37,23 +37,32 @@ self.addEventListener('activate', e => {
 self.addEventListener('fetch', e => {
   if (e.request.method !== 'GET') return;
   const url = new URL(e.request.url);
-  const isCode = e.request.mode === 'navigate' || /\.(html|js|json|css)$/.test(url.pathname);
-  /* Strategy:
-     - HTML/JS/JSON/CSS (code + data): NETWORK-FIRST → luôn lấy bản mới khi online,
-       cache chỉ làm fallback offline (tránh kẹt cache khi update app).
-     - Còn lại (ảnh...): CACHE-FIRST cho nhanh. */
+
+  /* === KHÔNG intercept navigation requests ===
+     Browser tự handle 308/302 chain + Cloudflare auto-strip .html.
+     Trước đây SW intercept gây ERR_FAILED khi chuyển module
+     (cache 308 hỏng → fetch fail → user thấy "This site can't be reached"). */
+  if (e.request.mode === 'navigate') return;
+
+  /* KHÔNG intercept cross-origin (Supabase API, CDN...) */
+  if (url.origin !== self.location.origin) return;
+
+  const isCode = /\.(js|json|css)$/.test(url.pathname);
+
   if (isCode) {
-    /* Ép revalidate HTTP cache (no-cache) — tránh browser memory/disk cache trả file js/html cũ */
+    /* JS/CSS/JSON: network-first, cache fallback offline */
     e.respondWith(
-      fetch(e.request.url, { cache: 'no-cache', credentials: 'same-origin' }).then(res => {
-        if (res.ok && res.type === 'basic') {
+      fetch(e.request.url, { cache: 'no-cache', credentials: 'same-origin', redirect: 'follow' }).then(res => {
+        /* CHỈ cache response 2xx có body — bỏ qua 3xx/4xx/5xx/opaque */
+        if (res.ok && res.type === 'basic' && res.status >= 200 && res.status < 300) {
           const clone = res.clone();
           caches.open(CACHE_VERSION).then(c => c.put(e.request, clone));
         }
         return res;
-      }).catch(() => caches.match(e.request).then(c => c || caches.match('/pages/login.html')))
+      }).catch(() => caches.match(e.request))
     );
-  } else {
+  } else if (/\.(jpg|jpeg|png|gif|webp|svg|ico|woff2?)$/.test(url.pathname)) {
+    /* Static assets (ảnh, font): cache-first cho nhanh */
     e.respondWith(
       caches.match(e.request).then(cached => cached || fetch(e.request).then(res => {
         if (res.ok && res.type === 'basic') {
@@ -64,4 +73,5 @@ self.addEventListener('fetch', e => {
       }))
     );
   }
+  /* Còn lại (HTML, redirects, API) — không intercept, browser tự xử lý */
 });
