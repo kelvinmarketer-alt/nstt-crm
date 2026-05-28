@@ -3,16 +3,15 @@
    Sửa SUPABASE_URL + SUPABASE_ANON_KEY khi bạn có project
    ========================================================= */
 window.SUPABASE_CONFIG = {
-  /* ⚠️ ĐÃ NGẮT khỏi project Supabase của VTY (dbfffwtnxhytcoczhxhf) — bản Tuấn Tú KHÔNG
-     được phép ghi đè dữ liệu app VTY. Muốn chạy cloud cho Tuấn Tú: tạo project Supabase
-     RIÊNG rồi điền url + anonKey của project đó vào đây (không dùng lại key VTY). */
-  url:     'YOUR_SUPABASE_URL',
-  anonKey: 'YOUR_SUPABASE_ANON_KEY',
+  /* ✅ Project NSTT riêng — KHÔNG dùng chung với VTY (dbfffwtnxhytcoczhxhf).
+     Project ref: edhyvdstmewshurxucka */
+  url:     'https://edhyvdstmewshurxucka.supabase.co',
+  anonKey: 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImVkaHl2ZHN0bWV3c2h1cnh1Y2thIiwicm9sZSI6ImFub24iLCJpYXQiOjE3Nzk5NDI4MDYsImV4cCI6MjA5NTUxODgwNn0.WXOLLLkyrLPRAOnAu_4tgFL4KJ-S3ZKuOYePgWc_96I',
 
   /* Chế độ vận hành.
      - 'localStorage': chạy bằng dữ liệu mock local (data/*.js) — tiện TEST & ĐIỀU CHỈNH offline.
      - 'supabase': đồng bộ cloud (cần seed lại dữ liệu đã rebrand vào Supabase trước).
-     Đổi về 'supabase' khi muốn dùng cloud. */
+     Đổi về 'supabase' SAU KHI đã chạy 4 file SQL trong supabase-nstt/ vào project NSTT. */
   mode:    'localStorage',            // 'localStorage' | 'supabase'
 
   /* Mapping STORE keys → Supabase tables */
