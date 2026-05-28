@@ -1587,17 +1587,25 @@
       const modelOpts = MODELS.filter(m => m.provider === p.provider).map(m =>
         `<option value="${m.model}" ${p.model === m.model ? 'selected' : ''}>${m.label} · ${m.badge}</option>`
       ).join('') || '<option value="">— Mặc định —</option>';
-      return `<div class="ai-prov-row" data-idx="${i}" style="display:grid;grid-template-columns:60px 130px 160px 1fr 200px 40px;gap:8px;padding:8px;border:1px solid var(--line);border-radius:7px;margin-bottom:6px;background:#fff;align-items:center">
-        <label class="toggle" style="margin:0;justify-self:start"><input type="checkbox" class="ai-enabled" ${p.enabled !== false ? 'checked' : ''}><span class="slider"></span></label>
-        <input class="ai-id" value="${p.id || ''}" placeholder="gemini-flash" style="padding:6px 8px;font-size:11.5px;font-family:ui-monospace,monospace;border:1px solid var(--line);border-radius:5px;color:var(--navy);min-width:0">
-        <select class="ai-provider" onchange="window.aiOnProviderChange(${i})" style="padding:6px 8px;font-size:12.5px;border:1px solid var(--line);border-radius:5px;min-width:0">
-          <option value="gemini" ${p.provider === 'gemini' ? 'selected' : ''}>🟢 Gemini</option>
-          <option value="claude" ${p.provider === 'claude' ? 'selected' : ''}>🟠 Claude</option>
-          <option value="openai" ${p.provider === 'openai' ? 'selected' : ''}>⚫ OpenAI</option>
-        </select>
-        <input class="ai-key" type="password" value="${p.apiKey || ''}" placeholder="${p.provider === 'gemini' ? 'AIzaSy...' : p.provider === 'claude' ? 'sk-ant-...' : 'sk-...'}" style="padding:6px 8px;font-size:12px;font-family:ui-monospace,monospace;border:1px solid var(--line);border-radius:5px;min-width:0">
-        <select class="ai-model" style="padding:6px 8px;font-size:11.5px;border:1px solid var(--line);border-radius:5px;min-width:0">${modelOpts}</select>
-        <button class="btn btn-ghost btn-sm" onclick="window.aiDeleteProvider(${i})" style="color:var(--danger);padding:4px 8px;justify-self:center" title="Xóa model">🗑</button>
+      /* Layout 2 hàng — API Key được 1 hàng đầy đủ rộng để gõ thoải mái,
+         tránh bị grid 1fr collapse về 0 trên modal hẹp. */
+      return `<div class="ai-prov-row" data-idx="${i}" style="padding:10px;border:1px solid var(--line);border-radius:7px;margin-bottom:8px;background:#fff">
+        <div style="display:grid;grid-template-columns:48px minmax(110px,1fr) minmax(120px,1fr) minmax(140px,1.5fr) 32px;gap:8px;align-items:center;margin-bottom:8px">
+          <label class="toggle" style="margin:0;justify-self:start"><input type="checkbox" class="ai-enabled" ${p.enabled !== false ? 'checked' : ''}><span class="slider"></span></label>
+          <input class="ai-id" value="${p.id || ''}" placeholder="gemini-flash" style="padding:6px 8px;font-size:11.5px;font-family:ui-monospace,monospace;border:1px solid var(--line);border-radius:5px;color:var(--navy);min-width:0" title="ID slug — bí danh model">
+          <select class="ai-provider" onchange="window.aiOnProviderChange(${i})" style="padding:6px 8px;font-size:12.5px;border:1px solid var(--line);border-radius:5px;min-width:0">
+            <option value="gemini" ${p.provider === 'gemini' ? 'selected' : ''}>🟢 Gemini</option>
+            <option value="claude" ${p.provider === 'claude' ? 'selected' : ''}>🟠 Claude</option>
+            <option value="openai" ${p.provider === 'openai' ? 'selected' : ''}>⚫ OpenAI</option>
+          </select>
+          <select class="ai-model" style="padding:6px 8px;font-size:11.5px;border:1px solid var(--line);border-radius:5px;min-width:0">${modelOpts}</select>
+          <button class="btn btn-ghost btn-sm" onclick="window.aiDeleteProvider(${i})" style="color:var(--danger);padding:4px 8px;justify-self:center" title="Xóa model">🗑</button>
+        </div>
+        <div style="display:flex;gap:6px;align-items:center">
+          <span style="font-size:10.5px;color:var(--muted);font-weight:700;letter-spacing:0.5px;flex:none">🔑 API KEY:</span>
+          <input class="ai-key" type="password" value="${p.apiKey || ''}" placeholder="${p.provider === 'gemini' ? 'AIzaSy...' : p.provider === 'claude' ? 'sk-ant-api03-...' : 'sk-proj-...'}" style="padding:7px 10px;font-size:12px;font-family:ui-monospace,monospace;border:1px solid var(--line);border-radius:5px;flex:1;min-width:0" autocomplete="off" spellcheck="false">
+          <button type="button" class="btn btn-ghost btn-sm" onclick="this.parentNode.querySelector('.ai-key').type = this.parentNode.querySelector('.ai-key').type === 'password' ? 'text' : 'password'" title="Hiện/Ẩn key" style="padding:5px 10px;flex:none">👁</button>
+        </div>
       </div>`;
     }).join('');
   }
