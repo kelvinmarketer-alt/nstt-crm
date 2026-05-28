@@ -1,0 +1,47 @@
+{
+  "name": "Nông Sản Tuấn Tú Hà Nội — CRM nội bộ",
+  "short_name": "Tuấn Tú",
+  "description": "Hệ thống quản lý vận hành nội bộ của Nông Sản Tuấn Tú Hà Nội — đơn hàng, khách hàng, kế toán, công nợ, hóa đơn, báo cáo",
+  "start_url": "/pages/dashboard.html",
+  "scope": "/",
+  "display": "standalone",
+  "orientation": "portrait-primary",
+  "background_color": "#1B5E20",
+  "theme_color": "#339B21",
+  "lang": "vi",
+  "categories": ["business", "productivity"],
+  "icons": [
+    {
+      "src": "data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 192 192'><rect width='192' height='192' rx='28' fill='%23fff'/><g transform='translate(-32.8 13.2) scale(1.84)'><circle cx='70' cy='45' r='38' fill='%23E8F5E2'/><circle cx='70' cy='45' r='38' fill='none' stroke='%23339B21' stroke-width='3.5'/><circle cx='61' cy='49' r='19' fill='%234EB83C'/><path d='M61 30 C 50 37 47 52 55 64' fill='none' stroke='%232A7D1A' stroke-width='2' stroke-linecap='round'/><path d='M61 30 C 72 37 75 52 67 64' fill='none' stroke='%232A7D1A' stroke-width='2' stroke-linecap='round'/><path d='M43 49 C 54 47 68 47 79 49' fill='none' stroke='%232A7D1A' stroke-width='2' stroke-linecap='round'/><circle cx='61' cy='49' r='5.5' fill='%232A7D1A'/><g transform='rotate(30 86 52)'><path d='M82 47 L90 47 L86 70 Z' fill='%23E8862E'/><path d='M82 47 C 79 39 85 37 86 43 C 87 37 93 39 90 47 Z' fill='%232A7D1A'/></g></g></svg>",
+      "sizes": "192x192",
+      "type": "image/svg+xml",
+      "purpose": "any maskable"
+    },
+    {
+      "src": "data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 512 512'><rect width='512' height='512' rx='80' fill='%23fff'/><g transform='translate(-94 31) scale(5)'><circle cx='70' cy='45' r='38' fill='%23E8F5E2'/><circle cx='70' cy='45' r='38' fill='none' stroke='%23339B21' stroke-width='3.5'/><circle cx='61' cy='49' r='19' fill='%234EB83C'/><path d='M61 30 C 50 37 47 52 55 64' fill='none' stroke='%232A7D1A' stroke-width='2' stroke-linecap='round'/><path d='M61 30 C 72 37 75 52 67 64' fill='none' stroke='%232A7D1A' stroke-width='2' stroke-linecap='round'/><path d='M43 49 C 54 47 68 47 79 49' fill='none' stroke='%232A7D1A' stroke-width='2' stroke-linecap='round'/><circle cx='61' cy='49' r='5.5' fill='%232A7D1A'/><g transform='rotate(30 86 52)'><path d='M82 47 L90 47 L86 70 Z' fill='%23E8862E'/><path d='M82 47 C 79 39 85 37 86 43 C 87 37 93 39 90 47 Z' fill='%232A7D1A'/></g></g></svg>",
+      "sizes": "512x512",
+      "type": "image/svg+xml",
+      "purpose": "any maskable"
+    }
+  ],
+  "shortcuts": [
+    {
+      "name": "Dashboard",
+      "short_name": "Dashboard",
+      "url": "/pages/dashboard.html",
+      "description": "Trang tổng quan KPI"
+    },
+    {
+      "name": "Tạo đơn mới",
+      "short_name": "Tạo đơn",
+      "url": "/pages/orders.html",
+      "description": "Tạo đơn hàng mới"
+    },
+    {
+      "name": "Khách hàng",
+      "short_name": "Khách hàng",
+      "url": "/pages/customers.html",
+      "description": "Quản lý khách hàng"
+    }
+  ]
+}

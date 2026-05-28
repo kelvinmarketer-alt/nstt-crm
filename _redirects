@@ -1,0 +1,6 @@
+# Cloudflare Pages routing rules
+# Bấm vào "/" sẽ tự chuyển sang trang login
+/  /pages/login.html  302
+
+# Fallback cho mọi route không match → login (SPA-style)
+# /*  /pages/login.html  200

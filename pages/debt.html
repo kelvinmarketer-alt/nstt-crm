@@ -1,0 +1,142 @@
+<!doctype html>
+<html lang="vi">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Công nợ · Nông Sản Tuấn Tú Hà Nội</title>
+<link rel="stylesheet" href="../styles/tokens.css">
+<link rel="stylesheet" href="../styles/app.css">
+<style>
+  .aging{display:grid;grid-template-columns:repeat(5,1fr);gap:10px;margin-bottom:14px}
+  @media (max-width:980px){.aging{grid-template-columns:repeat(2,1fr)}}
+  .aging-card{background:#fff;border:1px solid var(--line);border-radius:10px;padding:12px 14px;border-left:4px solid var(--line)}
+  .aging-card.b1{border-left-color:var(--ok)}
+  .aging-card.b2{border-left-color:#3B82F6}
+  .aging-card.b3{border-left-color:var(--warn)}
+  .aging-card.b4{border-left-color:#EA580C}
+  .aging-card.b5{border-left-color:var(--danger)}
+  .aging-card .lab{font-size:11.5px;color:var(--muted);text-transform:uppercase;letter-spacing:0.4px;font-weight:600}
+  .aging-card .val{font-size:22px;font-weight:800;color:var(--navy);margin-top:4px}
+  .aging-card .sub{font-size:11px;color:var(--muted);margin-top:2px}
+
+  .aging-bar{display:flex;height:10px;border-radius:99px;overflow:hidden;background:var(--line);margin:14px 0}
+  .aging-bar > div{height:100%}
+</style>
+</head>
+<body>
+
+<div class="app">
+  <aside class="sidebar"></aside>
+  <header class="topbar">
+    <div class="breadcrumb"></div>
+    <div class="top-spacer"></div>
+    <div class="search-global"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="7"/><path d="m21 21-4.3-4.3"/></svg><input placeholder="Tìm KH có công nợ..."></div>
+    <button class="icon-btn" title="Thông báo <button class="icon-btn"><span style="font-size:18px">🔔</span></button> cảnh báo hệ thống"><span style="font-size:18px">🔔</span></button>
+  </header>
+
+  <main class="main">
+
+    <div class="page-head">
+      <div>
+        <h1>Công nợ phải thu</h1>
+        <div class="sub">7 khách đang nợ · tổng 101.4 tr ₫ · trong đó 40.0 tr quá hạn &gt; 30 ngày</div>
+      </div>
+      <div class="head-actions">
+        <button class="btn btn-ghost" onclick="window.openBulkReminder()">📧 Nhắc nợ hàng loạt</button>
+        <button class="btn btn-ghost" onclick="window.exportDebtCSV()">⬇ Xuất Excel</button>
+        <button class="btn btn-primary" onclick="window.openSelectDebtor()">+ Phiếu thu nợ</button>
+      </div>
+    </div>
+
+    <!-- Aging -->
+    <section class="aging">
+      <div class="aging-card b1"><div class="lab">Trong hạn</div><div class="val">61.4 tr</div><div class="sub">0–30 ngày · 4 KH</div></div>
+      <div class="aging-card b2"><div class="lab">31–60 ngày</div><div class="val">22.0 tr</div><div class="sub">1 KH · Phú Cường</div></div>
+      <div class="aging-card b3"><div class="lab">61–90 ngày</div><div class="val">18.0 tr</div><div class="sub">1 KH · Hoàng Phát</div></div>
+      <div class="aging-card b4"><div class="lab">&gt; 90 ngày</div><div class="val">0 ₫</div><div class="sub">An toàn 🎉</div></div>
+      <div class="aging-card b5"><div class="lab">Khó đòi</div><div class="val">0 ₫</div><div class="sub">Chưa có</div></div>
+    </section>
+
+    <div style="background:#fff;border:1px solid var(--line);border-radius:10px;padding:14px 18px;margin-bottom:14px">
+      <div style="display:flex;align-items:center;justify-content:space-between;font-size:12.5px;color:var(--muted)">
+        <span>📊 Phân bố tuổi nợ</span>
+        <span>Tổng: <b style="color:var(--navy);font-size:14px">101.400.000 ₫</b></span>
+      </div>
+      <div class="aging-bar">
+        <div style="background:var(--ok);width:60.5%" title="Trong hạn"></div>
+        <div style="background:#3B82F6;width:21.7%" title="31-60 ngày"></div>
+        <div style="background:var(--warn);width:17.8%" title="61-90 ngày"></div>
+      </div>
+      <div style="display:flex;justify-content:space-between;font-size:11px;color:var(--muted)">
+        <span>🟢 Trong hạn 60.5%</span>
+        <span>🔵 31–60d 21.7%</span>
+        <span>🟡 61–90d 17.8%</span>
+      </div>
+    </div>
+
+    <div class="filter-bar">
+      <div class="search-in" style="flex:1.5">
+        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="7"/><path d="m21 21-4.3-4.3"/></svg>
+        <input id="qSearch" placeholder="Tìm KH...">
+      </div>
+      <select id="fBucket">
+        <option value="">Mức nợ (tất cả)</option>
+        <option value="ok">Trong hạn</option>
+        <option value="warn">31–60 ngày</option>
+        <option value="danger">&gt; 60 ngày</option>
+      </select>
+      <select>
+        <option>NV phụ trách (tất cả)</option>
+        <option>Trần Lan</option>
+        <option>Phạm Hùng</option>
+        <option>Hoàng Mai</option>
+      </select>
+    </div>
+
+    <div class="table-card">
+      <div class="table-head">
+        <div class="count">7 khách đang nợ · sắp xếp theo độ rủi ro giảm dần</div>
+      </div>
+      <div class="table-wrap">
+        <table>
+          <thead>
+            <tr>
+              <th>Khách hàng</th>
+              <th>NV PT</th>
+              <th class="num">Tổng nợ</th>
+              <th class="num">Quá hạn</th>
+              <th>Số ngày</th>
+              <th>HĐ chưa TT</th>
+              <th>Lần liên hệ cuối</th>
+              <th class="num">Hành động</th>
+            </tr>
+          </thead>
+          <tbody id="debtTbody"></tbody>
+        </table>
+      </div>
+    </div>
+
+  </main>
+</div>
+
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<script src="../scripts/supabase-config.js"></script>
+<script src="../scripts/supabase-client.js"></script>
+<script src="../scripts/shared.js"></script>
+<script src="../scripts/store.js"></script>
+<script src="../scripts/auth.js"></script>
+<script src="../scripts/help-tips.js"></script>
+<script src="../scripts/ux-improvements.js"></script>
+<script src="../scripts/onboarding.js"></script>
+<script src="../scripts/pdf-export.js"></script>
+<script>if(window.AUTH) window.AUTH.requireAuth();</script>
+<script src="../data/customers.js"></script>
+<script src="../scripts/debt.js"></script>
+<script src="../scripts/ai-fill.js"></script>
+<script src="../scripts/cust-search-box.js"></script>
+<script src="../data/demo-seed.js"></script>
+<script src="../scripts/data-linkage.js"></script>
+<script src="../scripts/system-core.js"></script>
+<script src="../scripts/ai-chat.js"></script>
+</body>
+</html>

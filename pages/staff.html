@@ -1,0 +1,108 @@
+<!doctype html>
+<html lang="vi">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Nhân viên · Nông Sản Tuấn Tú Hà Nội</title>
+<link rel="stylesheet" href="../styles/tokens.css">
+<link rel="stylesheet" href="../styles/app.css">
+<style>
+  .perm-pill{display:inline-block;font-size:10.5px;padding:2px 6px;border-radius:4px;background:var(--navy-soft);color:var(--navy);font-weight:600;margin-right:3px;margin-bottom:2px}
+  .kpi-bar{display:inline-block;width:60px;height:6px;background:var(--line);border-radius:99px;overflow:hidden;margin-right:5px;vertical-align:middle}
+  .kpi-bar > div{height:100%;background:var(--ok)}
+  .kpi-bar.warn > div{background:var(--warn)}
+  .perm-group{margin-top:10px;background:#FAFAFB;border:1px solid var(--line);border-radius:8px;padding:10px 12px}
+  .perm-group-h{font-size:12px;font-weight:700;color:var(--navy);text-transform:uppercase;letter-spacing:0.3px;margin-bottom:8px}
+  .perm-group .check-item{font-size:12.5px}
+  .perm-group .check-item.perm-sensitive{background:#FEF3C7;border-left:3px solid #DC2626;padding-left:8px;border-radius:4px}
+  .perm-group .check-item input[disabled]{opacity:0.5;cursor:not-allowed}
+</style>
+</head>
+<body>
+<div class="app">
+  <aside class="sidebar"></aside>
+  <header class="topbar">
+    <div class="breadcrumb"></div>
+    <div class="top-spacer"></div>
+    <div class="search-global"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="7"/><path d="m21 21-4.3-4.3"/></svg><input placeholder="Tìm NV..."></div>
+    <button class="icon-btn" title="Thông báo <button class="icon-btn"><span style="font-size:18px">🔔</span></button> cảnh báo hệ thống"><span style="font-size:18px">🔔</span></button>
+  </header>
+
+  <main class="main">
+    <div class="page-head">
+      <div>
+        <h1>Quản lý nhân viên</h1>
+        <div class="sub">9 nhân viên · 4 phòng ban · phân quyền truy cập module</div>
+      </div>
+      <div class="head-actions">
+        <button class="btn btn-ghost" onclick="window.location.href='payroll.html'">📅 Chấm công</button>
+        <button class="btn btn-ghost" onclick="window.location.href='payroll.html'">💰 Bảng lương</button>
+        <button class="btn btn-ghost" onclick="window.openImportStaffExcel()">📥 Nhập Excel</button>
+        <button class="btn btn-ghost" onclick="window.aiAddStaff()">📷 Thêm NV từ ảnh</button>
+        <button class="btn btn-primary" onclick="window.openModal('+ Thêm nhân viên',formNv(),{footer:footNv(),width:'560px'})">+ Thêm NV</button>
+      </div>
+    </div>
+
+    <section class="kpis">
+      <div class="kpi k-1"><div class="kpi-label">Tổng NV</div><div class="kpi-value">9</div><div class="kpi-trend">+ 1 NV mới (Phương)</div><div class="kpi-icon">🧑‍💼</div></div>
+      <div class="kpi k-2"><div class="kpi-label">Đang đi làm</div><div class="kpi-value">8</div><div class="kpi-trend up">1 NV nghỉ phép</div><div class="kpi-icon">✓</div></div>
+      <div class="kpi k-4"><div class="kpi-label">KPI TB tháng</div><div class="kpi-value">91%</div><div class="kpi-trend up">↑ +3% vs T4</div><div class="kpi-icon">📈</div></div>
+      <div class="kpi k-3"><div class="kpi-label">Tổng lương T5</div><div class="kpi-value">101 tr</div><div class="kpi-trend">Chi 25/05</div><div class="kpi-icon">💰</div></div>
+    </section>
+
+    <div class="quick-chips">
+      <button class="chip active" data-q="all">Tất cả <span class="cnt">9</span></button>
+      <button class="chip" data-q="Ban giám đốc">Ban GĐ <span class="cnt">1</span></button>
+      <button class="chip" data-q="Sales">Sales <span class="cnt">2</span></button>
+      <button class="chip" data-q="CSKH">CSKH <span class="cnt">1</span></button>
+      <button class="chip" data-q="Kế toán">Kế toán <span class="cnt">1</span></button>
+      <button class="chip" data-q="Vận hành">Vận hành <span class="cnt">4</span></button>
+    </div>
+
+    <div class="filter-bar">
+      <div class="search-in" style="flex:1.5">
+        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="7"/><path d="m21 21-4.3-4.3"/></svg>
+        <input id="qSearch" placeholder="Tìm tên / SĐT / mã NV...">
+      </div>
+      <select id="fStatus"><option value="">Trạng thái</option><option value="active">Đang làm</option><option value="off">Nghỉ</option></select>
+    </div>
+
+    <div class="table-card">
+      <div class="table-head"><div class="count" id="rowCount">9 nhân viên</div></div>
+      <div class="table-wrap">
+        <table>
+          <thead><tr>
+            <th>Mã</th><th>Nhân viên</th><th class="hide-sm">Phòng ban</th>
+            <th class="hide-md">SĐT</th><th>Phân quyền</th>
+            <th class="hide-sm">KPI T5</th><th class="num hide-md">Lương cơ bản</th>
+            <th>Trạng thái</th><th class="num">Hành động</th>
+          </tr></thead>
+          <tbody id="stTbody"></tbody>
+        </table>
+      </div>
+    </div>
+  </main>
+</div>
+
+<script src="https://cdn.sheetjs.com/xlsx-0.20.3/package/dist/xlsx.full.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<script src="../scripts/supabase-config.js"></script>
+<script src="../scripts/supabase-client.js"></script>
+<script src="../scripts/shared.js"></script>
+<script src="../scripts/store.js"></script>
+<script src="../scripts/auth.js"></script>
+<script src="../scripts/help-tips.js"></script>
+<script src="../scripts/ux-improvements.js"></script>
+<script src="../scripts/onboarding.js"></script>
+<script src="../scripts/pdf-export.js"></script>
+<script src="../scripts/ai-fill.js"></script>
+<script>if(window.AUTH) window.AUTH.requireAuth();</script>
+<script src="../data/staff.js"></script>
+<script src="../scripts/staff.js"></script>
+<script src="../scripts/cust-search-box.js"></script>
+<script src="../data/demo-seed.js"></script>
+<script src="../scripts/data-linkage.js"></script>
+<script src="../scripts/system-core.js"></script>
+<script src="../scripts/ai-chat.js"></script>
+</body>
+</html>

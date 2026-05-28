@@ -1,0 +1,123 @@
+<!doctype html>
+<html lang="vi">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Kho · Nông Sản Tuấn Tú Hà Nội</title>
+<link rel="stylesheet" href="../styles/tokens.css">
+<link rel="stylesheet" href="../styles/app.css">
+<style>
+  .inv-table{width:100%;border-collapse:collapse;font-size:13px}
+  .inv-table th{text-align:left;padding:10px 12px;background:#FAFBFC;font-size:11.5px;color:var(--muted);text-transform:uppercase;font-weight:700;border-bottom:1px solid var(--line)}
+  .inv-table td{padding:10px 12px;border-bottom:1px solid #F1F5F9;vertical-align:middle}
+  .stock-bar{display:inline-flex;align-items:center;gap:8px;min-width:140px}
+  .stock-bar .bar{flex:1;height:8px;border-radius:4px;background:#E5E7EB;overflow:hidden;min-width:60px}
+  .stock-bar .fill{height:100%;border-radius:4px;transition:width 0.3s}
+  .stock-bar .pct{font-size:11px;color:var(--muted);min-width:34px;text-align:right}
+  .lvl-ok{color:#16A34A;font-weight:700}
+  .lvl-warn{color:#D97706;font-weight:700}
+  .lvl-low{color:#DC2626;font-weight:700}
+  .lvl-out{color:#7F1D1D;font-weight:700}
+  .ik-kpi{background:#fff;border:1px solid var(--line);border-radius:10px;padding:14px 16px}
+  .ik-kpi .lab{font-size:11px;color:var(--muted);text-transform:uppercase;font-weight:700;letter-spacing:0.3px}
+  .ik-kpi .val{font-size:24px;font-weight:800;color:var(--navy);margin-top:4px}
+  .ik-kpi .sub{font-size:11.5px;color:var(--muted);margin-top:2px}
+</style>
+</head>
+<body>
+<div class="app">
+  <aside class="sidebar"></aside>
+  <header class="topbar">
+    <div class="breadcrumb"></div>
+    <div class="top-spacer"></div>
+    <div class="search-global"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="7"/><path d="m21 21-4.3-4.3"/></svg><input placeholder="Tìm... (Ctrl+K)"></div>
+    <button class="icon-btn" title="Thông báo"><span style="font-size:18px">🔔</span><span class="dot"></span></button>
+    <button class="icon-btn" title="Hướng dẫn" onclick="window.location.href='docs.html'"><span style="font-size:18px">❓</span></button>
+  </header>
+
+  <main class="main">
+    <div style="display:flex;align-items:center;gap:12px;margin-bottom:14px">
+      <div>
+        <h1 style="margin:0;font-size:22px;color:var(--navy);font-weight:800">📥 Kho / Tồn kho <span id="hbTitle"></span></h1>
+        <div style="font-size:13px;color:var(--muted);margin-top:2px">Theo dõi tồn — cảnh báo hết — tự trừ khi xuất đơn</div>
+      </div>
+      <div style="flex:1"></div>
+      <button class="btn btn-ghost" onclick="window.exportInvCsv()">⬇ Xuất Excel</button>
+      <button class="btn btn-ghost" onclick="window.openInvAdjust()">⚖️ Kiểm kê / Điều chỉnh</button>
+      <button class="btn btn-primary" onclick="window.location.href='purchases.html'">+ Tạo phiếu nhập</button>
+    </div>
+
+    <div id="hbHost"></div>
+
+    <!-- KPI strip -->
+    <div style="display:grid;grid-template-columns:repeat(5,1fr);gap:10px;margin-bottom:14px" id="invKpis"></div>
+
+    <!-- Filter -->
+    <div style="display:flex;gap:10px;margin-bottom:10px;flex-wrap:wrap;align-items:center">
+      <input id="invQ" placeholder="🔍 Tìm SP..." style="flex:1;min-width:200px;border:1px solid var(--line);border-radius:7px;padding:7px 11px;font-size:13px">
+      <select id="invFilter" style="border:1px solid var(--line);border-radius:7px;padding:7px 11px;font-size:13px">
+        <option value="">Tất cả tình trạng</option>
+        <option value="out">⛔ Hết hàng</option>
+        <option value="low">🔴 Dưới ngưỡng (cần nhập)</option>
+        <option value="warn">🟠 Sắp hết (< 1.5 lần ngưỡng)</option>
+        <option value="ok">🟢 Đủ tồn</option>
+      </select>
+      <select id="invLoc" style="border:1px solid var(--line);border-radius:7px;padding:7px 11px;font-size:13px">
+        <option value="">Tất cả kho</option>
+      </select>
+    </div>
+
+    <div style="background:#fff;border:1px solid var(--line);border-radius:10px;overflow:hidden">
+      <div style="overflow-x:auto">
+        <table class="inv-table">
+          <thead><tr>
+            <th>Sản phẩm</th>
+            <th>Mã SP</th>
+            <th>Kho</th>
+            <th class="num">Tồn hiện tại</th>
+            <th>Mức tồn</th>
+            <th class="num">Trung bình bán/ngày</th>
+            <th class="num">Còn đủ bán</th>
+            <th>Nhập gần nhất</th>
+            <th>Hành động</th>
+          </tr></thead>
+          <tbody id="invBody"></tbody>
+        </table>
+      </div>
+    </div>
+
+    <!-- Movements -->
+    <div style="background:#fff;border:1px solid var(--line);border-radius:10px;margin-top:14px;overflow:hidden">
+      <div style="padding:12px 16px;border-bottom:1px solid var(--line);display:flex;align-items:center">
+        <h3 style="margin:0;font-size:13px;color:var(--navy);font-weight:700;text-transform:uppercase;letter-spacing:0.4px">📜 Lịch sử biến động kho (gần đây) <span id="hbMv"></span></h3>
+      </div>
+      <div id="movList" style="max-height:320px;overflow:auto"></div>
+    </div>
+
+  </main>
+</div>
+
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<script src="../scripts/supabase-config.js"></script>
+<script src="../scripts/supabase-client.js"></script>
+<script src="../scripts/shared.js"></script>
+<script src="../scripts/store.js"></script>
+<script src="../scripts/auth.js"></script>
+<script src="../scripts/help-tips.js"></script>
+<script src="../scripts/ux-improvements.js"></script>
+<script src="../scripts/onboarding.js"></script>
+<script src="../scripts/pdf-export.js"></script>
+<script>if(window.AUTH) window.AUTH.requireAuth();</script>
+<script src="../data/products.js"></script>
+<script src="../data/inventory.js"></script>
+<script src="../data/purchases.js"></script>
+<script src="../data/suppliers.js"></script>
+<script src="../scripts/inventory.js"></script>
+<script src="../scripts/ai-fill.js"></script>
+<script src="../scripts/cust-search-box.js"></script>
+<script src="../data/demo-seed.js"></script>
+<script src="../scripts/data-linkage.js"></script>
+<script src="../scripts/system-core.js"></script>
+<script src="../scripts/ai-chat.js"></script>
+</body>
+</html>

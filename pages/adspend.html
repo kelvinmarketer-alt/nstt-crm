@@ -1,0 +1,75 @@
+<!doctype html>
+<html lang="vi">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Chi phí quảng cáo · Nông Sản Tuấn Tú Hà Nội</title>
+<link rel="stylesheet" href="../styles/tokens.css">
+<link rel="stylesheet" href="../styles/app.css">
+<style>
+  .rpt-tabs{display:flex;gap:0;background:#fff;border:1px solid var(--line);border-radius:10px;padding:4px;margin-bottom:14px;width:fit-content;flex-wrap:wrap}
+  .rpt-tab{padding:8px 16px;font-size:13px;font-weight:600;color:var(--muted);cursor:pointer;border-radius:7px;white-space:nowrap}
+  .rpt-tab.active{background:var(--red);color:#fff}
+</style>
+</head>
+<body>
+<div class="app">
+  <aside class="sidebar"></aside>
+  <header class="topbar">
+    <div class="breadcrumb"></div>
+    <div class="top-spacer"></div>
+    <div class="search-global">
+      <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="7"/><path d="m21 21-4.3-4.3"/></svg>
+      <input placeholder="Tìm khách, đơn hàng, mã HĐ... (Ctrl + K)">
+    </div>
+    <button class="icon-btn" title="Thông báo"><span style="font-size:18px">🔔</span><span class="dot"></span></button>
+    <button class="icon-btn" title="Hướng dẫn" onclick="window.location.href='docs.html'"><span style="font-size:18px">❓</span></button>
+  </header>
+
+  <main class="main">
+    <div class="page-head">
+      <div>
+        <h1>Chi phí quảng cáo</h1>
+        <div class="sub">Theo dõi chi phí ads hằng ngày theo kênh + mục đích chạy (mẫu báo cáo đổi theo mục đích)</div>
+      </div>
+      <div class="head-actions">
+        <button class="btn btn-ghost" onclick="window.openAdsExcelImport()">📥 Nhập Excel</button>
+        <button class="btn btn-ghost" onclick="window.aiFillAds()">📷 Nhập từ ảnh</button>
+        <button class="btn btn-primary" onclick="window.openAddAd()">+ Nhập chi phí ngày</button>
+      </div>
+    </div>
+
+    <div class="rpt-tabs" id="objTabs"></div>
+    <div class="quick-chips" id="chanFilter" style="margin-bottom:14px"></div>
+
+    <section class="kpis" id="adKpis" style="margin-bottom:14px"></section>
+
+    <div class="chart-card">
+      <table class="mini-table" id="adTable"></table>
+    </div>
+  </main>
+</div>
+
+<script src="https://cdn.sheetjs.com/xlsx-0.20.3/package/dist/xlsx.full.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<script src="../scripts/supabase-config.js"></script>
+<script src="../scripts/supabase-client.js"></script>
+<script src="../scripts/shared.js"></script>
+<script src="../scripts/store.js"></script>
+<script src="../scripts/auth.js"></script>
+<script src="../scripts/help-tips.js"></script>
+<script src="../scripts/ux-improvements.js"></script>
+<script src="../scripts/onboarding.js"></script>
+<script src="../scripts/pdf-export.js"></script>
+<script>if(window.AUTH) window.AUTH.requireAuth();</script>
+<script src="../data/adspend.js"></script>
+<script src="../data/customers.js"></script>
+<script src="../scripts/ai-fill.js"></script>
+<script src="../scripts/adspend.js"></script>
+<script src="../scripts/cust-search-box.js"></script>
+<script src="../data/demo-seed.js"></script>
+<script src="../scripts/data-linkage.js"></script>
+<script src="../scripts/system-core.js"></script>
+<script src="../scripts/ai-chat.js"></script>
+</body>
+</html>

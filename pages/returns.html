@@ -1,0 +1,223 @@
+<!doctype html>
+<html lang="vi">
+<head>
+<meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Trả hàng & POD · Nông Sản Tuấn Tú</title>
+<link rel="stylesheet" href="../styles/tokens.css"><link rel="stylesheet" href="../styles/app.css">
+</head>
+<body>
+<div class="app">
+  <aside class="sidebar"></aside>
+  <header class="topbar">
+    <div class="breadcrumb"></div><div class="top-spacer"></div>
+    <div class="search-global"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="7"/><path d="m21 21-4.3-4.3"/></svg><input placeholder="Tìm... (Ctrl+K)"></div>
+    <button class="icon-btn" title="Thông báo"><span style="font-size:18px">🔔</span><span class="dot"></span></button>
+    <button class="icon-btn" title="Hướng dẫn" onclick="window.location.href='docs.html'"><span style="font-size:18px">❓</span></button>
+  </header>
+
+  <main class="main">
+    <div style="display:flex;align-items:center;gap:12px;margin-bottom:14px">
+      <div>
+        <h1 style="margin:0;font-size:22px;color:var(--navy);font-weight:800">↩️ Trả hàng & POD <span id="hbT"></span></h1>
+        <div style="font-size:13px;color:var(--muted);margin-top:2px">Quản lý đơn trả + ảnh chứng minh giao (Proof of Delivery)</div>
+      </div>
+      <div style="flex:1"></div>
+      <button class="btn btn-ghost" onclick="document.getElementById('podSection').scrollIntoView()">📷 Đến POD</button>
+      <button class="btn btn-primary" onclick="window.openReturnModal()">+ Ghi nhận trả hàng</button>
+    </div>
+    <div id="hbHost"></div>
+
+    <h3 style="margin:16px 0 8px;font-size:13px;color:var(--navy);text-transform:uppercase;font-weight:700">↩️ Danh sách đơn trả hàng <span id="hb1"></span></h3>
+    <div style="background:#fff;border:1px solid var(--line);border-radius:10px;overflow:hidden">
+      <table style="width:100%;border-collapse:collapse;font-size:13px">
+        <thead><tr style="background:#FAFBFC">
+          <th style="text-align:left;padding:10px;font-size:11px;color:var(--muted);text-transform:uppercase">Mã</th>
+          <th style="text-align:left;padding:10px;font-size:11px;color:var(--muted);text-transform:uppercase">Đơn gốc</th>
+          <th style="text-align:left;padding:10px;font-size:11px;color:var(--muted);text-transform:uppercase">KH</th>
+          <th style="text-align:left;padding:10px;font-size:11px;color:var(--muted);text-transform:uppercase">Ngày</th>
+          <th style="text-align:left;padding:10px;font-size:11px;color:var(--muted);text-transform:uppercase">Lý do</th>
+          <th style="text-align:right;padding:10px;font-size:11px;color:var(--muted);text-transform:uppercase">Hoàn</th>
+          <th style="text-align:left;padding:10px;font-size:11px;color:var(--muted);text-transform:uppercase">Trạng thái</th>
+          <th style="text-align:left;padding:10px;font-size:11px;color:var(--muted);text-transform:uppercase">Hành động</th>
+        </tr></thead>
+        <tbody id="retBody"></tbody>
+      </table>
+    </div>
+
+    <h3 id="podSection" style="margin:24px 0 8px;font-size:13px;color:var(--navy);text-transform:uppercase;font-weight:700">📷 POD — Ảnh chứng minh giao hàng <span id="hb2"></span></h3>
+    <div id="podHelpHost"></div>
+    <div style="background:#fff;border:1px solid var(--line);border-radius:10px;padding:14px">
+      <p style="font-size:13px;margin:0 0 10px;color:var(--muted)">Chọn 1 đơn đã giao để upload ảnh POD (chữ ký KH / ảnh giao hàng tại bếp / hoá đơn ký nhận).</p>
+      <div style="display:flex;gap:8px;margin-bottom:14px">
+        <select id="podOrder" style="flex:1;border:1px solid var(--line);border-radius:7px;padding:7px 10px;font-size:13px"></select>
+        <input type="file" id="podFile" accept="image/*" capture="environment" style="display:none">
+        <button class="btn btn-primary" onclick="document.getElementById('podFile').click()">📷 Chụp / Chọn ảnh</button>
+      </div>
+      <div id="podPreview" style="font-size:12px;color:var(--muted)">Chưa chọn ảnh</div>
+      <div id="podGallery" style="display:grid;grid-template-columns:repeat(auto-fill,minmax(140px,1fr));gap:10px;margin-top:14px"></div>
+    </div>
+  </main>
+</div>
+
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<script src="../scripts/supabase-config.js"></script>
+<script src="../scripts/supabase-client.js"></script>
+<script src="../scripts/shared.js"></script><script src="../scripts/store.js"></script>
+<script src="../scripts/auth.js"></script><script src="../scripts/help-tips.js"></script>
+<script src="../scripts/ux-improvements.js"></script>
+<script src="../scripts/onboarding.js"></script>
+<script src="../scripts/pdf-export.js"></script>
+<script>if(window.AUTH) window.AUTH.requireAuth();</script>
+<script src="../data/returns.js"></script>
+
+<script>
+(function(){
+  window.renderAppShell('returns','Trả hàng & POD');
+  document.getElementById('hbHost').innerHTML = window.helpBanner(
+    '↩️ Quy trình Trả hàng',
+    'Khi KH nhận hàng nhưng có vấn đề (hỏng, sai, thiếu): ghi nhận đơn trả → bù tiền/hàng → đóng. <b>Hoàn tiền</b> sẽ tự tạo phiếu chi trong Kế toán. <b>POD</b> ảnh giúp bảo vệ shipper/DN khi KH khiếu nại oan.',
+    {id:'hb-ret', icon:'↩️'}
+  );
+  document.getElementById('hbT').innerHTML = window.helpTip('Tỷ lệ trả hàng > 2% là bất thường — cần kiểm tra quy trình đóng gói/vận chuyển.', {size:'lg'});
+  document.getElementById('hb1').innerHTML = window.helpTip('Đơn trả ghi cụ thể: mã đơn gốc, mặt hàng, lý do, số tiền hoàn. Cập nhật trạng thái "Đã hoàn" sau khi xử lý xong.');
+  document.getElementById('hb2').innerHTML = window.helpTip('POD = Proof of Delivery (ảnh chứng minh giao thành công). Nên chụp: hàng tại bếp + chữ ký nhận của KH.');
+
+  function getR() { return window.STORE.get('returns', window.RETURNS || []) || []; }
+  function getOrd() { return window.STORE.get('orders', []) || []; }
+  function getPODs() { return window.STORE.get('pod_photos', {}) || {}; }
+
+  function renderRet() {
+    const list = getR();
+    const tb = document.getElementById('retBody');
+    if (!list.length) { tb.innerHTML = `<tr><td colspan="8" style="padding:30px;text-align:center;color:var(--muted)">Chưa có đơn trả nào — tốt!</td></tr>`; return; }
+    const stLab = {pending:'⏳ Chờ xử lý', refunded:'✓ Đã hoàn', replaced:'🔄 Đổi hàng', rejected:'✕ Từ chối'};
+    const stClr = {pending:'#92400E', refunded:'#15803D', replaced:'#1E40AF', rejected:'#B91C1C'};
+    tb.innerHTML = list.slice().reverse().map(r => `<tr style="border-top:1px solid #F1F5F9">
+      <td style="padding:10px"><b>${r.id}</b></td>
+      <td style="padding:10px"><a href="orders.html" style="color:var(--navy)">${r.orderCode}</a></td>
+      <td style="padding:10px">${r.custName}</td>
+      <td style="padding:10px">${r.date}</td>
+      <td style="padding:10px;font-size:12px">${r.reason}</td>
+      <td style="padding:10px;text-align:right;font-weight:700;color:#DC2626">${window.fmt(r.refundTotal)} ₫</td>
+      <td style="padding:10px"><span style="background:${stClr[r.status]}1f;color:${stClr[r.status]};padding:2px 8px;border-radius:99px;font-size:11px;font-weight:700">${stLab[r.status]}</span></td>
+      <td style="padding:10px">${r.status==='pending' ? `<button class="btn btn-ghost btn-sm" onclick="window.processReturn('${r.id}')">✓ Xử lý</button>` : ''}</td>
+    </tr>`).join('');
+  }
+
+  function renderPodGallery() {
+    const pods = getPODs();
+    const host = document.getElementById('podGallery');
+    const all = [];
+    Object.keys(pods).forEach(orderCode => (pods[orderCode]||[]).forEach(p => all.push({orderCode, ...p})));
+    if (!all.length) { host.innerHTML = `<div style="grid-column:1/-1;text-align:center;padding:30px;color:var(--muted);font-size:12.5px">Chưa có ảnh POD nào. Hãy chụp ảnh khi giao hàng để có bằng chứng.</div>`; return; }
+    host.innerHTML = all.slice().reverse().slice(0, 30).map(p => `<div style="border:1px solid var(--line);border-radius:8px;overflow:hidden;background:#fff">
+      <img src="${p.dataURL}" style="width:100%;height:120px;object-fit:cover;cursor:pointer" onclick="window.open(this.src)">
+      <div style="padding:6px 8px;font-size:11px"><b>${p.orderCode}</b><div style="color:var(--muted)">${p.ts}</div></div>
+    </div>`).join('');
+  }
+
+  /* Populate POD order select */
+  function populatePODSelect() {
+    const orders = getOrd().filter(o => o.status === 'delivered' || o.status === 'reconciled' || o.status === 'transit');
+    const sel = document.getElementById('podOrder');
+    sel.innerHTML = '<option value="">— Chọn đơn để gắn ảnh POD —</option>' + orders.slice(0, 50).map(o => `<option value="${o.code}">${o.code} · ${o.custName} · ${o.date}</option>`).join('');
+  }
+
+  document.getElementById('podFile').onchange = (e) => {
+    const f = e.target.files[0]; if (!f) return;
+    const orderCode = document.getElementById('podOrder').value;
+    if (!orderCode) { window.toast('Chọn đơn trước','warn'); return; }
+    const fr = new FileReader();
+    fr.onload = () => {
+      const pods = getPODs();
+      pods[orderCode] = pods[orderCode] || [];
+      pods[orderCode].push({
+        dataURL: fr.result,
+        ts: new Date().toLocaleString('vi-VN'),
+        user: window.CURRENT_USER?.name || 'Shipper',
+      });
+      window.STORE.set('pod_photos', pods);
+      window.audit && window.audit.log('pod.upload', `Ảnh POD cho ${orderCode}`);
+      document.getElementById('podPreview').innerHTML = `✓ Đã lưu ảnh POD cho ${orderCode}`;
+      renderPodGallery();
+    };
+    fr.readAsDataURL(f);
+  };
+
+  window.processReturn = function(id) {
+    const list = getR();
+    const i = list.findIndex(x => x.id === id);
+    if (i < 0) return;
+    if (!confirm(`Đánh dấu đã hoàn ${window.fmt(list[i].refundTotal)} ₫ cho ${list[i].custName}?`)) return;
+    list[i].status = 'refunded';
+    window.STORE.set('returns', list);
+    /* Tạo phiếu chi */
+    const cash = window.STORE.get('cashEntries', []) || [];
+    cash.unshift({no:'PC'+String(cash.length+1).padStart(4,'0'), date:'18/05/2026', type:'expense',
+      amount:list[i].refundTotal, account:'Tiền mặt', counterparty:list[i].custName,
+      description:'Hoàn tiền trả hàng ' + list[i].orderCode});
+    window.STORE.set('cashEntries', cash);
+    window.audit && window.audit.log('return.refund', `${id} · ${window.fmt(list[i].refundTotal)} ₫`);
+    window.toast('✓ Đã ghi hoàn tiền + phiếu chi','success');
+    renderRet();
+  };
+
+  window.openReturnModal = function() {
+    const orders = getOrd().filter(o => o.status === 'delivered' || o.status === 'reconciled');
+    window.openModal('+ Ghi nhận trả hàng', `
+      <div style="background:#FEF3C7;color:#92400E;padding:9px 12px;border-radius:7px;font-size:12px;margin-bottom:12px">
+        💡 Ghi nhận khi KH trả hàng vì lý do hỏng/sai/thiếu. Sau khi lưu, bấm "✓ Xử lý" để hoàn tiền — phiếu chi sẽ tự tạo trong Kế toán.
+      </div>
+      <label style="font-size:12px;color:var(--muted)">Đơn gốc *</label>
+      <select id="rt_ord" style="width:100%;border:1px solid var(--line);border-radius:6px;padding:7px;font-size:13px;margin-bottom:8px"><option value="">— Chọn đơn —</option>${orders.slice(0,50).map(o => `<option value="${o.code}" data-cust="${o.custName}">${o.code} · ${o.custName} · ${o.date}</option>`).join('')}</select>
+      <label style="font-size:12px;color:var(--muted)">Lý do *</label>
+      <select id="rt_reason" style="width:100%;border:1px solid var(--line);border-radius:6px;padding:7px;font-size:13px;margin-bottom:8px">
+        <option>Rau hỏng/thối</option><option>Sai mặt hàng</option><option>Thiếu số lượng</option>
+        <option>Không đúng chất lượng</option><option>KH đổi ý</option><option>Khác</option>
+      </select>
+      <label style="font-size:12px;color:var(--muted)">Số tiền hoàn (₫)</label>
+      <input id="rt_refund" type="number" placeholder="VD: 80000" style="width:100%;border:1px solid var(--line);border-radius:6px;padding:7px;font-size:13px;margin-bottom:8px">
+      <label style="font-size:12px;color:var(--muted)">Ghi chú</label>
+      <textarea id="rt_note" rows="2" style="width:100%;border:1px solid var(--line);border-radius:6px;padding:7px;font-size:13px"></textarea>
+    `, {
+      footer:`<button class="btn btn-ghost" onclick="window.closeModal()">Hủy</button>
+              <button class="btn btn-primary" onclick="window._rtSave()">Lưu (Chờ xử lý)</button>`,
+      width:'480px'
+    });
+  };
+
+  window._rtSave = function() {
+    const sel = document.getElementById('rt_ord');
+    if (!sel.value) { window.toast('Chọn đơn','warn'); return; }
+    const list = getR();
+    list.push({
+      id: 'RT' + String(list.length+1).padStart(3,'0'),
+      orderCode: sel.value,
+      custName: sel.options[sel.selectedIndex].dataset.cust,
+      date: '18/05/2026',
+      reason: document.getElementById('rt_reason').value,
+      refundTotal: parseInt(document.getElementById('rt_refund').value) || 0,
+      note: document.getElementById('rt_note').value,
+      status: 'pending',
+      handledBy: window.CURRENT_USER?.name || '',
+      items: [],
+    });
+    window.STORE.set('returns', list);
+    window.audit && window.audit.log('return.create', `${sel.value}`);
+    window.toast('✓ Đã ghi nhận đơn trả','success');
+    window.closeModal();
+  };
+
+  window.STORE.subscribe('returns', renderRet);
+  window.STORE.subscribe('pod_photos', renderPodGallery);
+  renderRet();
+  populatePODSelect();
+  renderPodGallery();
+})();
+</script>
+<script src="../scripts/ai-fill.js"></script><script src="../scripts/cust-search-box.js"></script>
+<script src="../data/demo-seed.js"></script>
+<script src="../scripts/data-linkage.js"></script>
+<script src="../scripts/system-core.js"></script>
+<script src="../scripts/ai-chat.js"></script>
+</body></html>

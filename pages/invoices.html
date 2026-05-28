@@ -1,0 +1,94 @@
+<!doctype html>
+<html lang="vi">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Hóa đơn · Nông Sản Tuấn Tú Hà Nội</title>
+<link rel="stylesheet" href="../styles/tokens.css">
+<link rel="stylesheet" href="../styles/app.css">
+</head>
+<body>
+<div class="app">
+  <aside class="sidebar"></aside>
+  <header class="topbar">
+    <div class="breadcrumb"></div>
+    <div class="top-spacer"></div>
+    <div class="search-global"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="7"/><path d="m21 21-4.3-4.3"/></svg><input placeholder="Tìm số HĐ..."></div>
+    <button class="icon-btn" title="Thông báo <button class="icon-btn"><span style="font-size:18px">🔔</span></button> cảnh báo hệ thống"><span style="font-size:18px">🔔</span></button>
+  </header>
+
+  <main class="main">
+    <div class="page-head">
+      <div>
+        <h1>Hóa đơn VAT</h1>
+        <div class="sub">Hóa đơn điện tử · ký hiệu 1C25T · Mã CQT tự động</div>
+      </div>
+      <div class="head-actions">
+        <button class="btn btn-ghost" onclick="window.openCQTReconcile()">🔄 Đối chiếu CQT</button>
+        <button class="btn btn-ghost" onclick="window.exportInvExcel()">⬇ Xuất Excel</button>
+        <button class="btn btn-primary" onclick="window.openModal('+ Hóa đơn mới',formHd(),{footer:footHd(),width:'620px'})">+ Xuất HĐ</button>
+      </div>
+    </div>
+
+    <section class="kpis">
+      <div class="kpi k-1"><div class="kpi-label">HĐ tháng này</div><div class="kpi-value">42</div><div class="kpi-trend up">↑ 218 tr ₫</div><div class="kpi-icon">🧾</div></div>
+      <div class="kpi k-2"><div class="kpi-label">Đã thanh toán</div><div class="kpi-value">35</div><div class="kpi-trend up">83% · 178 tr</div><div class="kpi-icon">✓</div></div>
+      <div class="kpi k-4"><div class="kpi-label">Chờ thanh toán</div><div class="kpi-value">5</div><div class="kpi-trend">28 tr · trong hạn</div><div class="kpi-icon">⏳</div></div>
+      <div class="kpi k-3"><div class="kpi-label">Quá hạn TT</div><div class="kpi-value">2</div><div class="kpi-trend down">↓ 12 tr · cần đôn đốc</div><div class="kpi-icon">⚠️</div></div>
+      <div class="kpi k-5"><div class="kpi-label">Tổng VAT phải nộp</div><div class="kpi-value">21.8 tr</div><div class="kpi-trend">10% · kê khai T6</div><div class="kpi-icon">📋</div></div>
+    </section>
+
+    <div class="quick-chips">
+      <button class="chip active" data-q="all">Tất cả <span class="cnt">42</span></button>
+      <button class="chip" data-q="paid">Đã TT <span class="cnt">35</span></button>
+      <button class="chip" data-q="pending">Chờ TT <span class="cnt">5</span></button>
+      <button class="chip" data-q="overdue">Quá hạn <span class="cnt">2</span></button>
+      <button class="chip" data-q="draft">Nháp <span class="cnt">3</span></button>
+    </div>
+
+    <div class="filter-bar">
+      <div class="search-in" style="flex:1.5">
+        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="7"/><path d="m21 21-4.3-4.3"/></svg>
+        <input placeholder="Tìm số HĐ / KH / MST...">
+      </div>
+      <select><option>Tháng (tất cả)</option><option>05/2026</option><option>04/2026</option></select>
+      <select><option>KH (tất cả)</option><option>Doanh nghiệp</option><option>Cá nhân</option></select>
+    </div>
+
+    <div class="table-card">
+      <div class="table-head"><div class="count">42 hóa đơn · tháng 05/2026</div></div>
+      <div class="table-wrap">
+        <table>
+          <thead><tr>
+            <th>Số HĐ</th><th>Ngày</th><th>Khách hàng</th><th class="hide-md">MST</th>
+            <th class="num">Tiền hàng</th><th class="num">VAT 10%</th><th class="num">Tổng</th>
+            <th>Trạng thái</th><th class="num">Hành động</th>
+          </tr></thead>
+          <tbody id="invTbody"></tbody>
+        </table>
+      </div>
+    </div>
+  </main>
+</div>
+
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<script src="../scripts/supabase-config.js"></script>
+<script src="../scripts/supabase-client.js"></script>
+<script src="../scripts/shared.js"></script>
+<script src="../scripts/store.js"></script>
+<script src="../scripts/auth.js"></script>
+<script src="../scripts/help-tips.js"></script>
+<script src="../scripts/ux-improvements.js"></script>
+<script src="../scripts/onboarding.js"></script>
+<script src="../scripts/pdf-export.js"></script>
+<script>if(window.AUTH) window.AUTH.requireAuth();</script>
+<script src="../data/invoices.js"></script>
+<script src="../scripts/invoices.js"></script>
+<script src="../scripts/ai-fill.js"></script>
+<script src="../scripts/cust-search-box.js"></script>
+<script src="../data/demo-seed.js"></script>
+<script src="../scripts/data-linkage.js"></script>
+<script src="../scripts/system-core.js"></script>
+<script src="../scripts/ai-chat.js"></script>
+</body>
+</html>

@@ -1,0 +1,57 @@
+/* =========================================================
+   Nông Sản Tuấn Tú Hà Nội — Design Tokens
+   Đổi giá trị ở đây sẽ áp dụng toàn bộ app.
+   Palette lấy theo nhận diện nongsantuantuhanoi.com (tông xanh nông sản).
+   Ghi chú: giữ tên biến --red / --navy để khỏi sửa hàng trăm var() —
+   nhưng giá trị nay là XANH (primary) và XANH ĐẬM (header/sidebar).
+   ========================================================= */
+:root {
+  /* === Brand (xanh nông sản) === */
+  --red:        #339B21;   /* primary / CTA — xanh lá chủ đạo */
+  --red-dark:   #2A7D1A;   /* hover / pressed */
+  --red-soft:   #E3F4DE;   /* nền nhạt primary */
+  --navy:       #1B5E20;   /* header / sidebar / nhấn mạnh — xanh đậm */
+  --navy-dark:  #123F16;   /* xanh đậm hơn */
+  --navy-soft:  #E2F1E4;   /* nền nhạt xanh đậm */
+  --gold:       #E8A33D;   /* VIP / premium (giữ vàng harvest) */
+  --gold-soft:  #FEF3C7;
+
+  /* === Neutral === */
+  --bg:         #F5F6F8;
+  --card:       #FFFFFF;
+  --line:       #E5E7EB;
+  --text:       #111827;
+  --muted:      #6B7280;
+  --muted-2:    #9CA3AF;
+
+  /* === Semantic === */
+  --ok:         #15803D;
+  --ok-bg:      #DCFCE7;
+  --warn:       #B45309;
+  --warn-bg:    #FEF3C7;
+  --danger:     #B91C1C;
+  --danger-bg:  #FEE2E2;
+  --info:       #1E40AF;
+  --info-bg:    #DBEAFE;
+
+  /* === Shadow === */
+  --shadow-sm:  0 1px 2px rgba(0,0,0,0.04);
+  --shadow-md:  0 4px 12px rgba(0,0,0,0.08);
+  --shadow-lg:  0 20px 50px rgba(0,0,0,0.18);
+
+  /* === Radius === */
+  --r-sm: 6px;
+  --r-md: 8px;
+  --r-lg: 10px;
+  --r-xl: 12px;
+
+  /* === Typography === */
+  --font-sans: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, "Noto Sans", sans-serif;
+  --font-mono: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+  --fs-base: 13.5px;
+  --lh-base: 1.45;
+
+  /* === Layout === */
+  --sidebar-w: 230px;
+  --topbar-h:  56px;
+}

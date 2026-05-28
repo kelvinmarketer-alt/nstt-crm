@@ -1,0 +1,49 @@
+# =========================================================
+# VTY Logistics — Supabase Keep-Alive Cron
+# Ping Supabase mỗi 5 ngày để tránh project bị pause (free tier
+# pause sau 7 ngày inactivity).
+#
+# Free GitHub Actions: 2000 minutes/tháng, mỗi ping <30s
+# → 6 ping/tháng × 0.5min = 3min/tháng = 0.15% quota
+# =========================================================
+name: Keep-Alive Supabase Ping
+
+on:
+  schedule:
+    # Mỗi 5 ngày, 10:00 UTC (17:00 Việt Nam)
+    # Cron syntax: phút giờ ngày tháng day-of-week
+    - cron: '0 10 */5 * *'
+  # Cho phép trigger thủ công từ GitHub Actions tab
+  workflow_dispatch:
+
+jobs:
+  ping:
+    runs-on: ubuntu-latest
+    timeout-minutes: 2
+    steps:
+      - name: Ping Supabase REST API
+        env:
+          # anon key vốn public (sẵn trong code client), không cần GitHub Secrets
+          SUPABASE_URL: "https://dbfffwtnxhytcoczhxhf.supabase.co"
+          SUPABASE_ANON_KEY: "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImRiZmZmd3RueGh5dGNvY3poeGhmIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzkwOTg1MDAsImV4cCI6MjA5NDY3NDUwMH0.2k5jNZZCV6YPyOBfmaZSUwqGe6ihuddS3zhHzDgZ9l0"
+        run: |
+          echo "🏓 Pinging Supabase to prevent free-tier auto-pause..."
+          RESPONSE=$(curl -s -w "\n%{http_code}" \
+            "$SUPABASE_URL/rest/v1/staff?select=code&limit=1" \
+            -H "apikey: $SUPABASE_ANON_KEY" \
+            -H "Authorization: Bearer $SUPABASE_ANON_KEY")
+          HTTP_CODE=$(echo "$RESPONSE" | tail -n1)
+          BODY=$(echo "$RESPONSE" | head -n -1)
+          echo "HTTP Status: $HTTP_CODE"
+          echo "Response: $BODY"
+          if [ "$HTTP_CODE" != "200" ]; then
+            echo "❌ Ping failed - Supabase có thể đã pause!"
+            exit 1
+          fi
+          echo "✅ Supabase alive - không bị pause"
+
+      - name: Ping Render app (giữ Cloudflare cache nóng)
+        run: |
+          echo "🏓 Pinging Render Static Site..."
+          curl -s -o /dev/null -w "HTTP %{http_code}\n" \
+            "https://vty-logistics.onrender.com"

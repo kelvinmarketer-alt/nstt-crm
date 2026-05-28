@@ -1,0 +1,1341 @@
+<!doctype html>
+<html lang="vi">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Hướng dẫn sử dụng · Nông Sản Tuấn Tú Hà Nội</title>
+<link rel="stylesheet" href="../styles/tokens.css">
+<style>
+  *{box-sizing:border-box}
+  html{scroll-behavior:smooth;scroll-padding-top:80px}
+  body{
+    margin:0;font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,sans-serif;
+    background:#FAFAFB;color:#1F2937;font-size:15px;line-height:1.65;
+  }
+
+  /* === Top hero === */
+  .hero{
+    background:linear-gradient(135deg,#1B5E20 0%,#123F16 50%,#339B21 200%);
+    color:#fff;padding:60px 30px 80px;
+    position:relative;overflow:hidden;
+  }
+  .hero::before{
+    content:'';position:absolute;inset:0;
+    background:radial-gradient(circle at 80% 30%,rgba(232,163,61,0.25),transparent 50%);
+    pointer-events:none;
+  }
+  .hero-inner{max-width:980px;margin:0 auto;position:relative;z-index:2}
+  .hero .logo-row{display:flex;align-items:center;gap:18px;margin-bottom:24px}
+  .hero .logo{
+    width:84px;height:84px;border-radius:18px;background:#fff;
+    display:grid;place-items:center;box-shadow:0 14px 40px rgba(0,0,0,0.3);
+  }
+  .hero .brand-name{font-size:14px;letter-spacing:2.5px;opacity:0.7;text-transform:uppercase;font-weight:700}
+  .hero h1{
+    font-size:48px;font-weight:800;margin:6px 0 12px;
+    letter-spacing:-0.8px;line-height:1.1;
+    background:linear-gradient(90deg,#fff 30%,#E8A33D 90%);
+    -webkit-background-clip:text;background-clip:text;-webkit-text-fill-color:transparent;
+  }
+  .hero .sub{font-size:18px;opacity:0.85;max-width:680px;line-height:1.55}
+  .hero-meta{
+    display:flex;flex-wrap:wrap;gap:14px;margin-top:28px;font-size:13px;
+  }
+  .hero-meta span{
+    background:rgba(255,255,255,0.1);padding:6px 14px;border-radius:99px;
+    border:1px solid rgba(255,255,255,0.15);backdrop-filter:blur(8px);
+  }
+
+  /* === Layout === */
+  .layout{max-width:1240px;margin:-50px auto 60px;padding:0 24px;display:grid;grid-template-columns:260px 1fr;gap:30px;position:relative;z-index:5}
+  @media (max-width:900px){.layout{grid-template-columns:1fr;margin-top:-40px}}
+
+  /* === Sidebar TOC === */
+  .toc{
+    background:#fff;border:1px solid #E5E7EB;border-radius:14px;padding:18px 16px;
+    position:sticky;top:24px;max-height:calc(100vh - 48px);overflow:auto;align-self:start;
+    box-shadow:0 8px 24px rgba(28,45,90,0.08);
+  }
+  @media (max-width:900px){.toc{position:relative;max-height:none;top:0}}
+  .toc h3{
+    margin:0 0 10px;font-size:11px;color:#6B7280;font-weight:700;
+    text-transform:uppercase;letter-spacing:1.2px;padding:0 4px;
+  }
+  .toc a{
+    display:flex;align-items:center;gap:8px;
+    padding:8px 10px;font-size:13.5px;color:#374151;
+    text-decoration:none;border-radius:7px;font-weight:500;
+    margin-bottom:1px;line-height:1.3;
+  }
+  .toc a:hover{background:#FAFAFB;color:#1B5E20}
+  .toc a.active{background:#1B5E20;color:#fff;font-weight:600}
+  .toc a .ico{width:18px;text-align:center;font-size:14px;opacity:0.9}
+  .toc-section{
+    font-size:10px;color:#9CA3AF;letter-spacing:1.5px;font-weight:700;
+    text-transform:uppercase;padding:14px 10px 4px;
+  }
+
+  /* === Main content === */
+  .doc{
+    background:#fff;border:1px solid #E5E7EB;border-radius:14px;
+    padding:40px 48px 60px;
+    box-shadow:0 8px 24px rgba(28,45,90,0.08);
+  }
+  @media (max-width:680px){.doc{padding:28px 22px}}
+
+  /* Section titles */
+  .doc h2{
+    color:#339B21;font-size:30px;font-weight:800;letter-spacing:-0.4px;
+    margin:50px 0 10px;padding-bottom:12px;
+    border-bottom:3px solid #339B21;display:inline-block;
+  }
+  .doc h2:first-child{margin-top:0}
+  .doc h3{
+    color:#1B5E20;font-size:20px;font-weight:700;
+    margin:32px 0 10px;letter-spacing:-0.2px;
+  }
+  .doc h4{
+    color:#1F2937;font-size:16px;font-weight:700;margin:22px 0 8px;
+  }
+  .doc p{margin:0 0 14px}
+  .doc ul, .doc ol{padding-left:22px;margin:0 0 16px}
+  .doc li{margin-bottom:6px}
+  .doc strong{color:#1B5E20}
+  .doc code{
+    background:#F3F4F6;color:#339B21;padding:1px 7px;border-radius:5px;
+    font-family:ui-monospace,SFMono-Regular,Menlo,Consolas,monospace;
+    font-size:13px;border:1px solid #E5E7EB;
+  }
+  .doc kbd{
+    background:#1F2937;color:#fff;padding:2px 8px;border-radius:5px;
+    font-family:ui-monospace,monospace;font-size:12px;font-weight:600;
+    box-shadow:inset 0 -2px 0 rgba(0,0,0,0.3);
+  }
+  .doc a{color:#1B5E20;font-weight:600}
+  .doc a:hover{color:#339B21}
+
+  /* Step numbers */
+  .step-list{counter-reset:step;list-style:none;padding:0;margin:18px 0}
+  .step-list > li{
+    counter-increment:step;position:relative;padding-left:48px;
+    margin-bottom:14px;min-height:30px;
+  }
+  .step-list > li::before{
+    content:counter(step);
+    position:absolute;left:0;top:0;
+    width:32px;height:32px;border-radius:50%;
+    background:linear-gradient(135deg,#339B21,#2A7D1A);color:#fff;
+    display:grid;place-items:center;font-weight:800;font-size:14px;
+    box-shadow:0 4px 10px rgba(200,16,46,0.25);
+  }
+
+  /* Callouts */
+  .callout{
+    border-radius:10px;padding:14px 18px;margin:18px 0;
+    border-left:4px solid;display:flex;gap:12px;align-items:flex-start;
+  }
+  .callout .ic{font-size:20px;flex-shrink:0;margin-top:1px}
+  .callout .body{flex:1}
+  .callout strong{display:block;margin-bottom:4px}
+  .callout.tip{background:#F3E8FF;border-color:#7C3AED;color:#5B21B6}
+  .callout.tip strong{color:#5B21B6}
+  .callout.info{background:#DBEAFE;border-color:#1E40AF;color:#1E40AF}
+  .callout.warn{background:#FEF3C7;border-color:#B45309;color:#92400E}
+  .callout.danger{background:#FEE2E2;border-color:#B91C1C;color:#991B1B}
+  .callout.success{background:#DCFCE7;border-color:#15803D;color:#166534}
+
+  /* Cards grid */
+  .card-grid{display:grid;grid-template-columns:repeat(2,1fr);gap:14px;margin:16px 0}
+  @media (max-width:600px){.card-grid{grid-template-columns:1fr}}
+  .feat-card{
+    background:#FAFAFB;border:1px solid #E5E7EB;border-radius:10px;padding:14px 16px;
+  }
+  .feat-card .ic{font-size:24px;margin-bottom:6px}
+  .feat-card .t{font-weight:700;color:#1B5E20;margin-bottom:3px}
+  .feat-card .d{font-size:13px;color:#6B7280;line-height:1.5}
+
+  /* Tables */
+  .doc table{
+    width:100%;border-collapse:collapse;margin:16px 0;font-size:14px;
+    border:1px solid #E5E7EB;border-radius:10px;overflow:hidden;
+  }
+  .doc th{
+    background:#1B5E20;color:#fff;padding:10px 14px;text-align:left;
+    font-weight:700;font-size:13px;text-transform:uppercase;letter-spacing:0.4px;
+  }
+  .doc td{padding:10px 14px;border-bottom:1px solid #F3F4F6;vertical-align:top}
+  .doc tr:last-child td{border-bottom:none}
+  .doc tr:nth-child(even){background:#FAFAFB}
+
+  /* Account badge */
+  .acc-pill{
+    display:inline-flex;align-items:center;gap:8px;background:#F3F4F6;
+    padding:6px 12px;border-radius:99px;font-size:13px;font-weight:600;
+    border:1px solid #E5E7EB;margin:3px;
+  }
+  .acc-pill .dot{width:10px;height:10px;border-radius:50%}
+
+  /* Screenshot placeholders */
+  .screenshot{
+    background:linear-gradient(135deg,#FAFAFB,#F3F4F6);
+    border:2px dashed #D1D5DB;border-radius:10px;
+    padding:30px;text-align:center;color:#9CA3AF;
+    font-size:13px;margin:14px 0;
+  }
+  .screenshot::before{content:'📸';font-size:32px;display:block;margin-bottom:8px}
+
+  /* Workflow diagram */
+  .flow{
+    display:flex;flex-wrap:wrap;align-items:center;gap:8px;margin:18px 0;
+    padding:18px;background:#FAFAFB;border-radius:10px;border:1px solid #E5E7EB;
+  }
+  .flow .step-box{
+    background:#fff;border:2px solid #1B5E20;border-radius:8px;padding:8px 14px;
+    font-weight:600;color:#1B5E20;font-size:13px;text-align:center;
+  }
+  .flow .step-box.danger{border-color:#339B21;color:#339B21}
+  .flow .step-box.ok{border-color:#15803D;color:#15803D}
+  .flow .arrow{font-size:18px;color:#6B7280}
+
+  /* FAQ */
+  .faq-item{
+    background:#FAFAFB;border-radius:10px;margin-bottom:10px;
+    overflow:hidden;border:1px solid #E5E7EB;
+  }
+  .faq-q{
+    padding:14px 18px;font-weight:700;color:#1B5E20;cursor:pointer;
+    display:flex;align-items:center;gap:10px;
+  }
+  .faq-q::before{content:'❓';font-size:18px}
+  .faq-a{padding:0 18px 14px 44px;color:#374151;font-size:14px}
+
+  /* Footer */
+  .doc-foot{
+    margin-top:50px;padding:24px;background:#1B5E20;color:#fff;border-radius:14px;
+    text-align:center;
+  }
+  .doc-foot h3{color:#fff;margin:0 0 8px;font-size:18px}
+  .doc-foot p{color:rgba(255,255,255,0.7);margin:4px 0;font-size:14px}
+  .doc-foot .contact{margin-top:14px;display:flex;flex-wrap:wrap;justify-content:center;gap:14px}
+  .doc-foot .contact a{color:#E8A33D;text-decoration:none;font-weight:600}
+
+  /* Print styles */
+  @media print {
+    .toc, .hero{display:none}
+    .layout{grid-template-columns:1fr;margin:0;padding:0}
+    .doc{box-shadow:none;border:none;padding:20px}
+    .doc h2{break-before:page}
+  }
+
+  /* Back to top */
+  .back-top{
+    position:fixed;bottom:24px;right:24px;
+    width:48px;height:48px;border-radius:50%;
+    background:#339B21;color:#fff;border:none;cursor:pointer;
+    font-size:20px;box-shadow:0 8px 24px rgba(200,16,46,0.4);
+    display:none;z-index:99;
+  }
+  .back-top.show{display:block}
+  .back-top:hover{background:#2A7D1A;transform:translateY(-2px)}
+</style>
+</head>
+<body>
+
+<!-- HERO -->
+<div class="hero">
+  <div class="hero-inner">
+    <div class="logo-row">
+      <div class="logo">
+        <svg width="60" height="60" viewBox="0 0 140 90">
+          <path d="M 8 30 C 12 50, 22 68, 42 78 C 50 81, 56 78, 58 73 C 50 68, 38 56, 28 40 C 22 32, 14 27, 8 30 Z" fill="#339B21"/>
+          <path d="M 12 26 L 22 18 L 20 30 Z" fill="#339B21"/>
+          <path d="M 28 32 C 55 12, 95 8, 122 16 C 105 24, 80 28, 55 32 C 42 34, 32 34, 28 32 Z" fill="#339B21"/>
+          <path d="M 38 24 L 50 10 L 46 26 Z" fill="#339B21"/>
+          <path d="M 60 22 L 75 10 L 70 24 Z" fill="#339B21"/>
+          <path d="M 12 82 Q 70 92 130 80" stroke="#339B21" stroke-width="4" fill="none" stroke-linecap="round"/>
+          <text x="62" y="68" font-family="Arial Black, Helvetica, sans-serif" font-weight="900" font-size="42" fill="#1B5E20" letter-spacing="-1">TY</text>
+          <polygon points="126,32 129,40 137,40 130,46 133,54 126,49 119,54 122,46 115,40 123,40" fill="#339B21"/>
+        </svg>
+      </div>
+      <div>
+        <div class="brand-name">Nông Sản Tuấn Tú Hà Nội · Tài liệu nội bộ</div>
+        <h1>Hướng dẫn sử dụng</h1>
+      </div>
+    </div>
+    <p class="sub">Tài liệu chi tiết từng tính năng của hệ thống CRM Nông Sản Tuấn Tú Hà Nội — từ đăng nhập, quản lý đơn hàng, bảng giá ngày, xuất PDF, tích hợp Telegram đến báo cáo. Đọc 45 phút là dùng thành thạo.</p>
+    <div class="hero-meta">
+      <span>📅 Cập nhật T5/2026 (v54)</span>
+      <span>🔖 Phiên bản 2.0</span>
+      <span>📖 22 modules · ~45 phút đọc</span>
+      <span>👥 Dành cho NV nội bộ NSTT</span>
+    </div>
+  </div>
+</div>
+
+<!-- LAYOUT -->
+<div class="layout">
+
+  <!-- SIDEBAR -->
+  <nav class="toc" id="toc">
+    <h3>📑 Mục lục</h3>
+    <div class="toc-section">Bắt đầu</div>
+    <a href="#getting-started"><span class="ic">🚀</span> Bắt đầu nhanh</a>
+    <a href="#login"><span class="ic">🔐</span> Đăng nhập</a>
+    <a href="#interface"><span class="ic">🖥</span> Giao diện tổng quan</a>
+
+    <div class="toc-section">Bán hàng</div>
+    <a href="#dashboard"><span class="ic">📊</span> Dashboard</a>
+    <a href="#orders"><span class="ic">📦</span> Đơn hàng</a>
+    <a href="#quotes"><span class="ic">📝</span> Báo giá</a>
+    <a href="#recurring"><span class="ic">🔁</span> Đơn định kỳ</a>
+    <a href="#customers"><span class="ic">👥</span> Khách hàng</a>
+    <a href="#leads"><span class="ic">🎯</span> Lead/Tiềm năng</a>
+    <a href="#shippers"><span class="ic">🛵</span> Shipper</a>
+
+    <div class="toc-section">Hàng hóa</div>
+    <a href="#products"><span class="ic">🥬</span> Sản phẩm & Bảng giá</a>
+    <a href="#inventory"><span class="ic">📥</span> Kho / Tồn</a>
+    <a href="#suppliers"><span class="ic">🏭</span> Nhà cung cấp</a>
+    <a href="#purchases"><span class="ic">📦</span> Phiếu nhập</a>
+    <a href="#returns"><span class="ic">↩️</span> Trả hàng</a>
+
+    <div class="toc-section">Tài chính</div>
+    <a href="#accounting"><span class="ic">💰</span> Kế toán</a>
+    <a href="#debt"><span class="ic">📉</span> Công nợ</a>
+    <a href="#invoices"><span class="ic">🧾</span> Hóa đơn</a>
+    <a href="#adspend"><span class="ic">📣</span> Chi phí Ads</a>
+
+    <div class="toc-section">Nội bộ</div>
+    <a href="#staff"><span class="ic">🧑‍💼</span> Nhân viên</a>
+    <a href="#payroll"><span class="ic">📅</span> Chấm công & Lương</a>
+    <a href="#reports"><span class="ic">📈</span> Báo cáo</a>
+    <a href="#marketing"><span class="ic">📨</span> Email/Zalo blast</a>
+    <a href="#audit"><span class="ic">📋</span> Nhật ký</a>
+    <a href="#settings"><span class="ic">⚙️</span> Cài đặt</a>
+
+    <div class="toc-section">Tích hợp</div>
+    <a href="#telegram"><span class="ic">✈️</span> Telegram đa kênh</a>
+    <a href="#pdf-export"><span class="ic">🖨</span> Xuất PDF bảng giá</a>
+    <a href="#ai-features"><span class="ic">🤖</span> AI Form Filler</a>
+
+    <div class="toc-section">Tham khảo</div>
+    <a href="#shortcuts"><span class="ic">⌨️</span> Phím tắt</a>
+    <a href="#faq"><span class="ic">💡</span> Câu hỏi thường gặp</a>
+    <a href="#support"><span class="ic">📞</span> Hỗ trợ</a>
+  </nav>
+
+  <!-- MAIN -->
+  <main class="doc">
+
+    <!-- ========== GETTING STARTED ========== -->
+    <h2 id="getting-started">🚀 Bắt đầu nhanh</h2>
+    <p>Chào mừng bạn đến với <strong>Nông Sản Tuấn Tú Hà Nội CRM</strong> — hệ thống quản lý nội bộ của Nông Sản Tuấn Tú Hà Nội. Đây là 5 việc cần làm khi mới vào:</p>
+
+    <ol class="step-list">
+      <li><strong>Mở app</strong> tại <code>https://vty-logistics.onrender.com</code> trên Chrome / Edge / Safari (khuyến nghị Chrome). App hoạt động tốt trên cả máy tính, tablet, điện thoại.</li>
+      <li><strong>Đăng nhập</strong> bằng tài khoản chủ DN cấp — xem mục <a href="#login">Đăng nhập</a> bên dưới.</li>
+      <li><strong>Tìm hiểu giao diện</strong> — Sidebar trái có các module bạn được cấp quyền truy cập.</li>
+      <li><strong>Bắt đầu từ Dashboard</strong> — đây là trang tổng quan, xem KPI ngày + cảnh báo cần xử lý.</li>
+      <li><strong>Đọc tiếp tài liệu này</strong> — mỗi module có hướng dẫn riêng. Có thể bookmark trang để tra cứu sau.</li>
+    </ol>
+
+    <div class="callout tip">
+      <div class="ic">💡</div>
+      <div class="body">
+        <strong>Mẹo onboarding</strong>
+        NV mới chỉ cần 30-60 phút đọc tài liệu này + 1 buổi thực hành với sếp là dùng thành thạo. Đừng cố nhớ hết — bookmark trang này và tra cứu khi cần.
+      </div>
+    </div>
+
+    <!-- ========== LOGIN ========== -->
+    <h2 id="login">🔐 Đăng nhập</h2>
+    <p>App yêu cầu đăng nhập để bảo mật dữ liệu KH/đơn hàng. Mỗi NV có 1 tài khoản riêng và chỉ thấy được module mình được cấp quyền.</p>
+
+    <h3>4 vai trò tài khoản</h3>
+    <table>
+      <thead><tr><th>Vai trò</th><th>Tài khoản demo</th><th>Quyền truy cập</th></tr></thead>
+      <tbody>
+        <tr>
+          <td><strong>🔴 Chủ DN / Admin</strong></td>
+          <td><code>admin@nongsantuantu.com</code> / <code>admin123</code></td>
+          <td><strong>Tất cả 10 module</strong>. Toàn quyền cấu hình, phân quyền, sao lưu data.</td>
+        </tr>
+        <tr>
+          <td><strong>🔵 Sales / CSKH B2B</strong></td>
+          <td><code>sales@nongsantuantu.com</code> / <code>sales123</code></td>
+          <td>Dashboard · Khách hàng · Đơn hàng · Công nợ · Hóa đơn · Báo cáo</td>
+        </tr>
+        <tr>
+          <td><strong>🟢 Kế toán</strong></td>
+          <td><code>kt@nongsantuantu.com</code> / <code>kt123</code></td>
+          <td>Dashboard · Kế toán · Công nợ · Hóa đơn · Báo cáo</td>
+        </tr>
+        <tr>
+          <td><strong>🟡 CSKH B2C</strong></td>
+          <td><code>cskh@nongsantuantu.com</code> / <code>cskh123</code></td>
+          <td>Dashboard · Khách hàng · Đơn hàng (last-mile, đơn nội thành)</td>
+        </tr>
+      </tbody>
+    </table>
+
+    <h3>Cách đăng nhập</h3>
+    <ol class="step-list">
+      <li>Vào URL <code>https://vty-logistics.onrender.com</code> → tự chuyển sang trang đăng nhập</li>
+      <li>Nhập <strong>Email</strong> và <strong>Mật khẩu</strong> chủ DN cấp cho bạn</li>
+      <li>Tick <strong>Nhớ đăng nhập 7 ngày</strong> nếu dùng máy cá nhân (đừng tick trên máy chung)</li>
+      <li>Bấm <strong>🔐 Đăng nhập</strong></li>
+      <li>App tự chuyển sang Dashboard hoặc trang đầu tiên bạn có quyền</li>
+    </ol>
+
+    <div class="callout warn">
+      <div class="ic">⚠️</div>
+      <div class="body">
+        <strong>Quên mật khẩu?</strong>
+        Liên hệ chủ DN (Tuấn Tú — <code>0903 111 222</code>) để được reset. Hệ thống chưa có tính năng tự reset qua email.
+      </div>
+    </div>
+
+    <h3>Đăng xuất</h3>
+    <p>Click nút <strong>⏻ (đăng xuất)</strong> ở góc dưới cùng sidebar trái. Nên đăng xuất khi dùng máy chung hoặc rời chỗ ngồi lâu.</p>
+
+    <!-- ========== INTERFACE ========== -->
+    <h2 id="interface">🖥 Giao diện tổng quan</h2>
+
+    <h3>3 vùng chính</h3>
+    <div class="card-grid">
+      <div class="feat-card">
+        <div class="ic">📂</div>
+        <div class="t">Sidebar trái (cố định)</div>
+        <div class="d">Logo NSTT + danh sách 10 module + thông tin NV đang login + nút đăng xuất.</div>
+      </div>
+      <div class="feat-card">
+        <div class="ic">🔍</div>
+        <div class="t">Thanh trên cùng (topbar)</div>
+        <div class="d">Breadcrumb + ô tìm kiếm toàn cục (Ctrl+K) + nút thông báo 🔔 + nút help ❓.</div>
+      </div>
+      <div class="feat-card">
+        <div class="ic">📊</div>
+        <div class="t">Vùng nội dung chính</div>
+        <div class="d">Hiển thị KPI, bảng dữ liệu, form, biểu đồ tùy module bạn đang xem.</div>
+      </div>
+      <div class="feat-card">
+        <div class="ic">📋</div>
+        <div class="t">Drawer chi tiết (slide từ phải)</div>
+        <div class="d">Click vào 1 dòng trong bảng → drawer mở để xem/sửa chi tiết. Bấm ESC hoặc ✕ để đóng.</div>
+      </div>
+    </div>
+
+    <h3>Quy ước màu sắc</h3>
+    <ul>
+      <li><strong style="color:#339B21">🔴 Đỏ</strong>: nút chính (Tạo mới, Lưu), cảnh báo nguy hiểm, công nợ quá hạn.</li>
+      <li><strong style="color:#1B5E20">🔵 Navy</strong>: nút phụ, link, header table, sidebar.</li>
+      <li><strong style="color:#E8A33D">🟡 Gold</strong>: KH VIP, đánh giá, accent đặc biệt.</li>
+      <li><strong style="color:#15803D">🟢 Xanh lá</strong>: thành công, đơn đã giao, KH OK.</li>
+      <li><strong style="color:#B45309">🟠 Cam</strong>: cảnh báo, đang xử lý, công nợ 30-60d.</li>
+    </ul>
+
+    <!-- ========== DASHBOARD ========== -->
+    <h2 id="dashboard">📊 Dashboard</h2>
+    <p>Trang đầu tiên khi đăng nhập. Tổng quan toàn bộ hoạt động ngày + cảnh báo cần xử lý ngay.</p>
+
+    <h3>5 KPI quan trọng (cập nhật real-time)</h3>
+    <table>
+      <thead><tr><th>KPI</th><th>Ý nghĩa</th></tr></thead>
+      <tbody>
+        <tr><td><strong>📦 Đơn hôm nay</strong></td><td>Tổng số đơn được tạo trong ngày. So sánh với hôm qua.</td></tr>
+        <tr><td><strong>💰 Doanh thu tháng</strong></td><td>Tổng cước từ đầu tháng. TB ngày = doanh thu / 30.</td></tr>
+        <tr><td><strong>⚠️ COD chưa thu</strong></td><td>Tổng tiền KH thu hộ chưa kết toán. Càng thấp càng tốt.</td></tr>
+        <tr><td><strong>🚛 Đơn đang giao</strong></td><td>Số đơn đang ở trạng thái "đang giao" / "chờ lấy". Phản ánh khối lượng vận hành.</td></tr>
+        <tr><td><strong>👥 KH có công nợ</strong></td><td>Số KH đang nợ. Bấm vào → vào trang Công nợ chi tiết.</td></tr>
+      </tbody>
+    </table>
+
+    <h3>4 panel chính</h3>
+    <ol class="step-list">
+      <li><strong>📊 Biểu đồ doanh thu 7 ngày</strong> — Bar chart so sánh các ngày. Hôm nay highlight màu gold.</li>
+      <li><strong>📦 Đơn hàng gần đây</strong> — 8 đơn mới nhất với avatar KH + status pill. Click → vào trang Đơn hàng.</li>
+      <li><strong>⚡ Thao tác nhanh</strong> — 6 nút shortcut: Thêm KH · Tạo đơn · Điều xe · Nhắc nợ · Báo cáo · Chấm công.</li>
+      <li><strong>⚠️ Cảnh báo cần xử lý</strong> — Auto-sinh từ data: KH quá hạn nợ, xe sắp đăng kiểm, KH inactive. Click → đến trang xử lý.</li>
+      <li><strong>⭐ Top KH tháng</strong> — Top 5 KH doanh thu cao nhất, sort tự động.</li>
+    </ol>
+
+    <div class="callout tip">
+      <div class="ic">💡</div>
+      <div class="body">
+        <strong>Thói quen tốt</strong>
+        Mỗi sáng vào làm: mở Dashboard → xem KPI hôm qua → xử lý ngay 2-3 cảnh báo đỏ → mới sang module khác.
+      </div>
+    </div>
+
+    <!-- ========== CUSTOMERS ========== -->
+    <h2 id="customers">👥 Khách hàng</h2>
+    <p>Trung tâm CRM. Quản lý toàn bộ thông tin KH cá nhân (B2C) và doanh nghiệp (B2B). Mỗi KH có hồ sơ chi tiết với lịch sử đơn, công nợ, ghi chú.</p>
+
+    <h3>Thêm KH mới (3 cách)</h3>
+    <ol class="step-list">
+      <li><strong>Cách 1 — Form thủ công:</strong> Bấm nút <strong>+ Thêm khách hàng</strong> góc phải → điền form 13 trường → bấm <strong>💾 Chỉ lưu KH</strong>.</li>
+      <li><strong>Cách 2 — Lưu & Tạo đơn ngay (RECOMMENDED):</strong> Cùng form trên → bấm nút màu đỏ <strong>💾 Lưu & Tạo đơn ngay 🚚</strong> → tự nhảy sang trang Đơn hàng với KH đã chọn sẵn.</li>
+      <li><strong>Cách 3 — Dán chat AI tự điền (tương lai):</strong> Dán đoạn chat Zalo/Telegram vào ô <strong>📋 Dán chat</strong> → bấm AI parse → form tự điền (cần cấu hình AI ở Settings → Tích hợp).</li>
+    </ol>
+
+    <h3>Tìm và lọc KH</h3>
+    <ul>
+      <li><strong>Quick chips</strong> (chip tròn ở trên): Tất cả · Doanh nghiệp · Cá nhân · VIP · Có công nợ · Mới · Không hoạt động.</li>
+      <li><strong>Filter bar</strong>: Tìm theo tên/SĐT/mã + Nhóm KH + Tỉnh + Dịch vụ + Tình trạng.</li>
+      <li><strong>Tìm nhanh toàn cục</strong>: Bấm <kbd>Ctrl</kbd>+<kbd>K</kbd> trên topbar.</li>
+    </ul>
+
+    <h3>Drawer chi tiết KH</h3>
+    <p>Click vào 1 dòng KH → drawer mở từ phải với <strong>5 tab</strong>:</p>
+    <ol>
+      <li><strong>📋 Thông tin</strong>: Liên hệ, phân loại, B2B info (nếu có)</li>
+      <li><strong>📦 Lịch sử đơn</strong>: Tất cả đơn của KH này, lọc từ data Orders</li>
+      <li><strong>💰 Công nợ</strong>: Số dư hiện tại + sổ Nợ/Có dạng kế toán</li>
+      <li><strong>📝 Ghi chú nội bộ</strong>: Timeline ghi chú, có thể thêm note mới</li>
+      <li><strong>📎 Hợp đồng & File</strong>: Đính kèm file hợp đồng, ĐKKD...</li>
+    </ol>
+
+    <h3>5 nút hành động trên mỗi row</h3>
+    <table>
+      <thead><tr><th>Nút</th><th>Tác dụng</th></tr></thead>
+      <tbody>
+        <tr><td><strong style="color:#0084FF">Z</strong></td><td>Mở Zalo của KH (link <code>zalo.me/SĐT</code>)</td></tr>
+        <tr><td><strong style="color:#15803D">📞</strong></td><td>Gọi điện (link <code>tel:SĐT</code>) — chỉ hoạt động trên điện thoại</td></tr>
+        <tr><td><strong>📦</strong></td><td>Tạo đơn nhanh cho KH này — nhảy sang Orders</td></tr>
+        <tr><td><strong>✏️</strong></td><td>Sửa thông tin KH</td></tr>
+        <tr><td><strong style="color:#B91C1C">🗑</strong></td><td>Xóa KH (cần xác nhận)</td></tr>
+      </tbody>
+    </table>
+
+    <div class="callout warn">
+      <div class="ic">⚠️</div>
+      <div class="body">
+        <strong>Cẩn thận khi xóa</strong>
+        Xóa KH không thể hoàn tác (trong prototype). Trước khi xóa nên kiểm tra KH có đơn đang chạy / công nợ chưa thu không. Tốt nhất chỉ <em>đánh dấu "Inactive"</em> thay vì xóa.
+      </div>
+    </div>
+
+    <!-- ========== ORDERS ========== -->
+    <h2 id="orders">📦 Đơn hàng</h2>
+    <p>Trung tâm vận hành. Quản lý vòng đời đơn từ lúc tạo đến lúc đối soát xong. Tách rõ 6 loại dịch vụ và 6 trạng thái pipeline.</p>
+
+    <h3>6 loại dịch vụ NSTT cung cấp</h3>
+    <div class="card-grid">
+      <div class="feat-card"><div class="ic">🚚</div><div class="t">Vận chuyển liên tỉnh</div><div class="d">Đường bộ / thủy / sắt giữa các tỉnh. Có cước theo tuyến.</div></div>
+      <div class="feat-card"><div class="ic">🏠</div><div class="t">Chuyển nhà trọn gói</div><div class="d">Đóng gói + chuyển + tháo lắp đồ. Báo giá theo m³ hoặc chuyến.</div></div>
+      <div class="feat-card"><div class="ic">🚛</div><div class="t">Cho thuê xe tải</div><div class="d">Thuê xe + tài xế theo ngày/chuyến. Phù hợp KH cần linh hoạt.</div></div>
+      <div class="feat-card"><div class="ic">🏭</div><div class="t">Cho thuê kho bãi</div><div class="d">Lưu kho hàng KH theo tháng. Tính theo m² hoặc pallet.</div></div>
+      <div class="feat-card"><div class="ic">🏗</div><div class="t">Cho thuê xe cẩu</div><div class="d">Cẩu tự hành 5T-10T cho công trình. Tính theo giờ.</div></div>
+      <div class="feat-card"><div class="ic">💪</div><div class="t">Bốc xếp</div><div class="d">Chỉ nhân công bốc xếp tại chỗ. Tính theo lượt / khối lượng.</div></div>
+    </div>
+
+    <h3>Pipeline 6 trạng thái</h3>
+    <div class="flow">
+      <div class="step-box">📝 Mới</div>
+      <span class="arrow">→</span>
+      <div class="step-box">📦 Đang lấy</div>
+      <span class="arrow">→</span>
+      <div class="step-box">🚚 Đang giao</div>
+      <span class="arrow">→</span>
+      <div class="step-box ok">✓ Đã giao</div>
+      <span class="arrow">→</span>
+      <div class="step-box ok">💰 Đối soát</div>
+      <span class="arrow">⤓</span>
+      <div class="step-box danger">✕ Đã hủy</div>
+    </div>
+
+    <h3>Tạo đơn mới</h3>
+    <ol class="step-list">
+      <li>Bấm nút đỏ <strong>+ Tạo đơn mới</strong> góc phải</li>
+      <li>Mã đơn <strong>NSTT-NNNNNN</strong> tự sinh, không phải nhập</li>
+      <li>Chọn <strong>Khách hàng</strong> từ dropdown (KH phải có trong hệ thống trước)</li>
+      <li>Chọn <strong>Loại dịch vụ</strong> — form sẽ ẩn/hiện trường tùy loại</li>
+      <li>Với liên tỉnh: chọn thêm <strong>Phương thức vận chuyển</strong> (đường bộ/thủy/sắt)</li>
+      <li>Điền địa chỉ lấy/giao, hàng hóa, cước, COD</li>
+      <li>Chọn <strong>Nguồn xe</strong>:
+        <ul>
+          <li><strong>🏢 Xe & TX nội bộ NSTT</strong>: chọn tài xế + xe có sẵn trong fleet</li>
+          <li><strong>🤝 Đối tác ngoài</strong>: chọn đối tác (Cty Đại Phong, A.Tuấn Cẩu...) + nhập chi phí thuê</li>
+        </ul>
+      </li>
+      <li>Bấm <strong>💾 Lưu nháp</strong> (để đó) hoặc <strong>🚚 Tạo & gửi điều hành</strong> (chuyển status sang Mới)</li>
+    </ol>
+
+    <div class="callout info">
+      <div class="ic">💰</div>
+      <div class="body">
+        <strong>Tính lợi nhuận khi dùng đối tác ngoài</strong>
+        Khi bạn chọn đối tác ngoài và nhập "Chi phí thuê", ô <strong>Lợi nhuận</strong> auto-tính = <em>Cước thu KH - Chi phí thuê</em>. Số xanh = lời, số đỏ = lỗ. Đây là margin thực của NSTT trên đơn đó.
+      </div>
+    </div>
+
+    <h3>Chuyển trạng thái đơn</h3>
+    <p>Có 2 cách:</p>
+    <ul>
+      <li><strong>Cách nhanh</strong>: Click nút <strong>▶</strong> trong cột Hành động → đơn tự nhảy sang trạng thái kế tiếp.</li>
+      <li><strong>Cách qua drawer</strong>: Click row → tab <strong>⚡ Hành động</strong> → nút <strong>▶ Chuyển trạng thái kế tiếp</strong>.</li>
+    </ul>
+    <p>Khi đơn đạt <strong>Đã giao</strong>, hệ thống tự cộng doanh thu cho KH và tăng số đơn của KH lên 1.</p>
+
+    <h3>Hủy đơn</h3>
+    <p>Click nút <strong>🗑</strong> đỏ → confirm → đơn chuyển sang <strong>cancelled</strong>. Không thể hủy đơn đã <em>Đã giao</em> hoặc <em>Đối soát</em>.</p>
+
+    <!-- ========== QUOTES ========== -->
+    <h2 id="quotes">📝 Báo giá</h2>
+    <p>Soạn báo giá nhanh cho nhà hàng khách hỏi giá trước khi đặt đơn. Bản báo giá có hiệu lực 3-7 ngày, sau đó hết hạn nếu KH không chốt.</p>
+
+    <h3>Tạo báo giá</h3>
+    <ol class="step-list">
+      <li>Bấm <strong>+ Báo giá mới</strong> → chọn KH (autocomplete tên / SĐT)</li>
+      <li>Thêm SP từ <strong>Bảng giá hôm nay</strong> — auto fetch giá hiện hành</li>
+      <li>Điều chỉnh giá riêng nếu KH yêu cầu giá ưu đãi (ghi vào ô "Giá báo")</li>
+      <li>Đặt <strong>Hiệu lực đến</strong> (mặc định 7 ngày)</li>
+      <li>Bấm <strong>📤 Gửi báo giá Telegram</strong> hoặc <strong>📋 Copy link share</strong></li>
+    </ol>
+
+    <h3>Chuyển báo giá → Đơn hàng</h3>
+    <p>Khi KH chốt, click nút <strong>➕ Tạo đơn từ báo giá này</strong> trên drawer → toàn bộ SP + giá tự chuyển sang form Đơn hàng, chỉ cần điền địa chỉ giao + lịch ship.</p>
+
+    <!-- ========== RECURRING ========== -->
+    <h2 id="recurring">🔁 Đơn định kỳ</h2>
+    <p>Quản lý KH nhà hàng đặt cố định theo lịch (vd thứ 2-4-6 hàng tuần). Hệ thống tự sinh đơn vào ngày lịch chạy → NV không cần nhập lại 12 lần/tháng.</p>
+
+    <h3>Cấu hình lịch định kỳ</h3>
+    <ol class="step-list">
+      <li>Bấm <strong>+ Đơn định kỳ mới</strong> → chọn KH</li>
+      <li>Chọn lịch chạy: <em>Hằng ngày · Thứ trong tuần (multi-select) · Hằng tháng theo ngày</em></li>
+      <li>Đặt giờ chạy job (mặc định 06:00 — đẩy đơn cho NV xác nhận sáng sớm)</li>
+      <li>Khóa danh sách SP + số lượng cố định (nếu KH đổi thì chỉnh lại lịch)</li>
+      <li>Toggle <strong>Auto-confirm</strong>: tick để đơn tự duyệt, bỏ tick để NV xem lại trước khi chốt</li>
+    </ol>
+
+    <div class="callout tip">
+      <div class="ic">⚡</div>
+      <div class="body">
+        <strong>Ưu điểm đơn định kỳ</strong>
+        KH "Nhà hàng Sen Vàng" đặt rau 12kg/ngày 6 ngày/tuần — bình thường phải tạo 25 đơn/tháng. Với lịch định kỳ, NV chỉ setup 1 lần và hệ thống tự đẩy đơn — tiết kiệm ~30 phút/ngày.
+      </div>
+    </div>
+
+    <!-- ========== LEADS ========== -->
+    <h2 id="leads">🎯 Lead/Tiềm năng</h2>
+    <p>Theo dõi KH tiềm năng (chưa thành KH chính thức) qua các kênh: Facebook, Zalo, gọi đến hotline, đi khảo sát thực địa, giới thiệu...</p>
+
+    <h3>5 trạng thái lead</h3>
+    <table>
+      <thead><tr><th>Status</th><th>Ý nghĩa</th><th>Hành động kế tiếp</th></tr></thead>
+      <tbody>
+        <tr><td>🆕 <strong>Mới</strong></td><td>Vừa thu được info (chưa contact)</td><td>Gọi/nhắn trong 24h</td></tr>
+        <tr><td>📞 <strong>Đã contact</strong></td><td>Đã nói chuyện, đang follow</td><td>Gửi báo giá / lịch khảo sát</td></tr>
+        <tr><td>📅 <strong>Hẹn gặp</strong></td><td>Đã lên lịch gặp / khảo sát</td><td>Đi gặp + chốt nhu cầu</td></tr>
+        <tr><td>✅ <strong>Đã chốt → KH</strong></td><td>Đã chuyển thành KH chính thức</td><td>Lead tự ẩn, sang Customers</td></tr>
+        <tr><td>❌ <strong>Mất lead</strong></td><td>KH từ chối / không có nhu cầu</td><td>Ghi lý do + đóng lead</td></tr>
+      </tbody>
+    </table>
+
+    <h3>Chuyển Lead → KH</h3>
+    <p>Khi lead chốt mua, click <strong>✅ Chuyển thành KH</strong> → form Customer mở sẵn với info lead đã có → bấm <em>Lưu</em> → lead biến mất khỏi Lead, xuất hiện trong Customer với badge "Mới".</p>
+
+    <!-- ========== SHIPPERS ========== -->
+    <h2 id="shippers">🛵 Shipper</h2>
+    <p>Quản lý đội shipper nội bộ giao hàng nội thành Hà Nội. Có thể gán shipper cho từng đơn hàng, theo dõi tiến độ giao, tính lương theo số đơn / quãng đường.</p>
+
+    <h3>Quản lý shipper</h3>
+    <ol class="step-list">
+      <li>Bấm <strong>+ Shipper mới</strong> → điền họ tên, SĐT, biển số xe, khu vực phụ trách</li>
+      <li>Toggle ON/OFF để bật/tắt nhận đơn (ngày shipper nghỉ thì tắt)</li>
+      <li>Xem KPI: số đơn / ngày · doanh thu vận chuyển · tỉ lệ giao thành công</li>
+    </ol>
+
+    <h3>Gán shipper cho đơn</h3>
+    <p>Trong drawer đơn → tab <strong>🚚 Vận chuyển</strong> → chọn shipper từ dropdown (auto loại shipper đang nghỉ / đang full). Đồng thời có thể bấm <strong>📤 Gửi đơn cho Shipper</strong> để bot Telegram tự forward toàn bộ chi tiết đơn vào group shipper.</p>
+
+    <!-- ========== PRODUCTS & PRICE BOARD ========== -->
+    <h2 id="products">🥬 Sản phẩm & Bảng giá ngày</h2>
+    <p>Module trung tâm — nơi quản lý <strong>120+ sản phẩm</strong> (rau ta, rau Đà Lạt, nấm, rau vùng miền, gia vị, rau lá, thịt lợn, thịt gà, thịt bò, hàng khác) và <strong>bảng giá biến động hằng ngày</strong>. Đây là dữ liệu nguồn cho mọi đơn hàng, báo giá, hóa đơn.</p>
+
+    <h3>2 tab chính</h3>
+    <div class="card-grid">
+      <div class="feat-card">
+        <div class="ic">📋</div>
+        <div class="t">Bảng giá hôm nay</div>
+        <div class="d">Grid thoáng + ảnh thumbnail, cột giá nhập / giá bán / chênh lệch (delta vs hôm qua). NV chỉ cần đổi giá → tự lưu vào lịch sử giá theo ngày.</div>
+      </div>
+      <div class="feat-card">
+        <div class="ic">🥬</div>
+        <div class="t">Danh mục sản phẩm</div>
+        <div class="d">CRUD SP đầy đủ: tên VN/EN, ảnh, danh mục, đơn vị tính, nhà cung cấp mặc định, giá gốc tham chiếu, hashtag tìm kiếm.</div>
+      </div>
+    </div>
+
+    <h3>Cập nhật giá hằng ngày</h3>
+    <ol class="step-list">
+      <li>Vào tab <strong>📋 Bảng giá hôm nay</strong></li>
+      <li>Click thẳng vào ô <strong>Giá bán</strong> của SP → gõ số mới → nhấn <kbd>Enter</kbd> hoặc click ra ngoài</li>
+      <li>Hệ thống tự ghi vào <code>priceHistory</code> kèm ngày → mai mở app, app sẽ so sánh với giá hôm nay → hiện badge "+5%" hoặc "-3%"</li>
+      <li>Có thể chọn ngày trong quá khứ để xem lại bảng giá ngày đó (xem chi tiết: giá biến động thế nào)</li>
+    </ol>
+
+    <h3>Thêm sản phẩm hàng loạt</h3>
+    <ul>
+      <li><strong>📥 Excel</strong> — Tải template Excel có sẵn cột (tên VN, tên EN, danh mục, giá bán, đơn vị) → điền → upload → app parse và thêm hàng loạt</li>
+      <li><strong>📷 Từ ảnh AI</strong> — Chụp ảnh catalogue / bảng giá viết tay → upload → AI (Gemini/Claude) đọc và đề xuất SP để thêm, NV chỉ duyệt lại</li>
+      <li><strong>+ Thêm sản phẩm</strong> — Thêm thủ công từng SP với form đầy đủ</li>
+    </ul>
+
+    <!-- ========== PDF EXPORT ========== -->
+    <h2 id="pdf-export">🖨 Xuất PDF bảng giá (gửi nhà hàng)</h2>
+    <p>Tính năng "đinh" của module — sinh file PDF bảng giá đẹp như catalogue chuyên nghiệp để gửi nhà hàng. Tự nhúng 120 ảnh base64 vào HTML, in PDF chuẩn 8 trang A4.</p>
+
+    <h3>Cách xuất PDF</h3>
+    <ol class="step-list">
+      <li>Vào <strong>Sản phẩm → 📋 Bảng giá hôm nay</strong></li>
+      <li>Bấm nút <strong>🖨 Xuất PDF</strong> ở thanh trên</li>
+      <li>App mở cửa sổ popup mới, hiện toast <em>"Đang decode ảnh X/120…"</em> — đợi ~3-5s</li>
+      <li>Khi decode xong, Print dialog của Chrome tự mở</li>
+      <li>Trong Print dialog: chọn <strong>Save as PDF</strong>, tick <strong>"Background graphics"</strong> để giữ màu nền</li>
+      <li>Lưu file → có PDF bảng giá 8 trang để gửi mail/Zalo nhà hàng</li>
+    </ol>
+
+    <div class="callout tip">
+      <div class="ic">📐</div>
+      <div class="body">
+        <strong>Layout PDF tối ưu B2B</strong>
+        Grid <strong>6 cột × 4 hàng = 24 SP/trang</strong>. 120 SP gói gọn 5-6 trang nội dung + 1 trang intro/VAT + 1 trang footer = 8 trang A4 in 2 mặt = 4 tờ giấy. Header xanh có MST + hiệu lực ngày, footer có hotline + địa chỉ.
+      </div>
+    </div>
+
+    <h3>Xuất HTML self-contained</h3>
+    <p>Ngoài PDF, có thể bấm <strong>📤 Gửi Telegram</strong> hoặc <strong>💾 Tải HTML</strong> để có file HTML offline (~3.8MB) — nhà hàng mở bằng Chrome xem được ngay cả khi không có internet, có ô tìm kiếm SP và nav nhảy danh mục.</p>
+
+    <!-- ========== TELEGRAM AUTO-SEND ========== -->
+    <h2 id="telegram">✈️ Telegram đa kênh + Auto-send bảng giá</h2>
+    <p>Cấu hình <strong>4 kênh Telegram</strong> riêng biệt cho 4 mục đích — tránh trộn lẫn thông báo gây nhiễu.</p>
+
+    <h3>4 kênh Telegram</h3>
+    <table>
+      <thead><tr><th>Mục đích</th><th>Nhận thông báo gì</th><th>Khuyến nghị group/chat</th></tr></thead>
+      <tbody>
+        <tr><td>📊 <strong>Báo cáo ngày</strong></td><td>Tổng kết doanh thu + đơn + công nợ cuối ngày</td><td>Group ban GĐ (chỉ sếp xem)</td></tr>
+        <tr><td>🚚 <strong>Phân đơn Shipper</strong></td><td>Đơn mới + địa chỉ giao + SP cần đóng</td><td>Group shipper toàn đội</td></tr>
+        <tr><td>🥬 <strong>Cập nhật bảng giá</strong></td><td>File PDF/HTML bảng giá ngày tự gửi cho KH</td><td>Group nhà hàng VIP / 1-1 với KH</td></tr>
+        <tr><td>⚠️ <strong>Cảnh báo nội bộ</strong></td><td>Lỗi hệ thống, công nợ quá hạn, KH ngừng đặt</td><td>Admin chat (chủ DN)</td></tr>
+      </tbody>
+    </table>
+
+    <h3>Cấu hình kênh</h3>
+    <ol class="step-list">
+      <li>Vào <strong>Cài đặt → Telegram Bot</strong></li>
+      <li>Tạo bot mới với <a href="https://t.me/BotFather" target="_blank">@BotFather</a> → lấy Bot Token (có hướng dẫn ❓)</li>
+      <li>Cho mỗi mục đích trong 4 mục đích trên: nhập Bot Token + Chat ID + tên kênh</li>
+      <li>Bấm <strong>🔌 Test</strong> để gửi tin nhắn thử — kiểm tra Telegram nhận được không</li>
+      <li>Lưu cấu hình → các module trong app tự dùng đúng kênh</li>
+    </ol>
+
+    <h3>🤖 Auto-send bảng giá hằng ngày (smart price-diff)</h3>
+    <p>Tính năng mới giúp NV không phải nhớ gửi bảng giá hằng ngày cho nhà hàng. Có <strong>logic thông minh</strong>: chỉ gửi khi giá thực sự thay đổi vs hôm trước.</p>
+
+    <ol class="step-list">
+      <li>Vào <strong>Sản phẩm → 📋 Bảng giá hôm nay</strong></li>
+      <li>Bấm nút <strong>🤖 Auto hằng ngày</strong> → mở modal cấu hình</li>
+      <li>Tick <strong>Bật tự động</strong> → đặt giờ gửi (vd 08:00 sáng)</li>
+      <li>Chọn kênh: <strong>Cập nhật bảng giá</strong> (đã cấu hình ở Settings)</li>
+      <li>Lưu → mỗi sáng 08:00, hệ thống auto check giá hôm nay vs hôm qua:</li>
+    </ol>
+
+    <div class="flow">
+      <span class="step-box ok">08:00 giờ chạy</span>
+      <span class="arrow">→</span>
+      <span class="step-box">So sánh giá hôm nay vs hôm qua</span>
+      <span class="arrow">→</span>
+      <span class="step-box danger">Có ≥1 SP đổi giá?</span>
+      <span class="arrow">↓</span>
+      <span class="step-box ok">CÓ: gửi PDF + tóm tắt SP đổi giá lên Telegram</span>
+      <span class="step-box">KHÔNG: bỏ qua (không gửi)</span>
+    </div>
+
+    <div class="callout success">
+      <div class="ic">🧠</div>
+      <div class="body">
+        <strong>Vì sao smart skip?</strong>
+        Tránh spam nhà hàng. Nếu hôm nay giá giống hôm qua (chưa cập nhật) → không gửi, để khách không bị lờn. Khi NV cập nhật giá thực → tin mới có giá trị thực sự → khách mở xem ngay.
+      </div>
+    </div>
+
+    <h3>Test thủ công</h3>
+    <ul>
+      <li><strong>📤 Gửi ngay (nếu đổi)</strong>: trigger ngay logic so sánh + gửi — dùng khi cần test</li>
+      <li><strong>🔍 So sánh giá</strong>: mở modal xem diff không gửi — kiểm tra tay xem có bao nhiêu SP đổi giá hôm nay</li>
+    </ul>
+
+    <!-- ========== INVENTORY ========== -->
+    <h2 id="inventory">📥 Kho / Tồn</h2>
+    <p>Theo dõi tồn kho từng SP theo lô. Mỗi lần nhập hàng từ nhà cung cấp → cộng tồn; mỗi lần đóng đơn giao KH → trừ tồn.</p>
+
+    <h3>3 chỉ báo cảnh báo</h3>
+    <ul>
+      <li><strong>🔴 Hết hàng</strong> — Tồn = 0, không nhận đơn được</li>
+      <li><strong>🟡 Sắp hết</strong> — Tồn dưới ngưỡng cảnh báo (mặc định 5kg)</li>
+      <li><strong>🟢 Đủ</strong> — Tồn an toàn</li>
+    </ul>
+    <p>Vào Settings → Master data → SP để chỉnh ngưỡng cảnh báo riêng từng SP (vd thịt cấp đông ngưỡng cao hơn rau lá tươi).</p>
+
+    <!-- ========== SUPPLIERS ========== -->
+    <h2 id="suppliers">🏭 Nhà cung cấp</h2>
+    <p>Danh sách <strong>NCC nông sản</strong>: nông trại rau Đà Lạt, vựa thịt heo, vựa cá... Mỗi NCC có info liên hệ, danh sách SP cung ứng + giá nhập gần nhất, chính sách công nợ.</p>
+
+    <h3>Tính năng chính</h3>
+    <ul>
+      <li>+ Thêm NCC: tên, mã NCC (NCC001…), SĐT, địa chỉ, MST (nếu có), danh sách SP cung ứng</li>
+      <li>Lịch sử nhập: xem các phiếu nhập với NCC này, tổng tiền, công nợ phải trả</li>
+      <li>So sánh giá NCC: cùng 1 SP có thể nhập từ 2-3 NCC khác nhau, app hiện giá gần nhất từng NCC để chọn NCC rẻ nhất</li>
+    </ul>
+
+    <!-- ========== PURCHASES ========== -->
+    <h2 id="purchases">📦 Phiếu nhập</h2>
+    <p>Ghi phiếu nhập hàng từ NCC. Mỗi phiếu cộng tồn kho + tạo công nợ phải trả (nếu nhập trả chậm).</p>
+
+    <h3>Tạo phiếu nhập</h3>
+    <ol class="step-list">
+      <li>Bấm <strong>+ Phiếu nhập</strong> → chọn NCC</li>
+      <li>Thêm SP nhập: chọn SP, gõ số lượng, giá nhập (auto fill giá nhập gần nhất)</li>
+      <li>Chọn hình thức TT: <em>Trả ngay (tiền mặt / CK)</em> hoặc <em>Công nợ N ngày</em></li>
+      <li>Lưu phiếu → tồn kho cộng ngay, công nợ ghi sổ (nếu trả chậm)</li>
+    </ol>
+
+    <!-- ========== RETURNS ========== -->
+    <h2 id="returns">↩️ Trả hàng</h2>
+    <p>Xử lý đơn KH trả hàng (hàng kém chất lượng, sai SP, ướp đá hỏng...). Trừ doanh thu + cộng lại tồn kho (nếu còn dùng được).</p>
+
+    <h3>Quy trình</h3>
+    <ol>
+      <li>Bấm <strong>+ Phiếu trả hàng</strong> → chọn đơn gốc</li>
+      <li>Chọn SP trả + số lượng → ghi lý do (hỏng / sai / KH đổi ý)</li>
+      <li>Chọn xử lý: <em>Hoàn tiền KH</em> · <em>Đổi SP khác</em> · <em>Bù vào đơn sau</em></li>
+      <li>Lưu → app trừ doanh thu KH + xử lý kho (cộng lại / loại bỏ)</li>
+    </ol>
+
+    <!-- ========== ACCOUNTING ========== -->
+    <h2 id="accounting">💰 Kế toán</h2>
+    <p>Sổ quỹ tiền mặt + 5 tài khoản ngân hàng/ví. Mọi phiếu thu/chi đều ghi vào đây và <strong>tự cập nhật số dư</strong>.</p>
+
+    <h3>Tạo phiếu thu / chi</h3>
+    <ol class="step-list">
+      <li>Bấm <strong>+ Phiếu thu</strong> hoặc <strong>- Phiếu chi</strong> ở topbar</li>
+      <li>Số phiếu tự sinh (PT-XXXXXX cho thu, PC-XXXXXX cho chi)</li>
+      <li>Nhập đối tượng (KH/NV/đối tác)</li>
+      <li>Chọn TK nhận/chi tiền (tiền mặt, Vietcombank, MB Bank, MoMo...)</li>
+      <li>Nhập số tiền + diễn giải</li>
+      <li>Có thể link đến mã đơn (NSTT-XXXXXX)</li>
+      <li><strong>Lưu</strong> → tự ghi sổ quỹ + cập nhật số dư TK</li>
+    </ol>
+
+    <h3>Cấu hình tài khoản thanh toán</h3>
+    <p>Bấm <strong>⚙ Cài đặt TK</strong> ở topbar → modal hiện 6 TK mặc định:</p>
+    <ul>
+      <li>💵 Quỹ tiền mặt văn phòng</li>
+      <li>🏦 Vietcombank · 1021xxxxxx</li>
+      <li>🏦 MB Bank · 0312xxxxxx</li>
+      <li>🏦 Techcombank · 1903xxxxxx</li>
+      <li>📱 MoMo · 0903 111 222</li>
+      <li>📱 ViettelPay · 0903 111 222</li>
+    </ul>
+    <p>Có thể <strong>thêm/sửa/xóa/bật-tắt</strong> từng TK. TK tắt sẽ không xuất hiện trong dropdown khi tạo phiếu thu/chi.</p>
+
+    <!-- ========== DEBT ========== -->
+    <h2 id="debt">📉 Công nợ</h2>
+    <p>Module quan trọng nhất cho dòng tiền. Theo dõi <strong>tuổi nợ</strong> (aging) và <strong>nhắc nợ</strong> tự động.</p>
+
+    <h3>Phân loại tuổi nợ (Aging)</h3>
+    <table>
+      <thead><tr><th>Bucket</th><th>Ý nghĩa</th><th>Hành động</th></tr></thead>
+      <tbody>
+        <tr><td><strong style="color:#15803D">🟢 Trong hạn (0-30d)</strong></td><td>KH còn trong điều khoản TT</td><td>Theo dõi thường, không cần nhắc</td></tr>
+        <tr><td><strong style="color:#1E40AF">🔵 31-60 ngày</strong></td><td>Bắt đầu chậm</td><td>Nhắc nhẹ qua Zalo</td></tr>
+        <tr><td><strong style="color:#B45309">🟡 61-90 ngày</strong></td><td>Cảnh báo</td><td>Gọi điện, gửi văn bản</td></tr>
+        <tr><td><strong style="color:#EA580C">🟠 &gt; 90 ngày</strong></td><td>Nguy cơ cao</td><td>Cấp lãnh đạo can thiệp</td></tr>
+        <tr><td><strong style="color:#B91C1C">🔴 Khó đòi</strong></td><td>Có nguy cơ mất</td><td>Chuyển bộ phận pháp lý</td></tr>
+      </tbody>
+    </table>
+
+    <h3>Phiếu thu nợ (chuẩn pháp lý)</h3>
+    <ol class="step-list">
+      <li>Click nút <strong>💵</strong> trên row KH → modal phiếu thu mở</li>
+      <li>Hệ thống hiện <strong>danh sách HĐ chưa TT</strong> của KH → tick HĐ nào áp dụng phiếu thu</li>
+      <li>Số tiền thu tự cộng theo HĐ tick. Có thể sửa.</li>
+      <li>Chọn TK nhận tiền (mặc định Tiền mặt)</li>
+      <li>Tick <strong>"Mở phiếu thu để in"</strong> nếu cần in giấy</li>
+      <li>Bấm <strong>💾 Lưu phiếu thu</strong></li>
+    </ol>
+
+    <p>Lúc lưu, hệ thống <strong>đồng thời làm 4 việc</strong>:</p>
+    <ol>
+      <li>✅ Giảm <code>debt</code> của KH</li>
+      <li>✅ Đánh dấu HĐ tương ứng = <code>paid</code></li>
+      <li>✅ Ghi phiếu thu vào Sổ quỹ Kế toán</li>
+      <li>✅ Tăng số dư TK nhận tiền</li>
+    </ol>
+
+    <h3>In phiếu thu</h3>
+    <p>Sau khi tick "Mở phiếu thu để in", cửa sổ in tự mở với layout chuẩn:</p>
+    <ul>
+      <li>Logo NSTT + thông tin DN (đọc từ Settings)</li>
+      <li>Số phiếu, ngày, KH, SĐT</li>
+      <li>Số tiền nổi bật + <strong>số tiền bằng chữ tự động</strong> ("Hai mươi hai triệu đồng chẵn")</li>
+      <li>Danh sách HĐ áp dụng</li>
+      <li>3 cột chữ ký: Người nộp · Kế toán · Thủ quỹ</li>
+    </ul>
+
+    <h3>Nhắc nợ cá nhân</h3>
+    <ol class="step-list">
+      <li>Click row KH → mở Phiếu nhắc nợ</li>
+      <li>Chọn kênh: 📞 Gọi · 💬 Zalo · 📱 SMS · 📧 Email · 🚶 Đến tận nơi</li>
+      <li>Chọn mức độ: 🟢 Nhẹ / 🟡 Trung / 🔴 Cảnh báo mạnh</li>
+      <li>Dùng <strong>3 nút mẫu</strong> để auto-fill nội dung (tự điền tên KH + số nợ)</li>
+      <li>Ghi nhận <strong>phản hồi của khách</strong>: Hứa TT / Đã TT / Xin gia hạn / Đưa lý do / Không bắt máy / Từ chối</li>
+      <li>Bấm <strong>📝 Lưu phiếu nhắc</strong> → tự mở app liên hệ (Zalo/Phone)</li>
+    </ol>
+
+    <h3>Nhắc nợ hàng loạt</h3>
+    <p>Nút <strong>📧 Nhắc nợ hàng loạt</strong> ở topbar:</p>
+    <ol class="step-list">
+      <li>Modal hiện danh sách KH nợ, <strong>tự tick KH quá hạn</strong></li>
+      <li>Chọn kênh gửi (Zalo OA / SMS / Email / Telegram)</li>
+      <li>Chọn mức độ → template tự đổi</li>
+      <li>Template có biến: <code>{name}</code>, <code>{debt}</code>, <code>{days}</code> tự thay thế</li>
+      <li>3 nút nhanh: Chọn tất cả / Bỏ chọn / Chỉ quá hạn</li>
+      <li>Bấm <strong>👁 Xem trước</strong> để xem tin của KH đầu tiên</li>
+      <li>Bấm <strong>📤 Gửi nhắc nợ</strong> → log toàn bộ vào history</li>
+    </ol>
+
+    <!-- ========== INVOICES ========== -->
+    <h2 id="invoices">🧾 Hóa đơn VAT</h2>
+    <p>Phát hành hóa đơn điện tử theo <strong>Nghị định 123/2020</strong> và <strong>Thông tư 78/2021</strong> + đối chiếu với Cơ quan Thuế.</p>
+
+    <h3>4 trạng thái HĐ</h3>
+    <ul>
+      <li>📝 <strong>Nháp</strong>: Chưa phát hành, chỉ lưu trong app</li>
+      <li>⏳ <strong>Chờ TT</strong>: Đã phát hành CQT, KH chưa thanh toán</li>
+      <li>✓ <strong>Đã TT</strong>: KH đã thanh toán</li>
+      <li>⚠ <strong>Quá hạn</strong>: Vượt thời gian thanh toán cam kết</li>
+    </ul>
+
+    <h3>Tạo HĐ mới</h3>
+    <ol class="step-list">
+      <li>Bấm <strong>+ Xuất HĐ</strong> góc phải</li>
+      <li>Chọn KH B2B từ dropdown → MST tự fill</li>
+      <li>Nhập diễn giải (VD: "Cước vận chuyển tháng 5/2026")</li>
+      <li>Nhập tiền hàng + chọn VAT (10%/8%/5%/0%)</li>
+      <li><strong>VAT và Tổng cộng auto-tính</strong></li>
+      <li>Bấm <strong>💾 Lưu nháp</strong> hoặc <strong>🚀 Phát hành</strong></li>
+    </ol>
+
+    <p>Khi <strong>Phát hành</strong>: hệ thống sinh số HĐ thật (VD: <code>1C25T-0043</code>) + mã CQT (<code>M-123456789</code>) + status pending.</p>
+
+    <h3>In hóa đơn</h3>
+    <p>Bấm <strong>🖨</strong> trên row HĐ → cửa sổ in mở với layout chuẩn HĐ VAT VN:</p>
+    <ul>
+      <li>Mẫu số <strong>1/001</strong> · Ký hiệu <strong>1C25TVT</strong></li>
+      <li>Mã CQT (tra cứu được tại <code>tracuuhoadon.gdt.gov.vn</code>)</li>
+      <li>Box "Bên bán" (đỏ) + "Bên mua" (xanh) đầy đủ MST</li>
+      <li>Bảng hàng hóa STT/Tên/ĐVT/SL/Đơn giá/Thành tiền</li>
+      <li>Tiền hàng + VAT + <strong>Tổng thanh toán</strong></li>
+      <li>Số tiền bằng chữ + 2 cột chữ ký</li>
+    </ul>
+
+    <h3>Đối chiếu CQT</h3>
+    <p>Nút <strong>🔄 Đối chiếu CQT</strong> topbar mở modal so sánh HĐ trên NSTT với Tổng cục Thuế:</p>
+    <ul>
+      <li>4 KPI: Tổng HĐ phát hành · Đã đồng bộ · Chờ · Lỗi</li>
+      <li>Tổng giá trị tháng: Tiền hàng / VAT phải nộp / Tổng</li>
+      <li>Bảng chi tiết 15 HĐ với status đồng bộ</li>
+      <li>Nút <strong>🔄 Đồng bộ lại CQT</strong> nếu có lỗi</li>
+      <li>Nút <strong>⬇ Xuất báo cáo CQT</strong> → file CSV chuẩn để nộp BCTC</li>
+    </ul>
+
+    <div class="callout danger">
+      <div class="ic">⚖️</div>
+      <div class="body">
+        <strong>Theo NĐ 123/2020 + TT 78/2021</strong>
+        BẮT BUỘC dùng HĐ điện tử từ 01/07/2022 với mọi DN. Không thể dùng HĐ giấy. NSTT cần đăng ký với nhà cung cấp HĐĐT (VNPT-Invoice/Misa/EFY) — xem hướng dẫn ở Settings → Tích hợp → Hóa đơn điện tử.
+      </div>
+    </div>
+
+    <!-- ========== STAFF ========== -->
+    <h2 id="staff">🧑‍💼 Nhân viên</h2>
+    <p>Quản lý NV nội bộ với phân quyền 9 module. Chỉ <strong>Chủ DN</strong> truy cập được trang này.</p>
+
+    <h3>Thêm NV mới</h3>
+    <ol class="step-list">
+      <li>Bấm <strong>+ Thêm NV</strong> góc phải</li>
+      <li>Mã NV tự sinh (NV010, NV011...)</li>
+      <li>Điền họ tên, SĐT, email, lương cơ bản</li>
+      <li>Chọn phòng ban: Ban GĐ · Sales · CSKH · Kế toán · Vận hành</li>
+      <li><strong>Tick các module cấp quyền</strong>: 9 checkbox cho 9 module</li>
+      <li>Bấm <strong>💾 Lưu NV</strong></li>
+    </ol>
+
+    <h3>9 quyền module (chọn cấp cho NV)</h3>
+    <table>
+      <thead><tr><th>Quyền</th><th>Cho phép vào module</th></tr></thead>
+      <tbody>
+        <tr><td><strong>Dashboard</strong></td><td>Trang chủ tổng quan KPI</td></tr>
+        <tr><td><strong>Đơn hàng</strong></td><td>Tạo, sửa, chuyển trạng thái đơn</td></tr>
+        <tr><td><strong>Khách hàng</strong></td><td>CRUD khách hàng, ghi note</td></tr>
+        <tr><td><strong>Kế toán</strong></td><td>Sổ quỹ, phiếu thu/chi, cài đặt TK</td></tr>
+        <tr><td><strong>Công nợ</strong></td><td>Theo dõi và nhắc nợ KH</td></tr>
+        <tr><td><strong>Hóa đơn</strong></td><td>Xuất HĐ VAT, đối chiếu CQT</td></tr>
+        <tr><td><strong>Nhân viên</strong></td><td>Quản lý NV khác (admin only)</td></tr>
+        <tr><td><strong>Báo cáo</strong></td><td>Xem báo cáo + xuất Excel</td></tr>
+      </tbody>
+    </table>
+
+    <h3>Tắt / bật tài khoản</h3>
+    <p>Click nút <strong>⏸ / ▶</strong> ở row NV → toggle giữa <em>Đi làm</em> và <em>Nghỉ</em>. NV "Nghỉ" không đăng nhập được.</p>
+
+    <!-- ========== REPORTS ========== -->
+    <h2 id="reports">📈 Báo cáo &amp; Phân tích</h2>
+    <p>Module quan trọng cho ra quyết định. 5 tab báo cáo + filter động + xuất Excel.</p>
+
+    <h3>5 tab báo cáo</h3>
+    <ol>
+      <li><strong>💰 Doanh thu</strong>: KPI + chart 12 tháng + pie cơ cấu dịch vụ + top 5 KH</li>
+      <li><strong>👥 Khách hàng</strong>: Phân loại theo nguồn, tỉ lệ giữ chân, CLV/CAC</li>
+      <li><strong>🗺 Tuyến đường</strong>: Top 8 tuyến doanh thu, lợi nhuận, margin</li>
+      <li><strong>💰 Công nợ</strong>: Aging chart + Top debtors + theo NV PT + lịch sử nhắc</li>
+    </ol>
+
+    <h3>Filter tùy chỉnh</h3>
+    <p>Bấm <strong>🔍 Bộ lọc tùy chỉnh</strong> mở panel filter:</p>
+    <ul>
+      <li><strong>📅 Khoảng thời gian</strong>: 8 lựa chọn (hôm nay / tuần / tháng / quý / năm / <em>tùy chỉnh từ-đến</em>)</li>
+      <li><strong>👥 Khách hàng</strong>: Multi-select KH cần xem</li>
+      <li><strong>🚚 Dịch vụ</strong>: Lọc 1 hoặc nhiều dịch vụ</li>
+      <li><strong>🛣 Phương thức VC</strong> · <strong>👤 NV PT</strong> · <strong>🚛 Loại xe</strong> · <strong>🚥 Trạng thái</strong></li>
+      <li><strong>📊 9 chỉ số hiển thị</strong>: Tick để bật/tắt KPI cards</li>
+    </ul>
+
+    <p>Bấm <strong>🔍 Áp dụng lọc</strong> → KPI cards + bảng tự update theo filter.</p>
+    <p>Bấm <strong>💾 Lưu preset</strong> để dùng lại bộ lọc sau (đặt tên VD "BC tháng VIP").</p>
+
+    <h3>Xuất Excel + In</h3>
+    <ul>
+      <li><strong>⬇ Xuất Excel</strong>: tải file CSV với 13 cột (mã đơn, ngày, KH, dịch vụ, tuyến, cước, COD, status, NV, tài xế, xe, đối tác, LN)</li>
+      <li><strong>🖨 In</strong>: in trang báo cáo hiện tại (đã có @media print style)</li>
+    </ul>
+
+    <!-- ========== ADSPEND ========== -->
+    <h2 id="adspend">📣 Chi phí Ads</h2>
+    <p>Ghi nhận chi tiêu quảng cáo (Facebook Ads, Google Ads, Zalo Ads) — đối chiếu với số KH/lead thu được để tính <strong>CAC</strong> (chi phí có 1 KH).</p>
+
+    <h3>Tính năng</h3>
+    <ul>
+      <li>Nhập tay: tên chiến dịch, kênh, ngân sách, lead, conversion</li>
+      <li>Tự tính CAC = Chi phí ÷ Số KH mới</li>
+      <li>Cảnh báo trên Dashboard: ngày tiêu vượt 800k chưa có lead</li>
+      <li>Biểu đồ ROI theo tháng</li>
+    </ul>
+
+    <!-- ========== PAYROLL ========== -->
+    <h2 id="payroll">📅 Chấm công & Lương</h2>
+    <p>Chấm công ngày + tính lương cuối tháng cho NV nội bộ.</p>
+
+    <h3>Quy trình</h3>
+    <ol>
+      <li>Mỗi NV vào app → bấm <strong>📍 Check-in sáng / Check-out chiều</strong></li>
+      <li>Cuối tháng, kế toán vào module → bấm <strong>Tổng kết tháng [MM/YYYY]</strong></li>
+      <li>App tính: <em>Lương cơ bản × (Ngày công / Tổng ngày làm việc) + Phụ cấp - Trừ phép</em></li>
+      <li>Xuất bảng lương PDF + ghi phiếu chi vào Kế toán</li>
+    </ol>
+
+    <!-- ========== MARKETING ========== -->
+    <h2 id="marketing">📨 Email/Zalo blast</h2>
+    <p>Gửi tin nhắn / email hàng loạt cho danh sách KH có chọn lọc — ưu đãi, thông báo, lịch lễ Tết.</p>
+
+    <h3>Tạo chiến dịch blast</h3>
+    <ol class="step-list">
+      <li>Bấm <strong>+ Chiến dịch mới</strong> → đặt tên (vd "Khuyến mãi Tết 2026")</li>
+      <li>Chọn kênh: <em>Email · Zalo · Telegram · SMS</em></li>
+      <li>Lọc đối tượng: <em>Tất cả · VIP · Theo nhóm · Theo tuyến · Đã ngừng đặt > 14 ngày...</em></li>
+      <li>Soạn tin (có template có sẵn) + chèn biến cá nhân hóa <code>{{tên_KH}}</code>, <code>{{đơn_gần_nhất}}</code></li>
+      <li>Preview thử 1-2 mẫu trước khi bắn → bấm <strong>🚀 Gửi blast</strong></li>
+    </ol>
+
+    <!-- ========== AUDIT ========== -->
+    <h2 id="audit">📋 Nhật ký hệ thống</h2>
+    <p>Audit log mọi hành động quan trọng — xem ai đã làm gì lúc nào. Phòng chống NV xóa nhầm/sửa nhầm data.</p>
+
+    <h3>Loại sự kiện ghi log</h3>
+    <ul>
+      <li>📦 Tạo / sửa / hủy đơn hàng</li>
+      <li>👥 Tạo / sửa / xóa KH</li>
+      <li>💰 Phiếu thu / chi</li>
+      <li>🔐 Đăng nhập / đăng xuất</li>
+      <li>⚙️ Đổi cấu hình (Master data, tích hợp, sao lưu)</li>
+      <li>🖨 Xuất PDF bảng giá, gửi Telegram</li>
+    </ul>
+    <p>Có filter theo NV, thời gian, loại sự kiện. Click vào log → xem chi tiết: ai, lúc nào, thay đổi gì (before/after).</p>
+
+    <!-- ========== AI FEATURES ========== -->
+    <h2 id="ai-features">🤖 AI Form Filler — Trợ lý nhận đơn</h2>
+    <p>Tính năng "đắt giá" — NV không cần gõ form, chỉ <strong>forward chat KH</strong> (text / ảnh / voice) cho bot → AI tự đọc và điền đầy đủ form đơn hàng.</p>
+
+    <h3>3 nguồn AI hỗ trợ</h3>
+    <table>
+      <thead><tr><th>Provider</th><th>Model khuyến nghị</th><th>Chi phí</th></tr></thead>
+      <tbody>
+        <tr><td>Google Gemini</td><td>gemini-2.0-flash</td><td>FREE 1500 RPD (đủ NSTT)</td></tr>
+        <tr><td>Anthropic Claude</td><td>claude-haiku-4.5</td><td>~50đ/đơn parse</td></tr>
+        <tr><td>OpenAI</td><td>gpt-4o-mini</td><td>~80đ/đơn parse</td></tr>
+      </tbody>
+    </table>
+
+    <h3>Cấu hình + Sử dụng</h3>
+    <ol class="step-list">
+      <li>Vào <strong>Cài đặt → Tích hợp → AI Form Filler</strong></li>
+      <li>Chọn provider + nhập API key (có ❓ hướng dẫn cách lấy)</li>
+      <li>Bấm <strong>🔌 Test</strong> để thử AI có chạy không</li>
+      <li>Vào trang Đơn hàng → bấm <strong>🤖 Tạo đơn từ AI</strong> → paste chat KH</li>
+      <li>AI đọc + điền form (tên KH, SĐT, địa chỉ, SP, số lượng, lịch giao)</li>
+      <li>NV chỉ check lại + lưu → tiết kiệm ~3-5 phút/đơn</li>
+    </ol>
+
+    <h3>Bonus: đọc ảnh menu / bảng giá</h3>
+    <p>Trong module Sản phẩm → bấm <strong>📷 Từ ảnh AI</strong> → upload ảnh menu / catalog / bảng giá viết tay → AI đọc và đề xuất SP để thêm. Hữu ích khi nhận mới catalog NCC.</p>
+
+    <!-- ========== SETTINGS ========== -->
+    <h2 id="settings">⚙️ Cài đặt</h2>
+    <p>Trung tâm cấu hình toàn app. 6 mục sub-nav bên trái.</p>
+
+    <h3>🏢 Thông tin doanh nghiệp</h3>
+    <p>Thông tin pháp lý sẽ in trên HĐ + Hợp đồng:</p>
+    <ul>
+      <li>Tên DN · Tên rút gọn · MST · Số ĐKKD</li>
+      <li>Địa chỉ trụ sở · Hotline · Email · Website</li>
+      <li>Ngân hàng chính · Slogan</li>
+      <li><strong>Logo</strong>: Upload PNG/SVG (max 500KB) → áp dụng toàn app</li>
+    </ul>
+
+    <h3>📋 Master data — Trung tâm dữ liệu nền</h3>
+    <p>Quản lý 10 danh sách dropdown trong app. Sửa 1 chỗ áp dụng toàn app.</p>
+    <table>
+      <thead><tr><th>Danh mục</th><th>Dùng cho</th></tr></thead>
+      <tbody>
+        <tr><td>👤 Loại KH</td><td>B2B (DN) / B2C (cá nhân)</td></tr>
+        <tr><td>⭐ Nhóm KH</td><td>VIP / Thường / Mới / Inactive</td></tr>
+        <tr><td>📞 Nguồn KH</td><td>Giới thiệu / Web / Facebook / Zalo / Sales chủ động</td></tr>
+        <tr><td>🚚 Dịch vụ</td><td>6 dịch vụ NSTT</td></tr>
+        <tr><td>🛣 PT vận chuyển</td><td>Đường bộ / thủy / sắt</td></tr>
+        <tr><td>📦 Đơn vị tính</td><td>Thùng / Kiện / Pallet / Kg / Container...</td></tr>
+        <tr><td>💳 Hình thức TT</td><td>Người gửi/nhận trả / Công nợ</td></tr>
+        <tr><td>📍 Tỉnh / TP</td><td>18 tỉnh thành</td></tr>
+        <tr><td>🏢 Phòng ban</td><td>Cho thêm NV</td></tr>
+        <tr><td>🚛 Loại xe</td><td>1.5T / 2.5T / 3.5T / 5T / cẩu / đông lạnh</td></tr>
+      </tbody>
+    </table>
+
+    <h3>🔌 Tích hợp bên ngoài (8 tích hợp)</h3>
+    <p>Mỗi tích hợp có toggle ON/OFF, nút ⚙ cấu hình, nút ❓ hướng dẫn, nút 🔌 test kết nối:</p>
+    <ol>
+      <li>✈️ <strong>Telegram Bot</strong> — Thông báo nội bộ + AI parse chat</li>
+      <li>💬 <strong>Zalo OA</strong> — Nhận đơn từ chat Zalo (cần xác minh DN)</li>
+      <li>🤖 <strong>AI Form Filler</strong> — Claude/Gemini/OpenAI parse chat thành đơn</li>
+      <li>🧾 <strong>Hóa đơn điện tử</strong> — VNPT/Misa/EFY/Viettel SInvoice</li>
+      <li>📊 <strong>Google Sheets</strong> — Đồng bộ doanh thu cho kế toán xem</li>
+      <li>🗺 <strong>Google Maps</strong> — GPS tracking xe</li>
+      <li>📱 <strong>SMS Brand Name</strong> — Gửi SMS từ tên DN</li>
+      <li>📧 <strong>Email SMTP</strong> — Gửi HĐ + báo cáo tự động</li>
+    </ol>
+
+    <h3>✈️ Telegram Bot</h3>
+    <p>Tab riêng để cấu hình bot Telegram:</p>
+    <ul>
+      <li><strong>Tính năng 1 — AI điền form</strong>: NV forward chat khách (text/ảnh OCR/voice) vào bot → AI tạo đơn nháp</li>
+      <li><strong>Tính năng 2 — Báo cáo cuối ngày tự động</strong>: Bot gửi tóm tắt số liệu lên group nội bộ vào giờ định trước (vd 18:30)</li>
+    </ul>
+    <p>Mỗi trường (Bot Token, Group Chat ID, Admin Chat ID, API Key) đều có nút <strong>❓</strong> hướng dẫn chi tiết từng bước cách lấy.</p>
+
+    <h3>🔒 Bảo mật</h3>
+    <ul>
+      <li>Đổi mật khẩu (Mật khẩu hiện tại → Mật khẩu mới → Xác nhận)</li>
+      <li>Bật 2FA với Google Authenticator</li>
+      <li>Xem lịch sử đăng nhập 10 lần gần nhất</li>
+    </ul>
+
+    <h3>💾 Sao lưu</h3>
+    <ul>
+      <li><strong>⬇ Xuất toàn bộ dữ liệu (JSON)</strong>: tải file backup chứa 9 collections data</li>
+      <li><strong>📥 Phục hồi từ file JSON</strong>: import backup, ghi đè data hiện tại</li>
+      <li><strong>⚠️ Reset từng module / TẤT CẢ</strong>: xóa data về mặc định</li>
+    </ul>
+
+    <div class="callout warn">
+      <div class="ic">💾</div>
+      <div class="body">
+        <strong>Backup định kỳ</strong>
+        Vào Settings → Sao lưu → bấm <strong>⬇ Xuất toàn bộ dữ liệu</strong> mỗi tuần 1 lần. Lưu file vào Google Drive hoặc USB ngoài. Tránh mất data nếu localStorage trình duyệt bị clear.
+      </div>
+    </div>
+
+    <!-- ========== SHORTCUTS ========== -->
+    <h2 id="shortcuts">⌨️ Phím tắt &amp; Mẹo</h2>
+
+    <h3>Phím tắt toàn cục</h3>
+    <table>
+      <thead><tr><th>Phím</th><th>Tác dụng</th></tr></thead>
+      <tbody>
+        <tr><td><kbd>Ctrl</kbd> + <kbd>K</kbd></td><td>Focus thanh tìm kiếm toàn cục</td></tr>
+        <tr><td><kbd>Esc</kbd></td><td>Đóng drawer / modal đang mở</td></tr>
+        <tr><td><kbd>Ctrl</kbd> + <kbd>P</kbd></td><td>In trang hiện tại (cho báo cáo, phiếu thu, HĐ)</td></tr>
+        <tr><td><kbd>F5</kbd></td><td>Refresh trang (data localStorage vẫn còn)</td></tr>
+        <tr><td><kbd>F11</kbd></td><td>Toàn màn hình (full-screen mode)</td></tr>
+      </tbody>
+    </table>
+
+    <h3>12 mẹo dùng app hiệu quả</h3>
+    <ol>
+      <li><strong>Sáng đầu giờ 06:00-08:00</strong>: Mở Sản phẩm → cập nhật giá ngày mới. Bật <strong>🤖 Auto hằng ngày</strong> để 08:00 hệ thống tự gửi bảng giá đã cập nhật cho group nhà hàng VIP.</li>
+      <li><strong>Đầu giờ làm</strong>: Mở Dashboard → đọc cảnh báo (KH ngừng đặt > 14 ngày, công nợ quá hạn, đơn chờ điều phối) → xử lý ngay</li>
+      <li><strong>Sau khi đi khảo sát KH mới</strong>: Tạo Lead ngay tại quán café (mobile-friendly), sau đó chuyển thành KH khi chốt</li>
+      <li><strong>Đơn định kỳ</strong>: Setup 1 lần với KH nhà hàng đặt cố định → tiết kiệm 30 phút/ngày</li>
+      <li><strong>Tạo đơn nhanh từ chat</strong>: Forward chat KH cho bot AI → AI tự điền form, NV chỉ check lại</li>
+      <li><strong>Báo giá → Đơn</strong>: Tạo báo giá trước, khi KH chốt bấm "Tạo đơn từ báo giá" → không phải nhập SP lại</li>
+      <li><strong>Thu COD</strong>: Khi đơn delivered, ghi phiếu thu ngay trong ngày (đừng để tới cuối tuần)</li>
+      <li><strong>Phiếu chi xăng/nhập hàng</strong>: Tạo phiếu BD luôn tick "Tự ghi sổ quỹ" → khỏi nhập 2 lần</li>
+      <li><strong>Nhắc nợ hàng loạt cuối tháng</strong>: Tick "Chỉ quá hạn" → gửi Zalo bulk thay vì gọi từng người</li>
+      <li><strong>Xuất PDF bảng giá</strong>: Bấm 🖨 Xuất PDF → đợi "Đang decode 120/120" → tick "Background graphics" trong Print dialog → Save as PDF</li>
+      <li><strong>Báo cáo tháng</strong>: Lưu preset filter "BC tháng VIP" để dùng lại sau, không phải tick lại từ đầu</li>
+      <li><strong>Backup hàng tuần</strong>: Settings → Sao lưu → Xuất JSON → upload Google Drive (tránh mất nếu localStorage bị clear)</li>
+    </ol>
+
+    <!-- ========== FAQ ========== -->
+    <h2 id="faq">💡 Câu hỏi thường gặp</h2>
+
+    <div class="faq-item">
+      <div class="faq-q">App có dùng được trên điện thoại không?</div>
+      <div class="faq-a">CÓ. Mở Chrome trên điện thoại → vào URL app → login bình thường. UI responsive tự co theo màn hình. Trên iPhone có thể "Thêm vào màn hình chính" để dùng như app PWA (có thông báo, offline).</div>
+    </div>
+
+    <div class="faq-item">
+      <div class="faq-q">PDF bảng giá bị mất ảnh từ SP107 trở đi, sửa thế nào?</div>
+      <div class="faq-a">Đã fix ở phiên bản v54+. Cách kiểm tra: hard reload (<kbd>Ctrl</kbd>+<kbd>Shift</kbd>+<kbd>R</kbd> hoặc <kbd>Cmd</kbd>+<kbd>Shift</kbd>+<kbd>R</kbd> trên Mac) để service worker nạp lại bản mới. Khi bấm "Xuất PDF", đợi toast "Đang decode ảnh 120/120…" hiện rồi Print dialog mới mở — không bấm In trước đó.</div>
+    </div>
+
+    <div class="faq-item">
+      <div class="faq-q">Sao bảng giá auto-Telegram hôm nay không gửi?</div>
+      <div class="faq-a">Đây là tính năng <strong>smart skip</strong>: chỉ gửi khi có ≥1 SP đổi giá vs hôm qua. Nếu hôm nay quên cập nhật giá hoặc giá đúng bằng hôm qua → hệ thống bỏ qua để tránh spam KH. Để kiểm tra, vào Sản phẩm → bấm <strong>🔍 So sánh giá</strong> xem có bao nhiêu SP đổi giá.</div>
+    </div>
+
+    <div class="faq-item">
+      <div class="faq-q">Telegram báo "Bot token invalid" khi cấu hình kênh?</div>
+      <div class="faq-a">Token sai hoặc bot bị BotFather revoke. Tạo lại: chat với <a href="https://t.me/BotFather" target="_blank">@BotFather</a> → <code>/newbot</code> → đặt tên → copy token vào Settings. Sau đó add bot vào group, gõ <code>/start</code>, dùng <a href="https://t.me/userinfobot" target="_blank">@userinfobot</a> để lấy Chat ID.</div>
+    </div>
+
+    <div class="faq-item">
+      <div class="faq-q">Quên mật khẩu thì sao?</div>
+      <div class="faq-a">Liên hệ chủ DN (Tuấn Tú — <code>0903 111 222</code>). Hiện app chưa có tính năng tự reset password qua email.</div>
+    </div>
+
+    <div class="faq-item">
+      <div class="faq-q">Tôi đăng nhập nhưng không thấy menu nào?</div>
+      <div class="faq-a">Tài khoản chưa được cấp quyền module nào. Yêu cầu chủ DN vào Settings → Nhân viên → tick quyền cho bạn.</div>
+    </div>
+
+    <div class="faq-item">
+      <div class="faq-q">Data có bị mất khi đổi máy / đổi trình duyệt không?</div>
+      <div class="faq-a">CÓ. App hiện lưu data trong <strong>localStorage trình duyệt</strong> (mỗi browser khác nhau = data khác). Để dùng đa thiết bị cần migrate sang backend (Supabase/Firebase) — chủ DN đang lên kế hoạch.</div>
+    </div>
+
+    <div class="faq-item">
+      <div class="faq-q">Có thể in HĐ ra giấy không?</div>
+      <div class="faq-a">CÓ. Vào Hóa đơn → click 🖨 trên row HĐ → cửa sổ in mở với layout HĐ VAT chuẩn → bấm "🖨 In HĐ" hoặc <kbd>Ctrl</kbd>+<kbd>P</kbd>.</div>
+    </div>
+
+    <div class="faq-item">
+      <div class="faq-q">Làm sao đối tác ngoài (nhà xe khác) tham gia vào hệ thống?</div>
+      <div class="faq-a">Settings không cần. Trực tiếp: Xe & Tài xế → tab Đối tác ngoài → bấm <strong>+ Thêm đối tác ngoài</strong>. Khi tạo đơn, chọn radio "🤝 Thuê đối tác ngoài" thay vì "🏢 Xe nội bộ".</div>
+    </div>
+
+    <div class="faq-item">
+      <div class="faq-q">Tôi không có quyền truy cập Báo cáo nhưng cần xem doanh thu cá nhân?</div>
+      <div class="faq-a">Yêu cầu chủ DN cấp quyền <strong>Báo cáo</strong>. Hệ thống chưa có view "chỉ xem data của tôi" — tất cả ai có quyền Báo cáo đều thấy toàn DN.</div>
+    </div>
+
+    <div class="faq-item">
+      <div class="faq-q">App có bị lỗi gì hay không?</div>
+      <div class="faq-a">Đây là prototype giai đoạn đầu nên có thể có bug. Báo qua Telegram nội bộ hoặc liên hệ chủ DN. Đợt cập nhật được push lên Render trong vòng 5 phút sau khi fix xong.</div>
+    </div>
+
+    <div class="faq-item">
+      <div class="faq-q">Có thể export Excel toàn bộ KH/đơn hàng không?</div>
+      <div class="faq-a">CÓ. Vào Báo cáo → click <strong>⬇ Xuất Excel</strong> hoặc các trang con đều có nút Xuất Excel. File CSV, mở bằng Microsoft Excel hoặc Google Sheets bình thường.</div>
+    </div>
+
+    <div class="faq-item">
+      <div class="faq-q">Logo của tôi không đúng?</div>
+      <div class="faq-a">Vào Settings → Thông tin DN → Logo → bấm <strong>📁 Chọn file logo</strong> → upload PNG/SVG max 500KB. Logo sẽ áp dụng ngay vào sidebar + landing + HĐ in.</div>
+    </div>
+
+    <!-- ========== SUPPORT ========== -->
+    <h2 id="support">📞 Hỗ trợ</h2>
+    <p>Nếu gặp vấn đề khi sử dụng:</p>
+    <ol>
+      <li><strong>Đọc lại tài liệu này</strong> — 90% câu hỏi đã có câu trả lời ở trên</li>
+      <li><strong>Hỏi đồng nghiệp</strong> — NV dùng app lâu năm thường biết mẹo</li>
+      <li><strong>Báo lỗi qua Telegram nội bộ</strong> — kèm screenshot + mô tả</li>
+      <li><strong>Liên hệ chủ DN trực tiếp</strong>:
+        <ul>
+          <li>📞 Hotline: <code>0903 111 222</code></li>
+          <li>📧 Email: <code>luan@nongsantuantu.com</code></li>
+          <li>💬 Zalo: <code>0903 111 222</code></li>
+        </ul>
+      </li>
+    </ol>
+
+    <h3>Tài liệu thêm</h3>
+    <ul>
+      <li>🔗 Source code: <a href="https://github.com/kelvinmarketer-alt/vty-logistics" target="_blank">GitHub repo</a></li>
+      <li>🔗 App live: <a href="https://vty-logistics.onrender.com" target="_blank">vty-logistics.onrender.com</a></li>
+      <li>🔗 Render dashboard: chỉ chủ DN có quyền</li>
+    </ul>
+
+    <!-- Footer -->
+    <div class="doc-foot">
+      <h3>🎉 Chúc bạn dùng app hiệu quả!</h3>
+      <p>Tài liệu này được cập nhật thường xuyên theo phiên bản mới.</p>
+      <div class="contact">
+        <a href="../pages/dashboard.html">→ Vào Dashboard</a>
+        <a href="https://vty-logistics.onrender.com">→ vty-logistics.onrender.com</a>
+        <a href="tel:0903111222">📞 Hotline</a>
+      </div>
+      <p style="margin-top:18px;font-size:12px;opacity:0.5">© 2026 Nông Sản Tuấn Tú Hà Nội · v1.0 · Tài liệu nội bộ</p>
+    </div>
+
+  </main>
+</div>
+
+<button class="back-top" id="backTop" onclick="window.scrollTo({top:0,behavior:'smooth'})" title="Lên đầu trang">↑</button>
+
+<script>
+  /* Highlight TOC item theo section đang scroll */
+  const links = document.querySelectorAll('.toc a');
+  const sections = Array.from(document.querySelectorAll('.doc h2[id]'));
+  function updateActive() {
+    let cur = sections[0];
+    const y = window.scrollY + 100;
+    for (const s of sections) { if (s.offsetTop <= y) cur = s; }
+    links.forEach(a => {
+      a.classList.toggle('active', a.getAttribute('href') === '#' + cur.id);
+    });
+  }
+  window.addEventListener('scroll', updateActive);
+  updateActive();
+
+  /* Back to top button */
+  const btn = document.getElementById('backTop');
+  window.addEventListener('scroll', () => {
+    btn.classList.toggle('show', window.scrollY > 400);
+  });
+</script>
+</body>
+</html>

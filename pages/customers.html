@@ -1,0 +1,321 @@
+<!doctype html>
+<html lang="vi">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Quản lý Khách hàng · Nông Sản Tuấn Tú Hà Nội</title>
+<link rel="stylesheet" href="../styles/tokens.css">
+<link rel="stylesheet" href="../styles/app.css">
+</head>
+<body>
+
+<div class="app">
+
+  <!-- Sidebar (auto-render bởi shared.js) -->
+  <aside class="sidebar"></aside>
+
+  <!-- Topbar -->
+  <header class="topbar">
+    <div class="breadcrumb"></div>
+    <div class="top-spacer"></div>
+    <div class="search-global">
+      <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="7"/><path d="m21 21-4.3-4.3"/></svg>
+      <input placeholder="Tìm khách, đơn hàng, mã HĐ... (Ctrl + K)">
+    </div>
+    <button class="icon-btn" title="Thông báo"><span style="font-size:18px">🔔</span><span class="dot"></span></button>
+    <button class="icon-btn" title="Hướng dẫn sử dụng" onclick="window.location.href='docs.html'"><span style="font-size:18px">❓</span></button>
+  </header>
+
+  <!-- Main -->
+  <main class="main">
+
+    <div class="page-head">
+      <div>
+        <h1>Quản lý khách hàng</h1>
+        <div class="sub">Theo dõi 28 khách hàng · cập nhật 16/05/2026 14:32</div>
+      </div>
+      <div class="head-actions">
+        <button class="btn btn-ghost" onclick="window.exportCustomersCsv()">⬇ Xuất Excel</button>
+        <button class="btn btn-ghost" onclick="window.importCustomersCsv()">⬆ Nhập CSV</button>
+        <input type="file" id="custCsvFile" accept=".csv" style="display:none" onchange="window.handleCustCsvFile(event)">
+        <button class="btn btn-ghost" onclick="window.aiAddCustomer()">📷 Thêm KH từ ảnh</button>
+        <button class="btn btn-primary" onclick="openAddCustomerModal()">+ Thêm khách hàng</button>
+      </div>
+    </div>
+
+    <!-- KPI -->
+    <section class="kpis">
+      <div class="kpi k-1">
+        <div class="kpi-label">Tổng khách hàng</div>
+        <div class="kpi-value">28</div>
+        <div class="kpi-trend up">↑ +3 trong 30 ngày</div>
+        <div class="kpi-icon">👥</div>
+      </div>
+      <div class="kpi k-2">
+        <div class="kpi-label">Mới tháng này</div>
+        <div class="kpi-value">3</div>
+        <div class="kpi-trend up">↑ tốt hơn tháng trước (+50%)</div>
+        <div class="kpi-icon">✨</div>
+      </div>
+      <div class="kpi k-3">
+        <div class="kpi-label">Đang nợ</div>
+        <div class="kpi-value">7</div>
+        <div class="kpi-trend down">↓ Tổng 42.5 tr ₫ quá hạn</div>
+        <div class="kpi-icon">⚠️</div>
+      </div>
+      <div class="kpi k-4">
+        <div class="kpi-label">Khách VIP</div>
+        <div class="kpi-value">5</div>
+        <div class="kpi-trend up">≈ 68% doanh thu</div>
+        <div class="kpi-icon">⭐</div>
+      </div>
+      <div class="kpi k-5">
+        <div class="kpi-label">Không hoạt động</div>
+        <div class="kpi-value">4</div>
+        <div class="kpi-trend">&gt; 90 ngày không phát sinh</div>
+        <div class="kpi-icon">💤</div>
+      </div>
+    </section>
+
+    <!-- Quick chips (số đếm tự cập nhật từ data thật) -->
+    <div class="quick-chips" id="quickChips">
+      <button class="chip active" data-quick="all">Tất cả <span class="cnt" data-cnt="all">0</span></button>
+      <button class="chip" data-quick="b2b">🍽 Cơ sở KD <span class="cnt" data-cnt="b2b">0</span></button>
+      <button class="chip" data-quick="b2c">👤 Cá nhân <span class="cnt" data-cnt="b2c">0</span></button>
+      <button class="chip" data-quick="vip">⭐ VIP <span class="cnt" data-cnt="vip">0</span></button>
+      <button class="chip" data-quick="debt">⚠️ Có công nợ <span class="cnt" data-cnt="debt">0</span></button>
+      <button class="chip" data-quick="new">✨ Mới 30 ngày <span class="cnt" data-cnt="new">0</span></button>
+      <button class="chip" data-quick="inact">💤 Không hoạt động <span class="cnt" data-cnt="inact">0</span></button>
+    </div>
+
+    <!-- Filter -->
+    <div class="filter-bar">
+      <div class="search-in" style="flex:1.5">
+        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="7"/><path d="m21 21-4.3-4.3"/></svg>
+        <input id="qSearch" placeholder="Tìm theo tên / SĐT / mã KH / công ty...">
+      </div>
+      <select id="fGroup">
+        <option value="">Nhóm KH (tất cả)</option>
+        <option value="VIP">VIP</option>
+        <option value="Thường">Thường</option>
+        <option value="Mới">Mới</option>
+      </select>
+      <select id="fProvince">
+        <option value="">Tỉnh/TP (tất cả)</option>
+        <option>Hà Nội</option><option>Hải Phòng</option><option>TP.HCM</option>
+        <option>Đà Nẵng</option><option>Hải Dương</option><option>Quảng Ninh</option>
+        <option>Nam Định</option><option>Thanh Hóa</option><option>Bắc Ninh</option>
+      </select>
+      <select id="fService">
+        <option value="">Loại hình (tất cả)</option>
+        <option value="nha-hang">🍽 Nhà hàng</option>
+        <option value="quan-an">🍜 Quán ăn / Bún phở</option>
+        <option value="khach-san">🏨 Khách sạn</option>
+        <option value="canteen">🏭 Bếp ăn / Canteen</option>
+        <option value="cafe">☕ Quán cafe</option>
+        <option value="cua-hang">🏪 Cửa hàng / Đại lý</option>
+        <option value="ca-nhan">👤 Cá nhân / Hộ GĐ</option>
+      </select>
+      <select id="fStatus">
+        <option value="">Tình trạng (tất cả)</option>
+        <option value="active">Đang hoạt động</option>
+        <option value="inactive">Không hoạt động</option>
+      </select>
+      <button class="btn btn-ghost btn-sm" onclick="clearFilters()">↺ Xóa lọc</button>
+    </div>
+
+    <!-- Table -->
+    <div class="table-card">
+      <div class="table-head">
+        <div class="checkbox" onclick="this.classList.toggle('on')"></div>
+        <div class="count" id="rowCount">Đang hiển thị 28 / 28 khách hàng</div>
+        <div class="spacer"></div>
+        <button class="btn btn-ghost btn-sm" onclick="window.openCustColPicker()">⚙ Cột hiển thị</button>
+        <button class="btn btn-ghost btn-sm" onclick="window.openCustSortPicker()">↕ Sắp xếp</button>
+      </div>
+      <div class="table-wrap">
+        <table>
+          <thead>
+            <tr>
+              <th style="width:30px"></th>
+              <th>Khách hàng</th>
+              <th class="hide-sm">Loại hình</th>
+              <th class="hide-sm">Nhóm</th>
+              <th class="hide-md">Tỉnh/TP</th>
+              <th class="hide-md">Tần suất đặt</th>
+              <th class="hide-md">NV phụ trách</th>
+              <th class="num">Số đơn</th>
+              <th class="num">Doanh thu (₫)</th>
+              <th class="num">Công nợ (₫)</th>
+              <th class="hide-md">Liên hệ cuối</th>
+              <th class="num">Hành động</th>
+            </tr>
+          </thead>
+          <tbody id="tbody"></tbody>
+        </table>
+      </div>
+      <div class="table-foot">
+        <div>Hiển thị <b id="footCount">0</b> dòng</div>
+        <div class="spacer" style="flex:1"></div>
+        <div>Trang</div>
+        <div class="pager" id="custPager"></div>
+        <select id="custPageSize" style="border:1px solid var(--line); border-radius:6px; padding:5px 8px; font-size:12px">
+          <option value="25">25/trang</option>
+          <option value="50">50/trang</option>
+          <option value="100">100/trang</option>
+          <option value="999">Tất cả</option>
+        </select>
+      </div>
+    </div>
+
+  </main>
+</div>
+
+<!-- ============ DRAWER ============ -->
+<div class="drawer-bg" id="drawerBg" onclick="closeDrawer()"></div>
+<aside class="drawer" id="drawer">
+  <div class="drawer-head">
+    <div class="ava-lg" id="dAva">--</div>
+    <div class="info">
+      <h2 id="dName">—</h2>
+      <div class="meta" id="dMeta"></div>
+    </div>
+    <button class="close-btn" onclick="closeDrawer()">✕</button>
+  </div>
+
+  <div class="drawer-stats">
+    <div class="s"><div class="lab">LTV</div><div class="val" id="dLtv">—</div><div class="sub">Tổng doanh thu</div></div>
+    <div class="s"><div class="lab">AOV</div><div class="val" id="dAov">—</div><div class="sub">Trung bình / đơn</div></div>
+    <div class="s"><div class="lab">Số đơn</div><div class="val" id="dOrders">—</div><div class="sub">12 tháng qua</div></div>
+    <div class="s"><div class="lab">Công nợ</div><div class="val" id="dDebt">—</div><div class="sub" id="dDebtSub">Quá hạn</div></div>
+  </div>
+
+  <!-- Action bar: thao tác nhanh cho KH này -->
+  <div style="padding:10px 16px;border-bottom:1px solid var(--line);display:flex;gap:6px;flex-wrap:wrap;background:#FAFBFC">
+    <button class="btn btn-primary btn-sm" onclick="window.createOrderForCurrentCust()" title="Mở form tạo đơn với KH này được prefill">📦 Tạo đơn mới</button>
+    <button class="btn btn-ghost btn-sm" onclick="window.createRecurringForCurrentCust()" title="Mở mẫu định kỳ với KH này được prefill">🔁 Tạo đơn định kỳ</button>
+    <button class="btn btn-ghost btn-sm" onclick="window.createQuoteForCurrentCust()" title="Mở báo giá với KH này">📝 Tạo báo giá</button>
+    <button class="btn btn-ghost btn-sm" onclick="window.openCustAliasMgr && window.openCustAliasMgr(window._currentDrawerCust)" title="Quản lý từ điển AI riêng của KH">📖 Từ điển AI</button>
+  </div>
+
+  <div class="tabs">
+    <div class="tab active" data-tab="info">📋 Thông tin</div>
+    <div class="tab" data-tab="orders">📦 Đơn hàng <span class="bd" id="tabOrdCnt">0</span></div>
+    <div class="tab" data-tab="debt">💰 Công nợ</div>
+    <div class="tab" data-tab="note">📝 Ghi chú <span class="bd" id="tabNoteCnt">0</span></div>
+    <div class="tab" data-tab="file">📎 Hợp đồng &amp; File <span class="bd" id="tabFileCnt">0</span></div>
+    <div class="tab" data-tab="prefs">📖 Từ điển riêng <span class="bd" id="tabPrefCnt">0</span></div>
+  </div>
+
+  <div class="tab-body">
+
+    <div class="tab-pane active" data-pane="info">
+      <div class="section-h">Thông tin liên hệ</div>
+      <div class="kv-grid">
+        <div class="kv"><span class="k">Mã KH</span><span class="v" id="iCode">—</span></div>
+        <div class="kv"><span class="k">Người liên hệ</span><span class="v" id="iContact">—</span></div>
+        <div class="kv"><span class="k">SĐT chính</span><span class="v" id="iPhone">—</span></div>
+        <div class="kv"><span class="k">Email</span><span class="v" id="iEmail">—</span></div>
+        <div class="kv" style="grid-column:1/-1"><span class="k">Địa chỉ</span><span class="v" id="iAddr">—</span></div>
+      </div>
+
+      <div class="section-h">Phân loại</div>
+      <div class="kv-grid">
+        <div class="kv"><span class="k">Loại KH</span><span class="v" id="iType">—</span></div>
+        <div class="kv"><span class="k">Nhóm</span><span class="v" id="iGroup">—</span></div>
+        <div class="kv"><span class="k">Tần suất đặt</span><span class="v" id="iService">—</span></div>
+        <div class="kv"><span class="k">Nhóm hàng hay mua</span><span class="v" id="iRoute">—</span></div>
+        <div class="kv"><span class="k">Ngày tạo</span><span class="v" id="iCreated">—</span></div>
+        <div class="kv"><span class="k">Nguồn</span><span class="v" id="iSource">—</span></div>
+      </div>
+
+      <div class="section-h" id="biSection">Thông tin doanh nghiệp</div>
+      <div class="kv-grid" id="biGrid">
+        <div class="kv"><span class="k">Tên công ty</span><span class="v" id="iCompany">—</span></div>
+        <div class="kv"><span class="k">Mã số thuế</span><span class="v" id="iTax">—</span></div>
+        <div class="kv"><span class="k">Người đại diện</span><span class="v" id="iRep">—</span></div>
+        <div class="kv"><span class="k">Hợp đồng khung</span><span class="v" id="iContract">—</span></div>
+      </div>
+    </div>
+
+    <div class="tab-pane" data-pane="orders">
+      <div class="section-h">Lịch sử đơn hàng</div>
+      <table class="mini-table" id="ordersTable">
+        <thead><tr>
+          <th>Mã đơn</th><th>Ngày</th><th>Giao tới</th><th>Hàng</th>
+          <th class="num">Tiền hàng</th><th class="num">COD</th><th>Trạng thái</th>
+        </tr></thead>
+        <tbody></tbody>
+      </table>
+    </div>
+
+    <div class="tab-pane" data-pane="debt">
+      <div class="debt-summary">
+        <div class="b ok"><div class="lab">Đã thanh toán</div><div class="val" id="dbPaid">—</div></div>
+        <div class="b warn"><div class="lab">Còn nợ</div><div class="val" id="dbOwed">—</div></div>
+        <div class="b danger"><div class="lab">Quá hạn</div><div class="val" id="dbOver">—</div></div>
+      </div>
+      <div class="section-h">Sổ công nợ</div>
+      <table class="mini-table" id="debtTable">
+        <thead><tr>
+          <th>Ngày</th><th>Số HĐ</th><th>Diễn giải</th>
+          <th class="num">Nợ</th><th class="num">Có</th><th class="num">Số dư</th>
+        </tr></thead>
+        <tbody></tbody>
+      </table>
+    </div>
+
+    <div class="tab-pane" data-pane="note">
+      <div class="section-h">Ghi chú nội bộ</div>
+      <div id="noteList"></div>
+      <div class="note-input">
+        <textarea id="custNoteInput" placeholder="Thêm ghi chú nội bộ về khách này..."></textarea>
+        <button class="btn btn-primary" onclick="window.saveCustomerNote()">Lưu ghi chú</button>
+      </div>
+    </div>
+
+    <div class="tab-pane" data-pane="prefs">
+      <div class="section-h">📖 Từ điển riêng + lịch sử đặt hàng <span id="tabPrefHelp"></span></div>
+      <div id="prefContent" style="font-size:13px"></div>
+    </div>
+
+    <div class="tab-pane" data-pane="file">
+      <div class="section-h">Hợp đồng &amp; File đính kèm</div>
+      <input type="file" id="custFileInput" multiple style="display:none" onchange="window.uploadCustomerFiles(event)">
+      <div style="display:flex;gap:8px;margin-bottom:12px">
+        <button class="btn btn-primary" onclick="document.getElementById('custFileInput').click()">📎 Tải file lên</button>
+        <div style="font-size:11.5px;color:var(--muted);align-self:center">
+          PDF, JPG, PNG, DOCX, XLSX · ≤ 2MB / file · lưu trong localStorage
+        </div>
+      </div>
+      <div id="custFileList"></div>
+    </div>
+
+  </div>
+</aside>
+
+<!-- Scripts: thứ tự quan trọng -->
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<script src="../scripts/supabase-config.js"></script>
+<script src="../scripts/supabase-client.js"></script>
+<script src="../scripts/shared.js"></script>
+<script src="../scripts/store.js"></script>
+<script src="../scripts/auth.js"></script>
+<script src="../scripts/help-tips.js"></script>
+<script src="../scripts/ux-improvements.js"></script>
+<script src="../scripts/onboarding.js"></script>
+<script src="../scripts/pdf-export.js"></script>
+<script>if(window.AUTH) window.AUTH.requireAuth();</script>
+<script src="../data/customers.js"></script>
+<script src="../data/orders.js"></script>
+<script src="../scripts/ai-fill.js"></script>
+<script src="../scripts/customers.js"></script>
+<script src="../scripts/cust-preferences.js"></script>
+<script src="../scripts/pdf-templates.js"></script>
+<script src="../scripts/cust-search-box.js"></script>
+<script src="../data/demo-seed.js"></script>
+<script src="../scripts/data-linkage.js"></script>
+<script src="../scripts/system-core.js"></script>
+<script src="../scripts/ai-chat.js"></script>
+</body>
+</html>

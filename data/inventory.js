@@ -1,0 +1,50 @@
+/* =========================================================
+   Inventory — phủ 40 SP đa dạng để test cảnh báo/heatmap
+   ========================================================= */
+window.INVENTORY = [
+  /* Rau ta (kho A) — đa số đủ tồn, vài cái dưới ngưỡng */
+  {id:'INV001', productId:'SP001', stock:120, minStock:30, maxStock:300, avgDaily:35, lastIn:'17/05/2026', lastOut:'18/05/2026', location:'Kho A1'},
+  {id:'INV002', productId:'SP002', stock:18,  minStock:25, maxStock:200, avgDaily:22, lastIn:'16/05/2026', lastOut:'18/05/2026', location:'Kho A1'},
+  {id:'INV003', productId:'SP003', stock:85,  minStock:40, maxStock:250, avgDaily:30, lastIn:'17/05/2026', lastOut:'18/05/2026', location:'Kho A2'},
+  {id:'INV004', productId:'SP004', stock:60,  minStock:20, maxStock:150, avgDaily:18, lastIn:'17/05/2026', lastOut:'18/05/2026', location:'Kho A2'},
+  {id:'INV005', productId:'SP005', stock:240, minStock:50, maxStock:500, avgDaily:40, lastIn:'17/05/2026', lastOut:'18/05/2026', location:'Kho A1'},
+  {id:'INV006', productId:'SP006', stock:8,   minStock:30, maxStock:200, avgDaily:25, lastIn:'15/05/2026', lastOut:'18/05/2026', location:'Kho A1'},
+  {id:'INV007', productId:'SP007', stock:45,  minStock:20, maxStock:200, avgDaily:15, lastIn:'17/05/2026', lastOut:'18/05/2026', location:'Kho A1'},
+  {id:'INV008', productId:'SP008', stock:120, minStock:30, maxStock:300, avgDaily:28, lastIn:'17/05/2026', lastOut:'18/05/2026', location:'Kho B1'},
+  {id:'INV009', productId:'SP009', stock:0,   minStock:20, maxStock:150, avgDaily:18, lastIn:'14/05/2026', lastOut:'17/05/2026', location:'Kho B1'},
+  {id:'INV010', productId:'SP010', stock:32,  minStock:15, maxStock:100, avgDaily:12, lastIn:'17/05/2026', lastOut:'18/05/2026', location:'Kho B1'},
+  {id:'INV011', productId:'SP011', stock:35,  minStock:25, maxStock:150, avgDaily:20, lastIn:'17/05/2026', lastOut:'18/05/2026', location:'Kho B1'},
+  {id:'INV012', productId:'SP012', stock:22,  minStock:15, maxStock:120, avgDaily:14, lastIn:'17/05/2026', lastOut:'18/05/2026', location:'Kho B1'},
+  {id:'INV013', productId:'SP013', stock:40,  minStock:20, maxStock:150, avgDaily:18, lastIn:'17/05/2026', lastOut:'18/05/2026', location:'Kho B1'},
+  {id:'INV014', productId:'SP014', stock:55,  minStock:25, maxStock:180, avgDaily:22, lastIn:'17/05/2026', lastOut:'18/05/2026', location:'Kho B1'},
+  {id:'INV015', productId:'SP015', stock:38,  minStock:20, maxStock:140, avgDaily:16, lastIn:'17/05/2026', lastOut:'18/05/2026', location:'Kho B1'},
+  {id:'INV016', productId:'SP016', stock:5,   minStock:18, maxStock:120, avgDaily:14, lastIn:'13/05/2026', lastOut:'18/05/2026', location:'Kho A1'},
+  {id:'INV017', productId:'SP017', stock:80,  minStock:25, maxStock:200, avgDaily:24, lastIn:'17/05/2026', lastOut:'18/05/2026', location:'Kho A2'},
+  {id:'INV018', productId:'SP018', stock:70,  minStock:25, maxStock:200, avgDaily:22, lastIn:'17/05/2026', lastOut:'18/05/2026', location:'Kho A2'},
+  {id:'INV019', productId:'SP019', stock:45,  minStock:20, maxStock:150, avgDaily:18, lastIn:'17/05/2026', lastOut:'18/05/2026', location:'Kho A2'},
+  {id:'INV020', productId:'SP020', stock:95,  minStock:30, maxStock:200, avgDaily:25, lastIn:'17/05/2026', lastOut:'18/05/2026', location:'Kho A1'},
+  {id:'INV021', productId:'SP021', stock:28,  minStock:15, maxStock:100, avgDaily:12, lastIn:'17/05/2026', lastOut:'18/05/2026', location:'Kho B2'},
+  {id:'INV022', productId:'SP022', stock:25,  minStock:15, maxStock:100, avgDaily:12, lastIn:'17/05/2026', lastOut:'18/05/2026', location:'Kho B2'},
+  {id:'INV023', productId:'SP023', stock:18,  minStock:12, maxStock:80,  avgDaily:8,  lastIn:'17/05/2026', lastOut:'18/05/2026', location:'Kho B2'},
+  {id:'INV024', productId:'SP024', stock:12,  minStock:20, maxStock:80,  avgDaily:10, lastIn:'16/05/2026', lastOut:'18/05/2026', location:'Kho B2'},
+  {id:'INV025', productId:'SP025', stock:6,   minStock:15, maxStock:60,  avgDaily:8,  lastIn:'15/05/2026', lastOut:'18/05/2026', location:'Kho B2'},
+  {id:'INV026', productId:'SP026', stock:50,  minStock:20, maxStock:150, avgDaily:18, lastIn:'17/05/2026', lastOut:'18/05/2026', location:'Kho B1'},
+  /* Rau Đà Lạt — kho lạnh C */
+  {id:'INV027', productId:'SP027', stock:55,  minStock:30, maxStock:200, avgDaily:25, lastIn:'17/05/2026', lastOut:'18/05/2026', location:'Kho lạnh C'},
+  {id:'INV028', productId:'SP028', stock:42,  minStock:25, maxStock:200, avgDaily:22, lastIn:'17/05/2026', lastOut:'18/05/2026', location:'Kho lạnh C'},
+  {id:'INV029', productId:'SP029', stock:18,  minStock:15, maxStock:80,  avgDaily:10, lastIn:'17/05/2026', lastOut:'18/05/2026', location:'Kho lạnh C'},
+  {id:'INV030', productId:'SP030', stock:14,  minStock:12, maxStock:60,  avgDaily:8,  lastIn:'17/05/2026', lastOut:'18/05/2026', location:'Kho lạnh C'},
+  {id:'INV031', productId:'SP031', stock:0,   minStock:10, maxStock:50,  avgDaily:6,  lastIn:'14/05/2026', lastOut:'17/05/2026', location:'Kho lạnh C'},
+  {id:'INV032', productId:'SP032', stock:35,  minStock:20, maxStock:120, avgDaily:18, lastIn:'17/05/2026', lastOut:'18/05/2026', location:'Kho lạnh C'},
+  /* Nấm — kho lạnh */
+  {id:'INV033', productId:'SP033', stock:14,  minStock:20, maxStock:80,  avgDaily:15, lastIn:'17/05/2026', lastOut:'18/05/2026', location:'Kho lạnh C'},
+  {id:'INV034', productId:'SP034', stock:8,   minStock:10, maxStock:50,  avgDaily:7,  lastIn:'17/05/2026', lastOut:'18/05/2026', location:'Kho lạnh C'},
+  {id:'INV035', productId:'SP035', stock:22,  minStock:12, maxStock:80,  avgDaily:10, lastIn:'17/05/2026', lastOut:'18/05/2026', location:'Kho lạnh C'},
+  {id:'INV036', productId:'SP036', stock:25,  minStock:15, maxStock:80,  avgDaily:12, lastIn:'16/05/2026', lastOut:'18/05/2026', location:'Kho lạnh C'},
+  /* Rau vùng miền + gia vị */
+  {id:'INV037', productId:'SP040', stock:6,   minStock:10, maxStock:50,  avgDaily:8,  lastIn:'14/05/2026', lastOut:'18/05/2026', location:'Kho B1'},
+  {id:'INV038', productId:'SP043', stock:30,  minStock:15, maxStock:80,  avgDaily:12, lastIn:'17/05/2026', lastOut:'18/05/2026', location:'Kho B2'},
+  {id:'INV039', productId:'SP046', stock:48,  minStock:20, maxStock:120, avgDaily:18, lastIn:'17/05/2026', lastOut:'18/05/2026', location:'Kho A1'},
+  {id:'INV040', productId:'SP047', stock:15,  minStock:18, maxStock:80,  avgDaily:14, lastIn:'17/05/2026', lastOut:'18/05/2026', location:'Kho A1'},
+  {id:'INV041', productId:'SP049', stock:9,   minStock:15, maxStock:60,  avgDaily:11, lastIn:'17/05/2026', lastOut:'18/05/2026', location:'Kho A1'},
+];

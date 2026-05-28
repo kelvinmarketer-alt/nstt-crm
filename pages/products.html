@@ -1,0 +1,86 @@
+<!doctype html>
+<html lang="vi">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Sản phẩm & Bảng giá · Nông Sản Tuấn Tú Hà Nội</title>
+<link rel="stylesheet" href="../styles/tokens.css">
+<link rel="stylesheet" href="../styles/app.css">
+<style>
+  .pv-tabs{display:flex;gap:0;background:#fff;border:1px solid var(--line);border-radius:10px;padding:4px;margin-bottom:14px;width:fit-content;flex-wrap:wrap}
+  .pv-tab{padding:8px 16px;font-size:13px;font-weight:600;color:var(--muted);cursor:pointer;border-radius:7px;white-space:nowrap}
+  .pv-tab.active{background:var(--red);color:#fff}
+</style>
+</head>
+<body>
+
+<div class="app">
+
+  <!-- Sidebar (auto-render bởi shared.js) -->
+  <aside class="sidebar"></aside>
+
+  <!-- Topbar -->
+  <header class="topbar">
+    <div class="breadcrumb"></div>
+    <div class="top-spacer"></div>
+    <div class="search-global">
+      <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="7"/><path d="m21 21-4.3-4.3"/></svg>
+      <input placeholder="Tìm khách, đơn hàng, mã HĐ... (Ctrl + K)">
+    </div>
+    <button class="icon-btn" title="Thông báo"><span style="font-size:18px">🔔</span><span class="dot"></span></button>
+    <button class="icon-btn" title="Hướng dẫn sử dụng" onclick="window.location.href='docs.html'"><span style="font-size:18px">❓</span></button>
+  </header>
+
+  <!-- Main -->
+  <main class="main">
+
+    <div class="page-head">
+      <div>
+        <h1>Sản phẩm & Bảng giá ngày</h1>
+        <div class="sub">Giá nông sản cập nhật theo từng ngày · gửi bảng giá cho nhà hàng</div>
+      </div>
+      <div class="head-actions">
+        <button class="btn btn-ghost" onclick="window.prodImportExcel()" title="Import SP hàng loạt từ Excel">📥 Excel</button>
+        <button class="btn btn-ghost" onclick="window.prodImportAI()" title="Đọc ảnh AI: catalog / bảng giá để thêm SP">📷 Từ ảnh AI</button>
+        <button class="btn btn-primary" onclick="window.openAddProduct()">+ Thêm sản phẩm</button>
+      </div>
+    </div>
+
+    <div class="pv-tabs">
+      <div class="pv-tab active" onclick="window.switchPView(event,'board')">📋 Bảng giá hôm nay</div>
+      <div class="pv-tab" onclick="window.switchPView(event,'catalog')">🥬 Danh mục sản phẩm</div>
+    </div>
+
+    <div id="boardView"></div>
+    <div id="catalogView" style="display:none"></div>
+
+  </main>
+</div>
+
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<script src="../scripts/supabase-config.js"></script>
+<script src="../scripts/supabase-client.js"></script>
+<script src="../scripts/shared.js"></script>
+<script src="../scripts/store.js"></script>
+<script src="../scripts/auth.js"></script>
+<script src="../scripts/help-tips.js"></script>
+<script src="../scripts/ux-improvements.js"></script>
+<script src="../scripts/onboarding.js"></script>
+<script src="../scripts/pdf-export.js"></script>
+<script>if(window.AUTH) window.AUTH.requireAuth();</script>
+<script src="../data/products.js"></script>
+<script src="../data/product-images.js"></script>
+<script src="../data/brand-logo.js"></script>
+<script src="../scripts/ai-fill.js"></script>
+<script src="../scripts/price-catalogue.js"></script>
+<script src="../scripts/price-auto-send.js"></script>
+<script src="../scripts/products.js"></script>
+<script src="../scripts/cust-search-box.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
+<script src="../scripts/bulk-import.js"></script>
+<script src="../data/demo-seed.js"></script>
+<script src="../scripts/data-linkage.js"></script>
+<script src="../scripts/system-core.js"></script>
+<script src="../scripts/ai-chat.js"></script>
+</body>
+</html>

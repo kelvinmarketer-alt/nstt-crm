@@ -1,0 +1,222 @@
+<!doctype html>
+<html lang="vi">
+<head>
+<meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Marketing blast · Nông Sản Tuấn Tú</title>
+<link rel="stylesheet" href="../styles/tokens.css"><link rel="stylesheet" href="../styles/app.css">
+<style>
+  .tpl-card{background:#fff;border:1px solid var(--line);border-radius:10px;padding:14px;margin-bottom:10px}
+  .seg-pill{display:inline-block;padding:3px 9px;border-radius:99px;font-size:11.5px;background:#F0FDF4;color:#15803D;margin-right:5px;font-weight:600}
+</style>
+</head>
+<body>
+<div class="app">
+  <aside class="sidebar"></aside>
+  <header class="topbar">
+    <div class="breadcrumb"></div><div class="top-spacer"></div>
+    <div class="search-global"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="7"/><path d="m21 21-4.3-4.3"/></svg><input placeholder="Tìm... (Ctrl+K)"></div>
+    <button class="icon-btn" title="Thông báo"><span style="font-size:18px">🔔</span><span class="dot"></span></button>
+    <button class="icon-btn" title="Hướng dẫn" onclick="window.location.href='docs.html'"><span style="font-size:18px">❓</span></button>
+  </header>
+  <main class="main">
+    <div style="display:flex;align-items:center;gap:12px;margin-bottom:14px">
+      <div>
+        <h1 style="margin:0;font-size:22px;color:var(--navy);font-weight:800">📨 Marketing blast — Email & Zalo <span id="hbT"></span></h1>
+        <div style="font-size:13px;color:var(--muted);margin-top:2px">Gửi hàng loạt cho segment KH — bảng giá, ưu đãi, winback...</div>
+      </div>
+    </div>
+    <div id="hbHost"></div>
+
+    <div style="display:grid;grid-template-columns:1fr 1fr;gap:14px">
+      <!-- LEFT: Templates -->
+      <div>
+        <h3 style="margin:0 0 10px;font-size:13px;color:var(--navy);text-transform:uppercase;font-weight:700">📋 Thư viện template <span id="hb1"></span></h3>
+        <div id="tplList"></div>
+        <button class="btn btn-ghost" onclick="window.addTpl()" style="width:100%;margin-top:8px">+ Thêm template</button>
+      </div>
+
+      <!-- RIGHT: Compose -->
+      <div>
+        <h3 style="margin:0 0 10px;font-size:13px;color:var(--navy);text-transform:uppercase;font-weight:700">✉️ Soạn & Gửi <span id="hb2"></span></h3>
+        <div style="background:#fff;border:1px solid var(--line);border-radius:10px;padding:14px">
+          <label style="font-size:12px;color:var(--muted);font-weight:600">Kênh gửi</label>
+          <div style="display:flex;gap:8px;margin:6px 0 10px">
+            <label style="display:flex;align-items:center;gap:5px;font-size:13px;cursor:pointer"><input type="radio" name="ch" value="zalo" checked> 💬 Zalo (mở link/click)</label>
+            <label style="display:flex;align-items:center;gap:5px;font-size:13px;cursor:pointer"><input type="radio" name="ch" value="email"> ✉️ Email (mailto)</label>
+            <label style="display:flex;align-items:center;gap:5px;font-size:13px;cursor:pointer"><input type="radio" name="ch" value="sms"> 📱 SMS (clipboard)</label>
+          </div>
+
+          <label style="font-size:12px;color:var(--muted);font-weight:600">Segment KH ${window.helpTip ? window.helpTip('Chọn nhóm KH để gửi. Số trong ngoặc = số KH thỏa.') : ''}</label>
+          <select id="seg" style="width:100%;border:1px solid var(--line);border-radius:6px;padding:8px;margin-bottom:10px" onchange="window.recountSeg()">
+            <option value="all">Tất cả KH</option>
+            <option value="vip">⭐ VIP</option>
+            <option value="new">✨ Mới 30 ngày</option>
+            <option value="atrisk">⚠️ At-risk (60+ ngày không đặt)</option>
+            <option value="debt">📉 KH có công nợ</option>
+            <option value="b2b">🍽 Cơ sở KD (không phải cá nhân)</option>
+          </select>
+          <div id="segInfo" style="font-size:12px;color:var(--muted);margin-bottom:10px"></div>
+
+          <label style="font-size:12px;color:var(--muted);font-weight:600">Nội dung (hỗ trợ {tên}, {mã}, {nợ})</label>
+          <textarea id="msg" rows="6" placeholder="VD: Anh/chị {tên} ơi, bảng giá rau hôm nay đã cập nhật..." style="width:100%;border:1px solid var(--line);border-radius:6px;padding:8px;font-size:13px;font-family:inherit;line-height:1.5"></textarea>
+
+          <div style="display:flex;gap:8px;margin-top:10px">
+            <button class="btn btn-ghost" onclick="window.previewBlast()" style="flex:1">👁 Xem trước (1 KH)</button>
+            <button class="btn btn-primary" onclick="window.sendBlast()" style="flex:1">📨 Gửi cho segment</button>
+          </div>
+          <div id="blastLog" style="margin-top:12px;font-size:12px;max-height:160px;overflow:auto;background:#FAFBFC;padding:8px;border-radius:6px;display:none"></div>
+        </div>
+      </div>
+    </div>
+  </main>
+</div>
+
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<script src="../scripts/supabase-config.js"></script>
+<script src="../scripts/supabase-client.js"></script>
+<script src="../scripts/shared.js"></script><script src="../scripts/store.js"></script>
+<script src="../scripts/auth.js"></script><script src="../scripts/help-tips.js"></script>
+<script src="../scripts/ux-improvements.js"></script>
+<script src="../scripts/onboarding.js"></script>
+<script src="../scripts/pdf-export.js"></script>
+<script>if(window.AUTH) window.AUTH.requireAuth();</script>
+<script src="../data/customers.js"></script>
+
+<script>
+(function(){
+  window.renderAppShell('marketing','Marketing blast');
+  document.getElementById('hbHost').innerHTML = window.helpBanner(
+    '📨 Marketing blast làm gì?',
+    'Gửi hàng loạt cho nhóm KH (segment). Hỗ trợ <b>Zalo, Email, SMS</b>. Có template sẵn + biến động ({tên}, {nợ}...). Browser sẽ mở từng tab/dialog gửi — bạn click xác nhận để bảo vệ KH khỏi spam. Không dùng để gửi thư rác — chỉ thông báo, bảng giá, winback.',
+    {id:'hb-mk', icon:'📨'}
+  );
+  document.getElementById('hbT').innerHTML = window.helpTip('Triển khai production nên dùng Zalo OA / SendGrid để gửi thật trên server. Hiện tại dùng mailto/web link cho demo.', {size:'lg'});
+  document.getElementById('hb1').innerHTML = window.helpTip('Template lưu trong STORE — chỉnh sửa lưu tự động.');
+  document.getElementById('hb2').innerHTML = window.helpTip('Biến {tên} {mã} {nợ} sẽ tự thay theo từng KH.');
+
+  const DEFAULT_TPL = [
+    {id:'T01', name:'📋 Bảng giá tuần', body:'Chào anh/chị {tên},\n\nBảng giá rau tuần này đã cập nhật. Một số mặt hàng nổi bật:\n• Rau muống: 18.000 ₫/kg\n• Cà chua: 22.000 ₫/kg\n• Khoai tây: 14.000 ₫/kg\n\nXem chi tiết: nongsantuantuhanoi.com\n\nCảm ơn anh/chị!\nNông Sản Tuấn Tú'},
+    {id:'T02', name:'⚠️ Nhắc nợ', body:'Kính gửi {tên} ({mã}),\n\nBên Tuấn Tú xin thông báo công nợ hiện tại của anh/chị là {nợ} ₫.\n\nMong anh/chị sắp xếp thanh toán giúp.\nSố TK: VCB 0123456789 - NÔNG SẢN TUẤN TÚ HÀ NỘI.\n\nXin cảm ơn!'},
+    {id:'T03', name:'🎁 Ưu đãi KH VIP', body:'Anh/chị {tên} thân mến,\n\nTuấn Tú trân trọng cảm ơn anh/chị đã đồng hành với chúng tôi. Tặng riêng VIP:\n\n🎁 Giảm 10% mọi đơn từ 5tr trong tháng này\n🚚 Miễn phí giao hàng nội thành\n\nCó hiệu lực đến hết 31/05/2026.'},
+    {id:'T04', name:'💔 Winback (KH lâu không đặt)', body:'Anh/chị {tên} ơi,\n\nLâu rồi bên em không thấy anh/chị đặt hàng. Bên em vẫn luôn sẵn sàng phục vụ và có nhiều SP mới chất lượng.\n\nTặng riêng anh/chị: Giảm 5% đơn đầu tiên quay lại.\n\nMong anh/chị quay lại ủng hộ ạ!'},
+  ];
+
+  function getTpl() { return window.STORE.get('marketing_tpls', DEFAULT_TPL) || DEFAULT_TPL; }
+
+  function renderTpls(){
+    const list = getTpl();
+    document.getElementById('tplList').innerHTML = list.map(t => `<div class="tpl-card">
+      <div style="display:flex;align-items:center;gap:8px;margin-bottom:6px">
+        <b style="flex:1">${t.name}</b>
+        <button class="btn btn-ghost btn-sm" onclick="window.loadTpl('${t.id}')">↓ Dùng</button>
+        <button class="btn btn-ghost btn-sm" onclick="window.editTpl('${t.id}')">✏️</button>
+        <button class="btn btn-ghost btn-sm" style="color:var(--danger)" onclick="window.delTpl('${t.id}')">🗑</button>
+      </div>
+      <div style="font-size:12px;color:var(--muted);white-space:pre-wrap;line-height:1.5;max-height:80px;overflow:hidden">${t.body.slice(0,160)}${t.body.length>160?'…':''}</div>
+    </div>`).join('');
+  }
+
+  window.loadTpl = function(id){
+    const t = getTpl().find(x => x.id === id);
+    document.getElementById('msg').value = t.body;
+  };
+  window.editTpl = function(id){
+    const t = getTpl().find(x => x.id === id);
+    const newName = prompt('Tên template:', t.name); if (!newName) return;
+    const newBody = prompt('Nội dung:', t.body); if (!newBody) return;
+    const list = getTpl(); const i = list.findIndex(x => x.id === id);
+    list[i] = { ...t, name:newName, body:newBody };
+    window.STORE.set('marketing_tpls', list); renderTpls();
+  };
+  window.delTpl = function(id){
+    if (!confirm('Xoá template?')) return;
+    window.STORE.set('marketing_tpls', getTpl().filter(x => x.id !== id)); renderTpls();
+  };
+  window.addTpl = function(){
+    const name = prompt('Tên template:'); if (!name) return;
+    const body = prompt('Nội dung (dùng {tên} {mã} {nợ}):'); if (!body) return;
+    const list = getTpl();
+    list.push({id:'T'+String(list.length+1).padStart(2,'0'), name, body});
+    window.STORE.set('marketing_tpls', list); renderTpls();
+  };
+
+  function getSegment() {
+    const seg = document.getElementById('seg').value;
+    const custs = window.STORE.get('customers', window.CUSTOMERS || []) || [];
+    const today = new Date(2026, 4, 18);
+    function daysSince(s) {
+      const m = (s||'').match(/(\d+)\/(\d+)\/(\d+)/); if (!m) return 999;
+      return (today - new Date(+m[3],+m[2]-1,+m[1]))/86400000;
+    }
+    if (seg === 'vip') return custs.filter(c => c.group === 'VIP');
+    if (seg === 'new') return custs.filter(c => c.group === 'Mới');
+    if (seg === 'atrisk') return custs.filter(c => daysSince(c.lastOrder) > 60);
+    if (seg === 'debt') return custs.filter(c => (c.debt||0) > 0);
+    if (seg === 'b2b') return custs.filter(c => c.type !== 'ca-nhan');
+    return custs;
+  }
+
+  window.recountSeg = function(){
+    const list = getSegment();
+    document.getElementById('segInfo').innerHTML = `<b>${list.length}</b> KH thoả segment này`;
+  };
+
+  function fillTemplate(body, c){
+    return body.replace(/{tên}/g, c.contact || c.name)
+               .replace(/{mã}/g, c.code)
+               .replace(/{nợ}/g, ((c.debt||0).toLocaleString('vi-VN')));
+  }
+
+  window.previewBlast = function() {
+    const list = getSegment();
+    if (!list.length) { window.toast('Segment rỗng','warn'); return; }
+    const c = list[0];
+    const msg = fillTemplate(document.getElementById('msg').value, c);
+    alert(`Preview cho KH "${c.name}":\n\n${msg}`);
+  };
+
+  window.sendBlast = function() {
+    const list = getSegment();
+    if (!list.length) { window.toast('Segment rỗng','warn'); return; }
+    const body = document.getElementById('msg').value.trim();
+    if (!body) { window.toast('Nhập nội dung','warn'); return; }
+    const channel = document.querySelector('input[name="ch"]:checked').value;
+    if (!confirm(`Sẽ gửi qua ${channel.toUpperCase()} cho ${list.length} KH. Tiếp tục?\n\nLưu ý: Mỗi KH sẽ mở 1 tab/dialog — bạn cần click xác nhận để gửi (chống spam).`)) return;
+
+    const log = document.getElementById('blastLog');
+    log.style.display = 'block';
+    log.innerHTML = '';
+    let sent = 0;
+    list.forEach((c, i) => {
+      setTimeout(() => {
+        const msg = fillTemplate(body, c);
+        const phone = (c.phone||'').replace(/\s/g,'');
+        if (channel === 'zalo') {
+          window.open(`https://zalo.me/${phone}?txt=${encodeURIComponent(msg)}`,'_blank');
+        } else if (channel === 'email') {
+          if (c.email) window.open(`mailto:${c.email}?subject=Thông%20báo%20từ%20Tuấn%20Tú&body=${encodeURIComponent(msg)}`,'_blank');
+        } else {
+          /* SMS: copy to clipboard */
+          navigator.clipboard.writeText(msg);
+        }
+        sent++;
+        log.innerHTML += `<div>${i+1}. ${c.code} · ${c.name} → đã mở/copy</div>`;
+        log.scrollTop = log.scrollHeight;
+        if (i === list.length-1) {
+          window.audit && window.audit.log('marketing.blast', `${channel} → ${sent} KH (segment: ${document.getElementById('seg').value})`);
+          window.toast(`✓ Đã xử lý ${sent}/${list.length}`,'success');
+        }
+      }, i * 600);  /* 600ms / KH để không spam quá nhanh */
+    });
+  };
+
+  renderTpls();
+  window.recountSeg();
+})();
+</script>
+<script src="../scripts/ai-fill.js"></script><script src="../scripts/cust-search-box.js"></script>
+<script src="../data/demo-seed.js"></script>
+<script src="../scripts/data-linkage.js"></script>
+<script src="../scripts/system-core.js"></script>
+<script src="../scripts/ai-chat.js"></script>
+</body></html>

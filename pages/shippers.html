@@ -1,0 +1,91 @@
+<!doctype html>
+<html lang="vi">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Shipper · Nông Sản Tuấn Tú Hà Nội</title>
+<link rel="stylesheet" href="../styles/tokens.css">
+<link rel="stylesheet" href="../styles/app.css">
+<style>
+  /* Shipper table — consistent row height + vertical center */
+  .table-wrap table thead th {
+    font-size:11px;font-weight:700;color:var(--muted);text-transform:uppercase;letter-spacing:0.4px;
+    background:#FAFAFB;padding:10px 12px;border-bottom:1px solid var(--line);
+  }
+  .table-wrap table tbody td {
+    padding:12px;vertical-align:middle;border-bottom:1px solid #F1F3F5;
+  }
+  .table-wrap table tbody tr:hover { background:#FAFAFB; }
+  .table-wrap table tbody tr:last-child td { border-bottom:0; }
+</style>
+</head>
+<body>
+<div class="app">
+  <aside class="sidebar"></aside>
+  <header class="topbar">
+    <div class="breadcrumb"></div>
+    <div class="top-spacer"></div>
+    <div class="search-global">
+      <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="7"/><path d="m21 21-4.3-4.3"/></svg>
+      <input placeholder="Tìm khách, đơn hàng, mã HĐ... (Ctrl + K)">
+    </div>
+    <button class="icon-btn" title="Thông báo"><span style="font-size:18px">🔔</span><span class="dot"></span></button>
+    <button class="icon-btn" title="Hướng dẫn" onclick="window.location.href='docs.html'"><span style="font-size:18px">❓</span></button>
+  </header>
+
+  <main class="main">
+    <div class="page-head">
+      <div>
+        <h1>Quản lý Shipper</h1>
+        <div class="sub">Đội giao hàng nội thành · trạng thái tự cập nhật từ <b>chấm công</b> + <b>đơn hàng</b> hôm nay</div>
+      </div>
+      <div class="head-actions">
+        <button class="btn btn-primary" onclick="window.openAddShipper()">+ Thêm shipper</button>
+      </div>
+    </div>
+
+    <section class="kpis"></section>
+
+    <div class="quick-chips" id="shipChips" style="margin:14px 0"></div>
+
+    <div class="chart-card">
+      <table class="mini-table">
+        <thead><tr>
+          <th>Mã</th>
+          <th>Shipper</th>
+          <th>Sản lượng HÔM NAY · 4 chỉ số</th>
+          <th class="num">Đơn T5</th>
+          <th class="num">Σ đã nhận</th>
+          <th>Trạng thái</th>
+          <th></th>
+        </tr></thead>
+        <tbody id="shipBody"></tbody>
+      </table>
+    </div>
+  </main>
+</div>
+
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<script src="../scripts/supabase-config.js"></script>
+<script src="../scripts/supabase-client.js"></script>
+<script src="../scripts/shared.js"></script>
+<script src="../scripts/store.js"></script>
+<script src="../scripts/auth.js"></script>
+<script src="../scripts/help-tips.js"></script>
+<script src="../scripts/ux-improvements.js"></script>
+<script src="../scripts/onboarding.js"></script>
+<script src="../scripts/pdf-export.js"></script>
+<script>if(window.AUTH) window.AUTH.requireAuth();</script>
+<script src="../data/fleet.js"></script>
+<script src="../data/orders.js"></script>
+<script src="../data/staff.js"></script>
+<script src="../data/timesheet.js"></script>
+<script src="../scripts/shippers.js"></script>
+<script src="../scripts/ai-fill.js"></script>
+<script src="../scripts/cust-search-box.js"></script>
+<script src="../data/demo-seed.js"></script>
+<script src="../scripts/data-linkage.js"></script>
+<script src="../scripts/system-core.js"></script>
+<script src="../scripts/ai-chat.js"></script>
+</body>
+</html>

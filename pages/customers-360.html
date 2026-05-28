@@ -1,0 +1,138 @@
+<!doctype html>
+<html lang="vi">
+<head>
+<meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>KH 360 / RFM · Nông Sản Tuấn Tú</title>
+<link rel="stylesheet" href="../styles/tokens.css"><link rel="stylesheet" href="../styles/app.css">
+<style>
+  .seg-card{background:#fff;border:1px solid var(--line);border-radius:10px;padding:14px;cursor:pointer;transition:all 0.15s}
+  .seg-card:hover{border-color:var(--navy);transform:translateY(-1px);box-shadow:0 4px 12px rgba(0,0,0,0.05)}
+  .cust-mini{display:flex;align-items:center;gap:8px;padding:6px 10px;border-bottom:1px solid #F1F5F9;font-size:12.5px}
+  .cust-mini:hover{background:#FAFBFC}
+</style>
+</head>
+<body>
+<div class="app">
+  <aside class="sidebar"></aside>
+  <header class="topbar">
+    <div class="breadcrumb"></div><div class="top-spacer"></div>
+    <div class="search-global"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="7"/><path d="m21 21-4.3-4.3"/></svg><input placeholder="Tìm... (Ctrl+K)"></div>
+    <button class="icon-btn" title="Thông báo"><span style="font-size:18px">🔔</span><span class="dot"></span></button>
+    <button class="icon-btn" title="Hướng dẫn" onclick="window.location.href='docs.html'"><span style="font-size:18px">❓</span></button>
+  </header>
+
+  <main class="main">
+    <div style="display:flex;align-items:center;gap:12px;margin-bottom:14px">
+      <div>
+        <h1 style="margin:0;font-size:22px;color:var(--navy);font-weight:800">🎯 Khách hàng 360 · RFM <span id="hbT"></span></h1>
+        <div style="font-size:13px;color:var(--muted);margin-top:2px">Phân nhóm KH theo Recency · Frequency · Monetary — chiến lược chăm sóc đúng từng nhóm</div>
+      </div>
+      <div style="flex:1"></div>
+      <a class="btn btn-ghost" href="customers.html">← Danh sách KH</a>
+    </div>
+    <div id="hbHost"></div>
+
+    <h3 style="margin:16px 0 10px;font-size:13px;color:var(--navy);text-transform:uppercase;font-weight:700">Tổng quan 9 segment <span id="hb1"></span></h3>
+    <div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(220px,1fr));gap:10px;margin-bottom:20px" id="segGrid"></div>
+
+    <div style="display:grid;grid-template-columns:2fr 3fr;gap:16px">
+      <div>
+        <h3 style="margin:0 0 10px;font-size:13px;color:var(--navy);text-transform:uppercase;font-weight:700">🏆 Top Champion ${10}</h3>
+        <div id="champList" style="background:#fff;border:1px solid var(--line);border-radius:10px;overflow:hidden"></div>
+
+        <h3 style="margin:20px 0 10px;font-size:13px;color:#D97706;text-transform:uppercase;font-weight:700">⚠️ Cần liên hệ gấp (At-Risk + Hibernating)</h3>
+        <div id="riskList" style="background:#fff;border:1px solid var(--line);border-radius:10px;overflow:hidden"></div>
+      </div>
+      <div>
+        <h3 style="margin:0 0 10px;font-size:13px;color:var(--navy);text-transform:uppercase;font-weight:700">🗺️ Heatmap RFM <span id="hb2"></span></h3>
+        <div id="heatmap" style="background:#fff;border:1px solid var(--line);border-radius:10px;padding:16px"></div>
+      </div>
+    </div>
+  </main>
+</div>
+
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<script src="../scripts/supabase-config.js"></script>
+<script src="../scripts/supabase-client.js"></script>
+<script src="../scripts/shared.js"></script><script src="../scripts/store.js"></script>
+<script src="../scripts/auth.js"></script><script src="../scripts/help-tips.js"></script>
+<script src="../scripts/ux-improvements.js"></script>
+<script src="../scripts/onboarding.js"></script>
+<script src="../scripts/pdf-export.js"></script>
+<script>if(window.AUTH) window.AUTH.requireAuth();</script>
+<script src="../data/customers.js"></script><script src="../data/orders.js"></script>
+<script src="../scripts/rfm.js"></script>
+
+<script>
+(function(){
+  window.renderAppShell('customers','KH 360 / RFM');
+  document.getElementById('hbHost').innerHTML = window.helpBanner(
+    '🎯 RFM Analysis là gì?',
+    'RFM = chuẩn quốc tế phân nhóm KH dựa trên: <b>R</b>ecency (lần đặt gần nhất), <b>F</b>requency (số đơn 90 ngày), <b>M</b>onetary (doanh thu 90 ngày). Mỗi KH có 3 điểm 1-5 → tự phân vào 1 trong 9 segment. Áp dụng chiến lược chăm sóc khác nhau cho từng segment để tối ưu retention + upsell.',
+    {id:'hb-rfm', icon:'🎯'}
+  );
+  document.getElementById('hbT').innerHTML = window.helpTip('Cập nhật real-time dựa trên dữ liệu orders. Mỗi page load tính lại.', {size:'lg'});
+  document.getElementById('hb1').innerHTML = window.helpTip('9 segment dựa trên ma trận R×F×M. Click vào card để xem danh sách KH thuộc segment đó.');
+  document.getElementById('hb2').innerHTML = window.helpTip('Mỗi ô = 1 cặp (R, F). Đậm = nhiều KH. Góc trên phải = KH ngon. Góc dưới trái = KH cần winback.');
+
+  const custs = window.STORE.get('customers', window.CUSTOMERS || []) || [];
+  const segs = {};
+  custs.forEach(c => {
+    const r = window.RFM.calc(c.id);
+    c._rfm = r;
+    segs[r.segment] = segs[r.segment] || [];
+    segs[r.segment].push(c);
+  });
+
+  /* Segment grid */
+  const META = window.RFM.SEG_META;
+  document.getElementById('segGrid').innerHTML = Object.keys(META).map(k => {
+    const list = segs[k] || [];
+    const m = META[k];
+    return `<div class="seg-card" style="border-left:4px solid ${m.color}">
+      <div style="font-size:13px;font-weight:700;color:${m.color}">${m.label}</div>
+      <div style="font-size:24px;font-weight:800;color:var(--navy);margin:4px 0">${list.length}</div>
+      <div style="font-size:11.5px;color:var(--muted);line-height:1.45">${m.desc.slice(0,90)}${m.desc.length>90?'…':''}</div>
+    </div>`;
+  }).join('');
+
+  function listMini(arr, max=10) {
+    if (!arr.length) return `<div style="padding:20px;text-align:center;color:var(--muted);font-size:12.5px">Không có KH nào</div>`;
+    return arr.slice(0, max).map(c => `<a class="cust-mini" href="customers.html?focus=${c.code}" style="text-decoration:none;color:inherit">
+      <div style="width:26px;height:26px;border-radius:5px;background:${window.avatarColor(c.id)};color:#fff;display:grid;place-items:center;font-size:10px;font-weight:700">${window.initials(c.name)}</div>
+      <div style="flex:1;min-width:0"><b>${c.name}</b><div style="font-size:10.5px;color:var(--muted)">${c.code} · ${c._rfm.freq} đơn · ${window.fmtShort(c._rfm.money)}</div></div>
+      <div style="font-size:11px;font-weight:700;color:var(--navy)">R${c._rfm.R}F${c._rfm.F}M${c._rfm.M}</div>
+    </a>`).join('');
+  }
+  document.getElementById('champList').innerHTML = listMini([...(segs.champion||[]), ...(segs.loyal||[])].sort((a,b)=>b._rfm.money-a._rfm.money));
+  document.getElementById('riskList').innerHTML = listMini([...(segs.at_risk||[]), ...(segs.hibernating||[])].sort((a,b)=>a._rfm.recencyDays-b._rfm.recencyDays));
+
+  /* Heatmap R × F */
+  const grid = Array(5).fill(0).map(() => Array(5).fill(0));
+  custs.forEach(c => { grid[5-c._rfm.R][c._rfm.F-1]++; });
+  const max = Math.max(1, ...grid.flat());
+  let hm = `<div style="display:grid;grid-template-columns:30px repeat(5,1fr);gap:3px;font-size:11px">`;
+  hm += `<div></div>` + [1,2,3,4,5].map(f => `<div style="text-align:center;color:var(--muted)">F${f}</div>`).join('');
+  for (let r = 0; r < 5; r++) {
+    hm += `<div style="display:flex;align-items:center;color:var(--muted)">R${5-r}</div>`;
+    for (let f = 0; f < 5; f++) {
+      const v = grid[r][f];
+      const intensity = v / max;
+      const bg = `rgba(22, 163, 74, ${0.1 + intensity * 0.85})`;
+      hm += `<div style="background:${v?bg:'#F8FAFC'};aspect-ratio:1;display:grid;place-items:center;border-radius:5px;font-weight:700;color:${intensity>0.5?'#fff':'#475569'};font-size:13px">${v||''}</div>`;
+    }
+  }
+  hm += `</div>
+    <div style="display:flex;justify-content:space-between;margin-top:10px;font-size:11px;color:var(--muted)">
+      <span>← KH chi ít / ít đặt</span>
+      <span>KH ngon →</span>
+    </div>`;
+  document.getElementById('heatmap').innerHTML = hm;
+})();
+</script>
+<script src="../scripts/ai-fill.js"></script><script src="../scripts/cust-search-box.js"></script>
+<script src="../data/demo-seed.js"></script>
+<script src="../scripts/data-linkage.js"></script>
+<script src="../scripts/system-core.js"></script>
+<script src="../scripts/ai-chat.js"></script>
+</body></html>

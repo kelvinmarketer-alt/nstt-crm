@@ -1,0 +1,27 @@
+# OS
+.DS_Store
+Thumbs.db
+desktop.ini
+
+# Editor
+.vscode/
+.idea/
+*.swp
+*~
+
+# Logs / debug
+*.log
+.cache/
+
+# Local secrets (nếu sau này có)
+.env
+.env.local
+config.local.js
+
+# Build (chưa dùng, để sẵn cho tương lai)
+node_modules/
+dist/
+build/
+.git_vty_legacy_backup/
+
+# Backup folder VTY git history cũ — đã rename khỏi .git để init NSTT clean. KHÔNG commit.

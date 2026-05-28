@@ -1,0 +1,145 @@
+<!doctype html>
+<html lang="vi">
+<head>
+<meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Cổng Khách hàng · Nông Sản Tuấn Tú</title>
+<link rel="stylesheet" href="../styles/tokens.css">
+<style>
+  body{margin:0;font-family:'Segoe UI',sans-serif;background:#F0FDF4;color:var(--text)}
+  .pwrap{max-width:720px;margin:0 auto;padding:20px}
+  .ph{background:linear-gradient(135deg,#16A34A,#1B5E20);color:#fff;padding:18px 20px;border-radius:14px;margin-bottom:18px;display:flex;align-items:center;gap:12px}
+  .ph .icc{width:48px;height:48px;border-radius:10px;background:rgba(255,255,255,0.2);display:grid;place-items:center;font-size:24px}
+  .ph h1{margin:0;font-size:18px}
+  .ph .sub{font-size:12px;opacity:0.9;margin-top:2px}
+  .pcard{background:#fff;border-radius:12px;padding:16px;margin-bottom:14px;box-shadow:0 2px 8px rgba(0,0,0,0.04)}
+  .pcard h2{margin:0 0 10px;font-size:14px;color:var(--navy);text-transform:uppercase;letter-spacing:0.4px;font-weight:700}
+  .pkpi{display:grid;grid-template-columns:repeat(3,1fr);gap:8px;margin-bottom:14px}
+  .pkpi .k{background:#fff;border-radius:10px;padding:12px;text-align:center;box-shadow:0 1px 4px rgba(0,0,0,0.04)}
+  .pkpi .k .v{font-size:18px;font-weight:800;color:var(--navy)}
+  .pkpi .k .l{font-size:11px;color:var(--muted);margin-top:2px;text-transform:uppercase;letter-spacing:0.3px;font-weight:600}
+  .login-box{max-width:340px;margin:60px auto;background:#fff;padding:24px;border-radius:12px;box-shadow:0 4px 16px rgba(0,0,0,0.06)}
+  .login-box input{width:100%;padding:10px;font-size:14px;border:1px solid #ddd;border-radius:8px;margin-bottom:10px;box-sizing:border-box}
+  .login-box button{width:100%;padding:10px;background:#16A34A;color:#fff;border:none;border-radius:8px;font-weight:700;cursor:pointer;font-size:14px}
+  .order-row{display:flex;justify-content:space-between;padding:8px 0;border-bottom:1px solid #F1F5F9;font-size:13px}
+</style>
+</head>
+<body>
+<div id="root"></div>
+
+<script>
+/* Demo: dùng localStorage chung với app chính */
+const PREFIX='vty_';
+function get(k,d){try{return JSON.parse(localStorage.getItem(PREFIX+k))||d}catch(e){return d}}
+function fmt(n){return (n||0).toLocaleString('vi-VN')}
+const TODAY='18/05/2026';
+
+const $ = id => document.getElementById(id);
+
+function renderLogin(){
+  document.getElementById('root').innerHTML = `
+    <div class="login-box">
+      <div style="text-align:center;margin-bottom:20px">
+        <div style="font-size:32px">🥬</div>
+        <h2 style="margin:6px 0 4px;color:#1B5E20">Cổng Khách hàng</h2>
+        <div style="font-size:13px;color:#666">Nông Sản Tuấn Tú Hà Nội</div>
+      </div>
+      <div style="background:#FEF3C7;color:#92400E;padding:9px 12px;border-radius:7px;font-size:12px;margin-bottom:14px">
+        💡 <b>Demo:</b> nhập mã KH (VD: <b>KH001</b>, <b>KH002</b>...) để xem dashboard cá nhân của bạn.
+      </div>
+      <input id="custCode" placeholder="Mã KH (VD: KH001)" autofocus>
+      <button onclick="loginCust()">Vào cổng KH →</button>
+      <div style="text-align:center;margin-top:14px;font-size:12px;color:#666">
+        Không có mã? <a href="https://nongsantuantuhanoi.com" style="color:#16A34A">Liên hệ Hotline 0912 345 678</a>
+      </div>
+    </div>
+  `;
+}
+
+function loginCust(){
+  const code = $('custCode').value.trim().toUpperCase();
+  const custs = get('customers',[]);
+  const c = custs.find(x => x.code === code || x.id === code);
+  if (!c) { alert('Không tìm thấy mã KH ' + code + '. Vui lòng kiểm tra lại hoặc liên hệ hotline.'); return; }
+  localStorage.setItem('portal_cust', code);
+  renderPortal(c);
+}
+
+function logout(){ localStorage.removeItem('portal_cust'); renderLogin(); }
+
+function renderPortal(c){
+  const orders = get('orders',[]).filter(o => o.custId === c.id || o.code && (o.custName||'').includes(c.name));
+  const myOrders = orders.slice().reverse().slice(0,20);
+  const debt = c.debt || 0;
+  const overdueDebt = c.debtOverdue || 0;
+  const revenue = c.revenue || 0;
+  const totalOrders = c.orders || orders.length;
+
+  document.getElementById('root').innerHTML = `
+    <div class="pwrap">
+      <div class="ph">
+        <div class="icc">${c.name.split(/\s+/).slice(0,2).map(x=>x[0]||'').join('').toUpperCase()}</div>
+        <div style="flex:1">
+          <h1>Xin chào ${c.contact || c.name}</h1>
+          <div class="sub">${c.code} · ${c.name}</div>
+        </div>
+        <button onclick="logout()" style="background:rgba(255,255,255,0.2);border:none;color:#fff;padding:6px 10px;border-radius:6px;cursor:pointer;font-size:11px">Đăng xuất</button>
+      </div>
+
+      <div class="pkpi">
+        <div class="k"><div class="v">${totalOrders}</div><div class="l">Tổng đơn</div></div>
+        <div class="k"><div class="v">${(revenue/1_000_000).toFixed(1)}tr</div><div class="l">Tổng đã mua</div></div>
+        <div class="k"><div class="v" style="color:${debt>0?'#DC2626':'#16A34A'}">${debt>0?(debt/1_000_000).toFixed(1)+'tr':'0'}</div><div class="l">Công nợ</div></div>
+      </div>
+
+      ${debt > 0 ? `<div class="pcard" style="border-left:4px solid #DC2626">
+        <h2 style="color:#DC2626">⚠️ Công nợ cần thanh toán</h2>
+        <div>Bạn đang nợ <b style="color:#DC2626">${fmt(debt)} ₫</b>${overdueDebt > 0 ? ` <span style="background:#FEE2E2;color:#B91C1C;padding:1px 6px;border-radius:4px;font-size:11px">${fmt(overdueDebt)} quá hạn</span>` : ''}</div>
+        <div style="font-size:12px;color:#666;margin-top:6px">Vui lòng thanh toán qua chuyển khoản: <b>VCB 0123456789 - NÔNG SẢN TUẤN TÚ HÀ NỘI</b></div>
+      </div>` : ''}
+
+      <div class="pcard">
+        <h2>📦 Lịch sử đơn gần đây</h2>
+        ${myOrders.length ? myOrders.map(o => `<div class="order-row">
+          <div><b>${o.code}</b><div style="font-size:11px;color:#666">${o.date} · ${o.status||''}</div></div>
+          <div style="text-align:right"><b>${fmt(o.freight||0)} ₫</b></div>
+        </div>`).join('') : '<div style="text-align:center;padding:20px;color:#999">Chưa có đơn nào</div>'}
+      </div>
+
+      <div class="pcard">
+        <h2>💬 Liên hệ NV phụ trách</h2>
+        <div style="font-size:13px">
+          <b>${c.staffOwner || 'Tuấn Tú'}</b> — ${c.staffOwner ? '0912 345 678' : 'Hotline chung'}<br>
+          <span style="color:#666">Email: support@nongsantuantuhanoi.com</span>
+        </div>
+        <div style="display:flex;gap:8px;margin-top:10px">
+          <a href="tel:0912345678" style="flex:1;background:#16A34A;color:#fff;padding:9px;border-radius:7px;text-decoration:none;text-align:center;font-weight:600;font-size:13px">📞 Gọi ngay</a>
+          <a href="https://zalo.me/0912345678" style="flex:1;background:#1E40AF;color:#fff;padding:9px;border-radius:7px;text-decoration:none;text-align:center;font-weight:600;font-size:13px">💬 Zalo</a>
+        </div>
+      </div>
+
+      <div class="pcard">
+        <h2>📋 Thông tin tài khoản</h2>
+        <div style="font-size:13px;line-height:1.7">
+          <div><b>Tên:</b> ${c.name}</div>
+          <div><b>Mã KH:</b> ${c.code}</div>
+          <div><b>SĐT:</b> ${c.phone || '—'}</div>
+          <div><b>Email:</b> ${c.email || '—'}</div>
+          <div><b>Địa chỉ:</b> ${c.address || '—'}</div>
+          <div><b>Nhóm KH:</b> ${c.group || 'Thường'}</div>
+        </div>
+      </div>
+
+      <div style="text-align:center;font-size:11px;color:#999;margin-top:14px">
+        🥬 Nông Sản Tuấn Tú Hà Nội · <a href="https://nongsantuantuhanoi.com" style="color:#16A34A">nongsantuantuhanoi.com</a>
+      </div>
+    </div>
+  `;
+}
+
+const saved = localStorage.getItem('portal_cust');
+if (saved) {
+  const c = get('customers',[]).find(x => x.code === saved);
+  if (c) renderPortal(c); else renderLogin();
+} else renderLogin();
+</script>
+</body></html>

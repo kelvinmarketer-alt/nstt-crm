@@ -1,0 +1,286 @@
+<!doctype html>
+<html lang="vi">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Đơn hàng · Nông Sản Tuấn Tú Hà Nội</title>
+<link rel="stylesheet" href="../styles/tokens.css">
+<link rel="stylesheet" href="../styles/app.css">
+<style>
+  /* Status pipeline */
+  .pipeline{display:grid;grid-template-columns:repeat(7,1fr);gap:8px;margin-bottom:14px}
+  @media (max-width:980px){.pipeline{grid-template-columns:repeat(4,1fr)}}
+  @media (max-width:560px){.pipeline{grid-template-columns:repeat(2,1fr)}}
+  .pipe-card{background:#fff;border:1px solid var(--line);border-radius:9px;padding:10px 12px;cursor:pointer;border-left:4px solid transparent;transition:all 0.15s}
+  .pipe-card:hover{transform:translateY(-1px);box-shadow:var(--shadow-sm)}
+  .pipe-card.active{box-shadow:0 0 0 2px var(--navy)}
+  .pipe-card.s-confirmed{border-left-color:#3B82F6}
+  .pipe-card.s-pickup{border-left-color:#F59E0B}
+  .pipe-card.s-transit{border-left-color:#8B5CF6}
+  .pipe-card.s-delivered{border-left-color:var(--ok)}
+  .pipe-card.s-reconciled{border-left-color:var(--navy)}
+  .pipe-card.s-cancelled{border-left-color:var(--muted)}
+  .pipe-card .lab{font-size:11px;color:var(--muted);text-transform:uppercase;letter-spacing:0.4px;font-weight:600}
+  .pipe-card .val{font-size:20px;font-weight:800;color:var(--navy);margin-top:2px}
+  .pipe-card .sub{font-size:11px;color:var(--muted);margin-top:2px}
+
+  .status-pill.st-confirmed{background:#DBEAFE;color:#1E40AF}
+  .status-pill.st-pickup{background:#FEF3C7;color:#B45309}
+  .status-pill.st-transit{background:#EDE9FE;color:#7C3AED}
+  .status-pill.st-delivered{background:var(--ok-bg);color:var(--ok)}
+  .status-pill.st-reconciled{background:var(--navy-soft);color:var(--navy)}
+  .status-pill.st-cancelled{background:#FEE2E2;color:#B91C1C}
+  .status-pill.st-returned{background:#FFEDD5;color:#C2410C}
+
+  /* Pipeline cards màu cho returned + cancelled */
+  .pipe-card.s-returned{border-left:4px solid #EA580C}
+  .pipe-card.s-cancelled{border-left:4px solid #DC2626}
+
+  /* Status dropdown trong table — bỏ default arrow xám của browser */
+  .status-select{appearance:none;-webkit-appearance:none;background-image:url("data:image/svg+xml;charset=UTF-8,%3csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' viewBox='0 0 24 24' fill='none' stroke='currentColor' stroke-width='3'%3e%3cpolyline points='6 9 12 15 18 9'/%3e%3c/svg%3e");background-repeat:no-repeat;background-position:right 8px center;padding-right:24px!important;transition:transform 0.1s}
+  .status-select:hover{transform:translateY(-1px);box-shadow:0 2px 6px rgba(0,0,0,0.08)}
+  .status-select:focus{outline:2px solid currentColor;outline-offset:1px}
+
+  /* Service & Transport mode tags */
+  .svc-tag{display:inline-block;font-size:10.5px;padding:2px 7px;border-radius:4px;font-weight:600;margin-right:3px}
+  .tm-tag{display:inline-block;font-size:10.5px;padding:2px 7px;border-radius:4px;background:#F3F4F6;color:var(--text);font-weight:500}
+
+  /* Timeline */
+  .timeline{position:relative;padding-left:24px}
+  .timeline::before{content:'';position:absolute;left:8px;top:8px;bottom:8px;width:2px;background:var(--line)}
+  .tl-item{position:relative;padding:8px 0 14px;font-size:13px}
+  .tl-item::before{content:'';position:absolute;left:-22px;top:11px;width:14px;height:14px;border-radius:50%;background:#fff;border:2px solid var(--line)}
+  .tl-item.done::before{background:var(--ok);border-color:var(--ok)}
+  .tl-item.current::before{background:var(--red);border-color:var(--red);box-shadow:0 0 0 4px var(--red-soft)}
+  .tl-item .t1{font-weight:600;color:var(--text)}
+  .tl-item.pending .t1{color:var(--muted)}
+  .tl-item .t2{font-size:11.5px;color:var(--muted);margin-top:2px}
+</style>
+</head>
+<body>
+
+<div class="app">
+  <aside class="sidebar"></aside>
+
+  <header class="topbar">
+    <div class="breadcrumb"></div>
+    <div class="top-spacer"></div>
+    <div class="search-global">
+      <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="7"/><path d="m21 21-4.3-4.3"/></svg>
+      <input placeholder="Tìm mã đơn / SĐT / tên KH... (Ctrl + K)">
+    </div>
+    <button class="icon-btn" title="Thông báo"><span style="font-size:18px">🔔</span><span class="dot"></span></button>
+  </header>
+
+  <main class="main">
+
+    <div class="page-head">
+      <div>
+        <h1>Đơn hàng</h1>
+        <div class="sub">6 nhóm hàng · Pipeline 6 trạng thái · Mã đơn NSTT-NNNNNN</div>
+      </div>
+      <div class="head-actions">
+        <button class="btn btn-ghost" onclick="window.exportOrdersCsv()">⬇ Xuất Excel</button>
+        <button class="btn btn-ghost" onclick="window.printFilteredOrders()">🖨 In phiếu hàng loạt</button>
+        <button class="btn btn-ghost" onclick="window.aiCreateOrder()">📷 Tạo đơn từ ảnh</button>
+        <button class="btn btn-primary" onclick="window.openCreateOrder()">+ Tạo đơn mới</button>
+      </div>
+    </div>
+
+    <!-- Status pipeline -->
+    <div class="pipeline" id="pipeline"></div>
+
+    <!-- Service chips -->
+    <div class="quick-chips" id="serviceChips"></div>
+
+    <!-- Filter -->
+    <div class="filter-bar">
+      <div class="search-in" style="flex:1.5">
+        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="7"/><path d="m21 21-4.3-4.3"/></svg>
+        <input id="qSearch" placeholder="Tìm mã đơn / KH / shipper / xe...">
+      </div>
+      <select id="fMode">
+        <option value="">Hình thức giao (tất cả)</option>
+        <option value="giao-ngay">🛵 Giao trong ngày</option>
+        <option value="dat-truoc">📅 Đặt trước / định kỳ</option>
+        <option value="tan-bep">🍽 Giao tận bếp</option>
+      </select>
+      <select id="fDriver">
+        <option value="">Shipper (tất cả)</option>
+        <option>Lê Văn B</option>
+        <option>Phạm Đức</option>
+        <option>Bùi Văn C</option>
+        <option>Đỗ Văn Hải</option>
+        <option>Ngô Thị Thu</option>
+        <option>Trần Quốc Anh</option>
+      </select>
+      <select id="fStaff">
+        <option value="">NV phụ trách (tất cả)</option>
+        <option>Trần Lan</option>
+        <option>Phạm Hùng</option>
+        <option>Hoàng Mai</option>
+        <option>Tuấn Tú</option>
+      </select>
+      <button class="btn btn-ghost btn-sm" onclick="clearOrderFilters()">↺ Xóa lọc</button>
+    </div>
+
+    <!-- Table -->
+    <div class="table-card">
+      <div class="table-head">
+        <div class="checkbox" onclick="this.classList.toggle('on')"></div>
+        <div class="count" id="rowCount"></div>
+        <div class="spacer"></div>
+        <button class="btn btn-ghost btn-sm" onclick="window.openOrderColPicker()">⚙ Cột hiển thị</button>
+      </div>
+      <div class="table-wrap">
+        <table>
+          <thead>
+            <tr>
+              <th style="width:30px"></th>
+              <th>Mã đơn / Dịch vụ</th>
+              <th class="hide-sm">Thời gian</th>
+              <th>Khách hàng</th>
+              <th class="hide-md">Giao đến</th>
+              <th class="hide-md">Hàng</th>
+              <th class="num">Tiền hàng (₫)</th>
+              <th class="num hide-md">COD (₫)</th>
+              <th class="hide-md">Shipper / Xe</th>
+              <th>Trạng thái</th>
+              <th class="num">Hành động</th>
+            </tr>
+          </thead>
+          <tbody id="tbody"></tbody>
+        </table>
+      </div>
+      <div class="table-foot">
+        <div>Hiển thị <b id="footCount">0</b> đơn</div>
+        <div class="spacer" style="flex:1"></div>
+        <div class="pager">
+          <button disabled>‹</button><button class="active">1</button><button>›</button>
+        </div>
+      </div>
+    </div>
+
+  </main>
+</div>
+
+<!-- DRAWER -->
+<div class="drawer-bg" id="drawerBg" onclick="closeDrawer()"></div>
+<aside class="drawer" id="drawer">
+  <div class="drawer-head">
+    <div class="ava-lg" id="dAva" style="background:var(--navy)">📦</div>
+    <div class="info">
+      <h2 id="dCode">—</h2>
+      <div class="meta" id="dMeta"></div>
+    </div>
+    <button class="close-btn" onclick="closeDrawer()">✕</button>
+  </div>
+
+  <div class="drawer-stats">
+    <div class="s"><div class="lab">Tiền hàng</div><div class="val" id="dFreight">—</div><div class="sub" id="dPay">—</div></div>
+    <div class="s"><div class="lab">COD</div><div class="val" id="dCod">—</div><div class="sub">Thu hộ</div></div>
+    <div class="s"><div class="lab">Khối lượng</div><div class="val" id="dWeight">—</div><div class="sub" id="dUnit">—</div></div>
+    <div class="s"><div class="lab">Dịch vụ</div><div class="val" id="dService" style="font-size:13px">—</div><div class="sub" id="dMode">—</div></div>
+  </div>
+
+  <div class="tabs">
+    <div class="tab active" data-tab="info">📋 Thông tin</div>
+    <div class="tab" data-tab="timeline">⏱ Trạng thái</div>
+    <div class="tab" data-tab="vehicle">🚚 Shipper / Xe</div>
+    <div class="tab" data-tab="actions">⚡ Hành động</div>
+  </div>
+
+  <div class="tab-body">
+
+    <div class="tab-pane active" data-pane="info">
+      <div class="section-h">Thông tin đơn</div>
+      <div class="kv-grid">
+        <div class="kv"><span class="k">Mã đơn</span><span class="v" id="iCode">—</span></div>
+        <div class="kv"><span class="k">Khách hàng</span><span class="v" id="iCust">—</span></div>
+        <div class="kv"><span class="k">NV phụ trách</span><span class="v" id="iStaff">—</span></div>
+        <div class="kv"><span class="k">Ngày tạo</span><span class="v" id="iDate">—</span></div>
+        <div class="kv" style="grid-column:1/-1"><span class="k">Hàng hóa</span><span class="v" id="iGoods">—</span></div>
+      </div>
+      <div class="section-h">Điểm lấy / giao</div>
+      <div class="kv-grid">
+        <div class="kv"><span class="k">📍 Lấy hàng tại</span><span class="v" id="iPickup">—</span></div>
+        <div class="kv"><span class="k">🎯 Giao đến</span><span class="v" id="iDrop">—</span></div>
+      </div>
+      <div class="section-h">Thanh toán</div>
+      <div class="kv-grid">
+        <div class="kv"><span class="k">Hình thức</span><span class="v" id="iPayBy">—</span></div>
+        <div class="kv"><span class="k">Tổng thu</span><span class="v" id="iTotal" style="color:var(--red);font-weight:700">—</span></div>
+      </div>
+      <div class="section-h">Ghi chú</div>
+      <div style="font-size:13px;color:var(--text);padding:8px 12px;background:#FAFAFB;border-radius:7px" id="iNote">—</div>
+    </div>
+
+    <div class="tab-pane" data-pane="timeline">
+      <div class="section-h">Trạng thái đơn (timeline)</div>
+      <div class="timeline" id="timelineList"></div>
+    </div>
+
+    <div class="tab-pane" data-pane="vehicle">
+      <div class="section-h">Shipper &amp; Xe phụ trách</div>
+      <div class="kv-grid">
+        <div class="kv"><span class="k">Shipper</span><span class="v" id="iDriver">—</span></div>
+        <div class="kv"><span class="k">Xe</span><span class="v" id="iVehicle">—</span></div>
+      </div>
+      <div style="margin-top:14px;display:flex;gap:8px;flex-wrap:wrap">
+        <button class="btn btn-ghost btn-sm">📞 Gọi shipper</button>
+        <button class="btn btn-ghost btn-sm">💬 Nhắn Zalo</button>
+        <button class="btn btn-ghost btn-sm">🔄 Đổi shipper / xe</button>
+      </div>
+    </div>
+
+    <div class="tab-pane" data-pane="actions">
+      <div class="section-h">Đổi trạng thái</div>
+      <div style="margin-bottom:14px;padding:12px 14px;background:#FAFAFB;border-radius:8px;border:1px solid var(--line)">
+        <label style="font-size:11.5px;color:var(--muted);text-transform:uppercase;font-weight:700;letter-spacing:0.3px;display:block;margin-bottom:6px">Chọn trạng thái mới</label>
+        <select id="drawerStatusSel" style="width:100%;padding:10px 12px;font-size:14px;font-weight:700;border:2px solid var(--line);border-radius:8px;cursor:pointer;background:#fff"></select>
+        <div style="font-size:11px;color:var(--muted);margin-top:6px">
+          💡 Đổi sang <b>Đã trả hàng</b>: sẽ trừ doanh thu + công nợ KH tự động.<br>
+          💡 Đổi sang <b>Đã hủy</b>: dành cho đơn chưa giao. Nếu KH đã nhận → dùng <b>Đã trả hàng</b>.
+        </div>
+      </div>
+      <div class="section-h">Hành động khác</div>
+      <div style="display:flex;flex-direction:column;gap:8px">
+        <button class="btn btn-primary">📤 Gửi đơn cho shipper</button>
+        <button class="btn btn-navy">🖨 In phiếu giao hàng</button>
+        <button class="btn btn-ghost">📱 Gửi SMS cho khách</button>
+        <button class="btn btn-ghost">🔗 Sao chép link tracking</button>
+      </div>
+    </div>
+
+  </div>
+</aside>
+
+<script src="https://cdn.sheetjs.com/xlsx-0.20.3/package/dist/xlsx.full.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<script src="../scripts/supabase-config.js"></script>
+<script src="../scripts/supabase-client.js"></script>
+<script src="../scripts/shared.js"></script>
+<script src="../scripts/store.js"></script>
+<script src="../scripts/auth.js"></script>
+<script src="../scripts/help-tips.js"></script>
+<script src="../scripts/ux-improvements.js"></script>
+<script src="../scripts/onboarding.js"></script>
+<script src="../scripts/pdf-export.js"></script>
+<script>if(window.AUTH) window.AUTH.requireAuth();</script>
+<script src="../data/orders.js"></script>
+<script src="../data/fleet.js"></script>
+<script src="../data/products.js"></script>
+<script src="../data/product-images.js"></script>
+<script src="../scripts/ai-fill.js"></script>
+<script src="../scripts/cust-preferences.js"></script>
+<script src="../scripts/orders.js"></script>
+<script src="../data/brand-logo.js"></script>
+<script src="../scripts/pdf-templates.js"></script>
+<script src="../scripts/delivery-note.js"></script>
+<script src="../scripts/cust-search-box.js"></script>
+<script src="../data/demo-seed.js"></script>
+<script src="../scripts/data-linkage.js"></script>
+<script src="../scripts/system-core.js"></script>
+<script src="../scripts/ai-chat.js"></script>
+</body>
+</html>

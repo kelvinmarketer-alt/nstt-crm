@@ -1,0 +1,164 @@
+<!doctype html>
+<html lang="vi">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Kế toán · Nông Sản Tuấn Tú Hà Nội</title>
+<link rel="stylesheet" href="../styles/tokens.css">
+<link rel="stylesheet" href="../styles/app.css">
+<style>
+  .acc-grid{display:grid;grid-template-columns:1fr 1fr;gap:14px;margin-bottom:14px}
+  @media (max-width:980px){.acc-grid{grid-template-columns:1fr}}
+  .acc-card{background:#fff;border:1px solid var(--line);border-radius:10px;padding:14px 16px}
+  .acc-card .h{display:flex;align-items:center;gap:10px;margin-bottom:10px}
+  .acc-card .h h3{margin:0;font-size:13px;color:var(--navy);font-weight:700;text-transform:uppercase;letter-spacing:0.4px}
+  .acc-card .h .spc{flex:1}
+  .acc-row{display:flex;align-items:center;padding:8px 0;border-bottom:1px dashed var(--line);font-size:13px}
+  .acc-row:last-child{border-bottom:none}
+  .acc-row .lab{flex:1;color:var(--muted)}
+  .acc-row .val{font-weight:700;color:var(--navy);font-variant-numeric:tabular-nums}
+  .acc-row .val.in{color:var(--ok)}
+  .acc-row .val.out{color:var(--danger)}
+  .balance{padding:14px;background:linear-gradient(135deg,var(--navy) 0%,var(--navy-dark) 100%);color:#fff;border-radius:10px;margin-top:6px}
+  .balance .lab{font-size:11px;opacity:0.7;text-transform:uppercase;letter-spacing:0.5px;font-weight:600}
+  .balance .val{font-size:26px;font-weight:800;margin-top:4px}
+  .balance .sub{font-size:11.5px;opacity:0.7;margin-top:2px}
+
+  .type-in{color:var(--ok)}
+  .type-out{color:var(--danger)}
+</style>
+</head>
+<body>
+
+<div class="app">
+  <aside class="sidebar"></aside>
+  <header class="topbar">
+    <div class="breadcrumb"></div>
+    <div class="top-spacer"></div>
+    <div class="search-global"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="7"/><path d="m21 21-4.3-4.3"/></svg><input placeholder="Tìm phiếu thu/chi..."></div>
+    <button class="icon-btn" title="Thông báo <button class="icon-btn"><span style="font-size:18px">🔔</span></button> cảnh báo hệ thống"><span style="font-size:18px">🔔</span></button>
+  </header>
+
+  <main class="main">
+
+    <div class="page-head">
+      <div>
+        <h1>Kế toán</h1>
+        <div class="sub">Sổ quỹ tiền mặt + ngân hàng · phiếu thu / chi · tháng 05/2026</div>
+      </div>
+      <div class="head-actions">
+        <button class="btn btn-ghost" onclick="window.openAccountSettings()">⚙ Cài đặt TK</button>
+        <button class="btn btn-ghost" onclick="window.exportCashbookCsv()">⬇ Xuất Excel</button>
+        <button class="btn btn-ghost" onclick="window.openModal('+ Phiếu chi',formChi(),{footer:footChi(),width:'520px'})">- Phiếu chi</button>
+        <button class="btn btn-primary" onclick="window.openModal('+ Phiếu thu',formThu(),{footer:footThu(),width:'520px'})">+ Phiếu thu</button>
+      </div>
+    </div>
+
+    <!-- KPI -->
+    <section class="kpis">
+      <div class="kpi k-1"><div class="kpi-label">Tổng thu T5</div><div class="kpi-value">218 tr</div><div class="kpi-trend up">↑ +18% vs T4</div><div class="kpi-icon">📈</div></div>
+      <div class="kpi k-3"><div class="kpi-label">Tổng chi T5</div><div class="kpi-value">86 tr</div><div class="kpi-trend">Xăng, bảo dưỡng, lương</div><div class="kpi-icon">📉</div></div>
+      <div class="kpi k-2"><div class="kpi-label">Lợi nhuận gộp T5</div><div class="kpi-value">132 tr</div><div class="kpi-trend up">↑ Biên 60.5%</div><div class="kpi-icon">💰</div></div>
+      <div class="kpi k-4"><div class="kpi-label">Quỹ tiền mặt</div><div class="kpi-value">42 tr</div><div class="kpi-trend">Tại văn phòng</div><div class="kpi-icon">💵</div></div>
+      <div class="kpi k-5"><div class="kpi-label">TK ngân hàng</div><div class="kpi-value">186 tr</div><div class="kpi-trend">Vietcombank · MB</div><div class="kpi-icon">🏦</div></div>
+    </section>
+
+    <!-- 2 cột tổng quan -->
+    <div class="acc-grid">
+      <div class="acc-card">
+        <div class="h"><h3>💵 Quỹ tiền mặt</h3><div class="spc"></div><button class="btn btn-ghost btn-sm" onclick="window.openCashHistory()">Lịch sử</button></div>
+        <div class="acc-row"><div class="lab">Đầu kỳ (01/05)</div><div class="val">28.500.000 ₫</div></div>
+        <div class="acc-row"><div class="lab">Thu trong kỳ</div><div class="val in">+62.300.000 ₫</div></div>
+        <div class="acc-row"><div class="lab">Chi trong kỳ</div><div class="val out">-48.800.000 ₫</div></div>
+        <div class="balance">
+          <div class="lab">Số dư hiện tại</div>
+          <div class="val">42.000.000 ₫</div>
+          <div class="sub">Kiểm kê ngày 16/05/2026</div>
+        </div>
+      </div>
+
+      <div class="acc-card">
+        <div class="h"><h3>🏦 Tài khoản ngân hàng</h3><div class="spc"></div>
+          <button class="btn btn-ghost btn-sm" onclick="window.openAccountSettings()">⚙ Quản lý TK</button>
+          <button class="btn btn-ghost btn-sm" onclick="window.openBankReconcile()">🔍 Đối soát</button>
+        </div>
+        <div class="acc-row"><div class="lab">Vietcombank · 1021xxxxxx</div><div class="val">128.400.000 ₫</div></div>
+        <div class="acc-row"><div class="lab">MB Bank · 0312xxxxxx</div><div class="val">42.800.000 ₫</div></div>
+        <div class="acc-row"><div class="lab">Techcombank · 1903xxxxxx</div><div class="val">14.800.000 ₫</div></div>
+        <div class="balance" style="background:linear-gradient(135deg,#0EA5E9 0%,#0369A1 100%)">
+          <div class="lab">Tổng dư ngân hàng</div>
+          <div class="val">186.000.000 ₫</div>
+          <div class="sub">3 tài khoản · cập nhật 16/05 14:30</div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Sổ quỹ -->
+    <div class="filter-bar">
+      <div class="search-in" style="flex:1.5">
+        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="7"/><path d="m21 21-4.3-4.3"/></svg>
+        <input id="qSearch" placeholder="Tìm phiếu / KH / NV...">
+      </div>
+      <select id="fType">
+        <option value="">Loại (tất cả)</option>
+        <option value="in">+ Phiếu thu</option>
+        <option value="out">- Phiếu chi</option>
+      </select>
+      <select id="fAccount">
+        <option value="">Tài khoản (tất cả)</option>
+        <option>Tiền mặt</option>
+        <option>Vietcombank</option>
+        <option>MB Bank</option>
+      </select>
+      <input type="date" id="fFrom" style="border:1px solid var(--line);border-radius:7px;padding:8px;font-size:13px">
+      <input type="date" id="fTo" style="border:1px solid var(--line);border-radius:7px;padding:8px;font-size:13px">
+    </div>
+
+    <div class="table-card">
+      <div class="table-head">
+        <div class="count">Sổ quỹ — 30 phiếu gần nhất</div>
+        <div class="spacer"></div>
+      </div>
+      <div class="table-wrap">
+        <table>
+          <thead>
+            <tr>
+              <th>Số phiếu</th>
+              <th>Ngày</th>
+              <th>Loại</th>
+              <th>Đối tượng</th>
+              <th>Diễn giải</th>
+              <th>TK</th>
+              <th class="num">Số tiền</th>
+              <th>NV lập</th>
+            </tr>
+          </thead>
+          <tbody id="cashTbody"></tbody>
+        </table>
+      </div>
+    </div>
+
+  </main>
+</div>
+
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<script src="../scripts/supabase-config.js"></script>
+<script src="../scripts/supabase-client.js"></script>
+<script src="../scripts/shared.js"></script>
+<script src="../scripts/store.js"></script>
+<script src="../scripts/auth.js"></script>
+<script src="../scripts/help-tips.js"></script>
+<script src="../scripts/ux-improvements.js"></script>
+<script src="../scripts/onboarding.js"></script>
+<script src="../scripts/pdf-export.js"></script>
+<script>if(window.AUTH) window.AUTH.requireAuth();</script>
+<script src="../data/cash-entries.js"></script>
+<script src="../scripts/accounting.js"></script>
+<script src="../scripts/ai-fill.js"></script>
+<script src="../scripts/cust-search-box.js"></script>
+<script src="../data/demo-seed.js"></script>
+<script src="../scripts/data-linkage.js"></script>
+<script src="../scripts/system-core.js"></script>
+<script src="../scripts/ai-chat.js"></script>
+</body>
+</html>

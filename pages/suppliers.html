@@ -1,0 +1,102 @@
+<!doctype html>
+<html lang="vi">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Nhà cung cấp · Nông Sản Tuấn Tú</title>
+<link rel="stylesheet" href="../styles/tokens.css">
+<link rel="stylesheet" href="../styles/app.css">
+<style>
+  .sup-card{background:#fff;border:1px solid var(--line);border-radius:10px;padding:14px 16px;display:flex;gap:14px;align-items:center;margin-bottom:10px;transition:all 0.15s}
+  .sup-card:hover{border-color:var(--navy);box-shadow:0 2px 10px rgba(0,0,0,0.04)}
+  .sup-av{width:48px;height:48px;border-radius:10px;display:grid;place-items:center;color:#fff;font-weight:800;font-size:18px;flex-shrink:0}
+  .sup-info{flex:1;min-width:0;line-height:1.35}
+  .sup-info .n1{font-weight:700;font-size:14px;color:var(--text)}
+  .sup-info .n2{font-size:12px;color:var(--muted);margin-top:2px}
+  .sup-stat{text-align:right;min-width:140px}
+  .sup-stat .v{font-weight:700;color:var(--navy);font-variant-numeric:tabular-nums}
+  .sup-stat .s{font-size:11px;color:var(--muted)}
+  .rating-stars{color:#F59E0B;letter-spacing:1px}
+</style>
+</head>
+<body>
+<div class="app">
+  <aside class="sidebar"></aside>
+  <header class="topbar">
+    <div class="breadcrumb"></div>
+    <div class="top-spacer"></div>
+    <div class="search-global"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="7"/><path d="m21 21-4.3-4.3"/></svg><input placeholder="Tìm... (Ctrl+K)"></div>
+    <button class="icon-btn" title="Thông báo"><span style="font-size:18px">🔔</span><span class="dot"></span></button>
+    <button class="icon-btn" title="Hướng dẫn" onclick="window.location.href='docs.html'"><span style="font-size:18px">❓</span></button>
+  </header>
+
+  <main class="main">
+    <div style="display:flex;align-items:center;gap:12px;margin-bottom:14px">
+      <div>
+        <h1 style="margin:0;font-size:22px;color:var(--navy);font-weight:800">🏭 Nhà cung cấp <span id="hbTitle"></span></h1>
+        <div style="font-size:13px;color:var(--muted);margin-top:2px">Danh bạ NCC đầu vào — công nợ phải trả — lịch sử nhập hàng</div>
+      </div>
+      <div style="flex:1"></div>
+      <button class="btn btn-ghost" onclick="window.exportSupCsv()">⬇ Xuất CSV</button>
+      <button class="btn btn-ghost" onclick="window.supImportExcel()" title="Import NCC hàng loạt từ Excel">📥 Excel</button>
+      <button class="btn btn-ghost" onclick="window.supImportAI()" title="Đọc ảnh AI: danh thiếp / list NCC">📷 Từ ảnh AI</button>
+      <button class="btn btn-primary" onclick="window.openSupModal()">+ Thêm NCC</button>
+    </div>
+
+    <div id="hbHost"></div>
+
+    <div style="display:grid;grid-template-columns:repeat(4,1fr);gap:10px;margin-bottom:14px" id="supKpis"></div>
+
+    <div style="display:flex;gap:10px;margin-bottom:10px;flex-wrap:wrap">
+      <input id="supQ" placeholder="🔍 Tìm NCC, liên hệ, SĐT..." style="flex:1;min-width:240px;border:1px solid var(--line);border-radius:7px;padding:7px 11px;font-size:13px">
+      <select id="supCat" style="border:1px solid var(--line);border-radius:7px;padding:7px 11px;font-size:13px">
+        <option value="">Tất cả nhóm hàng</option>
+        <option value="rau-ta">Rau ta</option>
+        <option value="rau-dalat">Rau Đà Lạt</option>
+        <option value="nam">Nấm</option>
+        <option value="rau-vung-mien">Rau vùng miền</option>
+        <option value="rau-gia-vi">Rau gia vị</option>
+        <option value="hai-san">Hải sản</option>
+      </select>
+      <select id="supStatus" style="border:1px solid var(--line);border-radius:7px;padding:7px 11px;font-size:13px">
+        <option value="">Tất cả</option>
+        <option value="active">Đang hợp tác</option>
+        <option value="inactive">Ngưng</option>
+      </select>
+    </div>
+
+    <div id="supList"></div>
+
+  </main>
+</div>
+
+<!-- Drawer chi tiết NCC -->
+<div class="drawer-bg" id="drawerBg" onclick="closeDrawer()"></div>
+<aside class="drawer" id="drawer">
+  <div id="drawerContent" style="padding:0"></div>
+</aside>
+
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<script src="../scripts/supabase-config.js"></script>
+<script src="../scripts/supabase-client.js"></script>
+<script src="../scripts/shared.js"></script>
+<script src="../scripts/store.js"></script>
+<script src="../scripts/auth.js"></script>
+<script src="../scripts/help-tips.js"></script>
+<script src="../scripts/ux-improvements.js"></script>
+<script src="../scripts/onboarding.js"></script>
+<script src="../scripts/pdf-export.js"></script>
+<script>if(window.AUTH) window.AUTH.requireAuth();</script>
+<script src="../data/suppliers.js"></script>
+<script src="../data/purchases.js"></script>
+<script src="../scripts/suppliers.js"></script>
+<script src="../scripts/ai-fill.js"></script>
+<script src="../scripts/cust-search-box.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
+<script src="../scripts/bulk-import.js"></script>
+<script src="../data/demo-seed.js"></script>
+<script src="../scripts/data-linkage.js"></script>
+<script src="../scripts/system-core.js"></script>
+<script src="../scripts/ai-chat.js"></script>
+</body>
+</html>

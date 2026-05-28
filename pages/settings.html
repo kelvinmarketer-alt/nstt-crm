@@ -1,0 +1,1723 @@
+<!doctype html>
+<html lang="vi">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Cài đặt · Nông Sản Tuấn Tú Hà Nội</title>
+<link rel="stylesheet" href="../styles/tokens.css">
+<link rel="stylesheet" href="../styles/app.css">
+<style>
+  .set-layout{display:grid;grid-template-columns:240px 1fr;gap:14px;margin-top:6px}
+  @media (max-width:780px){.set-layout{grid-template-columns:1fr}}
+
+  .set-nav{background:#fff;border:1px solid var(--line);border-radius:10px;padding:6px;height:fit-content;position:sticky;top:80px}
+  .set-nav .item{padding:9px 12px;font-size:13px;font-weight:600;color:var(--muted);border-radius:7px;cursor:pointer;display:flex;align-items:center;gap:8px}
+  .set-nav .item:hover{background:var(--bg);color:var(--text)}
+  .set-nav .item.active{background:var(--navy);color:#fff}
+
+  .set-panel{background:#fff;border:1px solid var(--line);border-radius:10px;padding:18px 22px}
+  .set-panel h2{margin:0 0 4px;font-size:18px;color:var(--navy);font-weight:800}
+  .set-panel .desc{font-size:13px;color:var(--muted);margin-bottom:18px}
+
+  .md-list{display:flex;flex-direction:column;gap:6px}
+  .md-row{display:flex;align-items:center;gap:10px;padding:8px 12px;border:1px solid var(--line);border-radius:8px;font-size:13px}
+  .md-row .lab{flex:1;font-weight:500}
+  .md-row .meta{font-size:11.5px;color:var(--muted)}
+
+  .integration-card{display:flex;align-items:center;gap:14px;padding:14px;border:1px solid var(--line);border-radius:10px;margin-bottom:10px}
+  .integration-card .ic{width:48px;height:48px;border-radius:10px;display:grid;place-items:center;font-size:24px;color:#fff;flex-shrink:0}
+  .integration-card .info{flex:1;line-height:1.3}
+  .integration-card .info .n1{font-weight:700;color:var(--text);font-size:14px}
+  .integration-card .info .n2{font-size:12px;color:var(--muted);margin-top:2px}
+
+  .toggle{position:relative;display:inline-block;width:38px;height:22px}
+  .toggle input{opacity:0;width:0;height:0}
+  .toggle .slider{position:absolute;inset:0;background:var(--line);border-radius:99px;cursor:pointer;transition:0.2s}
+  .toggle .slider::before{content:'';position:absolute;width:16px;height:16px;left:3px;top:3px;background:#fff;border-radius:50%;transition:0.2s}
+  .toggle input:checked + .slider{background:var(--ok)}
+  .toggle input:checked + .slider::before{transform:translateX(16px)}
+
+  /* === Integration cards (new) === */
+  .int-card{
+    display:flex;gap:14px;align-items:center;
+    padding:14px 16px;border:1px solid var(--line);
+    border-radius:10px;margin-bottom:10px;background:#fff;
+    transition:all 0.15s;
+  }
+  .int-card:hover{border-color:var(--navy);box-shadow:0 2px 10px rgba(0,0,0,0.05)}
+  .int-icon{
+    width:52px;height:52px;border-radius:11px;
+    display:grid;place-items:center;font-size:24px;
+    color:#fff;flex-shrink:0;
+  }
+  .int-body{flex:1;min-width:0;line-height:1.3}
+  .int-head{display:flex;align-items:center;gap:10px;margin-bottom:3px}
+  .int-name{font-weight:700;font-size:14px;color:var(--text)}
+  .int-status{font-size:11px;font-weight:600;letter-spacing:0.2px;padding:1px 8px;border-radius:99px;background:rgba(0,0,0,0.04)}
+  .int-desc{font-size:12.5px;color:var(--muted);line-height:1.4}
+  .int-meta{margin-top:4px}
+  .int-actions{display:flex;align-items:center;gap:6px;flex-shrink:0;flex-wrap:wrap}
+  .int-actions .help-btn{width:30px;height:30px;font-size:13px}
+  @media (max-width:680px){
+    .int-card{flex-wrap:wrap}
+    .int-actions{width:100%;justify-content:flex-end;border-top:1px dashed var(--line);padding-top:10px;margin-top:6px}
+  }
+
+  /* === Master Data layout === */
+  .md-layout{display:grid;grid-template-columns:230px 1fr;min-height:520px}
+  @media (max-width:760px){.md-layout{grid-template-columns:1fr}}
+  .md-sidebar{
+    background:#FAFAFB;border-right:1px solid var(--line);
+    padding:14px 10px;
+  }
+  .md-sec-title{
+    font-size:10px;color:var(--muted);letter-spacing:1px;
+    text-transform:uppercase;font-weight:700;
+    padding:12px 12px 4px;
+  }
+  .md-item{
+    display:flex;align-items:center;gap:9px;
+    padding:9px 12px;font-size:13px;font-weight:500;
+    color:var(--text);cursor:pointer;
+    border-radius:7px;text-decoration:none;
+    margin-bottom:2px;
+  }
+  .md-item:hover{background:#fff;color:var(--navy)}
+  .md-item.active{background:var(--navy);color:#fff;font-weight:600;box-shadow:0 2px 8px rgba(28,45,90,0.2)}
+  .md-item .ic{font-size:16px;width:20px;text-align:center}
+  .md-item .cnt{
+    margin-left:auto;background:#fff;color:var(--muted);
+    font-size:10.5px;font-weight:700;
+    padding:1px 7px;border-radius:99px;
+    border:1px solid var(--line);
+  }
+  .md-item.active .cnt{background:rgba(255,255,255,0.2);color:#fff;border-color:transparent}
+  .md-main{padding:20px 22px 30px;overflow:auto}
+
+  /* === MD Editor inside main === */
+  .md-edit-head{margin-bottom:16px}
+  .md-edit-head h3{margin:0 0 4px;font-size:18px;color:var(--navy);font-weight:800;letter-spacing:-0.2px}
+  .md-edit-head .d{font-size:13px;color:var(--muted)}
+  .md-table{
+    background:#fff;border:1px solid var(--line);border-radius:10px;
+    overflow:hidden;
+  }
+  .md-thead{
+    display:grid;
+    background:#FAFAFB;
+    padding:10px 14px;
+    border-bottom:1px solid var(--line);
+    font-size:11px;color:var(--muted);
+    text-transform:uppercase;letter-spacing:0.5px;font-weight:700;
+  }
+  .md-row-new{
+    display:grid;align-items:center;
+    gap:10px;padding:8px 14px;
+    border-bottom:1px solid #F3F4F6;
+    transition:background 0.1s;
+  }
+  .md-row-new:last-of-type{border-bottom:none}
+  .md-row-new:hover{background:#FAFAFB}
+  .md-row-new .idx{width:24px;color:var(--muted);font-size:11px;text-align:center}
+  .md-row-new input[type="text"]{
+    border:1px solid transparent;background:transparent;
+    padding:6px 8px;font-size:13px;border-radius:6px;
+  }
+  .md-row-new input[type="text"]:focus{outline:none;border-color:var(--navy);background:#fff}
+  .md-row-new input.id-input{
+    font-family:ui-monospace,monospace;color:var(--muted);font-size:11.5px;
+  }
+  .md-row-new input.icon-input{text-align:center;font-size:16px;padding:6px}
+  .md-row-new input[type="color"]{
+    width:28px;height:28px;border:1px solid var(--line);border-radius:6px;cursor:pointer;padding:0;
+  }
+  .md-row-new .del-btn{
+    width:30px;height:30px;border:none;background:transparent;
+    color:var(--muted-2);cursor:pointer;border-radius:6px;font-size:14px;
+  }
+  .md-row-new .del-btn:hover{background:var(--danger-bg);color:var(--danger)}
+  .md-add-row{
+    padding:10px 14px;background:#FAFAFB;border-top:1px dashed var(--line);
+    display:flex;justify-content:center;
+  }
+  .md-add-row button{
+    background:#fff;border:1px dashed var(--navy);
+    color:var(--navy);padding:6px 16px;font-size:12.5px;font-weight:600;
+    border-radius:7px;cursor:pointer;
+  }
+  .md-add-row button:hover{background:var(--navy);color:#fff;border-style:solid}
+  .md-actions{
+    display:flex;gap:8px;align-items:center;
+    margin-top:14px;padding-top:14px;border-top:1px dashed var(--line);
+  }
+  .md-actions .info{font-size:12px;color:var(--muted)}
+</style>
+</head>
+<body>
+<div class="app">
+  <aside class="sidebar"></aside>
+  <header class="topbar">
+    <div class="breadcrumb"></div>
+    <div class="top-spacer"></div>
+    <button class="icon-btn" title="Thông báo <button class="icon-btn"><span style="font-size:18px">🔔</span></button> cảnh báo hệ thống"><span style="font-size:18px">🔔</span></button>
+  </header>
+
+  <main class="main">
+    <div class="page-head">
+      <div>
+        <h1>Cài đặt</h1>
+        <div class="sub">Thông tin doanh nghiệp · Master data · Tích hợp · Bảo mật</div>
+      </div>
+    </div>
+
+    <div class="set-layout">
+
+      <nav class="set-nav">
+        <div class="item active" onclick="switchSet(event,'company')">🏢 Thông tin DN</div>
+        <div class="item" onclick="switchSet(event,'master')">📋 Master data</div>
+        <div class="item" onclick="switchSet(event,'integrate')">🔌 Tích hợp</div>
+        <div class="item" onclick="switchSet(event,'telegram')">✈️ Telegram Bot</div>
+        <div class="item" onclick="switchSet(event,'security')">🔒 Bảo mật</div>
+        <div class="item" onclick="switchSet(event,'backup')">💾 Sao lưu</div>
+      </nav>
+
+      <div>
+        <!-- Company -->
+        <div id="setCompany" class="set-panel">
+          <h2>🏢 Thông tin doanh nghiệp</h2>
+          <div class="desc">Thông tin pháp lý — sẽ hiển thị trên hóa đơn, hợp đồng, phiếu giao hàng.</div>
+
+          <div class="form-row">
+            <div><label>Tên DN *</label><input value="Công ty TNHH Nông Sản Tuấn Tú Hà Nội"></div>
+            <div><label>Tên rút gọn</label><input value="Nông Sản Tuấn Tú Hà Nội"></div>
+          </div>
+          <div class="form-row">
+            <div><label>Mã số thuế *</label><input value="0109876543" style="font-family:ui-monospace,monospace"></div>
+            <div><label>Số ĐKKD</label><input value="0109876543"></div>
+          </div>
+          <div class="form-row wide"><label>Địa chỉ trụ sở *</label>
+            <input value="Số 88 Trần Duy Hưng, P. Trung Hòa, Q. Cầu Giấy, TP. Hà Nội"></div>
+          <div class="form-row">
+            <div><label>Hotline</label><input value="0903 111 222"></div>
+            <div><label>Email</label><input value="contact@nongsantuantu.com"></div>
+          </div>
+          <div class="form-row">
+            <div><label>Website</label><input value="https://nongsantuantu.com"></div>
+            <div><label>Ngân hàng chính</label><input value="Vietcombank · 1021xxxxxx"></div>
+          </div>
+          <div class="form-row wide"><label>Slogan / Lời chào</label>
+            <input value="Vận chuyển trọn niềm tin — Nông Sản Tuấn Tú"></div>
+
+          <div class="section-h" style="margin-top:18px">Logo doanh nghiệp</div>
+          <div style="display:flex;align-items:center;gap:16px;flex-wrap:wrap">
+            <div id="logoPreview" style="width:100px;height:100px;border:1px dashed var(--line);border-radius:10px;display:grid;place-items:center;background:#FAFAFB;overflow:hidden;flex-shrink:0">
+              <span style="color:var(--muted);font-size:11px;text-align:center;padding:8px">Chưa có logo<br>upload bên dưới</span>
+            </div>
+            <div style="flex:1;min-width:240px">
+              <input type="file" id="logoFile" accept="image/png,image/jpeg,image/svg+xml,image/webp" style="display:none" onchange="window.uploadLogo(event)">
+              <div style="display:flex;gap:8px;flex-wrap:wrap">
+                <button class="btn btn-primary btn-sm" onclick="document.getElementById('logoFile').click()">📁 Chọn file logo</button>
+                <button class="btn btn-ghost btn-sm" id="removeLogoBtn" style="display:none" onclick="window.removeLogo()">🗑 Xóa logo</button>
+              </div>
+              <div style="font-size:11.5px;color:var(--muted);margin-top:8px;line-height:1.5">
+                • PNG / JPG / SVG / WebP · Max 500KB · Nên dùng nền trong suốt<br>
+                • Logo sẽ áp dụng ngay vào sidebar + landing + hóa đơn in
+              </div>
+            </div>
+          </div>
+          <div id="logoInfo" style="display:none;margin-top:10px;padding:10px 12px;background:#F0FDF4;border:1px solid #86EFAC;border-radius:8px;font-size:12px;color:var(--ok)">
+            ✓ <b id="logoFileName"></b> · <span id="logoFileSize"></span>
+          </div>
+
+          <div style="margin-top:22px;display:flex;gap:8px">
+            <button class="btn btn-primary" onclick="window.saveCompanyInfo()">💾 Lưu thay đổi</button>
+            <button class="btn btn-ghost" onclick="location.reload()">↺ Hoàn tác</button>
+          </div>
+        </div>
+
+        <!-- Master data -->
+        <div id="setMaster" class="set-panel" style="display:none;padding:0;overflow:hidden">
+          <div style="padding:18px 22px;border-bottom:1px solid var(--line);background:#FAFAFB">
+            <h2 style="margin:0">📋 Master data</h2>
+            <div class="desc" style="margin:4px 0 0">Trung tâm dữ liệu nền — sửa 1 chỗ áp dụng toàn app.</div>
+          </div>
+
+          <div class="md-layout">
+            <!-- Sidebar -->
+            <nav class="md-sidebar">
+              <div class="md-sec-title">Khách hàng</div>
+              <a class="md-item active" data-md="custTypes" onclick="window.switchMD(event,'custTypes')"><span class="ic">🍽</span> Loại hình KH <span class="cnt" id="cnt-custTypes"></span></a>
+              <a class="md-item" data-md="custGroups" onclick="window.switchMD(event,'custGroups')"><span class="ic">⭐</span> Nhóm KH <span class="cnt" id="cnt-custGroups"></span></a>
+              <a class="md-item" data-md="orderFreq" onclick="window.switchMD(event,'orderFreq')"><span class="ic">🔁</span> Tần suất đặt <span class="cnt" id="cnt-orderFreq"></span></a>
+              <a class="md-item" data-md="sources" onclick="window.switchMD(event,'sources')"><span class="ic">📞</span> Nguồn KH <span class="cnt" id="cnt-sources"></span></a>
+
+              <div class="md-sec-title">Đơn hàng</div>
+              <a class="md-item" data-md="services" onclick="window.switchMD(event,'services')"><span class="ic">🥬</span> Nhóm hàng <span class="cnt" id="cnt-services"></span></a>
+              <a class="md-item" data-md="transportModes" onclick="window.switchMD(event,'transportModes')"><span class="ic">🛵</span> Hình thức giao <span class="cnt" id="cnt-transportModes"></span></a>
+              <a class="md-item" data-md="units" onclick="window.switchMD(event,'units')"><span class="ic">📦</span> Đơn vị tính <span class="cnt" id="cnt-units"></span></a>
+              <a class="md-item" data-md="payMethods" onclick="window.switchMD(event,'payMethods')"><span class="ic">💳</span> Hình thức TT <span class="cnt" id="cnt-payMethods"></span></a>
+
+              <div class="md-sec-title">Tổ chức</div>
+              <a class="md-item" data-md="departments" onclick="window.switchMD(event,'departments')"><span class="ic">🏢</span> Phòng ban <span class="cnt" id="cnt-departments"></span></a>
+              <a class="md-item" data-md="provinces" onclick="window.switchMD(event,'provinces')"><span class="ic">📍</span> Tỉnh/TP <span class="cnt" id="cnt-provinces"></span></a>
+            </nav>
+
+            <!-- Main editor -->
+            <div id="mdEditor" class="md-main"></div>
+          </div>
+        </div>
+
+        <!-- Integrations -->
+        <div id="setIntegrate" class="set-panel" style="display:none">
+          <h2>🔌 Tích hợp bên ngoài</h2>
+          <div class="desc">8 tích hợp · Toggle ON/OFF · Cấu hình API · Test kết nối · Nút ❓ hướng dẫn chi tiết cho từng mục.</div>
+
+          <div style="background:#F3E8FF;border:1px solid #E9D5FF;border-radius:8px;padding:10px 14px;font-size:12px;color:#7C3AED;margin-bottom:14px">
+            💡 <b>Lưu ý:</b> Prototype lưu cấu hình vào localStorage. Khi deploy thật cần backend để gọi API. Bạn vẫn có thể nhập đủ thông tin để chuẩn bị sẵn cấu hình + test khi cần.
+          </div>
+
+          <div id="integrationsList"></div>
+
+        </div>
+
+
+        <!-- Telegram Bot -->
+        <div id="setTelegram" class="set-panel" style="display:none">
+          <h2>✈️ Telegram Bot</h2>
+          <div class="desc">Bot gửi báo cáo ngày tự động + bảng giá hằng ngày + file PDF. Cấu hình token + chat ID rồi test.</div>
+
+          <div class="section-h">🤖 Cấu hình Bot (1 bot dùng chung)</div>
+          <div class="form-row">
+            <div>
+              <label class="help-label">Bot Token <span class="help-mini" onclick="window.openHelpGuide('tg-bot-token')" title="Hướng dẫn">?</span></label>
+              <div class="input-with-help">
+                <input id="tgBotToken" type="password" placeholder="123456:AAH... (lấy từ @BotFather)">
+                <button class="help-btn" type="button" onclick="window.openHelpGuide('tg-bot-token')" title="Hướng dẫn">❓</button>
+              </div>
+            </div>
+            <div>
+              <label class="help-label">Chat ID mặc định <span class="help-mini" onclick="window.openHelpGuide('tg-group-chat-id')">?</span></label>
+              <div class="input-with-help">
+                <input id="tgChatId" placeholder="-100123... (fallback nếu không cấu hình kênh riêng)">
+                <button class="help-btn" type="button" onclick="window.openHelpGuide('tg-group-chat-id')" title="Hướng dẫn">❓</button>
+              </div>
+            </div>
+          </div>
+          <div class="form-row wide">
+            <div id="tgStatus" style="padding:10px 12px;background:#FAFAFB;border-radius:8px;font-size:12.5px;color:var(--muted)">⏳ Đang tải cấu hình...</div>
+          </div>
+          <div style="display:flex;gap:8px;margin-top:10px;flex-wrap:wrap">
+            <button class="btn btn-primary" onclick="window.tgSaveConfig()">💾 Lưu cấu hình bot</button>
+            <button class="btn btn-ghost" onclick="window.tgPing()">🏓 Ping bot (getMe)</button>
+            <button class="btn btn-ghost" onclick="window.openHelpGuide('tg-bot-token')">🔗 Hướng dẫn</button>
+          </div>
+
+          <!-- ====== MULTI-CHANNEL: nhiều group theo mục đích ====== -->
+          <div class="section-h" style="margin-top:24px">📡 Kênh gửi (Telegram Groups)</div>
+          <div style="font-size:12.5px;color:var(--muted);margin-bottom:10px">
+            Thêm nhiều group/chat ID khác nhau, sau đó <b>map từng loại báo cáo vào group phù hợp</b> ở phần dưới.
+          </div>
+          <div id="tgChannelsList" style="margin-bottom:10px"></div>
+          <button class="btn btn-ghost btn-sm" onclick="window.tgAddChannel()">+ Thêm kênh mới</button>
+
+          <!-- ====== ROUTING: mỗi mục đích → kênh nào ====== -->
+          <div class="section-h" style="margin-top:24px">🎯 Routing — gửi loại báo cáo nào vào kênh nào</div>
+          <div id="tgRoutingList"></div>
+
+          <div style="display:flex;gap:8px;margin-top:14px;flex-wrap:wrap">
+            <button class="btn btn-primary" onclick="window.tgSaveChannelsRouting()">💾 Lưu kênh + routing</button>
+            <button class="btn btn-navy" onclick="window.tgTestSend()">📤 Test gửi vào kênh mặc định</button>
+            <button class="btn btn-navy" onclick="window.tgSendDailyTest()">📊 Gửi báo cáo ngày TEST</button>
+          </div>
+
+          <div class="section-h" style="margin-top:24px">⏰ Lịch gửi báo cáo tự động</div>
+          <div style="background:#FAFAFB;border:1px solid var(--line);border-radius:10px;padding:14px 16px">
+            <div class="form-row">
+              <div><label>Giờ gửi báo cáo ngày</label><input id="tgDailyHour" type="time" value="18:30"></div>
+              <div>
+                <label>Bật tự động</label>
+                <select id="tgAutoEnabled">
+                  <option value="0">Tắt — chỉ gửi thủ công</option>
+                  <option value="1">Bật — gửi mỗi 18:30 hàng ngày (cần host)</option>
+                </select>
+              </div>
+            </div>
+            <div style="font-size:11.5px;color:var(--muted);margin-top:10px;padding:8px;background:#FEF3C7;border-radius:6px">
+              💡 Lịch tự động cần worker chạy nền (Cloudflare Cron / GitHub Actions). App web tĩnh không gửi được khi không mở. Hiện tại chỉ lưu cấu hình + nút gửi thủ công.
+            </div>
+          </div>
+
+          <!-- Tùy chỉnh mẫu báo cáo + chọn metrics -->
+          <div class="section-h" style="margin-top:24px">📝 Tùy chỉnh mẫu báo cáo ngày</div>
+          <div style="background:#FAFAFB;border:1px solid var(--line);border-radius:10px;padding:16px">
+
+            <div style="display:grid;grid-template-columns:1fr 1fr;gap:14px;margin-bottom:14px">
+              <div>
+                <label style="font-weight:600;font-size:12px;color:var(--navy);text-transform:uppercase;letter-spacing:0.3px">Dòng tiêu đề</label>
+                <input id="tgRptHeader" placeholder="📊 BÁO CÁO NGÀY {date} — ..." style="width:100%;padding:8px 10px;font-size:13px;border:1px solid var(--line);border-radius:7px;font-family:ui-monospace,monospace">
+                <div style="font-size:11px;color:var(--muted);margin-top:4px">💡 Dùng <code>{date}</code> để chèn ngày tự động</div>
+              </div>
+              <div>
+                <label style="font-weight:600;font-size:12px;color:var(--navy);text-transform:uppercase;letter-spacing:0.3px">Dòng cuối (chữ ký)</label>
+                <input id="tgRptFooter" placeholder="— Gửi tự động từ CRM..." style="width:100%;padding:8px 10px;font-size:13px;border:1px solid var(--line);border-radius:7px;font-family:ui-monospace,monospace">
+                <div style="font-size:11px;color:var(--muted);margin-top:4px">Hiện cuối tin nhắn, có thể để trống</div>
+              </div>
+            </div>
+
+            <div style="display:flex;align-items:center;gap:10px;margin-bottom:8px">
+              <label style="font-weight:600;font-size:12px;color:var(--navy);text-transform:uppercase;letter-spacing:0.3px">Chỉ số đưa vào báo cáo (tick để chọn · kéo để sắp xếp)</label>
+              <div style="flex:1"></div>
+              <button class="btn btn-ghost btn-sm" onclick="window.tgSelectAllMetrics()">✓ Tất cả</button>
+              <button class="btn btn-ghost btn-sm" onclick="window.tgSelectNoneMetrics()">✕ Bỏ tick</button>
+              <button class="btn btn-ghost btn-sm" onclick="window.tgResetReportConfig()">↺ Mặc định</button>
+            </div>
+
+            <div id="tgMetricsList" style="background:#fff;border:1px solid var(--line);border-radius:8px;padding:10px;max-height:340px;overflow-y:auto"></div>
+
+            <div style="margin-top:14px">
+              <div style="display:flex;align-items:center;gap:10px;margin-bottom:6px">
+                <label style="font-weight:600;font-size:12px;color:var(--navy);text-transform:uppercase;letter-spacing:0.3px">👁 Xem trước tin nhắn (live)</label>
+                <div style="flex:1"></div>
+                <span style="font-size:11px;color:var(--muted)" id="tgPreviewLen">— ký tự</span>
+              </div>
+              <div id="tgRptPreview" style="background:#0088CC;color:#fff;padding:14px 16px;border-radius:10px;font-family:ui-monospace,'Segoe UI',sans-serif;font-size:13px;line-height:1.6;white-space:pre-wrap;min-height:60px"></div>
+            </div>
+
+            <div style="display:flex;gap:8px;margin-top:14px;flex-wrap:wrap">
+              <button class="btn btn-primary" onclick="window.tgSaveReportConfig()">💾 Lưu cấu hình báo cáo</button>
+              <button class="btn btn-navy" onclick="window.tgSendDailyTest()">📤 Gửi báo cáo TEST ngay</button>
+            </div>
+          </div>
+        </div>
+
+
+        <!-- Security -->
+        <div id="setSecurity" class="set-panel" style="display:none">
+          <h2>🔒 Bảo mật</h2>
+          <div class="desc">Mật khẩu, xác thực 2 lớp, lịch sử đăng nhập, phiên hoạt động.</div>
+
+          <div style="background:#FAFAFB;border:1px solid var(--line);border-radius:10px;padding:14px 16px;margin-bottom:14px">
+            <div style="font-weight:700;font-size:13px;color:var(--navy);margin-bottom:4px">Đổi mật khẩu của bạn</div>
+            <div style="font-size:12px;color:var(--muted);margin-bottom:10px">
+              App dùng Supabase Auth quản lý mật khẩu. Bấm bên dưới để app gửi email reset đến email đăng nhập — bạn click link trong email để đổi mật khẩu mới.
+            </div>
+            <button class="btn btn-primary" onclick="window.changeMyPassword()">🔑 Gửi email reset mật khẩu</button>
+          </div>
+
+          <div class="section-h">Xác thực 2 lớp (2FA)</div>
+          <div class="integration-card" id="twoFACard">
+            <div class="ic" style="background:var(--ok)">🛡</div>
+            <div class="info">
+              <div class="n1">Google Authenticator / Authy</div>
+              <div class="n2" id="twoFAStatus">Tăng bảo mật bằng mã OTP 6 chữ số trên điện thoại</div>
+            </div>
+            <label class="toggle"><input type="checkbox" id="twoFAToggle" onchange="window.toggleTwoFA(this.checked)"><span class="slider"></span></label>
+          </div>
+
+          <div class="section-h">Hoạt động gần đây (50 gần nhất)</div>
+          <table class="mini-table">
+            <thead><tr><th>Thời gian</th><th>NV</th><th>Hành động</th><th>Chi tiết</th></tr></thead>
+            <tbody id="activityHistoryBody">
+              <tr><td colspan="4" style="padding:18px;text-align:center;color:var(--muted)">Đang tải…</td></tr>
+            </tbody>
+          </table>
+        </div>
+
+        <!-- Backup -->
+        <div id="setBackup" class="set-panel" style="display:none">
+          <h2>💾 Sao lưu &amp; Phục hồi</h2>
+          <div class="desc">Sao lưu định kỳ, xuất toàn bộ dữ liệu, phục hồi snapshot.</div>
+
+          <div class="integration-card">
+            <div class="ic" style="background:var(--info)">☁</div>
+            <div class="info">
+              <div class="n1">Sao lưu tự động hằng ngày</div>
+              <div class="n2">Sao lưu lên Google Drive lúc 23:00 hằng ngày</div>
+            </div>
+            <label class="toggle"><input type="checkbox" checked><span class="slider"></span></label>
+          </div>
+
+          <div style="margin-top:14px;display:flex;gap:8px;flex-wrap:wrap">
+            <button class="btn btn-primary" onclick="window.exportAllData()">⬇ Xuất toàn bộ dữ liệu (JSON)</button>
+            <button class="btn btn-ghost" onclick="window.createSnapshot()">💾 Sao lưu ngay (snapshot)</button>
+            <button class="btn btn-ghost" onclick="document.getElementById('importFile').click()">📥 Phục hồi từ file JSON</button>
+            <button class="btn btn-ghost" onclick="window.DataLinkage && window.DataLinkage.showReport()" title="Kiểm tra liên kết FK giữa các module — phát hiện đơn trỏ KH không tồn tại, SP biến mất...">🔗 Audit liên kết dữ liệu</button>
+            <input type="file" id="importFile" accept=".json" style="display:none" onchange="window.importData(event)">
+          </div>
+
+          <div class="section-h" style="margin-top:20px">📚 Snapshot đã lưu</div>
+          <table class="mini-table">
+            <thead><tr><th>Thời gian</th><th>Dung lượng</th><th>Mô tả</th><th>NV tạo</th><th class="num">Hành động</th></tr></thead>
+            <tbody id="snapshotBody">
+              <tr><td colspan="5" style="padding:18px;text-align:center;color:var(--muted)">Đang tải…</td></tr>
+            </tbody>
+          </table>
+
+          <div class="section-h" style="margin-top:24px;color:var(--danger);border-bottom-color:var(--danger)">⚠️ Vùng nguy hiểm</div>
+          <div style="background:#FEF2F2;border:1px solid #FCA5A5;border-radius:10px;padding:14px 16px">
+            <div style="font-size:13px;color:var(--danger);margin-bottom:10px">
+              Reset dữ liệu sẽ xóa <b>tất cả thay đổi của bạn</b> và đưa app về trạng thái dữ liệu mẫu ban đầu.
+            </div>
+            <div style="display:flex;gap:8px;flex-wrap:wrap">
+              <button class="btn btn-ghost" onclick="window.resetKey('customers')">↺ Reset Khách hàng</button>
+              <button class="btn btn-ghost" onclick="window.resetKey('orders')">↺ Reset Đơn hàng</button>
+              <button class="btn btn-ghost" onclick="window.resetKey('vehicles')">↺ Reset Xe</button>
+              <button class="btn btn-ghost" onclick="window.resetKey('drivers')">↺ Reset Tài xế</button>
+              <button class="btn btn-ghost" onclick="window.resetKey('staff')">↺ Reset Nhân viên</button>
+              <button class="btn btn-ghost" onclick="window.resetKey('cashEntries')">↺ Reset Sổ quỹ</button>
+              <button class="btn btn-ghost" onclick="window.resetKey('invoices')">↺ Reset Hóa đơn</button>
+              <button class="btn" style="background:var(--danger);color:#fff" onclick="if(confirm('⚠️ Xóa TOÀN BỘ thay đổi và reset app?')){window.STORE.resetAll()}">🔥 Reset TẤT CẢ</button>
+            </div>
+          </div>
+
+        </div>
+
+      </div>
+    </div>
+  </main>
+</div>
+
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<script src="../scripts/supabase-config.js"></script>
+<script src="../scripts/supabase-client.js"></script>
+<script src="../scripts/shared.js"></script>
+<script src="../scripts/store.js"></script>
+<script src="../scripts/auth.js"></script>
+<script src="../scripts/help-tips.js"></script>
+<script src="../scripts/ux-improvements.js"></script>
+<script src="../scripts/onboarding.js"></script>
+<script src="../scripts/pdf-export.js"></script>
+<script>if(window.AUTH) window.AUTH.requireAuth();</script>
+<script>
+  window.switchSet = function(e, k) {
+    document.querySelectorAll('.set-nav .item').forEach(x => x.classList.remove('active'));
+    e.target.classList.add('active');
+    ['Company','Master','Integrate','Telegram','Security','Backup'].forEach(p => {
+      document.getElementById('set' + p).style.display = (p.toLowerCase() === k) ? 'block' : 'none';
+    });
+  };
+
+  /* Đổi link Help theo AI engine đang chọn */
+  window.onAiEngineChange = function(engine) {
+    const guideKey = 'ai-api-key-' + engine;
+    const mini = document.getElementById('aiHelpMini');
+    const btn  = document.getElementById('aiHelpBtn');
+    if (mini) mini.setAttribute('onclick', `window.openHelpGuide('${guideKey}')`);
+    if (btn)  btn.setAttribute('onclick',  `window.openHelpGuide('${guideKey}')`);
+  };
+
+  /* === Save / Load company info === */
+  window.saveCompanyInfo = function() {
+    const inputs = document.querySelectorAll('#setCompany .form-row input');
+    const data = {
+      name: inputs[0]?.value, shortName: inputs[1]?.value,
+      tax: inputs[2]?.value, regNo: inputs[3]?.value,
+      address: inputs[4]?.value,
+      hotline: inputs[5]?.value, email: inputs[6]?.value,
+      website: inputs[7]?.value, bank: inputs[8]?.value,
+      slogan: inputs[9]?.value,
+    };
+    window.STORE.set('companyInfo', data);
+    window.toast('✓ Đã lưu thông tin doanh nghiệp', 'success');
+  };
+
+  /* Auto-load saved company info on page open */
+  (function loadCompany() {
+    const saved = window.STORE.get('companyInfo', null);
+    if (saved && saved.name) {
+      const inputs = document.querySelectorAll('#setCompany .form-row input');
+      const keys = ['name','shortName','tax','regNo','address','hotline','email','website','bank','slogan'];
+      keys.forEach((k, i) => { if (inputs[i] && saved[k]) inputs[i].value = saved[k]; });
+    }
+  })();
+
+  /* === Reset / Export / Import === */
+  window.resetKey = function(key) {
+    const labels = {
+      customers:'Khách hàng', orders:'Đơn hàng', vehicles:'Xe', drivers:'Tài xế',
+      staff:'Nhân viên', cashEntries:'Sổ quỹ', invoices:'Hóa đơn'
+    };
+    if (confirm('Reset ' + labels[key] + ' về dữ liệu mẫu? Mất tất cả thay đổi của ' + labels[key] + '.')) {
+      window.STORE.reset(key);
+      setTimeout(() => location.reload(), 600);
+    }
+  };
+
+  window.exportAllData = function() {
+    const keys = ['customers','orders','vehicles','drivers','staff','cashEntries','invoices','paymentAccounts','companyInfo'];
+    const data = {};
+    keys.forEach(k => { data[k] = window.STORE.get(k, null); });
+    data._exportedAt = new Date().toISOString();
+    data._version = 'vty-1.0';
+    const blob = new Blob([JSON.stringify(data, null, 2)], { type: 'application/json' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = 'vty-backup-' + new Date().toISOString().slice(0,10) + '.json';
+    a.click();
+    URL.revokeObjectURL(url);
+    window.toast('✓ Đã xuất backup ra file JSON', 'success');
+  };
+
+  window.importData = function(event) {
+    const file = event.target.files[0];
+    if (!file) return;
+    const reader = new FileReader();
+    reader.onload = (e) => {
+      try {
+        const data = JSON.parse(e.target.result);
+        if (data._version !== 'vty-1.0') {
+          if (!confirm('File backup không đúng phiên bản. Vẫn phục hồi?')) return;
+        }
+        if (!confirm('Phục hồi sẽ ghi đè tất cả dữ liệu hiện tại. Tiếp tục?')) return;
+        Object.keys(data).forEach(k => {
+          if (!k.startsWith('_')) window.STORE.set(k, data[k]);
+        });
+        window.toast('✓ Đã phục hồi dữ liệu — reload sau 1s', 'success');
+        setTimeout(() => location.reload(), 1200);
+      } catch (err) {
+        window.toast('Lỗi đọc file: ' + err.message, 'danger');
+      }
+    };
+    reader.readAsText(file);
+  };
+
+  /* ============ MASTER DATA EDITOR ============ */
+  const MD_META = {
+    services:        { title:'🥬 Nhóm hàng', desc:'Nhóm sản phẩm nông sản. Hiện ở chip lọc + "nhóm hàng chính" khi tạo đơn.', fields:['id','label','icon','color'] },
+    custGroups:      { title:'⭐ Nhóm khách hàng', desc:'Phân loại KH theo độ thân thiết. Hiện trong dropdown khi thêm/sửa KH.', fields:['id','label','color'] },
+    custTypes:       { title:'🍽 Loại hình khách hàng', desc:'Nhà hàng / quán ăn / khách sạn / canteen / cafe / cửa hàng / cá nhân. Hiện ở phân loại KH.', fields:['id','label','color'] },
+    orderFreq:       { title:'🔁 Tần suất đặt hàng', desc:'Hằng ngày / 2-3 lần tuần / hằng tuần / thỉnh thoảng. Gắn cho từng KH.', fields:['id','label'] },
+    sources:         { title:'📞 Nguồn khách hàng', desc:'KH đến từ đâu: Web, Facebook, Giới thiệu, Sales chủ động...', fields:['id','label'] },
+    units:           { title:'📦 Đơn vị tính', desc:'Đơn vị đo hàng hóa khi tạo đơn: Thùng, Kiện, Pallet, Kg...', fields:['id','label'] },
+    transportModes:  { title:'🛵 Hình thức giao', desc:'Giao trong ngày / đặt trước / giao tận bếp.', fields:['id','label','icon'] },
+    payMethods:      { title:'💳 Hình thức thanh toán', desc:'Người gửi trả / nhận trả / công nợ.', fields:['id','label'] },
+    provinces:       { title:'📍 Tỉnh / Thành phố', desc:'Danh sách tỉnh có thể chọn khi thêm KH / điền địa chỉ.', fields:['_string'] },
+    departments:     { title:'🏢 Phòng ban', desc:'Cơ cấu phòng ban — dùng khi thêm NV.', fields:['id','label'] },
+  };
+
+  let currentMD = 'services';
+
+  window.switchMD = function(e, key) {
+    document.querySelectorAll('.md-item').forEach(x => x.classList.remove('active'));
+    (e.currentTarget || e.target).classList.add('active');
+    currentMD = key;
+    renderMDEditor();
+  };
+
+  /* Cập nhật count badge cho tất cả categories */
+  function updateMDCounts() {
+    Object.keys(MD_META).forEach(k => {
+      const el = document.getElementById('cnt-' + k);
+      if (el) el.textContent = window.MD.get(k).length;
+    });
+  }
+
+  function renderMDEditor() {
+    const meta = MD_META[currentMD];
+    const list = window.MD.get(currentMD);
+    const isStringList = meta.fields[0] === '_string';
+    const hasIcon = meta.fields.includes('icon');
+    const hasColor = meta.fields.includes('color');
+
+    /* Grid cột header */
+    let cols, headHTML;
+    if (isStringList) {
+      cols = '24px 1fr 30px';
+      headHTML = `<div style="display:grid;grid-template-columns:${cols};gap:10px;padding:10px 14px;background:#FAFAFB;border-bottom:1px solid var(--line);font-size:11px;color:var(--muted);text-transform:uppercase;letter-spacing:0.5px;font-weight:700">
+        <div></div><div>Giá trị</div><div></div>
+      </div>`;
+    } else {
+      cols = hasColor
+        ? (hasIcon ? '24px 36px 120px 1fr 36px 30px' : '24px 120px 1fr 36px 30px')
+        : (hasIcon ? '24px 36px 120px 1fr 30px' : '24px 120px 1fr 30px');
+      headHTML = `<div style="display:grid;grid-template-columns:${cols};gap:10px;padding:10px 14px;background:#FAFAFB;border-bottom:1px solid var(--line);font-size:11px;color:var(--muted);text-transform:uppercase;letter-spacing:0.5px;font-weight:700">
+        <div>#</div>
+        ${hasIcon ? '<div style="text-align:center">Icon</div>' : ''}
+        <div>ID (mã)</div>
+        <div>Tên hiển thị</div>
+        ${hasColor ? '<div style="text-align:center">Màu</div>' : ''}
+        <div></div>
+      </div>`;
+    }
+
+    let rowsHtml = list.map((item, i) => {
+      if (isStringList) {
+        return `<div class="md-row-new" style="grid-template-columns:${cols}">
+          <div class="idx">${i+1}</div>
+          <input type="text" data-idx="${i}" data-field="value" value="${item}" style="flex:1">
+          <button class="del-btn" data-del="${i}">🗑</button>
+        </div>`;
+      }
+      return `<div class="md-row-new" style="grid-template-columns:${cols}">
+        <div class="idx">${i+1}</div>
+        ${hasIcon ? `<input type="text" class="icon-input" data-idx="${i}" data-field="icon" value="${item.icon||''}" placeholder="📌">` : ''}
+        <input type="text" class="id-input" data-idx="${i}" data-field="id" value="${item.id||''}" placeholder="ma-id">
+        <input type="text" data-idx="${i}" data-field="label" value="${item.label||''}" placeholder="Tên hiển thị" style="font-weight:500">
+        ${hasColor ? `<input type="color" data-idx="${i}" data-field="color" value="${item.color||'#1B5E20'}">` : ''}
+        <button class="del-btn" data-del="${i}">🗑</button>
+      </div>`;
+    }).join('');
+
+    document.getElementById('mdEditor').innerHTML = `
+      <div class="md-edit-head">
+        <h3>${meta.title}</h3>
+        <div class="d">${meta.desc}</div>
+      </div>
+
+      <div class="md-table">
+        ${headHTML}
+        ${rowsHtml || '<div style="padding:30px;text-align:center;color:var(--muted);font-size:13px">Chưa có mục nào. Bấm nút bên dưới để thêm.</div>'}
+        <div class="md-add-row">
+          <button onclick="window.addMDItem()">+ Thêm mục mới</button>
+        </div>
+      </div>
+
+      <div class="md-actions">
+        <button class="btn btn-primary" onclick="window.saveMD()">💾 Lưu thay đổi</button>
+        <button class="btn btn-ghost" onclick="window.resetMD()">↺ Khôi phục mặc định</button>
+        <div style="flex:1"></div>
+        <span class="info"><b>${list.length}</b> mục · Sửa trực tiếp ô input rồi bấm Lưu</span>
+      </div>
+    `;
+
+    document.querySelectorAll('#mdEditor [data-del]').forEach(btn => {
+      btn.onclick = () => {
+        const i = parseInt(btn.dataset.del, 10);
+        if (confirm('Xóa "' + (typeof list[i]==='object' ? list[i].label : list[i]) + '"?')) {
+          list.splice(i, 1);
+          window.MD.save(currentMD, list);
+          renderMDEditor();
+          updateMDCounts();
+          window.toast('Đã xóa', 'danger');
+        }
+      };
+    });
+  }
+
+  window.addMDItem = function() {
+    const meta = MD_META[currentMD];
+    const list = window.MD.get(currentMD);
+    if (meta.fields[0] === '_string') {
+      list.push('Mục mới');
+    } else {
+      const newItem = { id:'moi-' + Date.now().toString(36).slice(-4), label:'Mục mới' };
+      if (meta.fields.includes('icon')) newItem.icon = '⭐';
+      if (meta.fields.includes('color')) newItem.color = '#1B5E20';
+      list.push(newItem);
+    }
+    window.MD.save(currentMD, list);
+    renderMDEditor();
+    updateMDCounts();
+    /* Focus vào input cuối cùng */
+    setTimeout(() => {
+      const inputs = document.querySelectorAll('#mdEditor input[data-field="label"], #mdEditor input[data-field="value"]');
+      inputs[inputs.length-1]?.focus();
+      inputs[inputs.length-1]?.select();
+    }, 50);
+  };
+
+  window.saveMD = function() {
+    const meta = MD_META[currentMD];
+    const list = window.MD.get(currentMD);
+    const isString = meta.fields[0] === '_string';
+    document.querySelectorAll('#mdEditor [data-idx]').forEach(inp => {
+      const i = parseInt(inp.dataset.idx, 10);
+      const f = inp.dataset.field;
+      if (isString) {
+        list[i] = inp.value;
+      } else {
+        if (!list[i] || typeof list[i] !== 'object') list[i] = {};
+        list[i][f] = inp.value;
+      }
+    });
+    window.MD.save(currentMD, list);
+    updateMDCounts();
+    window.toast('✓ Đã lưu ' + meta.title + ' (' + list.length + ' mục)', 'success');
+  };
+
+  window.resetMD = function() {
+    if (!confirm('Khôi phục ' + MD_META[currentMD].title + ' về mặc định? Mất tất cả thay đổi.')) return;
+    window.STORE.reset('md_' + currentMD);
+    setTimeout(() => renderMDEditor(), 100);
+    window.toast('Đã khôi phục mặc định', 'info');
+  };
+
+  /* Trigger render khi switch sang tab Master data */
+  const origSwitchSet = window.switchSet;
+  window.switchSet = function(e, k) {
+    origSwitchSet(e, k);
+    if (k === 'master') setTimeout(() => { renderMDEditor(); updateMDCounts(); }, 50);
+  };
+
+  /* Init counts ngay */
+  setTimeout(() => updateMDCounts(), 100);
+
+  /* ============ LOGO UPLOAD ============ */
+  window.uploadLogo = function(event) {
+    const file = event.target.files[0];
+    if (!file) return;
+    if (file.size > 500 * 1024) {
+      window.toast('File quá lớn — tối đa 500KB', 'warn');
+      return;
+    }
+    const reader = new FileReader();
+    reader.onload = (e) => {
+      const dataURL = e.target.result;
+      window.STORE.set('companyLogo', {
+        dataURL,
+        fileName: file.name,
+        size: file.size,
+        type: file.type,
+        uploadedAt: new Date().toISOString(),
+      });
+      applyLogo();
+      window.toast('✓ Đã tải logo "' + file.name + '" — áp dụng toàn app', 'success');
+    };
+    reader.onerror = () => window.toast('Lỗi đọc file logo', 'danger');
+    reader.readAsDataURL(file);
+  };
+
+  window.removeLogo = function() {
+    if (!confirm('Xóa logo? App sẽ dùng lại SVG mặc định.')) return;
+    window.STORE.set('companyLogo', null);
+    applyLogo();
+    window.toast('Đã xóa logo, dùng lại SVG mặc định', 'info');
+  };
+
+  function applyLogo() {
+    const logo = window.STORE.get('companyLogo', null);
+    const preview = document.getElementById('logoPreview');
+    const info = document.getElementById('logoInfo');
+    const removeBtn = document.getElementById('removeLogoBtn');
+
+    if (logo && logo.dataURL) {
+      if (preview) preview.innerHTML = `<img src="${logo.dataURL}" style="max-width:100%;max-height:100%;object-fit:contain">`;
+      if (info) info.style.display = 'block';
+      if (removeBtn) removeBtn.style.display = '';
+      if (document.getElementById('logoFileName')) document.getElementById('logoFileName').textContent = logo.fileName;
+      if (document.getElementById('logoFileSize')) document.getElementById('logoFileSize').textContent = (logo.size/1024).toFixed(1) + ' KB';
+
+      /* Update sidebar logo real-time */
+      const sbLogo = document.querySelector('.sidebar .brand-logo');
+      if (sbLogo) sbLogo.innerHTML = `<img src="${logo.dataURL}" style="max-width:100%;max-height:100%;object-fit:contain;border-radius:4px">`;
+    } else {
+      if (preview) preview.innerHTML = `<span style="color:var(--muted);font-size:11px;text-align:center;padding:8px">Chưa có logo<br>upload bên dưới</span>`;
+      if (info) info.style.display = 'none';
+      if (removeBtn) removeBtn.style.display = 'none';
+      /* Restore default SVG */
+      const sbLogo = document.querySelector('.sidebar .brand-logo');
+      if (sbLogo && window.brandLogo) sbLogo.innerHTML = window.brandLogo('compact', '../');
+    }
+  }
+
+  /* Load logo khi vào trang */
+  setTimeout(applyLogo, 200);
+
+  /* ============ INTEGRATIONS — render động ============ */
+  function getIntStatus(id) {
+    const cfg = window.STORE.get('int_' + id, {});
+    if (!cfg.enabled) return { cls:'off', label:'⚫ Tắt', color:'var(--muted)' };
+    /* Check required fields filled */
+    const meta = window.INTEGRATIONS.find(x => x.id === id);
+    const required = (meta?.fields||[]).filter(f => f.type !== 'checkbox' && !f.optional);
+    const filled = required.every(f => cfg[f.key]);
+    if (!filled) return { cls:'partial', label:'🟡 Chưa cấu hình đủ', color:'var(--warn)' };
+    return { cls:'on', label:'🟢 Đang hoạt động', color:'var(--ok)' };
+  }
+
+  function renderIntegrations() {
+    const list = window.INTEGRATIONS || [];
+    const container = document.getElementById('integrationsList');
+    if (!container) return;
+    container.innerHTML = list.map(it => {
+      const cfg = window.STORE.get('int_' + it.id, {});
+      const enabled = !!cfg.enabled;
+      const status = getIntStatus(it.id);
+      const filledFields = (it.fields||[]).filter(f => cfg[f.key]).length;
+      const totalFields = (it.fields||[]).length;
+      return `<div class="int-card">
+        <div class="int-icon" style="background:${it.color}">${it.icon}</div>
+        <div class="int-body">
+          <div class="int-head">
+            <div class="int-name">${it.name}</div>
+            <div class="int-status" style="color:${status.color}">${status.label}</div>
+          </div>
+          <div class="int-desc">${it.desc}</div>
+          <div class="int-meta">
+            <span style="font-size:11px;color:var(--muted)">⚙️ Đã cấu hình ${filledFields}/${totalFields} trường${cfg.lastTestAt?' · Test cuối: '+cfg.lastTestAt:''}</span>
+          </div>
+        </div>
+        <div class="int-actions">
+          <label class="toggle" title="Bật/Tắt">
+            <input type="checkbox" ${enabled?'checked':''} onchange="window.toggleIntegration('${it.id}',this.checked)">
+            <span class="slider"></span>
+          </label>
+          <button class="help-btn" onclick="window.openHelpGuide('${it.guideKey}')" title="Hướng dẫn">❓</button>
+          ${cfg.botToken||cfg.apiKey||cfg.accessToken ? `<button class="btn btn-sm btn-ghost" onclick="window.testIntegration('${it.id}')" title="Test kết nối">🔌 Test</button>` : ''}
+          <button class="btn btn-sm ${enabled?'btn-navy':'btn-ghost'}" onclick="window.openIntConfig('${it.id}')">⚙ Cấu hình</button>
+        </div>
+      </div>`;
+    }).join('');
+  }
+
+  window.toggleIntegration = function(id, on) {
+    const cfg = window.STORE.get('int_' + id, {});
+    cfg.enabled = on;
+    window.STORE.set('int_' + id, cfg);
+    renderIntegrations();
+    const meta = window.INTEGRATIONS.find(x => x.id === id);
+    if (on) {
+      const status = getIntStatus(id);
+      if (status.cls === 'partial') {
+        window.toast('⚠️ ' + meta.name + ' đã bật nhưng chưa cấu hình đủ — bấm "Cấu hình"', 'warn');
+      } else {
+        window.toast('✓ Đã bật ' + meta.name, 'success');
+      }
+    } else {
+      window.toast('Đã tắt ' + meta.name, 'info');
+    }
+  };
+
+  window.openIntConfig = function(id) {
+    const meta = window.INTEGRATIONS.find(x => x.id === id);
+    if (!meta) return;
+    const cfg = window.STORE.get('int_' + id, {});
+
+    /* Special: telegram → mở tab telegram trong settings */
+    if (id === 'telegram') {
+      window.closeModal?.();
+      const tgItem = document.querySelector('.set-nav .item[onclick*="telegram"]');
+      if (tgItem) tgItem.click();
+      return;
+    }
+    /* Special: ai-engine → mở modal multi-provider */
+    if (id === 'ai-engine') { window.openAiMultiConfig(); return; }
+
+    const fieldsHTML = (meta.fields||[]).map(f => {
+      const val = cfg[f.key] || '';
+      let input = '';
+      if (f.type === 'select') {
+        input = `<select id="cfg_${f.key}">${(f.options||[]).map(o => `<option value="${o.v}" ${val===o.v?'selected':''}>${o.l}</option>`).join('')}</select>`;
+      } else if (f.type === 'textarea') {
+        input = `<textarea id="cfg_${f.key}" rows="4" placeholder="${f.placeholder||''}">${val}</textarea>`;
+      } else if (f.type === 'checkbox') {
+        input = `<label class="check-item" style="margin-top:4px"><input type="checkbox" id="cfg_${f.key}" ${val?'checked':''}> <span>${f.label}</span></label>`;
+        return `<div class="form-row wide">${input}</div>`;
+      } else {
+        input = `<input type="${f.type||'text'}" id="cfg_${f.key}" value="${val}" placeholder="${f.placeholder||''}">`;
+      }
+      const helpBtn = f.guideKey
+        ? `<button class="help-btn" onclick="window.openHelpGuide('${f.guideKey}')" title="Hướng dẫn">❓</button>`
+        : '';
+      const wrapClass = f.guideKey ? 'input-with-help' : '';
+      return `<div class="form-row wide">
+        <label class="help-label">${f.label}${f.guideKey?` <span class="help-mini" onclick="window.openHelpGuide('${f.guideKey}')">?</span>`:''}</label>
+        ${f.guideKey && f.type !== 'select' && f.type !== 'textarea' ? `<div class="${wrapClass}">${input}${helpBtn}</div>` : input}
+      </div>`;
+    }).join('');
+
+    window.openModal('⚙ Cấu hình ' + meta.name, `
+      <div style="margin-bottom:14px;padding:10px 14px;background:${meta.color}15;border-left:4px solid ${meta.color};border-radius:7px;font-size:13px">
+        ${meta.icon} <b>${meta.name}</b><br>
+        <span style="font-size:12px;color:var(--muted)">${meta.desc}</span>
+      </div>
+
+      <button class="btn btn-ghost btn-sm" style="margin-bottom:14px" onclick="window.openHelpGuide('${meta.guideKey}')">📖 Xem hướng dẫn chi tiết tích hợp này</button>
+
+      ${fieldsHTML}
+
+      <div style="margin-top:14px;padding:10px 12px;background:#FAFAFB;border-radius:7px;font-size:11.5px;color:var(--muted)">
+        🔒 <b>Bảo mật:</b> API key / token được mã hóa lưu trong localStorage browser. Không gửi đi đâu khác (prototype).
+      </div>
+    `, {
+      footer: `<button class="btn btn-ghost" onclick="closeModal()">Hủy</button>
+               <button class="btn btn-ghost" onclick="window.testIntegration('${id}')">🔌 Test kết nối</button>
+               <button class="btn btn-primary" onclick="window.saveIntConfig('${id}')">💾 Lưu cấu hình</button>`,
+      width: '620px'
+    });
+  };
+
+  window.saveIntConfig = function(id) {
+    const meta = window.INTEGRATIONS.find(x => x.id === id);
+    if (!meta) return;
+    const cfg = window.STORE.get('int_' + id, {});
+    (meta.fields||[]).forEach(f => {
+      const el = document.getElementById('cfg_' + f.key);
+      if (!el) return;
+      if (f.type === 'checkbox') cfg[f.key] = el.checked;
+      else cfg[f.key] = el.value.trim();
+    });
+    cfg.configuredAt = new Date().toLocaleString('vi-VN');
+    window.STORE.set('int_' + id, cfg);
+    window.closeModal();
+    renderIntegrations();
+    window.toast('✓ Đã lưu cấu hình ' + meta.name, 'success');
+  };
+
+  window.testIntegration = function(id) {
+    const meta = window.INTEGRATIONS.find(x => x.id === id);
+    if (!meta) return;
+    const cfg = window.STORE.get('int_' + id, {});
+    const required = (meta.fields||[]).filter(f => f.type !== 'checkbox');
+    const missing = required.filter(f => !cfg[f.key] && !document.getElementById('cfg_' + f.key)?.value);
+    if (missing.length) {
+      window.toast('⚠️ Thiếu trường: ' + missing.map(f => f.label).join(', '), 'warn');
+      return;
+    }
+    window.toast('🔌 Đang test kết nối ' + meta.name + '...', 'info');
+    /* Mô phỏng test: ~70% success */
+    setTimeout(() => {
+      const success = Math.random() > 0.3;
+      cfg.lastTestAt = new Date().toLocaleString('vi-VN');
+      cfg.lastTestResult = success ? 'success' : 'failed';
+      window.STORE.set('int_' + id, cfg);
+      if (success) {
+        window.toast('✅ Test ' + meta.name + ' thành công! Kết nối OK.', 'success');
+      } else {
+        window.toast('❌ Test ' + meta.name + ' thất bại — kiểm tra lại token/API key', 'danger');
+      }
+      renderIntegrations();
+    }, 1200);
+  };
+
+  /* Render khi switch sang tab Tích hợp / Bảo mật / Telegram / Backup */
+  const origSwitchSet2 = window.switchSet;
+  window.switchSet = function(e, k) {
+    origSwitchSet2(e, k);
+    if (k === 'integrate') setTimeout(renderIntegrations, 50);
+    if (k === 'security')  setTimeout(() => { renderActivityHistory(); loadTwoFAStatus(); }, 50);
+    if (k === 'telegram')  setTimeout(tgLoadConfig, 50);
+    if (k === 'backup')    setTimeout(renderSnapshots, 50);
+  };
+
+  /* === 2FA TOGGLE === */
+  function loadTwoFAStatus() {
+    const u = window.AUTH && window.AUTH.currentUser(); if (!u) return;
+    const prefs = window.STORE.get('userPrefs_' + (u.staffId || u.email), {});
+    const enabled = !!prefs.twoFAEnabled;
+    const tog = document.getElementById('twoFAToggle');
+    const st = document.getElementById('twoFAStatus');
+    if (tog) tog.checked = enabled;
+    if (st) st.innerHTML = enabled
+      ? '✅ <b style="color:var(--ok)">Đã bật</b> · NV cần nhập OTP khi đăng nhập (mock)'
+      : 'Tăng bảo mật bằng mã OTP 6 chữ số trên điện thoại';
+  }
+  window.toggleTwoFA = function (checked) {
+    const u = window.AUTH && window.AUTH.currentUser();
+    if (!u) { window.toast('Chưa đăng nhập', 'warn'); return; }
+    if (checked) {
+      /* Mở popup hướng dẫn quét QR (mock — Supabase Auth chưa expose TOTP qua anon key) */
+      const secret = 'NSTT' + Math.random().toString(36).slice(2, 12).toUpperCase();
+      window.openModal('🛡 Bật xác thực 2 lớp', `
+        <div style="text-align:center;margin-bottom:14px">
+          <div style="display:inline-block;padding:18px;background:#fff;border:1px solid var(--line);border-radius:10px">
+            <svg width="160" height="160" viewBox="0 0 160 160">
+              <rect width="160" height="160" fill="#fff"/>
+              ${Array.from({length: 256}, (_, i) => { const x = (i%16)*10, y = Math.floor(i/16)*10; return Math.random() > 0.5 ? `<rect x="${x}" y="${y}" width="10" height="10" fill="#1B5E20"/>` : ''; }).join('')}
+              <rect x="0" y="0" width="40" height="40" fill="#fff" stroke="#1B5E20" stroke-width="6"/>
+              <rect x="10" y="10" width="20" height="20" fill="#1B5E20"/>
+              <rect x="120" y="0" width="40" height="40" fill="#fff" stroke="#1B5E20" stroke-width="6"/>
+              <rect x="130" y="10" width="20" height="20" fill="#1B5E20"/>
+              <rect x="0" y="120" width="40" height="40" fill="#fff" stroke="#1B5E20" stroke-width="6"/>
+              <rect x="10" y="130" width="20" height="20" fill="#1B5E20"/>
+            </svg>
+          </div>
+        </div>
+        <div style="font-size:13px;line-height:1.7">
+          <b>Hướng dẫn 30 giây:</b><br>
+          1. Cài <b>Google Authenticator</b> hoặc <b>Authy</b> trên điện thoại<br>
+          2. Mở app → bấm <b>+</b> → Quét mã QR ở trên<br>
+          3. Hoặc nhập tay khóa: <code style="background:#FEF3C7;padding:2px 8px;border-radius:4px;font-weight:700">${secret}</code><br>
+          4. Nhập mã OTP 6 số dưới đây để xác nhận:
+        </div>
+        <div style="margin-top:14px;text-align:center">
+          <input id="otpVerify" placeholder="000000" maxlength="6" style="width:160px;text-align:center;font-size:22px;letter-spacing:8px;padding:10px;border:2px solid var(--line);border-radius:8px;font-weight:700">
+        </div>
+        <div style="margin-top:12px;padding:10px;background:#FEF3C7;border-radius:6px;font-size:11.5px;color:var(--warn)">
+          💡 Đây là demo UI — Supabase chưa expose TOTP qua anon key. Production cần backend/Edge Function gọi <code>auth.mfa.enroll</code>.
+        </div>
+      `, {
+        footer: `<button class="btn btn-ghost" onclick="document.getElementById('twoFAToggle').checked=false;window.closeModal()">Hủy</button>
+                 <button class="btn btn-primary" onclick="window.confirmTwoFA('${secret}')">✓ Xác nhận bật</button>`,
+        width: '460px',
+      });
+    } else {
+      if (!confirm('Tắt xác thực 2 lớp?')) { document.getElementById('twoFAToggle').checked = true; return; }
+      const key = 'userPrefs_' + (u.staffId || u.email);
+      const p = window.STORE.get(key, {}); p.twoFAEnabled = false; p.twoFASecret = null;
+      window.STORE.set(key, p);
+      loadTwoFAStatus();
+      window.toast('🔓 Đã tắt 2FA', 'warn');
+    }
+  };
+  window.confirmTwoFA = function (secret) {
+    const otp = document.getElementById('otpVerify').value.trim();
+    if (!/^\d{6}$/.test(otp)) { window.toast('OTP phải là 6 chữ số', 'warn'); return; }
+    const u = window.AUTH && window.AUTH.currentUser();
+    const key = 'userPrefs_' + (u.staffId || u.email);
+    const p = window.STORE.get(key, {});
+    p.twoFAEnabled = true; p.twoFASecret = secret; p.twoFAEnrolledAt = new Date().toLocaleString('vi-VN');
+    window.STORE.set(key, p);
+    window.closeModal();
+    loadTwoFAStatus();
+    window.toast('✅ Đã bật 2FA thành công', 'success');
+  };
+
+  /* === SNAPSHOTS === */
+  window.createSnapshot = function () {
+    const desc = prompt('Mô tả snapshot (ví dụ: "trước khi nhập CSV", "cuối tháng T5"):', 'Snapshot ' + new Date().toLocaleString('vi-VN'));
+    if (desc === null) return;
+    /* Capture toàn bộ STORE data (trừ session) */
+    const u = window.AUTH && window.AUTH.currentUser();
+    const KEYS = ['customers','orders','staff','products','adspend','cashEntries','paymentAccounts','invoices','timesheet','payrollExtra','company','activityLogs'];
+    const data = {};
+    KEYS.forEach(k => { data[k] = window.STORE.get(k, null); });
+    const json = JSON.stringify(data);
+    const sizeKb = Math.round(json.length / 1024);
+    if (sizeKb > 4500) { window.toast('⚠ Dữ liệu > 4.5MB — vượt quota localStorage. Dùng "Xuất JSON" thay vào.', 'warn'); return; }
+    const snapshots = window.STORE.get('snapshots', []);
+    const snap = {
+      id: 'SS' + Date.now(),
+      desc: desc || 'Snapshot không tên',
+      at: new Date().toLocaleString('vi-VN'),
+      sizeKb,
+      by: (u && u.name) || 'Tôi',
+      data,
+    };
+    snapshots.unshift(snap);
+    /* Giữ tối đa 10 snapshot để không tràn quota */
+    if (snapshots.length > 10) snapshots.length = 10;
+    window.STORE.set('snapshots', snapshots);
+    renderSnapshots();
+    window.toast(`✓ Đã tạo snapshot (${sizeKb} KB) · giữ tối đa 10 bản gần nhất`, 'success');
+  };
+  function renderSnapshots() {
+    const body = document.getElementById('snapshotBody');
+    if (!body) return;
+    const snaps = window.STORE.get('snapshots', []);
+    if (!snaps.length) {
+      body.innerHTML = '<tr><td colspan="5" style="padding:18px;text-align:center;color:var(--muted)">Chưa có snapshot nào. Bấm <b>💾 Sao lưu ngay</b> để tạo bản đầu tiên.</td></tr>';
+      return;
+    }
+    body.innerHTML = snaps.map(s => `<tr>
+      <td style="font-size:12px;font-family:ui-monospace,monospace">${s.at}</td>
+      <td>${(s.sizeKb).toLocaleString('vi-VN')} KB</td>
+      <td><b>${s.desc}</b></td>
+      <td style="font-size:12px;color:var(--muted)">${s.by}</td>
+      <td class="num">
+        <button class="btn btn-sm btn-ghost" onclick="window.downloadSnapshot('${s.id}')" title="Tải file JSON">⬇</button>
+        <button class="btn btn-sm btn-ghost" onclick="window.restoreSnapshot('${s.id}')" style="color:var(--ok)" title="Phục hồi">↻</button>
+        <button class="btn btn-sm btn-ghost" onclick="window.deleteSnapshot('${s.id}')" style="color:var(--danger)" title="Xóa">🗑</button>
+      </td>
+    </tr>`).join('');
+  }
+  window.downloadSnapshot = function (id) {
+    const s = (window.STORE.get('snapshots', []) || []).find(x => x.id === id);
+    if (!s) return;
+    const blob = new Blob([JSON.stringify(s.data, null, 2)], { type: 'application/json' });
+    const a = document.createElement('a');
+    a.href = URL.createObjectURL(blob);
+    a.download = 'snapshot-NSTT-' + s.at.replace(/[^0-9]/g, '').slice(0, 12) + '.json';
+    a.click();
+    setTimeout(() => URL.revokeObjectURL(a.href), 1000);
+    window.toast('⬇ Đã tải snapshot', 'success');
+  };
+  window.restoreSnapshot = function (id) {
+    const s = (window.STORE.get('snapshots', []) || []).find(x => x.id === id);
+    if (!s) return;
+    if (!confirm(`Phục hồi snapshot "${s.desc}" (${s.at})?\n\n⚠ Toàn bộ dữ liệu hiện tại sẽ bị GHI ĐÈ. Nên tạo snapshot mới trước khi phục hồi.`)) return;
+    Object.entries(s.data).forEach(([k, v]) => { if (v !== null) window.STORE.set(k, v); });
+    window.toast('✓ Đã phục hồi snapshot · reload để thấy thay đổi', 'success');
+    setTimeout(() => location.reload(), 1500);
+  };
+  window.deleteSnapshot = function (id) {
+    if (!confirm('Xóa snapshot này?')) return;
+    const snaps = (window.STORE.get('snapshots', []) || []).filter(x => x.id !== id);
+    window.STORE.set('snapshots', snaps);
+    renderSnapshots();
+    window.toast('Đã xóa snapshot', 'danger');
+  };
+
+  /* === TELEGRAM BOT — wire 5 nút thực === */
+  function tgLoadConfig() {
+    const cfg = window.STORE.get('int_telegram', {});
+    const tok = document.getElementById('tgBotToken');
+    const cid = document.getElementById('tgChatId');
+    const hr  = document.getElementById('tgDailyHour');
+    const ae  = document.getElementById('tgAutoEnabled');
+    if (tok) tok.value = cfg.botToken || '';
+    if (cid) cid.value = cfg.chatId || '';
+    if (hr)  hr.value  = cfg.dailyHour || '18:30';
+    if (ae)  ae.value  = cfg.autoEnabled ? '1' : '0';
+    const st = document.getElementById('tgStatus');
+    if (st) {
+      const ok = cfg.botToken && cfg.chatId;
+      const chCount = (cfg.channels || []).length;
+      st.innerHTML = ok
+        ? `✅ <b style="color:var(--ok)">Đã cấu hình</b> · token <code>${(cfg.botToken||'').slice(0,12)}…</code> · chat mặc định <code>${cfg.chatId}</code>${chCount ? ' · <b style="color:var(--navy)">'+chCount+' kênh phụ</b>' : ''}`
+        : '⚠️ <b style="color:var(--warn)">Chưa cấu hình</b> — nhập Token + Chat ID rồi bấm Lưu cấu hình.';
+    }
+    /* Render channels + routing */
+    tgRenderChannels();
+    tgRenderRouting();
+  }
+
+  /* ============================================================
+     MULTI-CHANNEL: render danh sách kênh + form thêm/sửa/xóa
+     ============================================================ */
+  function tgChannels() {
+    const cfg = window.STORE.get('int_telegram', {});
+    return cfg.channels || [];
+  }
+  function tgRouting() {
+    const cfg = window.STORE.get('int_telegram', {});
+    return cfg.routing || {};
+  }
+
+  function tgRenderChannels() {
+    const list = document.getElementById('tgChannelsList');
+    if (!list) return;
+    const channels = tgChannels();
+    if (!channels.length) {
+      list.innerHTML = `<div style="padding:14px;background:#FAFAFB;border:1px dashed var(--line);border-radius:7px;text-align:center;color:var(--muted);font-size:12.5px">
+        <b>Chưa có kênh phụ.</b><br>Bấm "+ Thêm kênh mới" để tạo group cho từng mục đích (Sếp / Shipper / KH...).
+      </div>`;
+      return;
+    }
+    list.innerHTML = channels.map((c, i) => `
+      <div class="tg-channel-row" data-idx="${i}" style="display:grid;grid-template-columns:auto 1fr 1fr 100px auto auto;gap:8px;padding:8px;border:1px solid var(--line);border-radius:7px;margin-bottom:6px;background:#fff;align-items:center">
+        <label class="toggle" style="margin:0"><input type="checkbox" class="ch-enabled" ${c.enabled!==false?'checked':''}><span class="slider"></span></label>
+        <input class="ch-name" value="${c.name||''}" placeholder="Tên kênh (vd: Báo cáo Sếp)" style="padding:6px 8px;font-size:12.5px;border:1px solid var(--line);border-radius:5px">
+        <input class="ch-chatid" value="${c.chatId||''}" placeholder="-100123... (Chat ID)" style="padding:6px 8px;font-size:12.5px;font-family:ui-monospace,monospace;border:1px solid var(--line);border-radius:5px">
+        <input class="ch-id" value="${c.id||''}" placeholder="id (slug)" style="padding:6px 8px;font-size:11px;font-family:ui-monospace,monospace;border:1px solid var(--line);border-radius:5px;color:var(--muted)" title="Slug định danh (không dấu, không khoảng trắng)">
+        <button class="btn btn-ghost btn-sm" onclick="window.tgTestChannel(${i})" title="Test gửi tin vào kênh này">📤</button>
+        <button class="btn btn-ghost btn-sm" onclick="window.tgDeleteChannel(${i})" style="color:var(--danger)" title="Xóa kênh">🗑</button>
+      </div>
+    `).join('');
+  }
+
+  function tgRenderRouting() {
+    const list = document.getElementById('tgRoutingList');
+    if (!list) return;
+    const channels = tgChannels();
+    const routing = tgRouting();
+    const purposes = window.TG_PURPOSES || [];
+    const opts = `<option value="">— Dùng chat mặc định —</option>` +
+      channels.filter(c => c.enabled !== false).map(c => `<option value="${c.id}">${c.name || c.id}</option>`).join('');
+
+    list.innerHTML = purposes.map(p => `
+      <div style="display:grid;grid-template-columns:1fr 320px;gap:14px;padding:10px 12px;border:1px solid var(--line);border-radius:8px;margin-bottom:8px;background:#fff;align-items:center">
+        <div>
+          <div style="font-weight:700;font-size:13px;color:var(--navy)">${p.icon} ${p.label}</div>
+          <div style="font-size:11.5px;color:var(--muted);margin-top:2px">${p.desc}</div>
+        </div>
+        <select class="rt-select" data-purpose="${p.id}" style="padding:8px 10px;font-size:13px;border:1px solid var(--line);border-radius:6px">
+          ${opts.replace(`value="${routing[p.id]||''}"`, `value="${routing[p.id]||''}" selected`)}
+        </select>
+      </div>
+    `).join('');
+  }
+
+  window.tgAddChannel = function () {
+    const cfg = window.STORE.get('int_telegram', {});
+    cfg.channels = cfg.channels || [];
+    const n = cfg.channels.length + 1;
+    cfg.channels.push({ id: 'ch' + n, name: 'Kênh ' + n, chatId: '', enabled: true });
+    window.STORE.set('int_telegram', cfg);
+    tgRenderChannels();
+    tgRenderRouting();
+  };
+
+  window.tgDeleteChannel = function (idx) {
+    if (!confirm('Xóa kênh này?')) return;
+    const cfg = window.STORE.get('int_telegram', {});
+    const removed = cfg.channels.splice(idx, 1)[0];
+    /* Bỏ routing đang dùng kênh này */
+    if (removed && cfg.routing) {
+      Object.keys(cfg.routing).forEach(k => { if (cfg.routing[k] === removed.id) cfg.routing[k] = ''; });
+    }
+    window.STORE.set('int_telegram', cfg);
+    tgRenderChannels();
+    tgRenderRouting();
+    window.toast('Đã xóa kênh', 'danger');
+  };
+
+  window.tgTestChannel = async function (idx) {
+    /* Đọc từ DOM (giá trị user vừa gõ chưa lưu) */
+    const row = document.querySelectorAll('.tg-channel-row')[idx];
+    if (!row) return;
+    const chatId = row.querySelector('.ch-chatid').value.trim();
+    const name = row.querySelector('.ch-name').value.trim() || ('kênh ' + (idx + 1));
+    const cfg = window.STORE.get('int_telegram', {});
+    if (!cfg.botToken) { window.toast('Cần Bot Token trước', 'warn'); return; }
+    if (!chatId) { window.toast('Kênh chưa có Chat ID', 'warn'); return; }
+    try {
+      const r = await fetch(`https://api.telegram.org/bot${cfg.botToken}/sendMessage`, {
+        method: 'POST', headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ chat_id: chatId, text: `🧪 Test kênh "${name}" · ${new Date().toLocaleString('vi-VN')}\n\nCRM Nông Sản Tuấn Tú ✓` }),
+      });
+      const j = await r.json();
+      if (j.ok) window.toast(`✅ Đã gửi test vào "${name}"`, 'success');
+      else window.toast('❌ ' + (j.description || 'fail'), 'danger');
+    } catch (e) { window.toast('❌ ' + e.message, 'danger'); }
+  };
+
+  window.tgSaveChannelsRouting = function () {
+    const cfg = window.STORE.get('int_telegram', {});
+    /* Collect channels */
+    cfg.channels = Array.from(document.querySelectorAll('.tg-channel-row')).map(row => ({
+      id: row.querySelector('.ch-id').value.trim().toLowerCase().replace(/[^a-z0-9_]/g, '_') || ('ch' + Date.now()),
+      name: row.querySelector('.ch-name').value.trim() || 'Không tên',
+      chatId: row.querySelector('.ch-chatid').value.trim(),
+      enabled: row.querySelector('.ch-enabled').checked,
+    }));
+    /* Collect routing */
+    cfg.routing = {};
+    document.querySelectorAll('.rt-select').forEach(sel => {
+      cfg.routing[sel.dataset.purpose] = sel.value || '';
+    });
+    window.STORE.set('int_telegram', cfg);
+    window.toast('✓ Đã lưu cấu hình kênh + routing', 'success');
+    tgLoadConfig();
+  };
+
+  window.tgSaveConfig = function () {
+    const cfg = window.STORE.get('int_telegram', {});
+    cfg.botToken     = document.getElementById('tgBotToken').value.trim();
+    cfg.chatId       = document.getElementById('tgChatId').value.trim();
+    cfg.dailyHour    = document.getElementById('tgDailyHour').value || '18:30';
+    cfg.autoEnabled  = document.getElementById('tgAutoEnabled').value === '1';
+    if (!cfg.botToken || !cfg.chatId) { window.toast('Cần nhập đủ Bot Token + Chat ID', 'warn'); return; }
+    window.STORE.set('int_telegram', cfg);
+    window.toast('✓ Đã lưu cấu hình Telegram', 'success');
+    tgLoadConfig();
+  };
+
+  window.tgPing = async function () {
+    const cfg = window.STORE.get('int_telegram', {});
+    if (!cfg.botToken) { window.toast('Chưa có Bot Token', 'warn'); return; }
+    try {
+      const r = await fetch(`https://api.telegram.org/bot${cfg.botToken}/getMe`);
+      const j = await r.json();
+      if (j.ok) window.toast(`✅ Bot alive: @${j.result.username} (${j.result.first_name})`, 'success');
+      else window.toast('❌ Token sai: ' + (j.description || 'unknown'), 'danger');
+    } catch (e) { window.toast('❌ Network: ' + e.message, 'danger'); }
+  };
+
+  window.tgTestSend = async function () {
+    const cfg = window.STORE.get('int_telegram', {});
+    if (!cfg.botToken || !cfg.chatId) { window.toast('Cần token + chat ID', 'warn'); return; }
+    try {
+      const msg = `🧪 Test từ Nông Sản Tuấn Tú app · ${new Date().toLocaleString('vi-VN')}\n\nBot đang hoạt động ✓`;
+      const r = await fetch(`https://api.telegram.org/bot${cfg.botToken}/sendMessage`, {
+        method: 'POST', headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ chat_id: cfg.chatId, text: msg }),
+      });
+      const j = await r.json();
+      if (j.ok) window.toast('✅ Đã gửi tin test thành công', 'success');
+      else window.toast('❌ ' + (j.description || 'fail'), 'danger');
+    } catch (e) { window.toast('❌ ' + e.message, 'danger'); }
+  };
+
+  window.tgSendDailyTest = async function () {
+    const cfg = window.STORE.get('int_telegram', {});
+    if (!cfg.botToken || !cfg.chatId) { window.toast('Cần token + chat ID', 'warn'); return; }
+    /* Dùng builder customizable */
+    const built = window.buildDailyReport();
+    const msg = built.text;
+    if (!built.metrics.length) { window.toast('Chưa chọn chỉ số nào — tick ít nhất 1 metric', 'warn'); return; }
+    try {
+      const r = await fetch(`https://api.telegram.org/bot${cfg.botToken}/sendMessage`, {
+        method: 'POST', headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ chat_id: cfg.chatId, text: msg }),
+      });
+      const j = await r.json();
+      if (j.ok) window.toast('✅ Đã gửi báo cáo ngày TEST → group', 'success');
+      else window.toast('❌ ' + (j.description || 'fail'), 'danger');
+    } catch (e) { window.toast('❌ ' + e.message, 'danger'); }
+  };
+
+  /* === TÙY CHỈNH BÁO CÁO NGÀY — UI + builder === */
+  function tgLoadReportConfig() {
+    const cfg = Object.assign({}, window.TG_REPORT_DEFAULT, window.STORE.get('tg_report_config', {}));
+    const h = document.getElementById('tgRptHeader'); if (h) h.value = cfg.header || '';
+    const f = document.getElementById('tgRptFooter'); if (f) f.value = cfg.footer || '';
+    /* Render metrics list grouped — drag-to-reorder qua data-ord */
+    const list = document.getElementById('tgMetricsList');
+    if (!list) return;
+    const GROUPS = window.TG_REPORT_GROUPS;
+    const byGroup = {};
+    window.TG_REPORT_METRICS.forEach(m => { (byGroup[m.group] = byGroup[m.group] || []).push(m); });
+    const selectedSet = new Set(cfg.metrics || []);
+    /* Order: tick trước (theo thứ tự đã chọn), unticked sau (theo group định nghĩa) */
+    const orderedSelected = (cfg.metrics || []).map(id => window.TG_REPORT_METRICS.find(m => m.id === id)).filter(Boolean);
+    const orderedRest = window.TG_REPORT_METRICS.filter(m => !selectedSet.has(m.id));
+
+    function renderItem(m, checked, ord) {
+      return `<div class="tg-metric-item" draggable="${checked}" data-id="${m.id}" data-ord="${ord}"
+        style="display:flex;align-items:center;gap:10px;padding:8px 10px;border:1px solid var(--line);border-radius:7px;margin-bottom:6px;background:${checked?'#F0FDF4':'#fff'};cursor:${checked?'grab':'pointer'};font-size:13px">
+        <input type="checkbox" data-mid="${m.id}" ${checked?'checked':''} style="margin:0">
+        <span style="font-size:16px">${m.icon}</span>
+        <span style="flex:1">${m.label}</span>
+        <span style="font-size:10px;color:var(--muted);background:#fff;padding:2px 6px;border-radius:4px;border:1px solid var(--line)">${GROUPS[m.group] || m.group}</span>
+        ${checked ? '<span style="color:var(--muted);font-size:14px;cursor:grab" title="Kéo để sắp xếp">⋮⋮</span>' : ''}
+      </div>`;
+    }
+
+    let html = '';
+    if (orderedSelected.length) {
+      html += '<div style="font-size:11px;color:var(--ok);text-transform:uppercase;letter-spacing:0.3px;font-weight:700;margin-bottom:6px">✓ Đang hiện trong báo cáo (thứ tự từ trên xuống)</div>';
+      orderedSelected.forEach((m, i) => { html += renderItem(m, true, i); });
+    }
+    if (orderedRest.length) {
+      html += '<div style="font-size:11px;color:var(--muted);text-transform:uppercase;letter-spacing:0.3px;font-weight:700;margin:14px 0 6px">Chỉ số khác (tick để bật)</div>';
+      orderedRest.forEach((m, i) => { html += renderItem(m, false, 1000 + i); });
+    }
+    list.innerHTML = html;
+
+    /* Bind checkbox change */
+    list.querySelectorAll('input[type=checkbox]').forEach(cb => {
+      cb.addEventListener('change', tgSaveReportConfigFromUI);
+    });
+    list.querySelectorAll('input[type=checkbox]').forEach(cb => {
+      cb.addEventListener('click', e => e.stopPropagation());
+    });
+    /* Click vào hàng = toggle checkbox */
+    list.querySelectorAll('.tg-metric-item').forEach(it => {
+      it.addEventListener('click', e => {
+        if (e.target.tagName === 'INPUT') return;
+        const cb = it.querySelector('input[type=checkbox]');
+        cb.checked = !cb.checked;
+        tgSaveReportConfigFromUI();
+      });
+    });
+    /* Drag-to-reorder cho item đã tick */
+    let dragSrc = null;
+    list.querySelectorAll('.tg-metric-item[draggable=true]').forEach(it => {
+      it.addEventListener('dragstart', e => { dragSrc = it; it.style.opacity = '0.5'; });
+      it.addEventListener('dragend', () => { dragSrc = null; it.style.opacity = '1'; });
+      it.addEventListener('dragover', e => { e.preventDefault(); it.style.borderTop = '2px solid var(--red)'; });
+      it.addEventListener('dragleave', () => { it.style.borderTop = '1px solid var(--line)'; });
+      it.addEventListener('drop', e => {
+        e.preventDefault();
+        it.style.borderTop = '1px solid var(--line)';
+        if (!dragSrc || dragSrc === it) return;
+        it.parentNode.insertBefore(dragSrc, it);
+        tgSaveReportConfigFromUI();
+      });
+    });
+
+    tgRefreshPreview();
+  }
+
+  function tgSaveReportConfigFromUI() {
+    /* Collect selected metrics theo thứ tự DOM */
+    const list = document.getElementById('tgMetricsList');
+    const metrics = Array.from(list.querySelectorAll('.tg-metric-item'))
+      .filter(it => it.querySelector('input[type=checkbox]').checked)
+      .map(it => it.dataset.id);
+    const cfg = Object.assign({}, window.TG_REPORT_DEFAULT, window.STORE.get('tg_report_config', {}));
+    cfg.metrics = metrics;
+    cfg.header = document.getElementById('tgRptHeader').value;
+    cfg.footer = document.getElementById('tgRptFooter').value;
+    window.STORE.set('tg_report_config', cfg);
+    tgRefreshPreview();
+    /* Re-render để cập nhật vị trí (đã tick lên đầu) — chỉ khi toggle, không khi drag */
+  }
+
+  function tgRefreshPreview() {
+    const built = window.buildDailyReport();
+    const box = document.getElementById('tgRptPreview');
+    const len = document.getElementById('tgPreviewLen');
+    if (box) box.textContent = built.text || '(Chưa chọn chỉ số nào — tick ít nhất 1 metric)';
+    if (len) len.textContent = (built.text || '').length + ' ký tự';
+  }
+
+  window.tgSaveReportConfig = function () {
+    tgSaveReportConfigFromUI();
+    tgLoadReportConfig();   /* re-render để selected items lên đầu */
+    window.toast('✓ Đã lưu cấu hình mẫu báo cáo', 'success');
+  };
+  window.tgSelectAllMetrics = function () {
+    const cfg = Object.assign({}, window.TG_REPORT_DEFAULT, window.STORE.get('tg_report_config', {}));
+    cfg.metrics = window.TG_REPORT_METRICS.map(m => m.id);
+    window.STORE.set('tg_report_config', cfg);
+    tgLoadReportConfig();
+  };
+  window.tgSelectNoneMetrics = function () {
+    const cfg = Object.assign({}, window.TG_REPORT_DEFAULT, window.STORE.get('tg_report_config', {}));
+    cfg.metrics = [];
+    window.STORE.set('tg_report_config', cfg);
+    tgLoadReportConfig();
+  };
+  window.tgResetReportConfig = function () {
+    if (!confirm('Khôi phục mẫu báo cáo mặc định?')) return;
+    window.STORE.set('tg_report_config', Object.assign({}, window.TG_REPORT_DEFAULT));
+    tgLoadReportConfig();
+    window.toast('↺ Đã khôi phục mặc định', 'info');
+  };
+
+  /* Hook khi load Telegram panel — render thêm report config */
+  const origTgLoad = window.tgLoadConfig || (()=>{});
+  window.tgLoadConfig = function () {
+    origTgLoad();
+    tgLoadReportConfig();
+    /* Bind live update preview cho header / footer */
+    ['tgRptHeader','tgRptFooter'].forEach(id => {
+      const el = document.getElementById(id);
+      if (el && !el._tgBound) {
+        el._tgBound = true;
+        el.addEventListener('input', () => { tgSaveReportConfigFromUI(); });
+      }
+    });
+  };
+
+  /* === Đổi mật khẩu của chính mình === */
+  window.changeMyPassword = async function () {
+    const u = window.AUTH && window.AUTH.currentUser();
+    if (!u) { window.toast('Chưa đăng nhập', 'warn'); return; }
+    if (!u.email) { window.toast('Tài khoản không có email — không reset được', 'warn'); return; }
+    if (!confirm(`Gửi email reset mật khẩu đến ${u.email}?`)) return;
+    if (window.AUTH.resetPassword) {
+      const r = await window.AUTH.resetPassword(u.email);
+      if (r.success) window.toast('✓ Đã gửi email reset đến ' + u.email, 'success');
+      else window.toast('❌ ' + (r.error || 'Lỗi không xác định'), 'danger');
+    } else {
+      window.toast('Cần Supabase Auth để reset — hiện đang chạy mock', 'warn');
+    }
+  };
+
+  /* === Render lịch sử hoạt động (đọc từ STORE.activityLogs) === */
+  function renderActivityHistory() {
+    const body = document.getElementById('activityHistoryBody');
+    if (!body) return;
+    const logs = window.STORE.get('activityLogs', []).slice(0, 50);
+    if (!logs.length) {
+      body.innerHTML = '<tr><td colspan="4" style="padding:18px;text-align:center;color:var(--muted)">Chưa có log hoạt động nào.</td></tr>';
+      return;
+    }
+    const ACT_LABEL = { login:'🔓 Đăng nhập', logout:'🔒 Đăng xuất', create:'➕ Tạo', update:'✏️ Sửa', delete:'🗑 Xóa' };
+    body.innerHTML = logs.map(l => `<tr>
+      <td style="font-size:12px;font-family:ui-monospace,monospace">${l.at || ''}</td>
+      <td>${l.staffId || l.staff_id || '—'}</td>
+      <td>${ACT_LABEL[l.action] || l.action || '—'}</td>
+      <td style="font-size:12px;color:var(--muted)">${l.detail || ''}</td>
+    </tr>`).join('');
+  }
+
+  /* ============================================================
+     AI MULTI-PROVIDER MODAL — quản lý N model + routing per task
+     ============================================================ */
+  window.openAiMultiConfig = function () {
+    window.openModal('🤖 AI Form Filler — Nhiều model + Routing per task', `
+      <!-- Gợi ý + bảo mật ở header -->
+      <div style="padding:10px 14px;background:#F5F3FF;border-left:3px solid #7C3AED;border-radius:7px;font-size:12.5px;color:var(--navy);margin-bottom:14px;line-height:1.6">
+        💡 <b>Gợi ý chọn model:</b>
+        KH/Đơn/Chat → <b>Gemini Flash</b> (FREE) ·
+        Bảng giá/Ads/HĐ → <b>Claude Haiku</b> (~5đ/ảnh, chuẩn tài chính) ·
+        HĐ VAT phức tạp → <b>Claude Sonnet</b> hoặc <b>Gemini 2.5 Pro</b>
+      </div>
+
+      <!-- ============ CARD 1: DANH SÁCH MODEL ============ -->
+      <div style="border:1px solid var(--line);border-radius:10px;overflow:hidden;margin-bottom:14px">
+        <div style="display:flex;align-items:center;gap:10px;padding:10px 14px;background:#FAFAFB;border-bottom:1px solid var(--line)">
+          <div style="flex:1">
+            <div style="font-weight:700;font-size:13px;color:var(--navy);text-transform:uppercase;letter-spacing:0.4px">🔑 Bước 1 — Danh sách Model AI</div>
+            <div style="font-size:11.5px;color:var(--muted);margin-top:1px">Thêm nhiều provider, mỗi cái 1 API key, có thể bật/tắt</div>
+          </div>
+          <button class="btn btn-primary btn-sm" onclick="window.aiAddProvider()">+ Thêm model</button>
+        </div>
+        <div id="aiProvidersList" style="padding:12px"></div>
+      </div>
+
+      <!-- ============ CARD 2: ROUTING ============ -->
+      <div id="aiRoutingCard" style="border:1px solid var(--line);border-radius:10px;overflow:hidden;margin-bottom:10px">
+        <div style="padding:10px 14px;background:#FAFAFB;border-bottom:1px solid var(--line)">
+          <div style="font-weight:700;font-size:13px;color:var(--navy);text-transform:uppercase;letter-spacing:0.4px">🎯 Bước 2 — Routing per task</div>
+          <div style="font-size:11.5px;color:var(--muted);margin-top:1px">Mỗi loại task chọn 1 model phù hợp · Fallback cho task chưa map</div>
+        </div>
+        <div id="aiRoutingList" style="padding:12px"></div>
+      </div>
+
+      <div style="font-size:11px;color:var(--muted);padding:6px 10px;background:#FAFAFB;border-radius:6px;text-align:center">
+        🔒 API key lưu localStorage browser, không gửi ra ngoài (prototype mode).
+      </div>
+    `, {
+      footer: `<button class="btn btn-ghost" onclick="window.closeModal()">Đóng</button>
+               <button class="btn btn-primary" onclick="window.aiSaveAll()">💾 Lưu cấu hình</button>`,
+      width: '780px',
+    });
+    aiRenderProviders();
+    aiRenderRouting();
+  };
+
+  function aiCfg() { return window.STORE.get('int_ai-engine', {}) || {}; }
+
+  function aiRenderProviders() {
+    const list = document.getElementById('aiProvidersList');
+    if (!list) return;
+    const cfg = aiCfg();
+    let providers = cfg.providers || [];
+    /* Migration legacy */
+    if (!providers.length && cfg.apiKey) {
+      providers = [{ id: 'legacy', provider: cfg.provider || 'gemini', model: cfg.provider === 'openai' ? 'gpt-4o-mini' : cfg.provider === 'claude' ? 'claude-haiku-4-5' : 'gemini-2.0-flash', apiKey: cfg.apiKey, enabled: true }];
+    }
+    if (!providers.length) {
+      list.innerHTML = `<div style="padding:30px 14px;text-align:center;color:var(--muted);font-size:13px">
+        <div style="font-size:36px;margin-bottom:8px;opacity:0.4">🤖</div>
+        <div style="font-weight:600;color:var(--navy);margin-bottom:4px">Chưa có model nào</div>
+        <div style="font-size:12px">Bấm <b style="color:var(--red)">"+ Thêm model"</b> ở góc phải để bắt đầu.</div>
+      </div>`;
+      return;
+    }
+    const MODELS = window.AI_MODELS || [];
+    /* Header cột — giúp user hiểu mỗi cột là gì */
+    const head = `<div style="display:grid;grid-template-columns:60px 130px 160px 1fr 200px 40px;gap:8px;padding:0 8px 8px;font-size:10.5px;color:var(--muted);text-transform:uppercase;font-weight:700;letter-spacing:0.4px;border-bottom:1px dashed var(--line);margin-bottom:8px">
+      <span>Bật/Tắt</span>
+      <span>ID Slug</span>
+      <span>Provider</span>
+      <span>API Key</span>
+      <span>Model</span>
+      <span></span>
+    </div>`;
+    list.innerHTML = head + providers.map((p, i) => {
+      const modelOpts = MODELS.filter(m => m.provider === p.provider).map(m =>
+        `<option value="${m.model}" ${p.model === m.model ? 'selected' : ''}>${m.label} · ${m.badge}</option>`
+      ).join('') || '<option value="">— Mặc định —</option>';
+      return `<div class="ai-prov-row" data-idx="${i}" style="display:grid;grid-template-columns:60px 130px 160px 1fr 200px 40px;gap:8px;padding:8px;border:1px solid var(--line);border-radius:7px;margin-bottom:6px;background:#fff;align-items:center">
+        <label class="toggle" style="margin:0;justify-self:start"><input type="checkbox" class="ai-enabled" ${p.enabled !== false ? 'checked' : ''}><span class="slider"></span></label>
+        <input class="ai-id" value="${p.id || ''}" placeholder="gemini-flash" style="padding:6px 8px;font-size:11.5px;font-family:ui-monospace,monospace;border:1px solid var(--line);border-radius:5px;color:var(--navy);min-width:0">
+        <select class="ai-provider" onchange="window.aiOnProviderChange(${i})" style="padding:6px 8px;font-size:12.5px;border:1px solid var(--line);border-radius:5px;min-width:0">
+          <option value="gemini" ${p.provider === 'gemini' ? 'selected' : ''}>🟢 Gemini</option>
+          <option value="claude" ${p.provider === 'claude' ? 'selected' : ''}>🟠 Claude</option>
+          <option value="openai" ${p.provider === 'openai' ? 'selected' : ''}>⚫ OpenAI</option>
+        </select>
+        <input class="ai-key" type="password" value="${p.apiKey || ''}" placeholder="${p.provider === 'gemini' ? 'AIzaSy...' : p.provider === 'claude' ? 'sk-ant-...' : 'sk-...'}" style="padding:6px 8px;font-size:12px;font-family:ui-monospace,monospace;border:1px solid var(--line);border-radius:5px;min-width:0">
+        <select class="ai-model" style="padding:6px 8px;font-size:11.5px;border:1px solid var(--line);border-radius:5px;min-width:0">${modelOpts}</select>
+        <button class="btn btn-ghost btn-sm" onclick="window.aiDeleteProvider(${i})" style="color:var(--danger);padding:4px 8px;justify-self:center" title="Xóa model">🗑</button>
+      </div>`;
+    }).join('');
+  }
+
+  function aiRenderRouting() {
+    const card = document.getElementById('aiRoutingCard');
+    const list = document.getElementById('aiRoutingList');
+    if (!list || !card) return;
+    const cfg = aiCfg();
+    const tasks = window.AI_TASKS || [];
+    const providers = collectAiProvidersFromDOM();
+    const enabledProviders = providers.filter(p => p.enabled !== false && p.apiKey);
+
+    /* Ẩn card Routing nếu chưa có model nào enabled+có key */
+    if (!enabledProviders.length) {
+      list.innerHTML = `<div style="padding:24px 14px;text-align:center;color:var(--muted);font-size:13px">
+        <div style="font-size:30px;margin-bottom:6px;opacity:0.4">⬆</div>
+        <div style="font-weight:600;color:var(--navy);margin-bottom:4px">Thêm model trước</div>
+        <div style="font-size:12px">Sau khi có ít nhất 1 model bật + có API key, bạn sẽ map task vào model tương ứng ở đây.</div>
+      </div>`;
+      return;
+    }
+
+    const routing = cfg.routing || {};
+    const fallback = cfg.fallback || '';
+    const optsForSelect = (selected) => `<option value="">— Dùng Fallback —</option>` +
+      enabledProviders.map(p =>
+        `<option value="${p.id}" ${selected === p.id ? 'selected' : ''}>${p.id} · ${p.provider} ${p.model || ''}</option>`
+      ).join('');
+
+    list.innerHTML = tasks.map(t => `
+      <div style="display:grid;grid-template-columns:1fr 280px;gap:12px;padding:10px 12px;border:1px solid var(--line);border-radius:7px;margin-bottom:6px;background:#fff;align-items:center">
+        <div>
+          <div style="font-weight:700;font-size:13px;color:var(--navy)">${t.icon} ${t.label}</div>
+          <div style="font-size:11.5px;color:var(--muted);margin-top:2px">${t.desc}</div>
+        </div>
+        <select class="ai-rt" data-task="${t.id}" style="padding:7px 10px;font-size:12px;border:1px solid var(--line);border-radius:6px">${optsForSelect(routing[t.id])}</select>
+      </div>
+    `).join('') + `
+      <div style="display:grid;grid-template-columns:1fr 280px;gap:12px;padding:10px 12px;border:1px dashed #7C3AED;border-radius:7px;margin-top:10px;background:#F5F3FF;align-items:center">
+        <div>
+          <div style="font-weight:700;font-size:13px;color:#6D28D9">🔁 Fallback (mặc định)</div>
+          <div style="font-size:11.5px;color:var(--muted);margin-top:2px">Dùng khi task chưa map riêng — nên chọn model rẻ + ổn định (vd Gemini Flash)</div>
+        </div>
+        <select class="ai-fb" style="padding:7px 10px;font-size:12px;border:1px solid #7C3AED;border-radius:6px;background:#fff">${optsForSelect(fallback).replace('— Dùng Fallback —', '— Chưa chọn —')}</select>
+      </div>`;
+  }
+
+  function collectAiProvidersFromDOM() {
+    return Array.from(document.querySelectorAll('.ai-prov-row')).map(row => ({
+      id: row.querySelector('.ai-id').value.trim() || ('ai' + Date.now()),
+      provider: row.querySelector('.ai-provider').value,
+      model: row.querySelector('.ai-model').value,
+      apiKey: row.querySelector('.ai-key').value.trim(),
+      enabled: row.querySelector('.ai-enabled').checked,
+    }));
+  }
+
+  window.aiAddProvider = function () {
+    /* Save current state from DOM trước khi re-render */
+    const current = collectAiProvidersFromDOM();
+    /* Suggest sensible defaults — nếu chưa có Gemini thì add Gemini, ngược lại add Claude, ... */
+    const hasGemini = current.some(p => p.provider === 'gemini');
+    const hasClaude = current.some(p => p.provider === 'claude');
+    let next;
+    if (!hasGemini) next = { id: 'gemini-flash', provider: 'gemini', model: 'gemini-2.0-flash', apiKey: '', enabled: true };
+    else if (!hasClaude) next = { id: 'claude-haiku', provider: 'claude', model: 'claude-haiku-4-5', apiKey: '', enabled: true };
+    else next = { id: 'ai' + (current.length + 1), provider: 'gemini', model: 'gemini-2.0-flash', apiKey: '', enabled: true };
+    current.push(next);
+    const cfg = aiCfg(); cfg.providers = current;
+    window.STORE.set('int_ai-engine', cfg);
+    aiRenderProviders();
+    setTimeout(aiRenderRouting, 50);
+  };
+
+  window.aiDeleteProvider = function (idx) {
+    if (!confirm('Xóa model này?')) return;
+    const current = collectAiProvidersFromDOM();
+    current.splice(idx, 1);
+    const cfg = aiCfg(); cfg.providers = current;
+    window.STORE.set('int_ai-engine', cfg);
+    aiRenderProviders();
+    aiRenderRouting();
+  };
+
+  /* Khi đổi provider trong row → đổi list model phù hợp */
+  window.aiOnProviderChange = function (idx) {
+    const row = document.querySelectorAll('.ai-prov-row')[idx];
+    if (!row) return;
+    const newProvider = row.querySelector('.ai-provider').value;
+    const sel = row.querySelector('.ai-model');
+    const opts = (window.AI_MODELS || []).filter(m => m.provider === newProvider);
+    sel.innerHTML = opts.map(m => `<option value="${m.model}">${m.label} · ${m.badge}</option>`).join('');
+  };
+
+  window.aiSaveAll = function () {
+    const cfg = aiCfg();
+    cfg.providers = collectAiProvidersFromDOM();
+    cfg.routing = {};
+    document.querySelectorAll('.ai-rt').forEach(sel => { cfg.routing[sel.dataset.task] = sel.value || ''; });
+    const fb = document.querySelector('.ai-fb'); cfg.fallback = fb ? fb.value : '';
+    /* Validate */
+    const noKey = cfg.providers.filter(p => p.enabled && !p.apiKey);
+    if (noKey.length) { window.toast(`${noKey.length} model bật nhưng chưa nhập API key`, 'warn'); return; }
+    /* Migration: bỏ legacy single apiKey nếu có providers */
+    if (cfg.providers.length) { delete cfg.apiKey; delete cfg.provider; }
+    window.STORE.set('int_ai-engine', cfg);
+    window.closeModal();
+    window.toast(`✓ Đã lưu ${cfg.providers.length} model + routing ${Object.keys(cfg.routing).filter(k => cfg.routing[k]).length}/${(window.AI_TASKS||[]).length} task`, 'success');
+  };
+
+  /* Render ngay nếu user vào trang đang ở tab Tích hợp */
+  setTimeout(renderIntegrations, 300);
+  setTimeout(renderActivityHistory, 300);
+
+  window.renderAppShell('settings', 'Cài đặt');
+</script>
+<script src="../scripts/ai-fill.js"></script>
+<script src="../scripts/cust-search-box.js"></script>
+<script src="../data/demo-seed.js"></script>
+<script src="../scripts/data-linkage.js"></script>
+<script src="../scripts/system-core.js"></script>
+<script src="../scripts/ai-chat.js"></script>
+</body>
+</html>

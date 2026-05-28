@@ -1,0 +1,29 @@
+# =========================================================
+# VTY Logistics — Render.com Static Site config
+# Deploy: connect repo qua dashboard Render → auto detect file này
+# =========================================================
+services:
+  - type: web
+    name: vty-logistics
+    runtime: static
+    buildCommand: ""           # Không cần build — HTML/CSS/JS thuần
+    staticPublishPath: .       # Serve từ root project
+    pullRequestPreviewsEnabled: false
+
+    # Cache static assets aggressive
+    headers:
+      - path: /styles/*
+        name: Cache-Control
+        value: public, max-age=3600
+      - path: /scripts/*
+        name: Cache-Control
+        value: public, max-age=3600
+      - path: /assets/*
+        name: Cache-Control
+        value: public, max-age=86400
+      - path: /*
+        name: X-Frame-Options
+        value: SAMEORIGIN
+      - path: /*
+        name: X-Content-Type-Options
+        value: nosniff

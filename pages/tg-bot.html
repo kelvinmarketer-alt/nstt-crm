@@ -1,0 +1,168 @@
+<!doctype html>
+<html lang="vi">
+<head>
+<meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Telegram Bot 2-chiều · Nông Sản Tuấn Tú</title>
+<link rel="stylesheet" href="../styles/tokens.css"><link rel="stylesheet" href="../styles/app.css">
+<style>
+  .cmd-card{background:#fff;border:1px solid var(--line);border-radius:10px;padding:14px;margin-bottom:10px}
+  .cmd-code{background:#0F172A;color:#A7F3D0;padding:8px 12px;border-radius:6px;font-family:'JetBrains Mono',monospace;font-size:12px;display:inline-block;margin:2px}
+</style>
+</head>
+<body>
+<div class="app">
+  <aside class="sidebar"></aside>
+  <header class="topbar">
+    <div class="breadcrumb"></div><div class="top-spacer"></div>
+    <div class="search-global"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="7"/><path d="m21 21-4.3-4.3"/></svg><input placeholder="Tìm... (Ctrl+K)"></div>
+    <button class="icon-btn" title="Thông báo"><span style="font-size:18px">🔔</span><span class="dot"></span></button>
+    <button class="icon-btn" title="Hướng dẫn" onclick="window.location.href='docs.html'"><span style="font-size:18px">❓</span></button>
+  </header>
+  <main class="main">
+    <div style="display:flex;align-items:center;gap:12px;margin-bottom:14px">
+      <div>
+        <h1 style="margin:0;font-size:22px;color:var(--navy);font-weight:800">✈️ Telegram Bot 2 chiều — Shipper <span id="hbT"></span></h1>
+        <div style="font-size:13px;color:var(--muted);margin-top:2px">Shipper thao tác đơn ngay trên Telegram, không cần app riêng</div>
+      </div>
+    </div>
+    <div id="hbHost"></div>
+
+    <h3 style="margin:16px 0 10px;font-size:13px;color:var(--navy);text-transform:uppercase;font-weight:700">📡 Webhook URL (setup bot)</h3>
+    <div style="background:#fff;border:1px solid var(--line);border-radius:10px;padding:14px;font-size:13px">
+      <p style="margin:0 0 8px">Để bot nhận tin nhắn của shipper, bạn cần đặt webhook trên Telegram:</p>
+      <ol style="margin:0;padding-left:18px;line-height:1.7">
+        <li>Deploy 1 endpoint nhận webhook (Cloudflare Workers / Vercel / Netlify Functions) — file mẫu: <code style="background:#F1F5F9;padding:1px 6px;border-radius:3px">tg-webhook.example.js</code></li>
+        <li>Gọi API set webhook:
+          <div class="cmd-code" style="display:block;margin:6px 0;color:#FCD34D">curl -F "url=https://your-domain.com/tg-webhook" \\<br>&nbsp;&nbsp;https://api.telegram.org/bot&lt;BOT_TOKEN&gt;/setWebhook</div>
+        </li>
+        <li>Bot sẽ nhận message → parse command → gọi API NSTT cập nhật STORE</li>
+      </ol>
+      <div style="margin-top:10px;padding:9px 12px;background:#FEF3C7;color:#92400E;border-radius:6px;font-size:12px">
+        💡 Bản demo này chỉ <b>simulate</b> command — không thực sự nhận webhook. Để chạy thật cần deploy backend.
+      </div>
+    </div>
+
+    <h3 style="margin:20px 0 10px;font-size:13px;color:var(--navy);text-transform:uppercase;font-weight:700">⚡ Commands hỗ trợ</h3>
+
+    <div class="cmd-card">
+      <h4 style="margin:0 0 4px;color:var(--navy)">/giao &lt;mã đơn&gt;</h4>
+      <div style="font-size:12px;color:var(--muted);margin-bottom:6px">Đánh dấu đơn đã giao thành công cho KH</div>
+      <div class="cmd-code">/giao NSTT-000142</div>
+      <div style="font-size:11.5px;color:var(--muted);margin-top:6px">→ Status: transit → delivered. Tự update KPI shipper + cộng doanh thu KH.</div>
+    </div>
+
+    <div class="cmd-card">
+      <h4 style="margin:0 0 4px;color:var(--navy)">/lay &lt;mã đơn&gt;</h4>
+      <div style="font-size:12px;color:var(--muted);margin-bottom:6px">Đã lấy hàng ở kho, bắt đầu giao</div>
+      <div class="cmd-code">/lay NSTT-000142</div>
+      <div style="font-size:11.5px;color:var(--muted);margin-top:6px">→ confirmed → pickup → transit</div>
+    </div>
+
+    <div class="cmd-card">
+      <h4 style="margin:0 0 4px;color:var(--navy)">/hoan &lt;mã&gt; &lt;lý do&gt;</h4>
+      <div style="font-size:12px;color:var(--muted);margin-bottom:6px">KH từ chối/không có mặt — đánh dấu hoãn</div>
+      <div class="cmd-code">/hoan NSTT-000142 KH bận, hẹn 14h chiều</div>
+    </div>
+
+    <div class="cmd-card">
+      <h4 style="margin:0 0 4px;color:var(--navy)">/pod &lt;mã đơn&gt;</h4>
+      <div style="font-size:12px;color:var(--muted);margin-bottom:6px">Gửi kèm ảnh POD (Proof of Delivery)</div>
+      <div class="cmd-code">/pod NSTT-000142 + ảnh đính kèm</div>
+      <div style="font-size:11.5px;color:var(--muted);margin-top:6px">→ Ảnh lưu trong STORE.pod_photos, có thể xem ở trang Returns & POD.</div>
+    </div>
+
+    <div class="cmd-card">
+      <h4 style="margin:0 0 4px;color:var(--navy)">/donhom — Xem đơn hôm nay</h4>
+      <div style="font-size:12px;color:var(--muted);margin-bottom:6px">Bot trả về list đơn chưa giao của shipper</div>
+      <div class="cmd-code">/donhom</div>
+    </div>
+
+    <h3 style="margin:20px 0 10px;font-size:13px;color:var(--navy);text-transform:uppercase;font-weight:700">🧪 Simulate command (test logic)</h3>
+    <div style="background:#fff;border:1px solid var(--line);border-radius:10px;padding:14px">
+      <input id="simCmd" placeholder="VD: /giao NSTT-000142" style="width:100%;border:1px solid var(--line);border-radius:7px;padding:9px 12px;font-size:13px;font-family:monospace">
+      <div style="display:flex;gap:8px;margin-top:8px">
+        <button class="btn btn-primary" onclick="window.simulateCmd()">▶ Simulate</button>
+        <button class="btn btn-ghost" onclick="document.getElementById('simCmd').value='/giao '+(window.STORE.get('orders',[]).filter(o=>o.status==='transit')[0]?.code||'NSTT-000142')">↻ Đơn transit đầu tiên</button>
+      </div>
+      <div id="simOut" style="margin-top:12px;font-size:12px;background:#0F172A;color:#A7F3D0;padding:10px;border-radius:6px;font-family:monospace;min-height:60px"></div>
+    </div>
+  </main>
+</div>
+
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<script src="../scripts/supabase-config.js"></script>
+<script src="../scripts/supabase-client.js"></script>
+<script src="../scripts/shared.js"></script><script src="../scripts/store.js"></script>
+<script src="../scripts/auth.js"></script><script src="../scripts/help-tips.js"></script>
+<script src="../scripts/ux-improvements.js"></script>
+<script src="../scripts/onboarding.js"></script>
+<script src="../scripts/pdf-export.js"></script>
+<script>if(window.AUTH) window.AUTH.requireAuth();</script>
+<script src="../data/orders.js"></script>
+
+<script>
+(function(){
+  window.renderAppShell('settings','TG Bot 2 chiều');
+  document.getElementById('hbHost').innerHTML = window.helpBanner(
+    '✈️ Telegram Bot 2 chiều',
+    'Hiện tại Telegram của app chỉ <b>gửi đi</b> (báo cáo, đơn cho shipper). Module này thiết kế <b>nhận lệnh ngược lại</b> từ shipper — họ nhắn `/giao NSTT-000142` là đơn tự cập nhật. Không cần build app mobile riêng. Cần deploy 1 webhook nhỏ trên Cloudflare Workers (~5 phút setup).',
+    {id:'hb-tg', icon:'✈️'}
+  );
+  document.getElementById('hbT').innerHTML = window.helpTip('Mỗi shipper cần được mapping với Telegram chat ID (đã có field telegramChatId trong DRIVERS).', {size:'lg'});
+
+  window.simulateCmd = function() {
+    const cmd = document.getElementById('simCmd').value.trim();
+    const out = document.getElementById('simOut');
+    if (!cmd.startsWith('/')) { out.textContent = '❌ Lệnh phải bắt đầu bằng /'; return; }
+    const [verb, ...rest] = cmd.slice(1).split(' ');
+    const orderCode = rest[0];
+    const orders = window.STORE.get('orders', []) || [];
+    const oi = orders.findIndex(o => o.code === orderCode);
+    const log = [];
+    log.push(`📥 Bot nhận: "${cmd}"`);
+    log.push(`👤 Từ shipper: Bùi Văn C (chatId 5242450169)`);
+
+    if (verb === 'giao') {
+      if (oi < 0) { log.push(`❌ Không tìm thấy đơn ${orderCode}`); }
+      else {
+        orders[oi].status = 'delivered';
+        window.STORE.set('orders', orders);
+        log.push(`✓ Cập nhật ${orderCode} → delivered`);
+        log.push(`✓ Audit log: order.statusChange · ${orderCode}`);
+        log.push(`📤 Bot reply: "✅ Đã ghi nhận giao đơn ${orderCode}. Cảm ơn anh!"`);
+        window.audit && window.audit.log('order.statusChange.tg', `${orderCode} → delivered (qua TG bot)`);
+      }
+    } else if (verb === 'lay') {
+      if (oi < 0) { log.push(`❌ Không tìm thấy đơn`); }
+      else {
+        orders[oi].status = 'transit';
+        window.STORE.set('orders', orders);
+        log.push(`✓ Cập nhật ${orderCode} → transit (đang giao)`);
+        log.push(`📤 Bot reply: "🚚 ${orderCode} đang trên đường giao."`);
+      }
+    } else if (verb === 'donhom') {
+      const my = orders.filter(o => o.status === 'transit' || o.status === 'pickup' || o.status === 'confirmed').slice(0, 5);
+      log.push(`📋 Tìm thấy ${my.length} đơn cần giao:`);
+      my.forEach(o => log.push(`  • ${o.code} · ${o.custName} · ${o.drop}`));
+      log.push(`📤 Bot reply (list above)`);
+    } else if (verb === 'pod') {
+      log.push(`📷 Bot nhận ảnh đính kèm`);
+      log.push(`✓ Lưu vào STORE.pod_photos["${orderCode}"]`);
+      log.push(`📤 Bot reply: "📷 Đã lưu ảnh POD cho ${orderCode}"`);
+    } else if (verb === 'hoan') {
+      log.push(`✓ Ghi note vào đơn ${orderCode}: "${rest.slice(1).join(' ')}"`);
+      log.push(`📤 Bot reply: "📝 Đã ghi nhận hoãn. Vui lòng giao lại trong ngày."`);
+    } else {
+      log.push(`❌ Lệnh "${verb}" không hỗ trợ. Dùng: /giao /lay /hoan /pod /donhom`);
+    }
+
+    out.innerHTML = log.join('<br>');
+  };
+})();
+</script>
+<script src="../scripts/ai-fill.js"></script><script src="../scripts/cust-search-box.js"></script>
+<script src="../data/demo-seed.js"></script>
+<script src="../scripts/data-linkage.js"></script>
+<script src="../scripts/system-core.js"></script>
+<script src="../scripts/ai-chat.js"></script>
+</body></html>

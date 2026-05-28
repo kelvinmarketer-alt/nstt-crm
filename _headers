@@ -1,0 +1,33 @@
+# Cloudflare Pages — HTTP headers config
+# https://developers.cloudflare.com/pages/configuration/headers/
+
+# === Security headers cho mọi page ===
+/*
+  X-Frame-Options: SAMEORIGIN
+  X-Content-Type-Options: nosniff
+  Referrer-Policy: strict-origin-when-cross-origin
+  Permissions-Policy: geolocation=(), camera=(), microphone=()
+
+# === Service Worker: KHÔNG cache, để force update mỗi lần deploy mới ===
+/sw.js
+  Cache-Control: no-cache, no-store, must-revalidate
+
+# === HTML pages: short cache, vì có thể đổi text/UI ===
+/*.html
+  Cache-Control: public, max-age=300
+
+/pages/*
+  Cache-Control: public, max-age=300
+
+# === Static assets: aggressive cache (1 ngày) ===
+/styles/*
+  Cache-Control: public, max-age=86400
+
+/scripts/*
+  Cache-Control: public, max-age=3600
+
+/data/*
+  Cache-Control: public, max-age=3600
+
+/assets/*
+  Cache-Control: public, max-age=604800

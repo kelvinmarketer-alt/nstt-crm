@@ -1,0 +1,344 @@
+<!doctype html>
+<html lang="vi">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Đăng nhập · Nông Sản Tuấn Tú Hà Nội</title>
+<link rel="stylesheet" href="../styles/tokens.css">
+<style>
+  *{box-sizing:border-box}
+  html,body{margin:0;padding:0;min-height:100vh}
+  body{
+    font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,sans-serif;
+    background:linear-gradient(135deg, #1B5E20 0%, #123F16 50%, #339B21 200%);
+    color:#fff;
+    display:grid;
+    grid-template-columns:1fr 1fr;
+    min-height:100vh;
+  }
+  @media (max-width:880px){body{grid-template-columns:1fr}}
+
+  /* === Left side: branding === */
+  .brand-side{
+    padding:50px 50px 30px;
+    display:flex;flex-direction:column;justify-content:space-between;
+    position:relative;overflow:hidden;
+  }
+  .brand-side::before{
+    content:'';position:absolute;inset:0;
+    background:radial-gradient(circle at 30% 40%, rgba(200,16,46,0.2), transparent 50%);
+    pointer-events:none;
+  }
+  .brand-top{position:relative;z-index:2}
+  .brand-logo{
+    width:96px;height:96px;border-radius:18px;
+    background:#fff;display:grid;place-items:center;
+    box-shadow:0 12px 36px rgba(0,0,0,0.3);
+    margin-bottom:24px;
+  }
+  .brand-title{
+    font-size:34px;font-weight:800;letter-spacing:-0.5px;
+    background:linear-gradient(90deg, #fff 30%, #E8A33D 80%);
+    -webkit-background-clip:text;background-clip:text;
+    -webkit-text-fill-color:transparent;
+    margin-bottom:8px;line-height:1.1;
+  }
+  .brand-sub{font-size:16px;opacity:0.7;max-width:380px;line-height:1.5}
+
+  .brand-features{position:relative;z-index:2;margin-top:40px}
+  .brand-feat{
+    display:flex;align-items:flex-start;gap:14px;
+    padding:14px 0;border-top:1px solid rgba(255,255,255,0.08);
+  }
+  .brand-feat .ic{
+    width:42px;height:42px;border-radius:10px;
+    background:rgba(232,163,61,0.15);
+    color:#E8A33D;display:grid;place-items:center;
+    font-size:18px;flex-shrink:0;
+  }
+  .brand-feat .t1{font-weight:700;font-size:14px}
+  .brand-feat .t2{font-size:12.5px;opacity:0.65;margin-top:2px;line-height:1.5}
+
+  .brand-foot{
+    position:relative;z-index:2;
+    font-size:12px;opacity:0.5;
+    border-top:1px solid rgba(255,255,255,0.08);padding-top:20px;
+  }
+
+  /* === Right side: login form === */
+  .form-side{
+    background:#fff;color:#1B5E20;
+    padding:40px 50px;
+    display:flex;flex-direction:column;justify-content:center;
+  }
+  @media (max-width:880px){.brand-side{padding:30px} .form-side{padding:30px}}
+
+  .form-wrap{max-width:380px;width:100%;margin:0 auto}
+  .form-wrap h2{
+    font-size:26px;font-weight:800;margin:0 0 6px;color:#1B5E20;letter-spacing:-0.3px;
+  }
+  .form-wrap .sub{font-size:13.5px;color:#6B7280;margin-bottom:28px}
+
+  .field{margin-bottom:16px}
+  .field label{
+    display:block;font-size:12px;font-weight:700;color:#1B5E20;
+    text-transform:uppercase;letter-spacing:0.5px;margin-bottom:6px;
+  }
+  .field input{
+    width:100%;padding:12px 14px;font-size:14px;
+    border:1.5px solid #E5E7EB;border-radius:9px;
+    background:#FAFAFB;color:#1F2937;font-family:inherit;
+    transition:all 0.15s;
+  }
+  .field input:focus{
+    outline:none;border-color:#339B21;background:#fff;
+    box-shadow:0 0 0 4px rgba(200,16,46,0.08);
+  }
+
+  .field-row{display:flex;justify-content:space-between;align-items:center;font-size:13px;margin-bottom:20px}
+  .remember{display:flex;align-items:center;gap:7px;cursor:pointer;color:#6B7280}
+  .remember input{accent-color:#339B21;cursor:pointer}
+  .forgot{color:#339B21;text-decoration:none;font-weight:600}
+  .forgot:hover{text-decoration:underline}
+
+  .btn-login{
+    width:100%;padding:13px;
+    background:linear-gradient(135deg,#339B21,#2A7D1A);
+    color:#fff;border:none;border-radius:10px;
+    font-size:15px;font-weight:700;cursor:pointer;
+    box-shadow:0 8px 20px rgba(200,16,46,0.25);
+    transition:all 0.15s;
+  }
+  .btn-login:hover{transform:translateY(-1px);box-shadow:0 10px 24px rgba(200,16,46,0.35)}
+  .btn-login:active{transform:translateY(0)}
+  .btn-login:disabled{opacity:0.6;cursor:wait}
+
+  .divider{
+    display:flex;align-items:center;gap:14px;
+    margin:24px 0;color:#9CA3AF;font-size:12px;
+  }
+  .divider::before, .divider::after{
+    content:'';flex:1;height:1px;background:#E5E7EB;
+  }
+
+  /* Demo accounts */
+  .demo-accs{
+    background:#FAFAFB;border:1px solid #E5E7EB;border-radius:10px;
+    padding:14px 16px;
+  }
+  .demo-accs .h{
+    font-size:11px;color:#6B7280;font-weight:700;
+    text-transform:uppercase;letter-spacing:0.5px;margin-bottom:8px;
+    display:flex;align-items:center;gap:6px;
+  }
+  .demo-acc{
+    display:flex;align-items:center;gap:10px;
+    padding:6px 0;font-size:12.5px;cursor:pointer;
+    color:#374151;border-radius:6px;padding:6px 8px;margin:0 -8px;
+  }
+  .demo-acc:hover{background:#fff}
+  .demo-acc .ava{
+    width:26px;height:26px;border-radius:50%;
+    display:grid;place-items:center;color:#fff;font-weight:700;font-size:10px;flex-shrink:0;
+  }
+  .demo-acc .info{flex:1;line-height:1.2}
+  .demo-acc .name{font-weight:600;color:#1F2937}
+  .demo-acc .role{font-size:10.5px;color:#9CA3AF;margin-top:1px}
+  .demo-acc .arrow{color:#9CA3AF;font-size:11px}
+
+  .err-msg{
+    background:#FEE2E2;border:1px solid #FCA5A5;color:#B91C1C;
+    padding:10px 14px;border-radius:8px;font-size:12.5px;
+    margin-bottom:14px;display:none;
+  }
+  .err-msg.show{display:block}
+
+  /* === SVG logo phoenix === */
+  .vty-logo-sm{width:60px;height:60px}
+</style>
+</head>
+<body>
+
+<!-- LEFT: Brand side -->
+<div class="brand-side">
+  <div class="brand-top">
+    <div class="brand-logo" id="brandLogo">
+      <svg width="60" height="60" viewBox="0 0 140 90" xmlns="http://www.w3.org/2000/svg">
+        <g>
+          <circle cx="70" cy="45" r="38" fill="#E8F5E2"/>
+          <circle cx="70" cy="45" r="38" fill="none" stroke="#339B21" stroke-width="3.5"/>
+          <circle cx="61" cy="49" r="19" fill="#4EB83C"/>
+          <path d="M61 30 C 50 37 47 52 55 64" fill="none" stroke="#2A7D1A" stroke-width="2" stroke-linecap="round"/>
+          <path d="M61 30 C 72 37 75 52 67 64" fill="none" stroke="#2A7D1A" stroke-width="2" stroke-linecap="round"/>
+          <path d="M43 49 C 54 47 68 47 79 49" fill="none" stroke="#2A7D1A" stroke-width="2" stroke-linecap="round"/>
+          <circle cx="61" cy="49" r="5.5" fill="#2A7D1A"/>
+          <g transform="rotate(30 86 52)">
+            <path d="M82 47 L90 47 L86 70 Z" fill="#E8862E"/>
+            <path d="M82 47 C 79 39 85 37 86 43 C 87 37 93 39 90 47 Z" fill="#2A7D1A"/>
+          </g>
+        </g>
+      </svg>
+    </div>
+
+    <h1 class="brand-title">Nông Sản Tuấn Tú Hà Nội</h1>
+    <div class="brand-sub">Hệ thống quản lý vận hành nội bộ — cung ứng nông sản & thực phẩm cho nhà hàng tại Hà Nội</div>
+  </div>
+
+  <div class="brand-features">
+    <div class="brand-feat">
+      <div class="ic">📊</div>
+      <div><div class="t1">9 module quản lý đầy đủ</div>
+      <div class="t2">Đơn hàng · Khách hàng · Kế toán · Công nợ · Hóa đơn · Báo cáo</div></div>
+    </div>
+    <div class="brand-feat">
+      <div class="ic">🤝</div>
+      <div><div class="t1">Tích hợp nhà cung cấp</div>
+      <div class="t2">Đặt thêm từ nhà vườn / chợ đầu mối khi thiếu hàng</div></div>
+    </div>
+    <div class="brand-feat">
+      <div class="ic">🔐</div>
+      <div><div class="t1">Phân quyền theo nhân viên</div>
+      <div class="t2">Mỗi NV chỉ thấy module mà mình được cấp quyền</div></div>
+    </div>
+  </div>
+
+  <div class="brand-foot">
+    © 2026 Nông Sản Tuấn Tú Hà Nội · v1.0 · Mọi câu hỏi liên hệ chủ DN
+  </div>
+</div>
+
+<!-- RIGHT: Form side -->
+<div class="form-side">
+  <div class="form-wrap">
+    <h2>Đăng nhập</h2>
+    <div class="sub">Vào hệ thống bằng tài khoản nội bộ được cấp</div>
+
+    <div class="err-msg" id="errMsg"></div>
+
+    <form id="loginForm" onsubmit="window.submitLogin(event)">
+      <div class="field">
+        <label>Email / Tài khoản</label>
+        <input type="text" id="username" placeholder="admin@nongsantuantu.com" autocomplete="username" required>
+      </div>
+      <div class="field">
+        <label>Mật khẩu</label>
+        <input type="password" id="password" placeholder="••••••••" autocomplete="current-password" required>
+      </div>
+
+      <div class="field-row">
+        <label class="remember">
+          <input type="checkbox" id="remember" checked> Nhớ đăng nhập 7 ngày
+        </label>
+        <a href="#" class="forgot" onclick="alert('Liên hệ chủ DN (Tuấn Tú) để reset mật khẩu — 0903 111 222');return false">Quên mật khẩu?</a>
+      </div>
+
+      <button type="submit" class="btn-login" id="btnLogin">🔐 Đăng nhập</button>
+    </form>
+
+    <div class="divider">Hoặc thử nhanh</div>
+
+    <div class="demo-accs">
+      <div class="h">💡 Tài khoản demo (click để tự điền)</div>
+      <div class="demo-acc" onclick="window.fillDemo('admin@nongsantuantu.com','admin123')">
+        <div class="ava" style="background:#339B21">TT</div>
+        <div class="info">
+          <div class="name">Tuấn Tú</div>
+          <div class="role">Chủ doanh nghiệp · toàn quyền</div>
+        </div>
+        <div class="arrow">→</div>
+      </div>
+      <div class="demo-acc" onclick="window.fillDemo('sales@nongsantuantu.com','sales123')">
+        <div class="ava" style="background:#1B5E20">TL</div>
+        <div class="info">
+          <div class="name">Trần Lan</div>
+          <div class="role">Trưởng phòng Sales · KH/Đơn/Công nợ/Báo cáo</div>
+        </div>
+        <div class="arrow">→</div>
+      </div>
+      <div class="demo-acc" onclick="window.fillDemo('kt@nongsantuantu.com','kt123')">
+        <div class="ava" style="background:#15803D">LP</div>
+        <div class="info">
+          <div class="name">Lê Thị Phương</div>
+          <div class="role">Kế toán · Kế toán/Công nợ/Hóa đơn/Báo cáo</div>
+        </div>
+        <div class="arrow">→</div>
+      </div>
+      <div class="demo-acc" onclick="window.fillDemo('cskh@nongsantuantu.com','cskh123')">
+        <div class="ava" style="background:#E8A33D">HM</div>
+        <div class="info">
+          <div class="name">Hoàng Mai</div>
+          <div class="role">CSKH B2C · KH/Đơn hàng</div>
+        </div>
+        <div class="arrow">→</div>
+      </div>
+    </div>
+
+    <div style="margin-top:18px;padding:10px 12px;background:#F3E8FF;border:1px solid #E9D5FF;border-radius:8px;font-size:12px;color:#7C3AED;line-height:1.5">
+      🔒 <b>Bảo mật:</b> Prototype lưu auth state trong localStorage. Production cần backend với JWT/OAuth thật.
+    </div>
+  </div>
+</div>
+
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<script src="../scripts/supabase-config.js"></script>
+<script src="../scripts/supabase-client.js"></script>
+<script src="../scripts/store.js"></script>
+<script src="../scripts/auth.js"></script>
+<script src="../scripts/help-tips.js"></script>
+<script src="../scripts/ux-improvements.js"></script>
+<script src="../scripts/onboarding.js"></script>
+<script src="../scripts/pdf-export.js"></script>
+<script>
+  /* Nếu URL có ?clear → force logout (xoá session bị hỏng) */
+  const params = new URLSearchParams(location.search);
+  if (params.get('clear') === '1') {
+    window.STORE && window.STORE.set('currentUser', null);
+    history.replaceState(null, '', location.pathname);
+  }
+
+  /* Nếu đã login rồi → redirect về dashboard (hoặc trang đầu tiên có quyền) */
+  if (window.AUTH && window.AUTH.isLoggedIn()) {
+    const allowed = window.AUTH.getAllowedMenu();
+    window.location.href = allowed.includes('dashboard.html') ? 'dashboard.html' : (allowed[0] || 'dashboard.html');
+  }
+
+  window.fillDemo = function(u, p) {
+    document.getElementById('username').value = u;
+    document.getElementById('password').value = p;
+    document.getElementById('btnLogin').focus();
+  };
+
+  window.submitLogin = async function(e) {
+    e.preventDefault();
+    const u = document.getElementById('username').value.trim();
+    const p = document.getElementById('password').value;
+    const remember = document.getElementById('remember').checked;
+    const btn = document.getElementById('btnLogin');
+    const err = document.getElementById('errMsg');
+
+    btn.disabled = true;
+    btn.innerHTML = '⏳ Đang xác thực...';
+    err.classList.remove('show');
+
+    try {
+      const result = await window.AUTH.login(u, p, remember);
+      if (result && result.success) {
+        btn.innerHTML = '✓ Thành công · đang vào hệ thống...';
+        setTimeout(() => { window.location.href = 'dashboard.html'; }, 400);
+      } else {
+        err.textContent = '⚠️ ' + (result?.error || 'Đăng nhập thất bại');
+        err.classList.add('show');
+        btn.disabled = false;
+        btn.innerHTML = '🔐 Đăng nhập';
+      }
+    } catch (ex) {
+      console.error('[LOGIN]', ex);
+      err.textContent = '⚠️ Lỗi: ' + (ex.message || ex);
+      err.classList.add('show');
+      btn.disabled = false;
+      btn.innerHTML = '🔐 Đăng nhập';
+    }
+  };
+</script>
+</body>
+</html>

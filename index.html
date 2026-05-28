@@ -1,0 +1,40 @@
+<!doctype html>
+<html lang="vi">
+<head>
+<meta charset="utf-8">
+<title>Nông Sản Tuấn Tú Hà Nội — Internal CRM</title>
+<style>
+body{font-family:-apple-system,Segoe UI,Roboto,sans-serif;display:grid;place-items:center;min-height:100vh;margin:0;background:#1B5E20;color:#fff}
+a{color:#E8A33D;text-decoration:none;font-size:14px;margin-top:14px;display:inline-block}
+.spinner{width:32px;height:32px;border:3px solid rgba(255,255,255,0.2);border-top-color:#E8A33D;border-radius:50%;animation:spin 0.7s linear infinite;margin:14px auto}
+@keyframes spin{to{transform:rotate(360deg)}}
+</style>
+</head>
+<body>
+<div style="text-align:center">
+  <div style="font-size:14px;opacity:0.7;letter-spacing:2px">NSTT LOGISTICS</div>
+  <div class="spinner"></div>
+  <div style="margin-top:8px;font-size:13px;opacity:0.5" id="msg">Đang kiểm tra phiên đăng nhập...</div>
+  <a href="pages/login.html" id="manualLink" style="display:none">→ Vào trang đăng nhập</a>
+</div>
+
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<script src="scripts/supabase-config.js"></script>
+<script src="scripts/supabase-client.js"></script>
+<script src="scripts/store.js"></script>
+<script src="scripts/auth.js"></script>
+<script>
+  /* Auto-redirect dựa trên trạng thái login */
+  setTimeout(() => {
+    const isIn = window.AUTH && window.AUTH.isLoggedIn();
+    document.getElementById('msg').textContent = isIn
+      ? 'Đã đăng nhập, đang vào Dashboard...'
+      : 'Chưa đăng nhập, đang chuyển sang trang đăng nhập...';
+    document.getElementById('manualLink').style.display = 'inline-block';
+    setTimeout(() => {
+      window.location.href = isIn ? 'pages/dashboard.html' : 'pages/login.html';
+    }, 500);
+  }, 300);
+</script>
+</body>
+</html>

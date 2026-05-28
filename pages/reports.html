@@ -1,0 +1,606 @@
+<!doctype html>
+<html lang="vi">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Báo cáo · Nông Sản Tuấn Tú Hà Nội</title>
+<link rel="stylesheet" href="../styles/tokens.css">
+<link rel="stylesheet" href="../styles/app.css">
+<style>
+  .rpt-tabs{display:flex;gap:0;background:#fff;border:1px solid var(--line);border-radius:10px;padding:4px;margin-bottom:14px;width:fit-content;flex-wrap:wrap}
+  .rpt-tab{padding:8px 14px;font-size:13px;font-weight:600;color:var(--muted);cursor:pointer;border-radius:7px;white-space:nowrap}
+  .rpt-tab.active{background:var(--red);color:#fff}
+
+  .chart-card{background:#fff;border:1px solid var(--line);border-radius:10px;padding:14px 16px;margin-bottom:14px}
+  .chart-card h3{margin:0 0 12px;font-size:13px;color:var(--navy);font-weight:700;text-transform:uppercase;letter-spacing:0.4px}
+
+  .bar-chart{display:flex;align-items:flex-end;gap:6px;height:200px;padding-top:30px}
+  .bar-chart .bar{flex:1;border-radius:5px 5px 0 0;position:relative;min-height:6px;cursor:pointer;transition:filter 0.15s}
+  .bar-chart .bar:hover{filter:brightness(1.15)}
+  .bar-chart .bar .v{position:absolute;top:-22px;left:50%;transform:translateX(-50%);font-size:11px;font-weight:700;color:var(--navy);white-space:nowrap}
+  .bar-chart .bar .x{position:absolute;bottom:-22px;left:50%;transform:translateX(-50%);font-size:11px;color:var(--muted);white-space:nowrap}
+
+  .pie-row{display:grid;grid-template-columns:200px 1fr;gap:20px;align-items:center}
+  @media (max-width:680px){.pie-row{grid-template-columns:1fr}}
+  .pie{position:relative;width:180px;height:180px;margin:0 auto}
+  .pie-leg{display:flex;flex-direction:column;gap:8px}
+  .pie-leg-item{display:flex;align-items:center;gap:8px;font-size:13px}
+  .pie-leg-item .sw{width:12px;height:12px;border-radius:3px}
+  .pie-leg-item .lab{flex:1}
+  .pie-leg-item .v{font-weight:700;color:var(--navy)}
+
+  .rpt-grid{display:grid;grid-template-columns:1fr 1fr;gap:14px;margin-bottom:14px}
+  @media (max-width:980px){.rpt-grid{grid-template-columns:1fr}}
+
+  /* Profit period segmented control */
+  .seg{display:inline-flex;background:#fff;border:1px solid var(--line);border-radius:10px;padding:3px;gap:0}
+  .seg button{padding:7px 14px;font-size:12.5px;font-weight:600;color:var(--muted);border:0;background:transparent;border-radius:7px;cursor:pointer;white-space:nowrap}
+  .seg button.active{background:var(--red);color:#fff}
+
+  /* Profit waterfall row */
+  .pf-row{display:flex;justify-content:space-between;align-items:center;padding:10px 14px;border-bottom:1px solid var(--line);font-size:13.5px}
+  .pf-row:last-child{border-bottom:0}
+  .pf-row .lab{color:var(--navy);font-weight:600;display:flex;align-items:center;gap:8px}
+  .pf-row .lab .ic{width:28px;height:28px;border-radius:6px;display:grid;place-items:center;font-size:14px}
+  .pf-row.minus .val{color:var(--danger)}
+  .pf-row.plus .val{color:var(--ok)}
+  .pf-row .val{font-weight:700;font-family:ui-monospace,monospace}
+  .pf-row.total{background:#FAFAFB;font-size:16px;border-radius:0 0 8px 8px}
+  .pf-row.total .val{font-size:18px}
+
+  .tab-profit-lock{background:linear-gradient(90deg,#FEF3C7 0%,#fff 100%);border:1px dashed var(--gold)}
+  .tab-profit-lock.active{background:var(--red)!important;border:1px solid var(--red)}
+
+  /* Profit guide cards */
+  .pf-guide-card{padding:12px 14px;background:#FAFAFB;border:1px solid var(--line);border-radius:8px}
+  .pf-guide-card .g-h{display:flex;align-items:center;gap:8px;margin-bottom:8px;font-size:13.5px;color:var(--navy)}
+  .pf-guide-card .g-ic{width:28px;height:28px;border-radius:7px;display:grid;place-items:center;font-size:14px;flex-shrink:0}
+  .pf-guide-card .g-formula{font-size:13px;padding:6px 10px;background:#fff;border:1px dashed var(--line);border-radius:6px;margin-bottom:6px;font-family:ui-monospace,monospace;color:var(--navy)}
+  .pf-guide-card .g-src{font-size:11.5px;color:var(--muted);line-height:1.5;margin-bottom:4px}
+  .pf-guide-card .g-ex{font-size:11.5px;color:#0369A1;background:#E0F2FE;padding:4px 8px;border-radius:4px;display:inline-block;margin-top:2px}
+  .pf-guide-card code{background:#FFFBEB;color:#92400E;padding:1px 5px;border-radius:3px;font-size:11px;font-family:ui-monospace,monospace}
+  @media (max-width:780px){.pf-guide-card[style*="grid-column"]{grid-column:auto!important}}
+</style>
+</head>
+<body>
+<div class="app">
+  <aside class="sidebar"></aside>
+  <header class="topbar">
+    <div class="breadcrumb"></div>
+    <div class="top-spacer"></div>
+    <div class="search-global"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="7"/><path d="m21 21-4.3-4.3"/></svg><input placeholder="Tìm báo cáo..."></div>
+    <button class="icon-btn" title="Thông báo <button class="icon-btn"><span style="font-size:18px">🔔</span></button> cảnh báo hệ thống"><span style="font-size:18px">🔔</span></button>
+  </header>
+
+  <main class="main">
+    <div class="page-head">
+      <div>
+        <h1>Báo cáo &amp; Phân tích</h1>
+        <div class="sub">Doanh thu · Khách hàng · Hiệu quả NV KD · Công nợ · Báo cáo hôm nay</div>
+      </div>
+      <div class="head-actions">
+        <button class="btn btn-navy" onclick="window.toggleFilterPanel()">🔍 Bộ lọc tùy chỉnh</button>
+        <button class="btn btn-ghost" onclick="window.printReport()">🖨 In</button>
+        <button class="btn btn-primary" onclick="window.exportReport()">⬇ Xuất Excel</button>
+      </div>
+    </div>
+
+    <!-- Filter panel (collapsible) -->
+    <div id="filterPanel" style="display:none;background:#fff;border:1px solid var(--line);border-radius:10px;padding:16px 18px;margin-bottom:14px">
+      <div style="display:flex;align-items:center;gap:10px;margin-bottom:12px">
+        <h3 style="margin:0;font-size:13px;color:var(--navy);font-weight:700;text-transform:uppercase;letter-spacing:0.4px">🔍 Bộ lọc báo cáo</h3>
+        <div style="flex:1"></div>
+        <button class="btn btn-ghost btn-sm" onclick="window.savePreset()">💾 Lưu preset</button>
+        <button class="btn btn-ghost btn-sm" onclick="window.resetFilters()">↺ Reset</button>
+      </div>
+
+      <div class="form-row">
+        <div><label>📅 Khoảng thời gian</label>
+          <select id="filDateRange" onchange="window.onDateRangeChange()">
+            <option value="today">Hôm nay</option>
+            <option value="yesterday">Hôm qua</option>
+            <option value="week">Tuần này</option>
+            <option value="month" selected>Tháng này (T5/2026)</option>
+            <option value="lastMonth">Tháng trước (T4/2026)</option>
+            <option value="quarter">Quý này</option>
+            <option value="year">Năm 2026</option>
+            <option value="custom">Tùy chỉnh ngày...</option>
+          </select></div>
+        <div id="customDateWrap" style="display:none">
+          <label>Từ ngày — Đến ngày</label>
+          <div style="display:flex;gap:6px">
+            <input id="filFrom" type="date" style="flex:1">
+            <input id="filTo" type="date" style="flex:1">
+          </div>
+        </div>
+      </div>
+
+      <div class="form-row">
+        <div><label>👥 Khách hàng (chọn nhiều)</label>
+          <select id="filCust" multiple size="4" style="height:auto">
+            <option value="">Tất cả KH</option>
+          </select></div>
+        <div><label>🚚 Dịch vụ (chọn nhiều)</label>
+          <select id="filSvc" multiple size="4" style="height:auto"></select></div>
+      </div>
+
+      <div class="form-row">
+        <div><label>🛵 Hình thức giao</label>
+          <select id="filMode" multiple size="3" style="height:auto"></select></div>
+        <div><label>👤 NV phụ trách</label>
+          <select id="filStaff" multiple size="3" style="height:auto">
+            <option>Trần Lan</option><option>Phạm Hùng</option>
+            <option>Hoàng Mai</option><option>Tuấn Tú</option>
+          </select></div>
+      </div>
+
+      <div class="form-row">
+        <div><label>🚥 Trạng thái đơn</label>
+          <select id="filStatus" multiple size="3" style="height:auto">
+            <option value="confirmed">Mới</option>
+            <option value="pickup">Đang lấy</option>
+            <option value="transit">Đang giao</option>
+            <option value="delivered">Đã giao</option>
+            <option value="reconciled">Đối soát</option>
+            <option value="cancelled">Đã hủy</option>
+          </select></div>
+      </div>
+
+      <div class="form-row wide">
+        <label>📊 Chọn các chỉ số hiển thị (tick để bật)</label>
+        <div class="check-grid cols-3">
+          <label class="check-item"><input type="checkbox" id="m_revenue" checked> <span>💰 Doanh thu</span></label>
+          <label class="check-item"><input type="checkbox" id="m_orders" checked> <span>📦 Số đơn</span></label>
+          <label class="check-item"><input type="checkbox" id="m_aov" checked> <span>🧮 Giá trị đơn TB</span></label>
+          <label class="check-item"><input type="checkbox" id="m_cust" checked> <span>👥 Số KH</span></label>
+        </div>
+      </div>
+
+      <div style="display:flex;gap:8px;align-items:center;margin-top:12px;padding-top:12px;border-top:1px dashed var(--line)">
+        <div id="filterSummary" style="flex:1;font-size:12px;color:var(--muted)">Tất cả KH · Tất cả nhóm hàng · Tháng này</div>
+        <button class="btn btn-ghost btn-sm" onclick="window.toggleFilterPanel()">Đóng</button>
+        <button class="btn btn-primary btn-sm" onclick="window.applyFilters()">🔍 Áp dụng lọc</button>
+      </div>
+    </div>
+
+    <!-- Active filter badge -->
+    <div id="activeFilterBadge" style="display:none;background:var(--navy-soft);border:1px solid var(--navy);border-radius:8px;padding:8px 14px;margin-bottom:12px;font-size:12.5px;display:none">
+      <b style="color:var(--navy)">🔍 Đang lọc:</b> <span id="filterDesc"></span>
+      <button class="btn btn-sm btn-ghost" onclick="window.resetFilters()" style="float:right">✕ Bỏ lọc</button>
+    </div>
+
+    <!-- Tabs -->
+    <div class="rpt-tabs" id="rptTabs">
+      <div class="rpt-tab active" onclick="switchTab(event,'overview')" style="background:#1B5E20;color:#fff">🎯 Tổng quan toàn DN</div>
+      <div class="rpt-tab" onclick="switchTab(event,'revenue')">💰 Doanh thu</div>
+      <div class="rpt-tab tab-profit-lock" data-perm="reports.profit" onclick="switchTab(event,'profit')">💸 Lợi nhuận 🔒</div>
+      <div class="rpt-tab" onclick="switchTab(event,'customers')">👥 Khách hàng</div>
+      <div class="rpt-tab" onclick="switchTab(event,'sales')">🧑‍💼 Hiệu quả NV KD</div>
+      <div class="rpt-tab" onclick="switchTab(event,'debt')">📉 Công nợ</div>
+      <div class="rpt-tab" onclick="switchTab(event,'daily')">📅 Báo cáo hôm nay</div>
+      <div class="rpt-tab" onclick="switchTab(event,'forecast')">🔮 Dự báo + Cohort</div>
+      <div class="rpt-tab" onclick="switchTab(event,'variance')">📊 Plan vs Actual</div>
+    </div>
+
+    <!-- Pane Forecast -->
+    <div id="paneForecast" style="display:none">
+      <div id="hbFcHost"></div>
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:14px;margin-bottom:14px">
+        <div style="background:#fff;border:1px solid var(--line);border-radius:10px;padding:16px">
+          <h3 style="margin:0 0 12px;font-size:13px;color:var(--navy);font-weight:700;text-transform:uppercase">📈 Dự báo doanh thu 3 tháng tới <span id="hbFc1"></span></h3>
+          <div id="fcChart" style="display:flex;align-items:flex-end;gap:6px;height:200px;padding-bottom:24px"></div>
+          <div id="fcSummary" style="margin-top:14px;font-size:12.5px;color:var(--muted);line-height:1.6"></div>
+        </div>
+        <div style="background:#fff;border:1px solid var(--line);border-radius:10px;padding:16px">
+          <h3 style="margin:0 0 12px;font-size:13px;color:var(--navy);font-weight:700;text-transform:uppercase">🔁 Cohort Retention <span id="hbFc2"></span></h3>
+          <div id="cohortTbl" style="overflow-x:auto"></div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Pane Variance -->
+    <div id="paneVariance" style="display:none">
+      <div id="hbVrHost"></div>
+      <div style="display:flex;align-items:center;gap:10px;margin-bottom:12px">
+        <h3 style="margin:0;font-size:14px;color:var(--navy);font-weight:700">📊 Plan vs Actual — T5/2026</h3>
+        <div style="flex:1"></div>
+        <button class="btn btn-ghost btn-sm" onclick="window.openBudgetModal()">⚙️ Cấu hình Budget</button>
+      </div>
+      <div id="varianceTbl" style="background:#fff;border:1px solid var(--line);border-radius:10px;overflow:hidden"></div>
+    </div>
+
+    <!-- ============ OVERVIEW — Tổng quan toàn DN cho sếp ============ -->
+    <div id="paneOverview">
+      <div style="background:linear-gradient(135deg,#1B5E20 0%,#15803D 100%);color:#fff;padding:18px 22px;border-radius:12px;margin-bottom:16px;display:flex;align-items:center;gap:14px;flex-wrap:wrap">
+        <div style="flex:1;min-width:200px">
+          <div style="font-size:11.5px;opacity:0.8;text-transform:uppercase;letter-spacing:0.5px;font-weight:700">🎯 Báo cáo điều hành</div>
+          <div style="font-size:22px;font-weight:800;margin-top:2px">Tổng quan toàn DN — Tháng 5/2026</div>
+          <div style="font-size:12.5px;opacity:0.85;margin-top:4px" id="ovHeadSub">Tổng hợp 5 phòng ban · cập nhật realtime từ data app</div>
+        </div>
+        <button class="btn btn-primary" onclick="window.sendDailyReport()" style="background:rgba(255,255,255,0.15);border:1px solid rgba(255,255,255,0.3);color:#fff">📤 Gửi báo cáo Telegram</button>
+      </div>
+
+      <!-- 5 Section: 1 cho mỗi phòng ban -->
+      <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(320px,1fr));gap:14px">
+        <div id="ovSales" class="chart-card" style="border-left:4px solid #16A34A"></div>
+        <div id="ovOps" class="chart-card" style="border-left:4px solid #0EA5E9"></div>
+        <div id="ovFinance" class="chart-card" style="border-left:4px solid #DC2626"></div>
+        <div id="ovHr" class="chart-card" style="border-left:4px solid #F59E0B"></div>
+        <div id="ovMarketing" class="chart-card" style="border-left:4px solid #7C3AED"></div>
+        <div id="ovAlerts" class="chart-card" style="border-left:4px solid #DC2626"></div>
+      </div>
+
+      <!-- Heatmap đơn theo ngày -->
+      <div class="chart-card" style="margin-top:14px">
+        <h3>📅 Heatmap đơn theo ngày (tháng này)</h3>
+        <div id="ovHeatmap" style="display:grid;grid-template-columns:repeat(31,1fr);gap:3px;margin-top:10px"></div>
+        <div style="display:flex;align-items:center;gap:14px;font-size:11px;color:var(--muted);margin-top:10px">
+          <span>Ít đơn</span>
+          <div style="display:flex;gap:3px"><span style="width:14px;height:14px;background:#F0FDF4;border-radius:3px"></span><span style="width:14px;height:14px;background:#BBF7D0;border-radius:3px"></span><span style="width:14px;height:14px;background:#86EFAC;border-radius:3px"></span><span style="width:14px;height:14px;background:#22C55E;border-radius:3px"></span><span style="width:14px;height:14px;background:#15803D;border-radius:3px"></span></div>
+          <span>Nhiều đơn</span>
+          <div style="flex:1"></div>
+          <span style="background:#FEF3C7;padding:1px 6px;border-radius:3px">T7 nửa ngày</span>
+          <span style="background:#FEE2E2;padding:1px 6px;border-radius:3px">CN nghỉ</span>
+        </div>
+      </div>
+
+      <!-- So sánh tháng này vs tháng trước -->
+      <div class="chart-card" style="margin-top:14px">
+        <h3>📊 So sánh T5/2026 vs T4/2026</h3>
+        <table class="mini-table" id="ovCompareTbl">
+          <thead><tr><th>Chỉ số</th><th class="num">T4/2026</th><th class="num">T5/2026</th><th class="num">Thay đổi</th><th>Xu hướng</th></tr></thead>
+          <tbody></tbody>
+        </table>
+      </div>
+
+      <div style="font-size:11.5px;color:var(--muted);margin-top:14px;padding:10px 14px;background:#FAFAFB;border-radius:7px">
+        💡 <b>Tab này gom dữ liệu 5 phòng ban cho sếp xem 1 lần.</b> Click từng widget → mở chi tiết tab tương ứng.
+      </div>
+    </div>
+
+    <!-- Revenue -->
+    <div id="paneRevenue" style="display:none">
+      <section class="kpis">
+        <div class="kpi k-1"><div class="kpi-label">Doanh thu T5</div><div class="kpi-value">451 tr</div><div class="kpi-trend up">↑ +3% vs T4</div><div class="kpi-icon">💰</div></div>
+        <div class="kpi k-2"><div class="kpi-label">Số đơn T5</div><div class="kpi-value">68</div><div class="kpi-trend up">tới 17/05</div><div class="kpi-icon">📦</div></div>
+        <div class="kpi k-4"><div class="kpi-label">AOV</div><div class="kpi-value">6.6 tr</div><div class="kpi-trend">/đơn TB</div><div class="kpi-icon">🧮</div></div>
+        <div class="kpi k-3"><div class="kpi-label">Lợi nhuận gộp</div><div class="kpi-value">158 tr</div><div class="kpi-trend up">↑ Biên 35%</div><div class="kpi-icon">📈</div></div>
+        <div class="kpi k-5"><div class="kpi-label">YoY</div><div class="kpi-value">+96%</div><div class="kpi-trend up">vs T5/2025</div><div class="kpi-icon">🚀</div></div>
+      </section>
+
+      <div class="chart-card">
+        <h3>📊 Doanh thu 12 tháng qua</h3>
+        <div class="bar-chart" id="chartRev"></div>
+        <div style="display:flex;justify-content:space-between;font-size:11px;color:var(--muted);margin-top:14px;border-top:1px dashed var(--line);padding-top:10px">
+          <span>Tổng 12T: <b style="color:var(--navy);font-size:13px">3.97 tỷ ₫</b></span>
+          <span>TB tháng: <b style="color:var(--navy);font-size:13px">331 tr ₫</b></span>
+          <span>Cao nhất: <b style="color:var(--ok);font-size:13px">T12/2025 · 470 tr</b></span>
+          <span>Thấp nhất: <b style="color:var(--warn);font-size:13px">T6/2025 · 230 tr</b></span>
+        </div>
+      </div>
+
+      <div class="rpt-grid">
+        <div class="chart-card">
+          <h3>🥧 Cơ cấu dịch vụ</h3>
+          <div class="pie-row">
+            <div class="pie">
+              <svg viewBox="0 0 200 200" style="width:100%;height:100%">
+                <circle cx="100" cy="100" r="70" fill="none" stroke="var(--line)" stroke-width="40"/>
+                <circle cx="100" cy="100" r="70" fill="none" stroke="#339B21" stroke-width="40"
+                        stroke-dasharray="307 440" transform="rotate(-90 100 100)"/>
+                <circle cx="100" cy="100" r="70" fill="none" stroke="#1B5E20" stroke-width="40"
+                        stroke-dasharray="132 440" stroke-dashoffset="-307" transform="rotate(-90 100 100)"/>
+                <text x="100" y="100" text-anchor="middle" dy="0" font-size="14" fill="var(--muted)">Tổng</text>
+                <text x="100" y="118" text-anchor="middle" font-size="18" font-weight="800" fill="var(--navy)">218 tr</text>
+              </svg>
+            </div>
+            <div class="pie-leg">
+              <div class="pie-leg-item"><div class="sw" style="background:#339B21"></div><div class="lab">Liên tỉnh đường bộ</div><div class="v">152 tr (70%)</div></div>
+              <div class="pie-leg-item"><div class="sw" style="background:#1B5E20"></div><div class="lab">Last-mile nội thành</div><div class="v">66 tr (30%)</div></div>
+            </div>
+          </div>
+        </div>
+
+        <div class="chart-card">
+          <h3>🥇 Top 5 khách doanh thu</h3>
+          <div style="display:flex;flex-direction:column;gap:8px">
+            <div style="display:flex;align-items:center;gap:10px"><b style="width:18px;color:var(--muted)">1</b><div style="flex:1">HN Foods <span class="tag tag-vip">VIP</span></div><b>48.2 tr</b></div>
+            <div style="height:6px;background:var(--line);border-radius:99px"><div style="width:100%;background:var(--red);height:100%;border-radius:99px"></div></div>
+            <div style="display:flex;align-items:center;gap:10px"><b style="width:18px;color:var(--muted)">2</b><div style="flex:1">An Phát <span class="tag tag-vip">VIP</span></div><b>38.6 tr</b></div>
+            <div style="height:6px;background:var(--line);border-radius:99px"><div style="width:80%;background:var(--red);height:100%;border-radius:99px"></div></div>
+            <div style="display:flex;align-items:center;gap:10px"><b style="width:18px;color:var(--muted)">3</b><div style="flex:1">Đông Anh Gỗ <span class="tag tag-vip">VIP</span></div><b>32.4 tr</b></div>
+            <div style="height:6px;background:var(--line);border-radius:99px"><div style="width:67%;background:var(--red);height:100%;border-radius:99px"></div></div>
+            <div style="display:flex;align-items:center;gap:10px"><b style="width:18px;color:var(--muted)">4</b><div style="flex:1">Phú Cường <span class="tag tag-vip">VIP</span></div><b>24.8 tr</b></div>
+            <div style="height:6px;background:var(--line);border-radius:99px"><div style="width:51%;background:var(--red);height:100%;border-radius:99px"></div></div>
+            <div style="display:flex;align-items:center;gap:10px"><b style="width:18px;color:var(--muted)">5</b><div style="flex:1">Tech 88 <span class="tag tag-vip">VIP</span></div><b>8.4 tr</b></div>
+            <div style="height:6px;background:var(--line);border-radius:99px"><div style="width:18%;background:var(--red);height:100%;border-radius:99px"></div></div>
+          </div>
+        </div>
+      </div>
+
+      <div class="chart-card">
+        <h3>📋 Doanh thu chi tiết theo NV (T5/2026)</h3>
+        <table class="mini-table">
+          <thead><tr><th>NV phụ trách</th><th class="num">Số đơn</th><th class="num">Doanh thu</th><th class="num">AOV</th><th>% Mục tiêu</th></tr></thead>
+          <tbody>
+            <tr><td><b>Tuấn Tú</b> (chủ)</td><td class="num">38</td><td class="num">86.4 tr</td><td class="num">2.3 tr</td><td><b style="color:var(--ok)">115%</b> 🟢</td></tr>
+            <tr><td><b>Trần Lan</b> (TP Sales)</td><td class="num">62</td><td class="num">68.2 tr</td><td class="num">1.1 tr</td><td><b style="color:var(--ok)">92%</b> 🟢</td></tr>
+            <tr><td><b>Phạm Hùng</b></td><td class="num">28</td><td class="num">38.4 tr</td><td class="num">1.4 tr</td><td><b style="color:var(--warn)">88%</b> 🟡</td></tr>
+            <tr><td><b>Hoàng Mai</b> (CSKH B2C)</td><td class="num">98</td><td class="num">25.0 tr</td><td class="num">255k</td><td><b style="color:var(--ok)">95%</b> 🟢</td></tr>
+          </tbody>
+        </table>
+      </div>
+    </div>
+
+    <!-- Profit (gated by reports.profit) -->
+    <div id="paneProfit" style="display:none">
+      <div class="chart-card" style="display:flex;align-items:center;gap:12px;flex-wrap:wrap;margin-bottom:14px">
+        <div style="flex:1;min-width:240px">
+          <div style="font-size:14px;font-weight:800;color:var(--navy);display:flex;align-items:center;gap:8px">
+            💸 Báo cáo lợi nhuận <span style="background:#FEF3C7;color:#DC2626;font-size:10px;padding:2px 6px;border-radius:4px">🔒 NHẠY CẢM</span>
+          </div>
+          <div style="font-size:12px;color:var(--muted);margin-top:2px" id="pfPeriodLabel">Tháng này — T5/2026</div>
+        </div>
+        <div class="seg" id="pfSeg">
+          <button data-p="day"     onclick="window.setProfitPeriod('day')">Ngày</button>
+          <button data-p="week"    onclick="window.setProfitPeriod('week')">Tuần</button>
+          <button data-p="month" class="active" onclick="window.setProfitPeriod('month')">Tháng</button>
+          <button data-p="quarter" onclick="window.setProfitPeriod('quarter')">Quý</button>
+          <button data-p="year"    onclick="window.setProfitPeriod('year')">Năm</button>
+        </div>
+      </div>
+
+      <section class="kpis" id="pfKpis" style="margin-bottom:14px"></section>
+
+      <div class="rpt-grid">
+        <div class="chart-card">
+          <h3>🧾 Cấu trúc lợi nhuận (Waterfall)</h3>
+          <div id="pfWaterfall" style="margin-top:6px"></div>
+        </div>
+        <div class="chart-card">
+          <h3>📊 Lãi gộp theo tháng (12 tháng qua)</h3>
+          <div class="bar-chart" id="pfChart12m"></div>
+        </div>
+      </div>
+
+      <div class="chart-card">
+        <h3>🥇 Sản phẩm sinh lời nhất kỳ này</h3>
+        <table class="mini-table">
+          <thead><tr>
+            <th>#</th><th>Sản phẩm</th>
+            <th class="num">SL bán</th>
+            <th class="num">Doanh thu</th>
+            <th class="num">Giá vốn</th>
+            <th class="num">Lãi gộp</th>
+            <th class="num">Biên LN</th>
+          </tr></thead>
+          <tbody id="pfTopProd"></tbody>
+        </table>
+      </div>
+
+      <div class="chart-card">
+        <h3>🧑‍💼 Lợi nhuận theo NV phụ trách</h3>
+        <table class="mini-table">
+          <thead><tr>
+            <th>NV</th><th class="num">Đơn</th><th class="num">Doanh thu</th>
+            <th class="num">Giá vốn</th><th class="num">Lãi gộp</th><th class="num">Biên LN</th>
+          </tr></thead>
+          <tbody id="pfByStaff"></tbody>
+        </table>
+      </div>
+
+      <!-- Hướng dẫn cách tính (collapsible) -->
+      <div class="chart-card" style="border-left:4px solid var(--navy)">
+        <div style="display:flex;align-items:center;cursor:pointer" onclick="window.togglePfGuide()">
+          <h3 style="margin:0;flex:1">📖 Hướng dẫn cách tính từng chỉ số</h3>
+          <button class="btn btn-ghost btn-sm" id="pfGuideToggle" onclick="event.stopPropagation();window.togglePfGuide()">▾ Mở</button>
+        </div>
+        <div id="pfGuideBody" style="display:none;margin-top:14px">
+          <div style="display:grid;grid-template-columns:repeat(2,1fr);gap:10px">
+
+            <div class="pf-guide-card">
+              <div class="g-h"><span class="g-ic" style="background:#DCFCE7">💰</span><b>Doanh thu</b></div>
+              <div class="g-formula">Σ (<code>order.freight</code>) trong kỳ, <b>trừ đơn hủy</b></div>
+              <div class="g-src">📦 Nguồn: <code>STORE.orders</code> · lọc theo <code>status ≠ 'cancelled'</code> + <code>date</code> trong khoảng</div>
+              <div class="g-ex">Ví dụ T5/2026: 68 đơn × AOV ~6.6tr = <b>451 tr ₫</b></div>
+            </div>
+
+            <div class="pf-guide-card">
+              <div class="g-h"><span class="g-ic" style="background:#FEE2E2">🥕</span><b>Giá vốn (COGS)</b></div>
+              <div class="g-formula">Σ (<code>item.qty</code> × <code>buyPriceAt(SP, ngày đơn)</code>)</div>
+              <div class="g-src">📦 Nguồn: <code>STORE.products[].priceHistory[].buy</code> — chọn entry gần nhất có <code>date ≤ ngày đơn</code></div>
+              <div class="g-ex">Demo biên gộp ~35% → buy = sell × 0.65. SP không khớp ID: fallback <code>item.price × 0.8</code></div>
+            </div>
+
+            <div class="pf-guide-card">
+              <div class="g-h"><span class="g-ic" style="background:#BBF7D0">📈</span><b>Lãi gộp</b></div>
+              <div class="g-formula"><b>Doanh thu − Giá vốn (COGS)</b></div>
+              <div class="g-src">Đơn vị tiền tệ thô, chưa trừ chi phí cố định</div>
+              <div class="g-ex">VD T5: 451 tr − 293 tr = <b>158 tr</b></div>
+            </div>
+
+            <div class="pf-guide-card">
+              <div class="g-h"><span class="g-ic" style="background:#FEF3C7">📊</span><b>Biên gộp (Gross margin)</b></div>
+              <div class="g-formula">Lãi gộp ÷ Doanh thu × 100%</div>
+              <div class="g-src">Phản ánh hiệu quả mua hàng + giá bán. Nông sản B2B trung bình 25-35%</div>
+              <div class="g-ex">158 ÷ 451 × 100 = <b>35.0%</b></div>
+            </div>
+
+            <div class="pf-guide-card">
+              <div class="g-h"><span class="g-ic" style="background:#FEE2E2">📣</span><b>Chi phí Ads</b></div>
+              <div class="g-formula">Σ (<code>adspend.spend</code>) trong kỳ</div>
+              <div class="g-src">📦 Nguồn: <code>STORE.adspend</code> · lọc <code>date</code> trong khoảng. Cộng tất cả kênh + mục đích (bán hàng + tuyển dụng)</div>
+              <div class="g-ex">VD T5: ~13.1 tr (FB + Google Ads)</div>
+            </div>
+
+            <div class="pf-guide-card">
+              <div class="g-h"><span class="g-ic" style="background:#FEE2E2">👨‍💼</span><b>Chi phí Lương kỳ</b></div>
+              <div class="g-formula">Σ (<code>luongNgay × cong(X+P)</code>) per NV, <b>prorate</b> theo số ngày kỳ trùng tháng</div>
+              <div class="g-src">📦 Nguồn: <code>STORE.staff[].salary</code> ÷ <code>NC chuẩn (ngày không CN)</code> × công (X+P) từ <code>timesheet</code> + <code>payrollExtra</code> (thưởng − khấu trừ)</div>
+              <div class="g-ex">T5: 9 NV active, lương cơ bản ~101 tr ÷ 26 NC × ~24 công ≈ <b>99 tr</b></div>
+            </div>
+
+            <div class="pf-guide-card" style="grid-column:span 2;background:#F0FDF4">
+              <div class="g-h"><span class="g-ic" style="background:#16A34A;color:#fff">💎</span><b>Lãi ròng (Net profit)</b></div>
+              <div class="g-formula" style="font-size:14px"><b>Lãi gộp − Chi phí Ads − Chi phí Lương kỳ</b></div>
+              <div class="g-src">Phản ánh số tiền thực sự "vào túi" sau khi trừ mọi chi phí cố định trong kỳ</div>
+              <div class="g-ex">VD T5: 158 tr − 13 tr − 99 tr = <b style="color:var(--ok);font-size:14px">+46 tr ₫</b> (biên ròng ~10%)</div>
+            </div>
+
+            <div class="pf-guide-card">
+              <div class="g-h"><span class="g-ic" style="background:#E0F2FE">📐</span><b>Biên ròng (Net margin)</b></div>
+              <div class="g-formula">Lãi ròng ÷ Doanh thu × 100%</div>
+              <div class="g-src">KPI quan trọng nhất để đánh giá sức khỏe tài chính. Nông sản B2B khỏe: 5-12%</div>
+              <div class="g-ex">46 ÷ 451 × 100 = <b>10.2%</b></div>
+            </div>
+
+            <div class="pf-guide-card">
+              <div class="g-h"><span class="g-ic" style="background:#F3E8FF">🥇</span><b>Lợi nhuận theo SP / NV</b></div>
+              <div class="g-formula">Gom <code>item.total</code> + <code>item.qty × buy</code> theo <code>item.id</code> hoặc <code>order.staff</code></div>
+              <div class="g-src">Giúp xác định SP/NV mang lại lợi nhuận cao nhất kỳ. Margin tính = (rev − cogs) / rev</div>
+              <div class="g-ex">Có thể dùng để: tăng giá SP biên thấp, training NV biên thấp</div>
+            </div>
+
+          </div>
+
+          <div style="margin-top:14px;padding:12px 14px;background:#FEF3C7;border-left:3px solid var(--warn);border-radius:6px;font-size:12px;color:var(--warn)">
+            ⚠️ <b>Lưu ý:</b> Tab "Ngày" có thể âm vì 1 ngày DT thấp không đủ bù 1 ngày lương (cần Tuần/Tháng để có ý nghĩa). Tab "Quý"/"Năm" auto cap đến hôm nay → không tính lương cho thời gian chưa tới.
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Customers (placeholder cho các tab khác) -->
+    <div id="paneCustomers" style="display:none">
+      <section class="kpis">
+        <div class="kpi k-1"><div class="kpi-label">Tổng KH</div><div class="kpi-value">28</div><div class="kpi-trend up">↑ +3</div><div class="kpi-icon">👥</div></div>
+        <div class="kpi k-2"><div class="kpi-label">Tỉ lệ giữ chân</div><div class="kpi-value">86%</div><div class="kpi-trend up">↑ +2%</div><div class="kpi-icon">💚</div></div>
+        <div class="kpi k-3"><div class="kpi-label">Tỉ lệ churn</div><div class="kpi-value">14%</div><div class="kpi-trend">4 KH inactive</div><div class="kpi-icon">⚠</div></div>
+        <div class="kpi k-4"><div class="kpi-label">CLV TB</div><div class="kpi-value">68 tr</div><div class="kpi-trend">Lifetime value</div><div class="kpi-icon">💰</div></div>
+        <div class="kpi k-5"><div class="kpi-label">CAC TB</div><div class="kpi-value">1.2 tr</div><div class="kpi-trend">Chi phí thu hút</div><div class="kpi-icon">📞</div></div>
+      </section>
+
+      <div class="chart-card">
+        <h3>📊 Phân tích KH theo nguồn</h3>
+        <div class="bar-chart">
+          <div class="bar" style="height:160px;background:#339B21"><div class="v">12 KH (43%)</div><div class="x">Giới thiệu</div></div>
+          <div class="bar" style="height:100px;background:#1B5E20"><div class="v">8 KH (29%)</div><div class="x">Facebook</div></div>
+          <div class="bar" style="height:75px;background:#E8A33D"><div class="v">5 KH (18%)</div><div class="x">Web/SEO</div></div>
+          <div class="bar" style="height:30px;background:#7C3AED"><div class="v">2 KH (7%)</div><div class="x">Zalo</div></div>
+          <div class="bar" style="height:15px;background:#0EA5E9"><div class="v">1 KH (3%)</div><div class="x">Hội chợ</div></div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Routes -->
+    <div id="paneSales" style="display:none">
+      <section class="kpis" id="salesKpis" style="margin-bottom:14px"></section>
+      <div class="chart-card">
+        <h3>🧑‍💼 Hiệu quả nhân viên kinh doanh (theo doanh thu đơn)</h3>
+        <div style="font-size:12px;color:var(--muted);margin-bottom:10px">Doanh thu = tổng tiền hàng các đơn NV phụ trách (trừ đơn hủy). Công nợ = nợ của KH do NV quản lý.</div>
+        <table class="mini-table">
+          <thead><tr><th>#</th><th>Nhân viên KD</th><th class="num">Số đơn</th><th class="num">Doanh thu</th><th class="num">% DT</th><th class="num">KH phụ trách</th><th class="num">Công nợ</th><th class="num">TB/đơn</th></tr></thead>
+          <tbody id="salesBody"></tbody>
+        </table>
+      </div>
+    </div>
+
+    <!-- Debt report -->
+    <div id="paneDebt" style="display:none">
+
+      <section class="kpis" style="margin-bottom:14px">
+        <div class="kpi k-1"><div class="kpi-label">Tổng phải thu</div><div class="kpi-value" id="rDebtTotal">—</div><div class="kpi-trend" id="rDebtCustCount">— KH</div><div class="kpi-icon">📉</div></div>
+        <div class="kpi k-3"><div class="kpi-label">Quá hạn</div><div class="kpi-value" id="rDebtOverdue">—</div><div class="kpi-trend down" id="rDebtOverdueCount">— KH</div><div class="kpi-icon">⚠️</div></div>
+        <div class="kpi k-2"><div class="kpi-label">Tỷ lệ thu T5</div><div class="kpi-value" id="rRecovery">—</div><div class="kpi-trend up">Đã thu / phải thu</div><div class="kpi-icon">✓</div></div>
+        <div class="kpi k-4"><div class="kpi-label">DSO</div><div class="kpi-value" id="rDso">—</div><div class="kpi-trend">Ngày thu nợ TB</div><div class="kpi-icon">📅</div></div>
+        <div class="kpi k-5"><div class="kpi-label">Đã nhắc 30d</div><div class="kpi-value" id="rRemind30">—</div><div class="kpi-trend">Lượt nhắc</div><div class="kpi-icon">📞</div></div>
+      </section>
+
+      <!-- Aging chart -->
+      <div class="chart-card">
+        <h3>📊 Phân bố tuổi nợ (Aging)</h3>
+        <div id="agingChart" style="display:grid;grid-template-columns:repeat(5,1fr);gap:10px;margin-top:12px"></div>
+        <div id="agingBar" style="margin-top:16px"></div>
+      </div>
+
+      <div class="rpt-grid">
+        <!-- Top debtors -->
+        <div class="chart-card">
+          <h3>🚨 Top 5 KH nợ nhiều nhất</h3>
+          <div id="topDebtors"></div>
+        </div>
+        <!-- Theo NV phụ trách -->
+        <div class="chart-card">
+          <h3>👤 Công nợ theo NV phụ trách</h3>
+          <div id="debtByStaff"></div>
+        </div>
+      </div>
+
+      <!-- Lịch sử nhắc nợ -->
+      <div class="chart-card">
+        <h3>📞 Lịch sử nhắc nợ (30 ngày gần nhất)</h3>
+        <table class="mini-table">
+          <thead><tr><th>Ngày</th><th>KH</th><th>Kênh</th><th>NV</th><th>Phản hồi</th><th>Trạng thái sau</th></tr></thead>
+          <tbody id="remindHistory"></tbody>
+        </table>
+      </div>
+
+      <!-- Theo dõi thanh toán -->
+      <div class="chart-card">
+        <h3>💵 Phiếu thu nợ gần đây</h3>
+        <table class="mini-table">
+          <thead><tr><th>Ngày</th><th>Số phiếu</th><th>KH</th><th class="num">Số tiền</th><th>TK nhận</th><th>NV thu</th></tr></thead>
+          <tbody id="recentReceipts"></tbody>
+        </table>
+      </div>
+
+    </div>
+
+    <!-- Daily report -->
+    <div id="paneDaily" style="display:none">
+      <div class="chart-card" style="margin-bottom:14px;border-left:4px solid var(--red)">
+        <div style="display:flex;gap:12px;align-items:center;flex-wrap:wrap">
+          <div style="flex:1;min-width:200px">
+            <div style="font-weight:800;font-size:15px" id="dailyTitle">Báo cáo vận hành hôm nay</div>
+            <div style="font-size:12.5px;color:var(--muted)">Tổng hợp doanh thu · công nợ · chi phí quảng cáo trong ngày</div>
+          </div>
+          <button class="btn btn-sm btn-primary" onclick="window.sendDailyReport()">📤 Gửi báo cáo (Telegram/Zalo)</button>
+        </div>
+      </div>
+      <section class="kpis" id="dailyKpis" style="margin-bottom:14px"></section>
+      <div class="rpt-grid">
+        <div class="chart-card"><h3>📦 Đơn hàng hôm nay</h3><div id="dailyOrders"></div></div>
+        <div class="chart-card"><h3>📣 Chi phí quảng cáo hôm nay</h3><div id="dailyAds"></div></div>
+      </div>
+    </div>
+
+  </main>
+</div>
+
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<script src="../scripts/supabase-config.js"></script>
+<script src="../scripts/supabase-client.js"></script>
+<script src="../scripts/shared.js"></script>
+<script src="../scripts/store.js"></script>
+<script src="../scripts/auth.js"></script>
+<script src="../scripts/help-tips.js"></script>
+<script src="../scripts/ux-improvements.js"></script>
+<script src="../scripts/onboarding.js"></script>
+<script src="../scripts/pdf-export.js"></script>
+<script>if(window.AUTH) window.AUTH.requireAuth();</script>
+<script src="../data/orders.js"></script>
+<script src="../data/customers.js"></script>
+<script src="../data/adspend.js"></script>
+<script src="../data/products.js"></script>
+<script src="../data/staff.js"></script>
+<script src="../data/timesheet.js"></script>
+<script src="../scripts/forecasting.js"></script>
+<script src="../scripts/reports.js"></script>
+<script src="../scripts/ai-fill.js"></script>
+<script src="../scripts/cust-search-box.js"></script>
+<script src="../data/demo-seed.js"></script>
+<script src="../scripts/data-linkage.js"></script>
+<script src="../scripts/system-core.js"></script>
+<script src="../scripts/ai-chat.js"></script>
+</body>
+</html>

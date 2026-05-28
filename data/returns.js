@@ -1,0 +1,40 @@
+/* =========================================================
+   Returns — 8 đơn trả hàng với đủ lý do + trạng thái
+   ========================================================= */
+window.RETURNS = [
+  {id:'RT001', orderCode:'NSTT-000098', custName:'Nhà hàng Á Đông', date:'16/05/2026',
+    reason:'Rau hỏng do vận chuyển', items:[{name:'Cải dưa bẹ', qty:8, refund:80000}],
+    refundTotal:80000, status:'refunded', podPhoto:'', handledBy:'Trần Lan',
+    note:'Xe lạnh hỏng giữa đường, rau úng 1 thùng'},
+  {id:'RT002', orderCode:'NSTT-000115', custName:'Phở Thìn Bờ Hồ', date:'17/05/2026',
+    reason:'Sai mặt hàng', items:[{name:'Hành lá', qty:3, refund:60000}],
+    refundTotal:60000, status:'pending', podPhoto:'', handledBy:'Phạm Hùng',
+    note:'Đóng nhầm hành tây thay vì hành lá'},
+  {id:'RT003', orderCode:'NSTT-000128', custName:'Khách sạn Mường Thanh HN', date:'15/05/2026',
+    reason:'Thiếu số lượng', items:[{name:'Cà chua đại', qty:5, refund:130000}],
+    refundTotal:130000, status:'refunded', podPhoto:'', handledBy:'Tuấn Tú',
+    note:'Cân thiếu 5kg so với phiếu — bếp tổng phát hiện lúc nhập kho'},
+  {id:'RT004', orderCode:'NSTT-000141', custName:'Bếp ăn Canteen FPT', date:'18/05/2026',
+    reason:'KH đổi ý', items:[{name:'Bí xanh', qty:20, refund:280000}],
+    refundTotal:280000, status:'pending', podPhoto:'', handledBy:'Hoàng Mai',
+    note:'Bếp đã đặt nhầm SP — yêu cầu đổi sang bí ngô'},
+  {id:'RT005', orderCode:'NSTT-000089', custName:'Quán Bún chả Tuấn Anh', date:'12/05/2026',
+    reason:'Không đúng chất lượng', items:[{name:'Xà lách xoăn', qty:5, refund:150000}],
+    refundTotal:150000, status:'refunded', podPhoto:'', handledBy:'Phạm Hùng',
+    note:'Xà lách héo, không đạt tiêu chuẩn — bù hàng đợt sau'},
+  {id:'RT006', orderCode:'NSTT-000156', custName:'Phở Thìn Bờ Hồ', date:'18/05/2026',
+    reason:'Rau hỏng/thối', items:[
+      {name:'Mùi ta', qty:1, refund:20000},
+      {name:'Húng chó ta', qty:0.5, refund:20000}
+    ],
+    refundTotal:40000, status:'replaced', podPhoto:'', handledBy:'Phạm Hùng',
+    note:'Đã đổi hàng mới sáng nay — KH OK'},
+  {id:'RT007', orderCode:'NSTT-000172', custName:'Nhà hàng Sen Tây Hồ', date:'17/05/2026',
+    reason:'Khác', items:[{name:'Lơ xanh', qty:8, refund:224000}],
+    refundTotal:224000, status:'rejected', podPhoto:'', handledBy:'Tuấn Tú',
+    note:'KH phản ánh lơ già — nhưng kiểm tra POD thấy hàng đúng chuẩn → từ chối hoàn'},
+  {id:'RT008', orderCode:'NSTT-000165', custName:'Café Phố Cổ', date:'16/05/2026',
+    reason:'KH đổi ý', items:[{name:'Chanh', qty:2, refund:64000}],
+    refundTotal:64000, status:'refunded', podPhoto:'', handledBy:'Hoàng Mai',
+    note:'KH lấy nhầm chanh đào thay vì chanh ta'},
+];

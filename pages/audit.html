@@ -1,0 +1,221 @@
+<!doctype html>
+<html lang="vi">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Nhật ký hoạt động · Nông Sản Tuấn Tú Hà Nội</title>
+<link rel="stylesheet" href="../styles/tokens.css">
+<link rel="stylesheet" href="../styles/app.css">
+<style>
+  .au-card{background:#fff;border:1px solid var(--line);border-radius:10px;overflow:hidden}
+  .au-filt{display:flex;gap:10px;padding:14px;border-bottom:1px solid var(--line);flex-wrap:wrap;align-items:center}
+  .au-filt input,.au-filt select{border:1px solid var(--line);border-radius:7px;padding:7px 11px;font-size:13px}
+  .au-table{width:100%;border-collapse:collapse;font-size:13px}
+  .au-table th{text-align:left;padding:10px 14px;background:#FAFBFC;font-size:11.5px;color:var(--muted);text-transform:uppercase;font-weight:700;letter-spacing:0.3px;border-bottom:1px solid var(--line)}
+  .au-table td{padding:10px 14px;border-bottom:1px solid #F1F5F9;vertical-align:top}
+  .au-table tr:hover td{background:#FAFBFC}
+  .au-action{font-family:'JetBrains Mono',monospace;font-size:11.5px;background:#F1F5F9;padding:2px 7px;border-radius:4px;color:#0F172A;display:inline-block}
+  .au-action.dot-create{background:#DCFCE7;color:#15803D}
+  .au-action.dot-update{background:#DBEAFE;color:#1E40AF}
+  .au-action.dot-delete{background:#FEE2E2;color:#B91C1C}
+  .au-action.dot-backup{background:#FEF3C7;color:#92400E}
+  .au-action.dot-aichat{background:#F3E8FF;color:#6B21A8}
+</style>
+</head>
+<body>
+<div class="app">
+  <aside class="sidebar"></aside>
+  <header class="topbar">
+    <div class="breadcrumb"></div>
+    <div class="top-spacer"></div>
+    <div class="search-global">
+      <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="7"/><path d="m21 21-4.3-4.3"/></svg>
+      <input placeholder="Tìm... (Ctrl+K)">
+    </div>
+    <button class="icon-btn" title="Thông báo"><span style="font-size:18px">🔔</span><span class="dot"></span></button>
+    <button class="icon-btn" title="Hướng dẫn" onclick="window.location.href='docs.html'"><span style="font-size:18px">❓</span></button>
+  </header>
+
+  <main class="main">
+
+    <div class="page-head" style="display:flex;align-items:center;gap:12px;margin-bottom:14px">
+      <div>
+        <h1 style="margin:0;font-size:22px;color:var(--navy);font-weight:800">📋 Nhật ký hoạt động <span id="hb1"></span></h1>
+        <div style="font-size:13px;color:var(--muted);margin-top:2px">Truy vết mọi thao tác CRUD (ai làm — làm gì — lúc nào)</div>
+      </div>
+      <div style="flex:1"></div>
+      <button class="btn btn-ghost" onclick="window.exportAuditCsv()">⬇ Xuất CSV</button>
+      <button class="btn btn-ghost" style="color:var(--danger)" onclick="window.clearAuditLog()">🗑 Xoá toàn bộ</button>
+    </div>
+
+    <div id="helpBannerHost"></div>
+
+    <div class="au-card">
+      <div class="au-filt">
+        <input id="auQ" placeholder="🔍 Tìm theo action hoặc chi tiết..." style="flex:1;min-width:220px">
+        <select id="auUser"><option value="">Tất cả user</option></select>
+        <select id="auType">
+          <option value="">Tất cả loại</option>
+          <option value="create">➕ Tạo mới</option>
+          <option value="update">✏️ Cập nhật</option>
+          <option value="delete">🗑 Xoá</option>
+          <option value="backup">💾 Backup</option>
+          <option value="aichat">🤖 AI Chat</option>
+          <option value="login">🔐 Login</option>
+        </select>
+        <input type="date" id="auFrom" title="Từ ngày">
+        <input type="date" id="auTo" title="Đến ngày">
+        <button class="btn btn-ghost btn-sm" onclick="window.clearAuFilters()">↺ Xoá lọc</button>
+      </div>
+      <div style="overflow-x:auto">
+        <table class="au-table">
+          <thead><tr>
+            <th style="width:140px">Thời gian</th>
+            <th style="width:160px">Người thực hiện</th>
+            <th style="width:200px">Hành động</th>
+            <th>Chi tiết</th>
+          </tr></thead>
+          <tbody id="auBody"></tbody>
+        </table>
+      </div>
+      <div style="padding:12px 14px;border-top:1px solid var(--line);font-size:12.5px;color:var(--muted);display:flex;justify-content:space-between">
+        <span><b id="auCnt">0</b> bản ghi · giữ tối đa 5.000 bản ghi gần nhất</span>
+        <span>💡 Gắn `window.audit.log("type.action","mô tả")` ở mọi nơi cần truy vết</span>
+      </div>
+    </div>
+
+  </main>
+</div>
+
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<script src="../scripts/supabase-config.js"></script>
+<script src="../scripts/supabase-client.js"></script>
+<script src="../scripts/shared.js"></script>
+<script src="../scripts/store.js"></script>
+<script src="../scripts/auth.js"></script>
+<script src="../scripts/help-tips.js"></script>
+<script src="../scripts/ux-improvements.js"></script>
+<script src="../scripts/onboarding.js"></script>
+<script src="../scripts/pdf-export.js"></script>
+<script>if(window.AUTH) window.AUTH.requireAuth();</script>
+
+<script>
+(function(){
+  window.renderAppShell('audit', 'Nhật ký hoạt động');
+  /* Help banner */
+  document.getElementById('helpBannerHost').innerHTML = window.helpBanner(
+    '💡 Nhật ký hoạt động là gì?',
+    'Mọi thao tác quan trọng (tạo/sửa/xoá đơn, KH, NV, đổi giá, backup, đăng nhập...) đều được ghi vào đây. Dùng để truy vết "ai làm gì lúc nào" — đặc biệt khi có sự cố hoặc tranh chấp giữa nhân viên. Filter theo người/loại/thời gian để tìm nhanh.',
+    {id:'hb-audit-1', icon:'📋'}
+  );
+  document.getElementById('hb1').innerHTML = window.helpTip('Bảng này hiển thị 5.000 bản ghi mới nhất. Cũ hơn sẽ tự xoá để không phình bộ nhớ. Backup snapshot trước khi cần lưu lâu dài.', {size:'lg'});
+
+  function fmtTs(iso){
+    const d = new Date(iso);
+    const pad = n => String(n).padStart(2,'0');
+    return `${pad(d.getDate())}/${pad(d.getMonth()+1)} ${pad(d.getHours())}:${pad(d.getMinutes())}:${pad(d.getSeconds())}`;
+  }
+  function getType(action){
+    if (action.includes('create')) return 'create';
+    if (action.includes('update') || action.includes('edit')) return 'update';
+    if (action.includes('delete') || action.includes('remove')) return 'delete';
+    if (action.includes('backup') || action.includes('snapshot')) return 'backup';
+    if (action.includes('aichat')) return 'aichat';
+    if (action.includes('login') || action.includes('auth')) return 'login';
+    return 'update';
+  }
+
+  function render(){
+    const list = (window.audit && window.audit.list()) || [];
+    /* Build user options */
+    const users = [...new Set(list.map(e => e.user))];
+    const uSel = document.getElementById('auUser');
+    const cur = uSel.value;
+    uSel.innerHTML = '<option value="">Tất cả user</option>' + users.map(u => `<option ${u===cur?'selected':''}>${u}</option>`).join('');
+
+    const q = document.getElementById('auQ').value.toLowerCase();
+    const u = document.getElementById('auUser').value;
+    const t = document.getElementById('auType').value;
+    const from = document.getElementById('auFrom').value;
+    const to = document.getElementById('auTo').value;
+
+    const filtered = list.filter(e => {
+      if (q && !((e.action+' '+e.detail).toLowerCase().includes(q))) return false;
+      if (u && e.user !== u) return false;
+      if (t && getType(e.action) !== t) return false;
+      const dateOnly = (e.ts||'').slice(0,10);
+      if (from && dateOnly < from) return false;
+      if (to && dateOnly > to) return false;
+      return true;
+    });
+
+    document.getElementById('auCnt').textContent = filtered.length;
+    const tb = document.getElementById('auBody');
+    if (!filtered.length) {
+      tb.innerHTML = `<tr><td colspan="4" style="padding:36px;text-align:center;color:var(--muted)">Chưa có bản ghi nào khớp bộ lọc.</td></tr>`;
+      return;
+    }
+    /* Sắp xếp mới nhất trước */
+    const sorted = filtered.slice().reverse();
+    tb.innerHTML = sorted.slice(0, 500).map(e => {
+      const tp = getType(e.action);
+      return `<tr>
+        <td style="white-space:nowrap;font-family:monospace;font-size:11.5px;color:var(--muted)">${fmtTs(e.ts)}</td>
+        <td><b>${e.user||'?'}</b><div style="font-size:11px;color:var(--muted)">${e.role||''}</div></td>
+        <td><span class="au-action dot-${tp}">${e.action}</span></td>
+        <td>${e.detail||'—'}</td>
+      </tr>`;
+    }).join('') + (sorted.length > 500 ? `<tr><td colspan="4" style="padding:14px;text-align:center;color:var(--muted)">… còn ${sorted.length-500} bản ghi nữa (lọc thêm để xem)</td></tr>` : '');
+  }
+
+  ['auQ','auUser','auType','auFrom','auTo'].forEach(id => document.getElementById(id).oninput = render);
+  window.clearAuFilters = function(){
+    ['auQ','auUser','auType','auFrom','auTo'].forEach(id => document.getElementById(id).value='');
+    render();
+  };
+
+  window.clearAuditLog = function(){
+    window.confirmDelete('Xoá toàn bộ nhật ký? Không thể khôi phục.', () => {
+      window.audit.clear();
+      render();
+      window.toast('Đã xoá nhật ký','danger');
+    });
+  };
+
+  window.exportAuditCsv = function(){
+    const list = (window.audit && window.audit.list()) || [];
+    const head = 'Thời gian,User,Vai trò,Action,Chi tiết\n';
+    const rows = list.slice().reverse().map(e => {
+      const esc = s => '"' + String(s||'').replace(/"/g,'""') + '"';
+      return [esc(e.ts), esc(e.user), esc(e.role), esc(e.action), esc(e.detail)].join(',');
+    });
+    const blob = new Blob(['﻿' + head + rows.join('\n')], {type:'text/csv;charset=utf-8'});
+    const a = document.createElement('a');
+    a.href = URL.createObjectURL(blob);
+    a.download = `audit-log-${new Date().toISOString().slice(0,10)}.csv`;
+    a.click();
+    window.toast('Đã tải nhật ký CSV','success');
+  };
+
+  /* Demo seed: nếu chưa có log nào thì tạo vài log mẫu */
+  if (window.audit && !window.audit.list().length) {
+    window.audit.log('auth.login', 'Đăng nhập vào hệ thống');
+    window.audit.log('customer.view', 'Mở trang Khách hàng');
+    window.audit.log('order.create', 'Tạo đơn NSTT-000142 cho Nhà hàng Á Đông (12.5 tr ₫)');
+    window.audit.log('product.editPrice', 'Cập nhật giá bán Rau muống 18.000 → 20.000 ₫/kg');
+    window.audit.log('payroll.edit', 'Chấm công ngày 18/05 cho 9 NV');
+    window.audit.log('backup.create', 'Snapshot tự động (32.4 KB)');
+  }
+
+  setInterval(render, 5000);
+  render();
+})();
+</script>
+<script src="../scripts/ai-fill.js"></script>
+<script src="../scripts/cust-search-box.js"></script>
+<script src="../data/demo-seed.js"></script>
+<script src="../scripts/data-linkage.js"></script>
+<script src="../scripts/system-core.js"></script>
+<script src="../scripts/ai-chat.js"></script>
+</body>
+</html>
