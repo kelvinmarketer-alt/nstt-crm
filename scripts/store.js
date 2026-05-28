@@ -42,21 +42,22 @@
   const _subs = {};
   const _preloaded = new Set();
 
-  /* Mapping STORE key → Supabase table name */
+  /* Mapping STORE key → Supabase table name (NSTT 14 bảng nông sản) */
   const TABLE_MAP = {
     customers:        'customers',
+    products:         'products',
     orders:           'orders',
-    vehicles:         'vehicles',
-    drivers:          'drivers',
-    partners:         'partners',
+    invoices:         'invoices',
+    suppliers:        'suppliers',
+    shippers:         'shippers',
+    leads:            'leads',
     staff:            'staff',
     paymentAccounts:  'payment_accounts',
     cashEntries:      'cash_entries',
-    invoices:         'invoices',
     activityLogs:     'activity_logs',
   };
 
-  /* ID column thường khác id (vd: orders.code, invoices.no, cashEntries.no) */
+  /* ID column khác `id` cho 1 số bảng */
   const ID_COLUMN = {
     orders:       'code',
     cashEntries:  'no',

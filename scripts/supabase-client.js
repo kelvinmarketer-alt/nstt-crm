@@ -30,70 +30,66 @@
   window.SB = client;
   console.log('[Supabase] Client ready');
 
-  /* === Mapping field NSTT (camelCase JS) ↔ Postgres (snake_case) === */
+  /* === Mapping field NSTT (camelCase JS) ↔ Postgres (snake_case) ===
+     CHỈ map những column NSTT DB thật sự có, theo schema supabase-nstt/01-schema-nstt.sql.
+     `to`   = JS camelCase → DB snake_case (khi insert/update)
+     `from` = DB snake_case → JS camelCase (khi đọc về app) */
   const FIELD_MAP = {
     customers: {
-      to:   { groupName:'group_name', staffOwner:'staff_owner', lastContact:'last_contact', lastOrder:'last_order',
-              ordersCount:'orders_count', debtOverdue:'debt_overdue', remindCount:'remind_count',
-              taxCode:'tax_code', representative:'rep', serviceId:'service_id' },
-      from: { group_name:'groupName', staff_owner:'staffOwner', last_contact:'lastContact', last_order:'lastOrder',
-              orders_count:'orders', debt_overdue:'debtOverdue', remind_count:'remindCount',
-              tax_code:'tax', rep:'rep', service_id:'serviceId' },
+      to:   { group:'group_name', staffOwner:'staff_owner', lastContact:'last_contact', lastOrder:'last_order',
+              orders:'orders_count', debtOverdue:'debt_overdue', orderFreq:'order_freq', mainCats:'main_cats' },
+      from: { group_name:'group', staff_owner:'staffOwner', last_contact:'lastContact', last_order:'lastOrder',
+              orders_count:'orders', debt_overdue:'debtOverdue', order_freq:'orderFreq', main_cats:'mainCats' },
+    },
+    products: {
+      to:   { priceHistory:'price_history', stockThreshold:'stock_threshold', supplierId:'supplier_id' },
+      from: { price_history:'priceHistory', stock_threshold:'stockThreshold', supplier_id:'supplierId' },
     },
     orders: {
-      to:   { customerName:'customer_name', customerId:'customer_id', serviceType:'service_type', transportMode:'transport_mode',
-              dropAddress:'drop_address', payBy:'pay_by', driverId:'driver_id', driverName:'driver_name',
-              partnerId:'partner_id', partnerName:'partner_name', partnerCost:'partner_cost',
-              cancelReason:'cancel_reason', orderDate:'order_date',
-              drop:'drop_address' },
-      from: { customer_name:'custName', customer_id:'cust', service_type:'serviceType', transport_mode:'transportMode',
-              drop_address:'drop', pay_by:'payBy', driver_id:'driver', driver_name:'driverName',
-              partner_id:'partnerId', partner_name:'partnerName', partner_cost:'partnerCost',
-              cancel_reason:'cancelReason', order_date:'date',
-              cust_id_alias:null },
+      to:   { date:'order_date', custName:'cust_name', cust:'customer_id', serviceType:'service_type',
+              transportMode:'transport_mode', pickup:'pickup_addr', drop:'drop_addr', payBy:'pay_by',
+              driverName:'driver_name', returnReason:'return_reason', deliveryTime:'delivery_time',
+              takenBy:'taken_by', deliveredAt:'delivered_at', shipperId:'shipper_id' },
+      from: { order_date:'date', cust_name:'custName', customer_id:'cust', service_type:'serviceType',
+              transport_mode:'transportMode', pickup_addr:'pickup', drop_addr:'drop', pay_by:'payBy',
+              driver_name:'driverName', return_reason:'returnReason', delivery_time:'deliveryTime',
+              taken_by:'takenBy', delivered_at:'deliveredAt', shipper_id:'shipperId' },
     },
-    vehicles: {
-      to:   { vehicleType:'vehicle_type', capUnit:'cap_unit', lastDriver:'last_driver', lastDriverName:'last_driver_name',
-              currentOrder:'current_order', currentRoute:'current_route', lastService:'last_service',
-              nextRegister:'next_register', nextServiceKm:'next_service_km', cost30d:'cost_30d', trips30d:'trips_30d',
-              maintenanceNote:'maintenance_note' },
-      from: { vehicle_type:'type', cap_unit:'capUnit', last_driver:'lastDriver', last_driver_name:'lastDriverName',
-              current_order:'currentOrder', current_route:'currentRoute', last_service:'lastService',
-              next_register:'nextRegister', next_service_km:'nextServiceKm', cost_30d:'cost30d', trips_30d:'trips30d',
-              maintenance_note:'maintenanceNote' },
+    invoices: {
+      to:   { date:'invoice_date', desc:'description', vatRate:'vat_rate', paidDate:'paid_date',
+              cqtCode:'cqt_code', cqtSync:'cqt_sync', issuedAt:'issued_at', relatedOrder:'related_order',
+              customerId:'customer_id' },
+      from: { invoice_date:'date', description:'desc', vat_rate:'vatRate', paid_date:'paidDate',
+              cqt_code:'cqtCode', cqt_sync:'cqtSync', issued_at:'issuedAt', related_order:'relatedOrder',
+              customer_id:'customerId' },
     },
-    drivers: {
-      to:   { canDrive:'can_drive', primaryVehicle:'primary_vehicle', primaryPlate:'primary_plate',
-              joinDate:'join_date', trips30d:'trips_30d', revenue30d:'revenue_30d' },
-      from: { can_drive:'canDrive', primary_vehicle:'primaryVehicle', primary_plate:'primaryPlate',
-              join_date:'joinDate', trips_30d:'trips30d', revenue_30d:'revenue30d' },
+    suppliers: {
+      to:   { contactPerson:'contact_person', supplyCategories:'supply_categories', paymentTerms:'payment_terms' },
+      from: { contact_person:'contactPerson', supply_categories:'supplyCategories', payment_terms:'paymentTerms' },
     },
-    partners: {
-      to:   { vehiclePlate:'vehicle_plate', vehicleType:'vehicle_type', capUnit:'cap_unit',
-              trips30d:'trips_30d', totalSpent30d:'total_spent_30d' },
-      from: { vehicle_plate:'vehiclePlate', vehicle_type:'vehicleType', cap_unit:'capUnit',
-              trips_30d:'trips30d', total_spent_30d:'totalSpent30d' },
+    shippers: {
+      to:   { ordersToday:'orders_today', kpiTotal:'kpi_total' },
+      from: { orders_today:'ordersToday', kpi_total:'kpiTotal' },
+    },
+    leads: {
+      to:   { estValue:'est_value', value:'est_value', lastContact:'last_contact', convertedTo:'converted_to',
+              lostReason:'lost_reason' },
+      from: { est_value:'estValue', last_contact:'lastContact', converted_to:'convertedTo',
+              lost_reason:'lostReason' },
     },
     staff: {
-      to:   { avatarColor:'avatar_color', joinDate:'join_date' },
-      from: { avatar_color:'avatarColor', join_date:'joinDate' },
+      to:   { hireDate:'hire_date', userId:'user_id' },
+      from: { hire_date:'hireDate', user_id:'userId' },
     },
     paymentAccounts: {
       to:   {},
       from: {},
     },
     cashEntries: {
-      to:   { entryDate:'entry_date', entryType:'entry_type', refOrder:'ref_order',
-              date:'entry_date', type:'entry_type', desc:'description' },
-      from: { entry_date:'date', entry_type:'type', ref_order:'refOrder', description:'desc' },
-    },
-    invoices: {
-      to:   { invDate:'inv_date', taxCode:'tax_code', cqtCode:'cqt_code', cqtSync:'cqt_sync',
-              issuedAt:'issued_at', paidDate:'paid_date', paidVia:'paid_via',
-              date:'inv_date', cust:'customer', tax:'tax_code', desc:'description' },
-      from: { inv_date:'date', tax_code:'tax', cqt_code:'cqtCode', cqt_sync:'cqtSync',
-              issued_at:'issuedAt', paid_date:'paidDate', paid_via:'paidVia',
-              customer:'cust', description:'desc' },
+      to:   { date:'entry_date', type:'entry_type', desc:'description',
+              relatedOrder:'related_order', relatedInvoice:'related_invoice' },
+      from: { entry_date:'date', entry_type:'type', description:'desc',
+              related_order:'relatedOrder', related_invoice:'relatedInvoice' },
     },
   };
 
@@ -160,14 +156,14 @@
         }).subscribe();
     },
 
-    /* Get master data */
+    /* Get master data (column trong DB là `items`, không phải `data`) */
     async getMasterData(key) {
-      const { data, error } = await client.from('master_data').select('data').eq('key', key).single();
+      const { data, error } = await client.from('master_data').select('items').eq('key', key).single();
       if (error || !data) return null;
-      return data.data;
+      return data.items;
     },
     async setMasterData(key, value) {
-      const { error } = await client.from('master_data').upsert({ key, data: value, updated_at: new Date().toISOString() });
+      const { error } = await client.from('master_data').upsert({ key, items: value, updated_at: new Date().toISOString() });
       return !error;
     },
 
