@@ -1,0 +1,8 @@
+.git
+.git_vty_legacy_backup
+_archive-vty-legacy-sql
+node_modules
+.DS_Store
+*.log
+.vscode
+.idea

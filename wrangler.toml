@@ -1,0 +1,6 @@
+# Cloudflare Pages config
+name = "nstt-crm"
+compatibility_date = "2026-05-28"
+
+[assets]
+directory = "./"
