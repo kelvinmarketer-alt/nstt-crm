@@ -13,7 +13,7 @@
   /* === Seed version === : khi đổi dữ liệu mẫu (data/*.js) thì tăng version này.
      App sẽ tự xoá các key dữ liệu cũ trong localStorage để nạp lại bản mới
      (giữ nguyên đăng nhập + cấu hình tích hợp). Tránh tình trạng "kẹt data cũ". */
-  const SEED_VERSION = 'nstt-2026-05-27-wave-7-full-demo';
+  const SEED_VERSION = 'nstt-2026-05-28-supabase-cloud-v1';
   try {
     if (localStorage.getItem(PREFIX + 'seedVersion') !== SEED_VERSION) {
       [
