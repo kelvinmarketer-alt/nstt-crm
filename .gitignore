@@ -25,3 +25,9 @@ build/
 .git_vty_legacy_backup/
 
 # Backup folder VTY git history cũ — đã rename khỏi .git để init NSTT clean. KHÔNG commit.
+
+# wrangler files
+.wrangler
+.dev.vars*
+!.dev.vars.example
+!.env.example
