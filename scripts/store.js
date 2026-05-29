@@ -430,17 +430,34 @@
     }
   }, 100);
 
-  /* === REALTIME POLL ===
-     Mỗi 60s re-fetch các bảng đã preload từ Supabase để đồng bộ giữa nhiều máy.
-     Khi user A tạo đơn, sau ≤60s user B refresh hoặc tab focus → sẽ thấy đơn mới.
-     Chỉ chạy poll khi tab đang FOCUS (tiết kiệm bandwidth khi tab nền). */
-  if (typeof window !== 'undefined') {
-    setInterval(() => {
+  /* === REALTIME POLL — tiết kiệm egress ===
+     Mỗi N phút re-fetch các bảng đã preload từ Supabase để đồng bộ.
+     Default 5 phút (300s) — vừa đủ cho free tier 5GB egress với 50 NV.
+     User có thể chỉnh ở Settings → window.STORE.setPollInterval(seconds).
+
+     Chi phí free tier:
+     - Poll 60s × 50 NV × 8h = ~360GB egress/tháng (VƯỢT 5GB free)
+     - Poll 5min × 50 NV × 8h = ~7GB egress/tháng (vẫn nhẹ vượt nhưng OK)
+     - Poll 10min × 50 NV × 8h = ~3.5GB egress/tháng (an toàn)
+
+     Skip poll khi tab nền (document.hidden) → 0 cost khi user không xem. */
+
+  const DEFAULT_POLL_SEC = 300;     /* 5 phút */
+  let _pollIntervalId = null;
+  let _pollSec = DEFAULT_POLL_SEC;
+
+  function _startPoll() {
+    if (_pollIntervalId) clearInterval(_pollIntervalId);
+    /* Load user-configured interval từ localStorage nếu có */
+    try {
+      const saved = parseInt(localStorage.getItem(PREFIX + 'pollSec') || '0', 10);
+      if (saved >= 60) _pollSec = saved;
+    } catch (e) {}
+    _pollIntervalId = setInterval(() => {
       if (!isSupabaseMode()) return;
-      if (document.hidden) return;     /* Skip khi tab nền */
+      if (document.hidden) return;
       _preloaded.forEach(key => {
         if (TABLE_MAP[key]) {
-          /* Re-fetch table key */
           window.SB_DATA.getAll(TABLE_MAP[key]).then(data => {
             if (!Array.isArray(data) || data.length === 0) return;
             const oldJson = JSON.stringify(_data[key] || []);
@@ -449,11 +466,25 @@
               _data[key] = data;
               try { localStorage.setItem(PREFIX + key, JSON.stringify(data)); } catch (e) {}
               (_subs[key] || []).forEach(fn => fn(data));
-              console.log(`[STORE poll] ${key} cập nhật mới (${data.length} records)`);
+              console.log(`[STORE poll] ${key} cập nhật (${data.length} records)`);
             }
           }).catch(()=>{});
         }
       });
-    }, 60000); /* 60s */
+    }, _pollSec * 1000);
+    console.log(`[STORE] ⏱ Realtime poll: ${_pollSec}s (${(_pollSec/60).toFixed(1)} phút)`);
   }
+
+  /* Public API: user/dev có thể chỉnh poll interval */
+  window.STORE.setPollInterval = function (sec) {
+    if (sec < 60) { console.warn('Min 60s'); return; }
+    if (sec > 3600) { console.warn('Max 1h'); return; }
+    _pollSec = sec;
+    try { localStorage.setItem(PREFIX + 'pollSec', String(sec)); } catch (e) {}
+    _startPoll();
+    console.log(`[STORE] Poll interval saved: ${sec}s`);
+  };
+  window.STORE.getPollInterval = function () { return _pollSec; };
+
+  if (typeof window !== 'undefined') _startPoll();
 })();

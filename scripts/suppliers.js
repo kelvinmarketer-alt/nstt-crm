@@ -54,8 +54,9 @@
       const numPur = pur.filter(p => p.supplierId === s.id).length;
       const cats = (s.category||[]).map(c => `<span class="tag" style="background:#F0FDF4;color:#15803D">${CATS[c]||c}</span>`).join(' ');
       const termClr = { 'COD':'#16A34A', 'NET 7':'#0EA5E9', 'NET 14':'#A16207', 'NET 30':'#DC2626' };
-      return `<div class="sup-card" data-id="${s.id}" onclick="window.openSupDrawer('${s.id}')" style="cursor:pointer">
-        <div class="sup-av" style="background:${window.avatarColor(s.id)}">${window.initials(s.name)}</div>
+      return `<div class="sup-card" data-id="${s.id}" onclick="window.openSupDrawer('${s.id}')" style="cursor:pointer;position:relative">
+        <div class="checkbox" onclick="event.stopPropagation();this.classList.toggle('on')" style="position:absolute;top:14px;left:14px;z-index:2"></div>
+        <div class="sup-av" style="background:${window.avatarColor(s.id)};margin-left:24px">${window.initials(s.name)}</div>
         <div class="sup-info">
           <div class="n1" data-field="name" title="Click để sửa tên NCC">${s.name} ${s.active ? '' : '<span style="color:var(--muted);font-weight:500;font-size:11px">· Ngưng</span>'}</div>
           <div class="n2"><span data-field="contact" title="Click để sửa người liên hệ">${s.contact}</span> · <span data-field="phone" title="Click để sửa SĐT">${s.phone}</span> · <span data-field="address" title="Click để sửa địa chỉ">${s.address}</span></div>
@@ -72,9 +73,26 @@
       </div>`;
     }).join('');
 
+    /* Bulk + Inline edit */
+    if (!host.id) host.id = 'supList';
+
+    if (window.attachBulkOps) {
+      window.attachBulkOps({
+        tableSelector: '#' + host.id,
+        store: 'suppliers',
+        label: 'NCC',
+        actions: {
+          changeStatus: {
+            label: '🔄 Đổi điều khoản',
+            field: 'paymentTerm',
+            options: ['COD', 'NET 7', 'NET 14', 'NET 30']
+          }
+        }
+      });
+    }
+
     /* Inline edit (click cell = sửa nhanh) */
     if (window.attachInlineEdit) {
-      if (!host.id) host.id = 'supList';
       window.attachInlineEdit('#' + host.id, {
         store: 'suppliers',
         fields: {

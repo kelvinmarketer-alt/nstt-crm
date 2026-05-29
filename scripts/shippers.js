@@ -211,6 +211,7 @@
         .reduce((sum, o) => sum + (o.freight||0), 0);
 
       return `<tr data-id="${s.id}">
+        <td onclick="event.stopPropagation()"><div class="checkbox" onclick="this.classList.toggle('on')"></div></td>
         <td style="font-size:12.5px;font-weight:600;color:var(--navy)" title="${codeTip}">${s.code || s.id}</td>
         <td>
           <div style="display:flex;align-items:center;gap:10px">
@@ -262,15 +263,35 @@
           <button class="icon-btn" title="Xóa" style="color:var(--danger)" onclick="window.deleteShipper('${s.id}')">🗑</button>
         </td>
       </tr>`;
-    }).join('') || `<tr><td colspan="7" style="padding:30px;text-align:center;color:var(--muted)">Không có shipper nào khớp filter.</td></tr>`;
+    }).join('') || `<tr><td colspan="8" style="padding:30px;text-align:center;color:var(--muted)">Không có shipper nào khớp filter.</td></tr>`;
 
     const shipBody = document.getElementById('shipBody');
     shipBody.innerHTML = rows;
 
-    /* Inline edit (click cell = sửa nhanh) */
+    /* Bulk + Inline edit */
+    const tbl = shipBody.closest('table') || shipBody;
+    if (!tbl.id) tbl.id = 'tblShippers';
+
+    if (window.attachBulkOps) {
+      window.attachBulkOps({
+        tableSelector: '#' + tbl.id,
+        store: 'shippers',
+        label: 'shipper',
+        actions: {
+          changeStatus: {
+            label: '🔄 Đổi trạng thái',
+            field: 'status',
+            options: [
+              {id:'running', label:'🟢 Đang chạy'},
+              {id:'off', label:'⚪ Nghỉ'},
+              {id:'leave', label:'🟠 Phép'},
+            ]
+          }
+        }
+      });
+    }
+
     if (window.attachInlineEdit) {
-      const tbl = shipBody.closest('table') || shipBody;
-      if (!tbl.id) tbl.id = 'tblShippers';
       window.attachInlineEdit('#' + tbl.id, {
         store: 'shippers',
         fields: {

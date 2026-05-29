@@ -248,6 +248,7 @@
       const buy = e ? e.buy : 0, sell = e ? e.sell : 0;
       const margin = sell - buy;
       return `<tr data-id="${p.id}">
+        <td onclick="event.stopPropagation()"><div class="checkbox" onclick="this.classList.toggle('on')"></div></td>
         <td>${p.img ? `<img src="${p.img}" alt="" loading="lazy" style="width:42px;height:42px;object-fit:cover;border-radius:7px;background:#eef3ee" onerror="this.style.visibility='hidden'">` : ''}</td>
         <td data-field="name" title="Click để sửa tên SP"><b>${p.name}</b><div style="color:var(--muted);font-size:11px">${p.en || p.note || ''}</div></td>
         <td data-field="cat" title="Click để đổi nhóm"><span class="tag" style="background:${cat.color}20;color:${cat.color}">${cat.icon} ${cat.label}</span></td>
@@ -260,7 +261,7 @@
           <button class="icon-btn" title="Xóa sản phẩm" style="color:var(--danger)" onclick="window.deleteProduct('${p.id}')">🗑</button>
         </td>
       </tr>`;
-    }).join('') || `<tr><td colspan="8" style="padding:30px;text-align:center;color:var(--muted)">Chưa có sản phẩm.</td></tr>`;
+    }).join('') || `<tr><td colspan="9" style="padding:30px;text-align:center;color:var(--muted)">Chưa có sản phẩm.</td></tr>`;
 
     document.getElementById('catalogView').innerHTML = `
       <div class="chart-card" style="margin-bottom:14px">
@@ -273,7 +274,10 @@
       <div class="quick-chips" style="margin-bottom:14px">${chips}</div>
       <div class="chart-card">
         <table class="mini-table">
-          <thead><tr><th style="width:50px">Ảnh</th><th>Tên sản phẩm</th><th>Nhóm</th><th>ĐVT</th><th class="num">Giá nhập</th><th class="num">Giá bán</th><th class="num">Lãi/ĐV</th><th></th></tr></thead>
+          <thead><tr>
+            <th style="width:32px"><div class="checkbox" onclick="this.classList.toggle('on')" title="Chọn tất cả"></div></th>
+            <th style="width:50px">Ảnh</th><th>Tên sản phẩm</th><th>Nhóm</th><th>ĐVT</th><th class="num">Giá nhập</th><th class="num">Giá bán</th><th class="num">Lãi/ĐV</th><th></th>
+          </tr></thead>
           <tbody>${rows}</tbody>
         </table>
       </div>`;
@@ -282,6 +286,35 @@
     document.querySelectorAll('#catalogView .cat-price').forEach(inp => {
       inp.addEventListener('change', () => savePriceInline(inp.dataset.id, inp.dataset.field, parseInt(inp.value, 10) || 0));
     });
+
+    /* Bulk operations cho sản phẩm */
+    if (window.attachBulkOps) {
+      const tbl = document.querySelector('#catalogView .mini-table');
+      if (tbl) {
+        if (!tbl.id) tbl.id = 'tblProducts';
+        window.attachBulkOps({
+          tableSelector: '#' + tbl.id,
+          store: 'products',
+          label: 'SP',
+          actions: {
+            changeStatus: {
+              label: '🔄 Đổi nhóm',
+              field: 'cat',
+              options: [
+                {id:'rau-ta', label:'🥬 Rau ta'},
+                {id:'rau-dalat', label:'🥗 Rau Đà Lạt'},
+                {id:'nam', label:'🍄 Nấm'},
+                {id:'rau-gia-vi', label:'🌶 Rau gia vị'},
+                {id:'thit-lon', label:'🐖 Thịt lợn'},
+                {id:'thit-ga', label:'🐓 Thịt gà'},
+                {id:'thit-bo', label:'🥩 Thịt bò'},
+                {id:'hang-khac', label:'🧺 Hàng khác'},
+              ]
+            }
+          }
+        });
+      }
+    }
 
     /* Inline edit cho name/cat/unit (click cell = sửa) */
     if (window.attachInlineEdit) {
