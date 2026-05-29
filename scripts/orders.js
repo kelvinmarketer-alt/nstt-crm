@@ -81,44 +81,51 @@
     }
 
     document.getElementById('tbody').innerHTML = rows.map(o => {
-      const st = STATUS[o.status];
-      const svc = SVC[o.serviceType] || {icon:'❓', label:o.serviceType, color:'#666'};
-      const tm = o.transportMode ? TM[o.transportMode] : null;
-      return `<tr data-code="${o.code}">
-        <td onclick="event.stopPropagation()"><div class="checkbox" onclick="this.classList.toggle('on')"></div></td>
-        <td><b style="color:var(--navy)">${o.code}</b>
-            <div style="margin-top:2px">
-              <span class="svc-tag" style="background:${svc.color}20;color:${svc.color}">${svc.icon} ${svc.label}</span>
-              ${tm ? `<span class="tm-tag">${tm.icon} ${tm.label}</span>` : ''}
-            </div></td>
-        <td class="hide-sm" data-field="date" title="Click để sửa ngày đặt" style="font-size:12px;color:var(--muted)">${o.date}</td>
-        <td>
-          <div style="font-weight:600" data-field="custName" title="Click để sửa tên KH">${o.custName}</div>
-          <div style="font-size:11.5px;color:var(--muted)">${o.cust} · <span data-field="staff" title="Click để đổi NV phụ trách">${o.staff}</span></div>
-        </td>
-        <td class="hide-md" data-field="drop" title="Click để sửa địa chỉ giao" style="font-size:12px">${(o.drop || '—').split(',').slice(0, 2).join(',')}</td>
-        <td class="hide-md" style="font-size:12px">${o.qty} ${o.unit.toLowerCase()}${o.weight ? ' · '+o.weight+'kg' : ''}</td>
-        <td class="num" data-field="freight" title="Click để sửa tiền hàng">${window.fmt(o.freight)}</td>
-        <td class="num hide-md" data-field="cod" title="Click để sửa COD">${o.cod ? window.fmt(o.cod) : '—'}</td>
-        <td class="hide-md" style="font-size:12px">
-          <div><span data-field="driverName" title="Click để đổi shipper">${o.driverName}</span>${o.external?' <span class="alert-badge warn" style="font-size:9px">ĐT ngoài</span>':''}</div>
-          <div style="color:var(--muted);font-size:11px">${o.vehicle}${o.external && o.partnerCost?' · '+window.fmtShort(o.partnerCost)+'đ':''}</div>
-        </td>
-        <td onclick="event.stopPropagation()">
-          <select class="status-select status-select-${o.status}" data-code="${o.code}" data-act="status"
-            title="Đổi trạng thái đơn"
-            style="border:1px solid var(--line);border-radius:7px;padding:5px 8px;font-size:11.5px;font-weight:700;cursor:pointer;background:${st.color}15;color:${st.color};min-width:130px">
-            ${ALL_STATUSES.map(k => `<option value="${k}" ${o.status===k?'selected':''}>${STATUS[k].icon} ${STATUS[k].label}</option>`).join('')}
-          </select>
-        </td>
-        <td onclick="event.stopPropagation()">
-          <div class="row-actions">
-            <button title="In phiếu giao hàng / xác nhận / xuất kho (mở dialog chọn 3 loại)" data-act="print" data-code="${o.code}">🖨</button>
-            ${(o.status === 'delivered' || o.status === 'settled') ? `<button title="🧾 Phiếu xuất kho kiêm HĐ bán hàng — gửi KH sau khi giao xong" data-act="deliveryNote" data-code="${o.code}" style="color:#C00000">🧾</button>` : ''}
-            <button title="Xem thông tin đơn (mở chi tiết bên phải)" data-act="edit" data-code="${o.code}">👁</button>
-          </div>
-        </td>
-      </tr>`;
+      try {
+        const st = STATUS[o.status] || {color:'#666', icon:'❓', label:o.status||'?'};
+        const svc = SVC[o.serviceType] || {icon:'❓', label:o.serviceType||'—', color:'#666'};
+        const tm = o.transportMode ? TM[o.transportMode] : null;
+        const unitStr = (o.unit || 'kg').toLowerCase();
+        const dropStr = (o.drop || '—').split(',').slice(0, 2).join(',');
+        return `<tr data-code="${o.code}">
+          <td onclick="event.stopPropagation()"><div class="checkbox" onclick="this.classList.toggle('on')"></div></td>
+          <td><b style="color:var(--navy)">${o.code || '—'}</b>
+              <div style="margin-top:2px">
+                <span class="svc-tag" style="background:${svc.color}20;color:${svc.color}">${svc.icon} ${svc.label}</span>
+                ${tm ? `<span class="tm-tag">${tm.icon} ${tm.label}</span>` : ''}
+              </div></td>
+          <td class="hide-sm" data-field="date" title="Click để sửa ngày đặt" style="font-size:12px;color:var(--muted)">${o.date || '—'}</td>
+          <td>
+            <div style="font-weight:600" data-field="custName" title="Click để sửa tên KH">${o.custName || '—'}</div>
+            <div style="font-size:11.5px;color:var(--muted)">${o.cust || ''} · <span data-field="staff" title="Click để đổi NV phụ trách">${o.staff || ''}</span></div>
+          </td>
+          <td class="hide-md" data-field="drop" title="Click để sửa địa chỉ giao" style="font-size:12px">${dropStr}</td>
+          <td class="hide-md" style="font-size:12px">${o.qty || 0} ${unitStr}${o.weight ? ' · '+o.weight+'kg' : ''}</td>
+          <td class="num" data-field="freight" title="Click để sửa tiền hàng">${window.fmt(o.freight || 0)}</td>
+          <td class="num hide-md" data-field="cod" title="Click để sửa COD">${o.cod ? window.fmt(o.cod) : '—'}</td>
+          <td class="hide-md" style="font-size:12px">
+            <div><span data-field="driverName" title="Click để đổi shipper">${o.driverName || '—'}</span>${o.external?' <span class="alert-badge warn" style="font-size:9px">ĐT ngoài</span>':''}</div>
+            <div style="color:var(--muted);font-size:11px">${o.vehicle || ''}${o.external && o.partnerCost?' · '+window.fmtShort(o.partnerCost)+'đ':''}</div>
+          </td>
+          <td onclick="event.stopPropagation()">
+            <select class="status-select status-select-${o.status}" data-code="${o.code}" data-act="status"
+              title="Đổi trạng thái đơn"
+              style="border:1px solid var(--line);border-radius:7px;padding:5px 8px;font-size:11.5px;font-weight:700;cursor:pointer;background:${st.color}15;color:${st.color};min-width:130px">
+              ${ALL_STATUSES.map(k => `<option value="${k}" ${o.status===k?'selected':''}>${STATUS[k].icon} ${STATUS[k].label}</option>`).join('')}
+            </select>
+          </td>
+          <td onclick="event.stopPropagation()">
+            <div class="row-actions">
+              <button title="In phiếu giao hàng / xác nhận / xuất kho" data-act="print" data-code="${o.code}">🖨</button>
+              ${(o.status === 'delivered' || o.status === 'settled') ? `<button title="🧾 Phiếu xuất kho" data-act="deliveryNote" data-code="${o.code}" style="color:#C00000">🧾</button>` : ''}
+              <button title="Xem thông tin đơn" data-act="edit" data-code="${o.code}">👁</button>
+            </div>
+          </td>
+        </tr>`;
+      } catch (err) {
+        console.warn('[orders render] bỏ qua đơn lỗi:', o.code, err.message);
+        return ''; /* skip đơn lỗi, không break cả map */
+      }
     }).join('');
 
     document.querySelectorAll('#tbody tr[data-code]').forEach(tr => {

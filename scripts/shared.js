@@ -563,7 +563,8 @@ window.NAV = [
     { id: 'reports',    label: 'Báo cáo',     icon: '📈', href: 'reports.html' },
     { id: 'marketing',  label: 'Email/Zalo blast', icon: '📨', href: 'marketing.html' },
     { id: 'audit',      label: 'Nhật ký',     icon: '📋', href: 'audit.html' },
-    { id: 'tg-bot',     label: 'Telegram Bot 2 chiều', icon: '🤖', href: 'tg-bot.html' },
+    /* tg-bot.html ẩn — chỉ là simulator demo, chưa hoạt động thật.
+       Khi có backend Telegram webhook thật → unhide lại. */
     { id: 'settings',   label: 'Cài đặt',     icon: '⚙️', href: 'settings.html' },
     { id: 'docs',       label: 'Hướng dẫn',   icon: '📖', href: 'docs.html' },
   ]},

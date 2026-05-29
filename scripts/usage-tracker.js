@@ -16,6 +16,43 @@
    ========================================================= */
 (function () {
   const KEY = 'usage_stats';
+
+  /* Giá tham khảo USD per token (2026-05) — input + output khác nhau */
+  const PRICING = {
+    /* Gemini Flash 2.0/2.5 — FREE tier 1500 calls/day, sau đó: */
+    'gemini-flash':    { in: 0.0000001,  out: 0.0000004 },
+    'gemini-flash-1.5':{ in: 0.0000001,  out: 0.0000004 },
+    'gemini-flash-2.0':{ in: 0.0000001,  out: 0.0000004 },
+    /* Claude */
+    'claude-haiku':    { in: 0.0000008,  out: 0.0000040 },
+    'claude-haiku-4-5':{ in: 0.0000008,  out: 0.0000040 },
+    'claude-sonnet':   { in: 0.0000030,  out: 0.0000150 },
+    /* OpenAI */
+    'openai-gpt-4o-mini': { in: 0.00000015, out: 0.0000006 },
+    'openai-gpt-4o':      { in: 0.0000025,  out: 0.000010 },
+    'openai-gpt-4-turbo': { in: 0.000010,   out: 0.000030 },
+    'openai-gpt-3.5-turbo': { in: 0.0000005, out: 0.0000015 },
+  };
+  function getPrice(model) {
+    if (PRICING[model]) return PRICING[model];
+    /* Fuzzy match — vd "openai-gpt-4o-mini" → prefix match */
+    const key = Object.keys(PRICING).find(k => model.startsWith(k) || model.includes(k.split('-')[1] || ''));
+    return key ? PRICING[key] : { in: 0, out: 0 };
+  }
+  function computeCostByModel(byModel) {
+    const out = {};
+    let total = 0;
+    Object.entries(byModel).forEach(([m, d]) => {
+      const p = getPrice(m);
+      const cost = (d.in || 0) * p.in + (d.out || 0) * p.out;
+      out[m] = cost.toFixed(4);
+      total += cost;
+    });
+    out.TOTAL = total.toFixed(4);
+    return out;
+  }
+  /* Expose computePrice cho settings.html dùng */
+  window.USAGE_PRICING = { getPrice, computeCostByModel };
   /* Auto-reset monthly */
   function _ensureCurrentMonth() {
     const s = window.STORE.get(KEY, {}) || {};
@@ -88,13 +125,8 @@
         byModel: s.byModel || {},
         history: s.history || [],
         forecast,
-        /* Cost estimate USD theo giá tham khảo */
-        costUSD: {
-          gemini_flash: ((s.byModel?.['gemini-flash']?.in || 0) * 0.00000010
-                       + (s.byModel?.['gemini-flash']?.out || 0) * 0.00000040).toFixed(4),
-          claude_haiku: ((s.byModel?.['claude-haiku']?.in || 0) * 0.00000080
-                       + (s.byModel?.['claude-haiku']?.out || 0) * 0.00000400).toFixed(4),
-        },
+        /* Cost estimate USD theo giá tham khảo cho mọi model */
+        costUSD: computeCostByModel(s.byModel || {}),
         /* Free tier limits */
         limits: {
           supabase_egress_GB: 5,

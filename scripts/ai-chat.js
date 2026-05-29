@@ -395,6 +395,11 @@ ${recent}`;
         });
         const j = await r.json();
         if (!r.ok) throw new Error(j.error?.message || 'OpenAI ' + r.status);
+        /* Track OpenAI usage */
+        if (window.USAGE && j.usage) {
+          window.USAGE.trackAI('openai-' + (provider.model || 'gpt-4o-mini'),
+            j.usage.prompt_tokens || 0, j.usage.completion_tokens || 0);
+        }
         return j.choices?.[0]?.message?.content || '';
       } catch (e) {
         return '❌ Lỗi gọi AI: ' + e.message;

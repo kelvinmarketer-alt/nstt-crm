@@ -503,8 +503,9 @@
   window.switchSet = function(e, k) {
     document.querySelectorAll('.set-nav .item').forEach(x => x.classList.remove('active'));
     e.target.classList.add('active');
-    ['Company','Master','Integrate','Telegram','Security','Backup'].forEach(p => {
-      document.getElementById('set' + p).style.display = (p.toLowerCase() === k) ? 'block' : 'none';
+    ['Company','Master','Integrate','Telegram','Security','Backup','Usage'].forEach(p => {
+      const el = document.getElementById('set' + p);
+      if (el) el.style.display = (p.toLowerCase() === k) ? 'block' : 'none';
     });
   };
 
@@ -1018,15 +1019,16 @@
     const egressColor = egressPct > 80 ? 'var(--danger)' : egressPct > 50 ? 'var(--warn)' : 'var(--ok)';
     const totalTokensMonth = r.tokensIn + r.tokensOut;
 
-    /* By model breakdown */
+    /* By model breakdown — dùng USAGE_PRICING global cho mọi model */
     const modelHtml = Object.entries(r.byModel).map(([m, d]) => {
-      const totalCost = (m.includes('claude') ? (d.in * 0.0000008 + d.out * 0.000004) : (d.in * 0.0000001 + d.out * 0.0000004)).toFixed(4);
+      const cost = r.costUSD[m] || '0.0000';
+      const icon = m.startsWith('claude') ? '🤖' : m.startsWith('gemini') ? '✨' : m.startsWith('openai') ? '🟢' : '🔵';
       return `<tr>
-        <td><b>${m}</b></td>
+        <td>${icon} <b>${m}</b></td>
         <td class="num">${d.calls}</td>
         <td class="num">${d.in.toLocaleString('vi-VN')}</td>
         <td class="num">${d.out.toLocaleString('vi-VN')}</td>
-        <td class="num">~$${totalCost}</td>
+        <td class="num">~$${cost}</td>
       </tr>`;
     }).join('') || '<tr><td colspan="5" style="text-align:center;padding:14px;color:var(--muted)">Chưa có call AI nào tháng này</td></tr>';
 
@@ -1058,9 +1060,9 @@
           <div class="kpi-trend">Σ tokens: <b>${totalTokensMonth.toLocaleString('vi-VN')}</b><br>In ${r.tokensIn.toLocaleString('vi-VN')} · Out ${r.tokensOut.toLocaleString('vi-VN')}</div>
         </div>
         <div class="kpi" style="border-left:4px solid var(--ok)">
-          <div class="kpi-label">💰 CHI PHÍ AI</div>
-          <div class="kpi-value">$${(parseFloat(r.costUSD.gemini_flash) + parseFloat(r.costUSD.claude_haiku)).toFixed(4)}</div>
-          <div class="kpi-trend">Gemini: $${r.costUSD.gemini_flash}<br>Claude: $${r.costUSD.claude_haiku}</div>
+          <div class="kpi-label">💰 CHI PHÍ AI (tháng)</div>
+          <div class="kpi-value">$${r.costUSD.TOTAL || '0.0000'}</div>
+          <div class="kpi-trend">${Object.entries(r.costUSD).filter(([k])=>k!=='TOTAL' && parseFloat(r.costUSD[k])>0).map(([k,v])=>`${k}: $${v}`).join('<br>') || 'Chưa có chi phí'}</div>
         </div>
       </div>
 
