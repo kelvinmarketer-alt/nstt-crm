@@ -225,7 +225,11 @@
     /* Lấy tất cả records của 1 bảng */
     async getAll(table) {
       const { data, error } = await client.from(table).select('*').order('created_at', { ascending: false });
-      if (error) { console.error('[SB getAll]', table, error); return []; }
+      if (error) {
+        console.error('[SB getAll]', table, error);
+        window.toast?.('⚠ Load ' + table + ' lỗi cloud: ' + (error.message||'unknown'), 'warn');
+        return [];
+      }
       return data.map(r => mapFrom(table, r));
     },
 
@@ -233,7 +237,11 @@
     async insert(table, record) {
       const mapped = mapTo(table, record);
       const { data, error } = await client.from(table).insert(mapped).select().single();
-      if (error) { console.error('[SB insert]', table, error); return null; }
+      if (error) {
+        console.error('[SB insert]', table, error);
+        window.toast?.('⚠ Lưu cloud lỗi ' + table + ': ' + (error.message||'unknown'), 'warn');
+        return null;
+      }
       return mapFrom(table, data);
     },
 
@@ -241,14 +249,22 @@
     async update(table, id, patch, idColumn = 'id') {
       const mapped = mapTo(table, patch);
       const { data, error } = await client.from(table).update(mapped).eq(idColumn, id).select().single();
-      if (error) { console.error('[SB update]', table, error); return null; }
+      if (error) {
+        console.error('[SB update]', table, error);
+        window.toast?.('⚠ Update cloud lỗi ' + table + ': ' + (error.message||'unknown'), 'warn');
+        return null;
+      }
       return mapFrom(table, data);
     },
 
     /* Xóa theo id */
     async remove(table, id, idColumn = 'id') {
       const { error } = await client.from(table).delete().eq(idColumn, id);
-      if (error) { console.error('[SB remove]', table, error); return false; }
+      if (error) {
+        console.error('[SB remove]', table, error);
+        window.toast?.('⚠ Xóa cloud lỗi ' + table + ': ' + (error.message||'unknown'), 'warn');
+        return false;
+      }
       return true;
     },
 
@@ -279,6 +295,27 @@
     },
     async setCompanyInfo(info) {
       const { error } = await client.from('company_info').upsert({ id: 1, ...info, updated_at: new Date().toISOString() });
+      return !error;
+    },
+
+    /* === Generic kv_store — cho 9 keys business-critical ===
+       timesheet, payrollExtra, audit_log, inv_movements, snapshots,
+       budget_2026, loyalty_rules, marketing_tpls, cust_prefs */
+    async getKv(key) {
+      const { data, error } = await client.from('kv_store').select('value').eq('key', key).single();
+      if (error || !data) return null;
+      return data.value;
+    },
+    async setKv(key, value) {
+      const updated_by = (window.CURRENT_USER || {}).name || 'system';
+      const { error } = await client.from('kv_store').upsert({
+        key, value, updated_by,
+        updated_at: new Date().toISOString(),
+      });
+      if (error) {
+        console.warn('[SB setKv]', key, error.message);
+        window.toast?.('⚠ Sync ' + key + ' lỗi: ' + error.message, 'warn');
+      }
       return !error;
     },
 

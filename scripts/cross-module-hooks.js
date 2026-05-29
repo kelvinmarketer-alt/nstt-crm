@@ -43,7 +43,7 @@
           inv.push(item);
         }
         item.stock = Math.max(0, (item.stock || 0) + deltaQty);
-        const today = new Date(2026, 4, 18);
+        const today = window.todayDate();
         const vi = `${String(today.getDate()).padStart(2,'0')}/${String(today.getMonth()+1).padStart(2,'0')}/${today.getFullYear()}`;
         if (deltaQty > 0) item.lastIn = vi;
         else item.lastOut = vi;

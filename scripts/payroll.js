@@ -139,7 +139,7 @@
     const staffs = STAFF();
     const [y, m] = month.split('-').map(Number); const last = new Date(y, m, 0).getDate();
     const dayNames = ['CN', 'T2', 'T3', 'T4', 'T5', 'T6', 'T7'];
-    const today = new Date(2026, 4, 18);
+    const today = window.todayDate();
 
     /* === HEADER === T2-T6 thường · T7 vàng (chỉ sáng) · CN đỏ (nghỉ) · today xanh dương */
     const dayHead = Array.from({ length: last }, (_, i) => {

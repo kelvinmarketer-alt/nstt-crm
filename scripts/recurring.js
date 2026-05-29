@@ -9,7 +9,7 @@
   function getRO() { return window.STORE.get('recurring_orders', window.RECURRING_ORDERS || []) || []; }
   function getCust(id) { return (window.STORE.get('customers', window.CUSTOMERS || []) || []).find(c => c.id === id); }
   const DAY_LABELS = ['CN','T2','T3','T4','T5','T6','T7'];
-  const TODAY = new Date(2026, 4, 18);
+  const TODAY = window.todayDate();
 
   function parseVi(s) { const m = (s||'').match(/(\d+)\/(\d+)\/(\d+)/); return m ? new Date(+m[3],+m[2]-1,+m[1]) : null; }
   function fmtVi(d) { return `${String(d.getDate()).padStart(2,'0')}/${String(d.getMonth()+1).padStart(2,'0')}/${d.getFullYear()}`; }
@@ -30,7 +30,7 @@
     const activeDrivers = drivers.filter(d => !d.freelancer || d.freelancer);  /* All including freelance */
     if (!activeDrivers.length) return null;
     const orders = window.STORE.get('orders', []) || [];
-    const TODAY_VI = '18/05/2026';
+    const TODAY_VI = window.todayVN();
     const todayOrders = orders.filter(o => (o.date||'').startsWith(TODAY_VI) && o.status !== 'cancelled');
     /* Đếm đơn hôm nay per shipper */
     const loadByShipper = {};
@@ -62,7 +62,7 @@
       const code = 'NSTT-' + String(orders.length + 200 + created).padStart(6,'0');
       const items = ro.items.map(it => ({
         id: it.productId, name: it.name, qty: it.qty,
-        price: window.priceOn ? window.priceOn(it.productId, '2026-05-18') : 15000,
+        price: window.priceOn ? window.priceOn(it.productId, window.todayISO()) : 15000,
         total: 0,
       }));
       items.forEach(it => it.total = it.qty * it.price);
@@ -113,7 +113,7 @@
   function renderKpis() {
     const list = getRO();
     const active = list.filter(r => r.active).length;
-    const today = list.filter(r => r.active && r.nextRun === '18/05/2026').length;
+    const today = list.filter(r => r.active && r.nextRun === window.todayVN()).length;
     const orders = window.STORE.get('orders', []) || [];
     const fromRo = orders.filter(o => o.source === 'recurring').length;
     const totalQty = list.filter(r => r.active).reduce((s,r) => s + (r.items||[]).length, 0);

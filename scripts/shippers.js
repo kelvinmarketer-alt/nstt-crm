@@ -46,7 +46,7 @@
   /* === Get today timesheet status for a staff === */
   function todayTimesheetStatus(staffId, todayDate) {
     const sheets = window.STORE.get('timesheet', window.TIMESHEET || []);
-    const today = todayDate || new Date(2026, 4, 18);    /* demo today */
+    const today = todayDate || window.todayDate();    /* demo today */
     const yyyy = today.getFullYear();
     const mm = String(today.getMonth() + 1).padStart(2, '0');
     const dd = today.getDate();
@@ -104,7 +104,7 @@
     const all = shippers();
     /* Pre-load today orders để compute status nhanh */
     const orders = window.STORE.get('orders', window.ORDERS || []);
-    const TODAY_VI = '18/05/2026';
+    const TODAY_VI = window.todayVN();
     const todayOrders = orders.filter(o => (o.date || '').startsWith(TODAY_VI));
 
     /* Compute status cho mỗi shipper */
@@ -324,7 +324,7 @@
   /* === LỊCH SHIP HÔM NAY của shipper === */
   function renderShipperScheduleHTML(s) {
     const orders = window.STORE.get('orders', window.ORDERS || []);
-    const TODAY_VI = '18/05/2026';
+    const TODAY_VI = window.todayVN();
     const myOrders = orders.filter(o =>
       (o.driver === s.id || o.driverName === s.name) &&
       (o.date || '').startsWith(TODAY_VI) &&
@@ -370,7 +370,7 @@
   function buildShipperScheduleMsg(s) {
     const orders = window.STORE.get('orders', window.ORDERS || []);
     const customers = window.STORE.get('customers', window.CUSTOMERS || []);
-    const TODAY_VI = '18/05/2026';
+    const TODAY_VI = window.todayVN();
     const myOrders = orders.filter(o =>
       (o.driver === s.id || o.driverName === s.name) &&
       (o.date || '').startsWith(TODAY_VI) &&
@@ -450,7 +450,7 @@
     if (!s) return;
     /* Compute live status để hiển thị trong form */
     const orders = window.STORE.get('orders', window.ORDERS || []);
-    const TODAY_VI = '18/05/2026';
+    const TODAY_VI = window.todayVN();
     const todayOrders = orders.filter(o => (o.date || '').startsWith(TODAY_VI));
     s.live = liveStatus(s, todayOrders);
     window.openModal('Sửa shipper: ' + s.name, form(s), {

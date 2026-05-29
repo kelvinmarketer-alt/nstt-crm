@@ -13,7 +13,7 @@
 
   function renderKpis() {
     const list = getPur();
-    const today = '18/05/2026';
+    const today = window.todayVN();
     const todayList = list.filter(p => p.date === today);
     const ordered = list.filter(p => p.status === 'ordered');
     const monthSpend = list.filter(p => p.status === 'received' && (p.date||'').endsWith('/2026') && (p.date||'').startsWith('1') === false || (p.date||'').includes('/05/2026')).reduce((s,p) => s + (p.total||0), 0);
@@ -140,7 +140,7 @@
     }
     /* Cập nhật priceHistory cho từng SP */
     const prods = getProds();
-    const today = '2026-05-18';
+    const today = window.todayISO();
     (list[i].items || []).forEach(it => {
       const p = prods.find(x => x.id === it.productId);
       if (p && it.price) {
@@ -196,7 +196,7 @@
     /* Ghi phiếu chi */
     const cash = window.STORE.get('cashEntries', []) || [];
     cash.unshift({
-      no:'PC' + String(cash.length+1).padStart(4,'0'), date:'18/05/2026',
+      no:'PC' + String(cash.length+1).padStart(4,'0'), date:window.todayVN(),
       type:'expense', amount: amt, account:'Tiền mặt',
       counterparty: findSup(p.supplierId)?.name || p.supplierId,
       description:'Thanh toán phiếu ' + id,
@@ -288,7 +288,7 @@
     const obj = {
       id: document.getElementById('pn_id').value,
       supplierId: document.getElementById('pn_sup').value,
-      date: m ? `${m[3]}/${m[2]}/${m[1]}` : '18/05/2026',
+      date: m ? `${m[3]}/${m[2]}/${m[1]}` : window.todayVN(),
       status: 'ordered',
       total: items.reduce((s,i) => s + i.total, 0),
       paid: 0,

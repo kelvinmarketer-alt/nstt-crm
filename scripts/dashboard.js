@@ -9,8 +9,8 @@
    - Marketing (adspend)
    ========================================================= */
 (function () {
-  const TODAY_VI = '18/05/2026';
-  const TODAY_ISO = '2026-05-18';
+  const TODAY_VI = window.todayVN();
+  const TODAY_ISO = window.todayISO();
   const MONTH_VI = '05/2026';
 
   function parseViDate(s) {
@@ -58,7 +58,7 @@
     const pendingDispatch = orders.filter(o => o.status === 'confirmed' && (!o.driver || o.driver === '—')).length;
 
     /* Shipper status hôm nay */
-    const todaySh = new Date(2026, 4, 18);
+    const todaySh = window.todayDate();
     const todayDay = todaySh.getDate();
     function todayAtt(staffId) {
       if (!staffId) return null;
@@ -295,7 +295,7 @@
   function renderChart() {
     const orders = window.STORE.get('orders', window.ORDERS || []) || [];
     const days = [];
-    const today = new Date(2026, 4, 18);
+    const today = window.todayDate();
     for (let i = 6; i >= 0; i--) {
       const d = new Date(today); d.setDate(today.getDate() - i);
       const vi = `${String(d.getDate()).padStart(2,'0')}/${String(d.getMonth()+1).padStart(2,'0')}/${d.getFullYear()}`;
@@ -330,7 +330,7 @@
     const now = new Date();
     const h = now.getHours();
     const greet = h < 11 ? 'Chào buổi sáng' : h < 14 ? 'Chào buổi trưa' : h < 18 ? 'Chào buổi chiều' : 'Chào buổi tối';
-    const dayName = ['CN','T2','T3','T4','T5','T6','T7'][new Date(2026,4,18).getDay()];
+    const dayName = ['CN','T2','T3','T4','T5','T6','T7'][window.todayDate().getDay()];
     const dayLabel = dayName === 'CN' ? 'Chủ Nhật' : 'thứ ' + dayName.slice(1);
     /* Đếm cảnh báo */
     let alerts = 0;

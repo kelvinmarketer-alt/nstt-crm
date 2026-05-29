@@ -151,7 +151,7 @@
   /* 12-month revenue bar chart — compute từ orders thật */
   function renderChart() {
     const orders = window.STORE.get('orders', window.ORDERS || []);
-    const today = new Date(2026, 4, 18);
+    const today = window.todayDate();
     const months = [];
     for (let i = 11; i >= 0; i--) {
       const d = new Date(today.getFullYear(), today.getMonth() - i, 1);
@@ -324,8 +324,8 @@
 
 
   /* === BÁO CÁO HÔM NAY (doanh thu + công nợ + chi phí ads) === */
-  const DAILY_VI = '18/05/2026';     // "hôm nay" demo (khớp dashboard)
-  const DAILY_ISO = '2026-05-18';
+  const DAILY_VI = window.todayVN();     // "hôm nay" demo (khớp dashboard)
+  const DAILY_ISO = window.todayISO();
   function dailyData() {
     const orders = window.STORE.get('orders', window.ORDERS || []);
     const customers = window.STORE.get('customers', window.CUSTOMERS || []);
@@ -609,7 +609,7 @@
      ========================================================= */
   let profitPeriod = 'month';
   /* "Hôm nay" demo neo vào ngày dữ liệu mock (giữ đồng bộ dashboard / báo cáo ngày) */
-  const TODAY = new Date(2026, 4, 18);   /* 18/05/2026 */
+  const TODAY = window.todayDate();   /* 18/05/2026 */
 
   function parseViDate(s) {
     const m = (s || '').match(/(\d{1,2})\/(\d{1,2})\/(\d{4})/);
@@ -914,7 +914,7 @@
       if (o.status !== 'pickup' && o.status !== 'transit') return false;
       const m = (o.date || '').match(/(\d+)\/(\d+)\/(\d+)/);
       if (!m) return false;
-      const today = new Date(2026, 4, 18);
+      const today = window.todayDate();
       const d = new Date(+m[3], +m[2]-1, +m[1]);
       return (today - d) / 86400000 > 1;
     }).length;

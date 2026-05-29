@@ -87,6 +87,24 @@
     invoices:     'no',
   };
 
+  /* === Generic kv_store keys — sync qua bảng kv_store(key, value JSONB) ===
+     Các bảng này schema phức tạp (JSONB nested), ít query SQL → dùng generic.
+     QUAN TRỌNG: NV mất chấm công + bảng lương khi đổi máy nếu KHÔNG sync. */
+  const KV_KEYS = new Set([
+    'timesheet',       /* Chấm công NV — CRITICAL */
+    'timesheetMeta',   /* Giờ vào muộn, lý do — CRITICAL */
+    'payrollExtra',    /* Bảng lương chi tiết — CRITICAL */
+    'audit_log',       /* Truy vết NV — HIGH */
+    'inv_movements',   /* Sổ xuất nhập kho — HIGH */
+    'snapshots',       /* Auto-backup — HIGH */
+    'budget_2026',     /* Kế hoạch năm — HIGH */
+    'loyalty_rules',   /* Rules tích điểm — MED */
+    'marketing_tpls',  /* Template marketing — MED */
+    'cust_prefs',      /* Thói quen mua KH — MED */
+    'pod_photos',      /* Ảnh giao hàng — MED (base64 lớn) */
+    'telegramChannels', /* Cấu hình routing (legacy, deprecated) */
+  ]);
+
   function isSupabaseMode() {
     return window.SUPABASE_CONFIG?.mode === 'supabase' && !!window.SB_DATA;
   }
@@ -140,6 +158,29 @@
         }
         return;
       }
+      /* === KV store (timesheet, payrollExtra, audit_log...) ===
+         Bảng kv_store(key, value JSONB) — generic key-value sync.
+         9 keys CRITICAL: NV mất chấm công + bảng lương nếu KHÔNG sync. */
+      if (KV_KEYS.has(key) && window.SB_DATA?.getKv) {
+        const v = await window.SB_DATA.getKv(key);
+        if (v != null && (!Array.isArray(v) || v.length > 0)) {
+          /* Cloud có data → dùng, ghi đè local */
+          _data[key] = v;
+          try { localStorage.setItem(PREFIX + key, JSON.stringify(v)); } catch (e) {}
+          (_subs[key] || []).forEach(fn => fn(v));
+          console.log(`[STORE] Synced ${key} ← kv_store (${Array.isArray(v) ? v.length + ' items' : 'object'})`);
+        } else {
+          /* Cloud trống → MIGRATION: push local lên cloud nếu local có data */
+          const localV = _data[key];
+          if (localV && (Array.isArray(localV) ? localV.length > 0 : Object.keys(localV).length > 0)) {
+            window.SB_DATA.setKv(key, localV)
+              .then(() => console.log(`[STORE] ⬆ Migrated ${key} → kv_store`))
+              .catch(e => console.warn(`[STORE migrate ${key}]`, e));
+          }
+        }
+        return;
+      }
+
       /* === Integrations (int_telegram, int_ai-engine, int_gmail...) ===
          Bảng `integrations` (key, enabled, config) — sync để cấu hình
          token/API key hoạt động trên mọi máy/trình duyệt. */
@@ -184,9 +225,10 @@
     /* Lấy dữ liệu — sync, return cache instantly */
     get(key, fallback) {
       if (!(key in _data)) _data[key] = _load(key, fallback);
-      /* Fire-and-forget preload từ Supabase — TABLE_MAP keys + companyInfo + md_* + int_* */
+      /* Fire-and-forget preload từ Supabase — TABLE_MAP + companyInfo + md_* + int_* + KV_KEYS */
       if (isSupabaseMode() && !_preloaded.has(key) &&
-          (TABLE_MAP[key] || key === 'companyInfo' || key.startsWith('md_') || key.startsWith('int_'))) {
+          (TABLE_MAP[key] || key === 'companyInfo' ||
+           key.startsWith('md_') || key.startsWith('int_') || KV_KEYS.has(key))) {
         _preloadFromSupabase(key);
       }
       return _data[key];
@@ -214,6 +256,11 @@
          dùng được trên mọi máy/trình duyệt. */
       if (isSupabaseMode() && key.startsWith('int_') && window.SB_DATA?.setIntegration && value) {
         window.SB_DATA.setIntegration(key.slice(4), value).catch(e => console.warn('[STORE int → SB]', e));
+        return;
+      }
+      /* KV store (timesheet, payrollExtra, audit_log, snapshots, ...) */
+      if (isSupabaseMode() && KV_KEYS.has(key) && window.SB_DATA?.setKv && value != null) {
+        window.SB_DATA.setKv(key, value).catch(e => console.warn(`[STORE kv ${key} → SB]`, e));
         return;
       }
 
@@ -382,4 +429,31 @@
       console.log('%c[NSTT] 💾 LocalStorage mode', 'color:#B45309;font-weight:bold');
     }
   }, 100);
+
+  /* === REALTIME POLL ===
+     Mỗi 60s re-fetch các bảng đã preload từ Supabase để đồng bộ giữa nhiều máy.
+     Khi user A tạo đơn, sau ≤60s user B refresh hoặc tab focus → sẽ thấy đơn mới.
+     Chỉ chạy poll khi tab đang FOCUS (tiết kiệm bandwidth khi tab nền). */
+  if (typeof window !== 'undefined') {
+    setInterval(() => {
+      if (!isSupabaseMode()) return;
+      if (document.hidden) return;     /* Skip khi tab nền */
+      _preloaded.forEach(key => {
+        if (TABLE_MAP[key]) {
+          /* Re-fetch table key */
+          window.SB_DATA.getAll(TABLE_MAP[key]).then(data => {
+            if (!Array.isArray(data) || data.length === 0) return;
+            const oldJson = JSON.stringify(_data[key] || []);
+            const newJson = JSON.stringify(data);
+            if (oldJson !== newJson) {
+              _data[key] = data;
+              try { localStorage.setItem(PREFIX + key, JSON.stringify(data)); } catch (e) {}
+              (_subs[key] || []).forEach(fn => fn(data));
+              console.log(`[STORE poll] ${key} cập nhật mới (${data.length} records)`);
+            }
+          }).catch(()=>{});
+        }
+      });
+    }, 60000); /* 60s */
+  }
 })();

@@ -258,7 +258,10 @@
     /* Mở modal cấu hình auto-send */
     openConfig() {
       const c = getCfg();
-      const channels = (window.STORE.get('telegramChannels', []) || []);
+      /* Đọc channels từ int_telegram.channels (configured trong Settings → Telegram).
+         Trước đây đọc 'telegramChannels' nhưng key đó không có nơi nào SET → dead. */
+      const tg = window.STORE.get('int_telegram', {}) || {};
+      const channels = tg.channels || [];
       const tgPurposes = window.TG_PURPOSES || [
         {id:'price_update', label:'📋 Cập nhật bảng giá'},
         {id:'boss_report', label:'👔 Báo cáo sếp'},

@@ -195,10 +195,17 @@ window.avatarColor = function(seed) {
   return window.AVATAR_COLORS[h % window.AVATAR_COLORS.length];
 };
 
-/* ============ Giá sản phẩm theo ngày (dùng chung Sản phẩm + Đơn hàng) ============ */
+/* ============ Date helpers — KHÔNG HARDCODE NGÀY ============
+   Cũ: app hardcode 18/05/2026 vì lúc gen seed là ngày đó.
+   Mới: dùng runtime. Demo data 17-18/05 sẽ hiện "cũ" — đúng nghĩa. */
 window.todayISO = function() {
   const d = new Date();
   return `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}`;
+};
+window.todayDate = function() { return new Date(); };
+window.todayVN = function() {
+  const d = new Date();
+  return `${String(d.getDate()).padStart(2,'0')}/${String(d.getMonth()+1).padStart(2,'0')}/${d.getFullYear()}`;
 };
 window.productById = function(id) {
   return window.STORE.get('products', window.PRODUCTS || []).find(p => p.id === id) || null;

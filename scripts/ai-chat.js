@@ -118,7 +118,7 @@
         const ads = window.STORE.get('adspend', []) || [];
         const inv = window.STORE.get('inventory', []) || [];
 
-        const TODAY = '18/05/2026';
+        const TODAY = window.todayVN();
         /* Sales/CSKH chỉ thấy KH+đơn mình phụ trách. Admin/all → full */
         const mineFilter = (arr, ownerField) =>
           can('all') ? arr : arr.filter(x => (x[ownerField]||'').includes(myName) || !x[ownerField]);

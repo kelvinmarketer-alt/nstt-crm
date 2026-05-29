@@ -15,7 +15,7 @@
    - New           R5F1    : mới đặt 1 lần
    ========================================================= */
 window.RFM = (function () {
-  const TODAY = new Date(2026, 4, 18);
+  const TODAY = window.todayDate();
 
   function parseVi(s) { const m=(s||'').match(/(\d+)\/(\d+)\/(\d+)/); return m?new Date(+m[3],+m[2]-1,+m[1]):null; }
 

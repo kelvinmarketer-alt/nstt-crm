@@ -491,10 +491,12 @@
       </div>
       <div class="form-row">
         <div><label>NV phụ trách</label>
-          <select id="addStaff">
-            <option>Trần Lan</option><option>Phạm Hùng</option>
-            <option>Hoàng Mai</option><option>Tuấn Tú</option>
-          </select></div>
+          <select id="addStaff">${
+            (window.STORE.get('staff', []) || [])
+              .filter(s => s.status !== 'inactive')
+              .map(s => `<option>${s.name}</option>`)
+              .join('') || '<option>Tuấn Tú</option>'
+          }</select></div>
         <div><label>Nguồn</label>
           <select id="addSource">${window.MD.options('sources')}</select></div>
       </div>
@@ -563,7 +565,12 @@
       <div class="form-row">
         <div><label>Email</label><input id="eEmail" value="${c.email||''}"></div>
         <div><label>NV phụ trách</label>
-          <select id="eStaff">${['Trần Lan','Phạm Hùng','Hoàng Mai','Tuấn Tú'].map(s=>`<option ${c.staffOwner===s?'selected':''}>${s}</option>`).join('')}</select></div>
+          <select id="eStaff">${
+            ((window.STORE.get('staff', []) || []).filter(s => s.status !== 'inactive').map(s => s.name).length
+              ? (window.STORE.get('staff', []) || []).filter(s => s.status !== 'inactive').map(s => s.name)
+              : ['Trần Lan','Phạm Hùng','Hoàng Mai','Tuấn Tú']
+            ).map(s=>`<option ${c.staffOwner===s?'selected':''}>${s}</option>`).join('')
+          }</select></div>
       </div>
       <div class="form-row wide"><label>Địa chỉ</label><input id="eAddress" value="${c.address}"></div>
     `, {
