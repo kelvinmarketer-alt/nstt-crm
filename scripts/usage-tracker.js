@@ -15,7 +15,20 @@
    Data lưu trong STORE key 'usage_stats' → sync cloud qua kv_store
    ========================================================= */
 (function () {
-  const KEY = 'usage_stats';
+  /* Tracker theo PER-MACHINE (deviceId) thay vì global.
+     Lý do: nếu sync cloud → nhiều máy ghi đè nhau → số liệu loạn.
+     Mỗi máy có deviceId riêng (tự sinh + lưu localStorage),
+     stats lưu PURE LOCAL, không sync. */
+  function getDeviceId() {
+    let id = localStorage.getItem('vty_deviceId');
+    if (!id) {
+      id = 'DEV-' + Date.now().toString(36) + '-' + Math.random().toString(36).slice(2,7);
+      localStorage.setItem('vty_deviceId', id);
+    }
+    return id;
+  }
+  const DEVICE_ID = getDeviceId();
+  const KEY = 'usage_stats_local';   /* CHỈ localStorage, không qua kv_store sync */
 
   /* Giá tham khảo USD per token (2026-05) — input + output khác nhau */
   const PRICING = {
@@ -53,9 +66,20 @@
   }
   /* Expose computePrice cho settings.html dùng */
   window.USAGE_PRICING = { getPrice, computeCostByModel };
+  /* Read/write trực tiếp localStorage (KHÔNG qua STORE để tránh sync cloud) */
+  function _loadStats() {
+    try {
+      const raw = localStorage.getItem('vty_' + KEY);
+      return raw ? JSON.parse(raw) : {};
+    } catch (e) { return {}; }
+  }
+  function _saveStats(s) {
+    try { localStorage.setItem('vty_' + KEY, JSON.stringify(s)); } catch (e) {}
+  }
+
   /* Auto-reset monthly */
   function _ensureCurrentMonth() {
-    const s = window.STORE.get(KEY, {}) || {};
+    const s = _loadStats();
     const thisMonth = new Date().toISOString().slice(0, 7); /* "2026-05" */
     if (s.month !== thisMonth) {
       /* Lưu tháng cũ vào history */
@@ -68,11 +92,12 @@
       });
       if (history.length > 12) history.length = 12;
       const fresh = {
+        deviceId: DEVICE_ID,
         month: thisMonth, polls: 0, egressMB: 0,
         aiCalls: 0, tokensIn: 0, tokensOut: 0,
         byModel: {}, history,
       };
-      window.STORE.set(KEY, fresh);
+      _saveStats(fresh);
       return fresh;
     }
     return s;
@@ -83,14 +108,12 @@
       const s = _ensureCurrentMonth();
       s.polls = (s.polls || 0) + 1;
       s.egressMB = (s.egressMB || 0) + (bytesDownloaded / 1024 / 1024);
-      /* Throttle save: chỉ save mỗi 30s tránh write storm */
+      /* Throttle save mỗi 5s để tránh write storm */
       const now = Date.now();
-      if (!this._lastSave || now - this._lastSave > 30000) {
-        window.STORE.set(KEY, s);
+      this._pendingStats = s;
+      if (!this._lastSave || now - this._lastSave > 5000) {
+        _saveStats(s);
         this._lastSave = now;
-      } else {
-        /* Update cache only */
-        window.STORE.get(KEY, {});  /* trigger cache sync */
       }
     },
     trackAI(model, tokensIn, tokensOut) {
@@ -103,8 +126,10 @@
       m.calls++;
       m.in += (tokensIn || 0);
       m.out += (tokensOut || 0);
-      window.STORE.set(KEY, s);
+      _saveStats(s);
     },
+    /* Helper exposes deviceId */
+    deviceId() { return DEVICE_ID; },
     getReport() {
       const s = _ensureCurrentMonth();
       const dayOfMonth = new Date().getDate();
@@ -136,10 +161,15 @@
       };
     },
     resetMonth() {
-      _ensureCurrentMonth();
-      const s = window.STORE.get(KEY, {});
-      Object.assign(s, { polls: 0, egressMB: 0, aiCalls: 0, tokensIn: 0, tokensOut: 0, byModel: {} });
-      window.STORE.set(KEY, s);
+      const s = _loadStats();
+      const thisMonth = new Date().toISOString().slice(0, 7);
+      Object.assign(s, {
+        deviceId: DEVICE_ID, month: thisMonth,
+        polls: 0, egressMB: 0,
+        aiCalls: 0, tokensIn: 0, tokensOut: 0,
+        byModel: {}
+      });
+      _saveStats(s);
     },
   };
 
