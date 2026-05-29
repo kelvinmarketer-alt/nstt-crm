@@ -407,14 +407,19 @@ select.status-select[title]:hover::before {
 .drawer-stats .s .sub{font-size:10.5px; color:var(--muted); margin-top:2px; white-space:nowrap; overflow:hidden; text-overflow:ellipsis}
 
 .tabs{
-  display:flex; padding:0 16px;
+  display:flex; padding:0 12px;
   border-bottom:1px solid var(--line); background:#fff;
+  overflow-x:auto; -webkit-overflow-scrolling:touch;
+  scrollbar-width:thin;
 }
+.tabs::-webkit-scrollbar{height:4px}
+.tabs::-webkit-scrollbar-thumb{background:var(--line); border-radius:2px}
 .tab{
-  padding:11px 14px; font-size:13px; font-weight:600;
+  padding:11px 12px; font-size:13px; font-weight:600;
   color:var(--muted); cursor:pointer;
   border-bottom:2px solid transparent;
   display:flex; align-items:center; gap:6px;
+  white-space:nowrap; flex-shrink:0;
 }
 .tab:hover{color:var(--text)}
 .tab.active{color:var(--red); border-bottom-color:var(--red)}
