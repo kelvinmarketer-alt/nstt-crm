@@ -98,8 +98,19 @@
     /* ============================================================
        TẦNG 4: LIVE DATA SNAPSHOT — bơm số liệu thật vào prompt
        ============================================================ */
+    /* === Helper: check perms của user hiện tại === */
+    _can(perm) {
+      const u = window.CURRENT_USER || {};
+      const perms = u.perms || [];
+      return perms.includes('all') || perms.includes('*') || perms.includes(perm);
+    },
+
     liveDataSnapshot() {
       try {
+        const can = (p) => this._can(p);
+        const u = window.CURRENT_USER || {};
+        const myName = u.name || '';
+
         const orders = window.STORE.get('orders', []) || [];
         const customers = window.STORE.get('customers', []) || [];
         const products = window.STORE.get('products', []) || [];
@@ -108,24 +119,62 @@
         const inv = window.STORE.get('inventory', []) || [];
 
         const TODAY = '18/05/2026';
-        const todayOrders = orders.filter(o => (o.date||'').startsWith(TODAY) && o.status !== 'cancelled');
-        const monthOrders = orders.filter(o => (o.date||'').includes('/05/2026') && o.status !== 'cancelled');
-        const monthRev = monthOrders.reduce((s,o)=>s+(o.freight||0),0);
-        const monthAds = ads.filter(a => (a.date||'').startsWith('2026-05')).reduce((s,a)=>s+(a.spend||0),0);
-        const totalDebt = customers.reduce((s,c)=>s+(c.debt||0),0);
-        const overdueDebt = customers.reduce((s,c)=>s+(c.debtOverdue||0),0);
-        const overdueCusts = customers.filter(c => c.debtOverdue > 0).sort((a,b)=>b.debtOverdue-a.debtOverdue).slice(0,3);
-        const vipCusts = customers.filter(c => c.group === 'VIP').length;
-        const activeStaff = staff.filter(s => s.status === 'active').length;
-        const lowStock = inv.filter(i => i.stock < i.minStock).length;
-        const outStock = inv.filter(i => i.stock <= 0).length;
+        /* Sales/CSKH chỉ thấy KH+đơn mình phụ trách. Admin/all → full */
+        const mineFilter = (arr, ownerField) =>
+          can('all') ? arr : arr.filter(x => (x[ownerField]||'').includes(myName) || !x[ownerField]);
+        const visibleCusts  = can('customers') ? mineFilter(customers, 'staffOwner') : [];
+        const visibleOrders = can('orders')    ? mineFilter(orders,    'staff') : [];
 
-        return `📊 DỮ LIỆU THẬT HIỆN TẠI (cập nhật ngay khi user hỏi — bot DÙNG SỐ NÀY, không bịa):
-- Hôm nay (${TODAY}): ${todayOrders.length} đơn mới · DT ${(todayOrders.reduce((s,o)=>s+(o.freight||0),0)/1e6).toFixed(1)}tr
-- Tháng 5/2026: ${monthOrders.length} đơn · DT ${(monthRev/1e6).toFixed(1)}tr · Ads ${(monthAds/1e6).toFixed(1)}tr
-- Khách hàng: ${customers.length} tổng (${vipCusts} VIP) · Σ công nợ ${(totalDebt/1e6).toFixed(1)}tr (${(overdueDebt/1e6).toFixed(1)}tr QUÁ HẠN)
-${overdueCusts.length ? '- KH NỢ QUÁ HẠN cần đôn: ' + overdueCusts.map(c=>`${c.name}(${(c.debtOverdue/1e6).toFixed(1)}tr)`).join(', ') : ''}
-- Nhân sự: ${activeStaff} NV active · Kho: ${products.length} SP catalog, ${outStock} HẾT HÀNG, ${lowStock} dưới ngưỡng`;
+        const todayOrders = visibleOrders.filter(o => (o.date||'').startsWith(TODAY) && o.status !== 'cancelled');
+        const monthOrders = visibleOrders.filter(o => (o.date||'').includes('/05/2026') && o.status !== 'cancelled');
+        const monthRev = monthOrders.reduce((s,o)=>s+(o.freight||0),0);
+
+        const out = [];
+        out.push(`📊 DỮ LIỆU THẬT HIỆN TẠI (chỉ trong PHẠM VI ${u.role||'user'} của ${myName||'user'}):`);
+
+        if (can('orders')) {
+          out.push(`- Hôm nay (${TODAY}): ${todayOrders.length} đơn · DT ${(todayOrders.reduce((s,o)=>s+(o.freight||0),0)/1e6).toFixed(1)}tr`);
+          out.push(`- Tháng 5/2026: ${monthOrders.length} đơn · DT ${(monthRev/1e6).toFixed(1)}tr`);
+        }
+        if (can('customers')) {
+          const vipCusts = visibleCusts.filter(c => c.group === 'VIP').length;
+          out.push(`- KH (trong phạm vi): ${visibleCusts.length} tổng (${vipCusts} VIP)`);
+        }
+        if (can('debt') || can('accounting') || can('all')) {
+          const totalDebt = visibleCusts.reduce((s,c)=>s+(c.debt||0),0);
+          const overdueDebt = visibleCusts.reduce((s,c)=>s+(c.debtOverdue||0),0);
+          const overdueCusts = visibleCusts.filter(c => c.debtOverdue > 0).sort((a,b)=>b.debtOverdue-a.debtOverdue).slice(0,3);
+          out.push(`- Σ công nợ ${(totalDebt/1e6).toFixed(1)}tr (${(overdueDebt/1e6).toFixed(1)}tr QUÁ HẠN)`);
+          if (overdueCusts.length) out.push(`- KH nợ QH cần đôn: ${overdueCusts.map(c=>`${c.name}(${(c.debtOverdue/1e6).toFixed(1)}tr)`).join(', ')}`);
+        }
+        if (can('adspend')) {
+          const monthAds = ads.filter(a => (a.date||'').startsWith('2026-05')).reduce((s,a)=>s+(a.spend||0),0);
+          out.push(`- Chi phí Ads T5: ${(monthAds/1e6).toFixed(1)}tr`);
+        }
+        if (can('inventory')) {
+          const lowStock = inv.filter(i => i.stock < i.minStock).length;
+          const outStock = inv.filter(i => i.stock <= 0).length;
+          out.push(`- Kho: ${products.length} SP, ${outStock} HẾT HÀNG, ${lowStock} dưới ngưỡng`);
+        }
+        if (can('staff') || can('payroll')) {
+          const activeStaff = staff.filter(s => s.status === 'active').length;
+          out.push(`- Nhân sự: ${activeStaff} NV active`);
+        }
+        /* Lợi nhuận, giá vốn, lương — CHỈ admin (perms='all') */
+        if (can('all')) {
+          const cogs = monthOrders.reduce((s,o)=>{
+            return s + (o.items||[]).reduce((ss,it) => {
+              const p = products.find(x=>x.id===it.id);
+              const buy = p && p.priceHistory ? (p.priceHistory[p.priceHistory.length-1]?.buy || 0) : 0;
+              return ss + buy * (it.qty||0);
+            },0);
+          },0);
+          const grossProfit = monthRev - cogs;
+          const totalSalary = staff.reduce((s,x)=>s+(x.salary||0),0);
+          out.push(`- 💼 LỢI NHUẬN T5 (admin-only): gộp ${(grossProfit/1e6).toFixed(1)}tr (sau giá vốn ${(cogs/1e6).toFixed(1)}tr)`);
+          out.push(`- 💼 Quỹ lương tháng (admin-only): ${(totalSalary/1e6).toFixed(1)}tr`);
+        }
+        return out.join('\n');
       } catch (e) {
         return '(không lấy được data snapshot)';
       }
@@ -146,11 +195,38 @@ ${overdueCusts.length ? '- KH NỢ QUÁ HẠN cần đôn: ' + overdueCusts.map(
         : '';
       const dataBlock = '\n\n' + this.liveDataSnapshot();
 
+      /* === Tính permission block động === */
+      const perms = u.perms || [];
+      const isAdmin = perms.includes('all') || perms.includes('*');
+      const allowed = [];
+      const blocked = [];
+      const PERM_LABELS = {
+        orders: 'Đơn hàng', customers: 'Khách hàng', leads: 'Lead', shippers: 'Shipper',
+        products: 'Sản phẩm', inventory: 'Kho', suppliers: 'NCC', purchases: 'Phiếu nhập',
+        invoices: 'Hóa đơn', debt: 'Công nợ', accounting: 'Kế toán',
+        adspend: 'Chi phí Ads', staff: 'Nhân viên', payroll: 'Lương', reports: 'Báo cáo',
+        settings: 'Cài đặt', marketing: 'Marketing', returns: 'Trả hàng',
+        quotes: 'Báo giá', recurring: 'Đơn định kỳ',
+      };
+      if (isAdmin) {
+        allowed.push('TẤT CẢ (admin)');
+      } else {
+        for (const [k, lbl] of Object.entries(PERM_LABELS)) {
+          if (perms.includes(k)) allowed.push(lbl); else blocked.push(lbl);
+        }
+      }
+      const permsBlock = `
+🔒 PHÂN QUYỀN USER (NGHIÊM NGẶT — KHÔNG ĐƯỢC PHÉP VƯỢT):
+- Được phép: ${allowed.join(', ')}
+${blocked.length ? '- KHÔNG được phép: ' + blocked.join(', ') : ''}
+${!isAdmin ? `- KHÔNG được tiết lộ lợi nhuận, giá vốn, lương NV, doanh thu toàn công ty (chỉ phạm vi mình phụ trách)` : ''}`;
+
       return `Bạn là TUTÚ — trợ lý AI nội bộ của app CRM "Nông Sản Tuấn Tú Hà Nội" (B2B nông sản cho nhà hàng Hà Nội).
 
-📦 APP CÓ 22 MODULES: Dashboard · Đơn hàng · Báo giá · Đơn định kỳ · Khách hàng · KH 360/RFM · Lead funnel · Shipper · Kho · Nhà cung cấp · Phiếu nhập · Trả hàng+POD · Sản phẩm+Giá ngày · Loyalty · Kế toán · Công nợ · Hóa đơn VAT · Chi phí Ads · Nhân viên · Chấm công+Lương · Marketing blast · Báo cáo (có dự báo+cohort+variance) · Audit log · TG Bot 2 chiều · Cài đặt.
+📦 APP CÓ 22 MODULES: Dashboard · Đơn hàng · Báo giá · Đơn định kỳ · Khách hàng · KH 360/RFM · Lead funnel · Shipper · Kho · Nhà cung cấp · Phiếu nhập · Trả hàng+POD · Sản phẩm+Giá ngày · Loyalty · Kế toán · Công nợ · Hóa đơn VAT · Chi phí Ads · Nhân viên · Chấm công+Lương · Marketing blast · Báo cáo · Audit log · TG Bot 2 chiều · Cài đặt.
 
 👤 USER ĐANG ĐĂNG NHẬP: ${u.name||'Khách'} (vai trò: ${u.role||'?'}), đang xem trang: ${page||'?'}
+${permsBlock}
 ${factsBlock}
 ${summaryBlock}
 ${dataBlock}
@@ -159,9 +235,10 @@ ${dataBlock}
 1. Tiếng Việt tự nhiên, ngắn gọn (3-6 câu), thực tế — không dài dòng
 2. Khi user hỏi số liệu → DÙNG số trong DỮ LIỆU THẬT phía trên, KHÔNG BỊA
 3. Khi user hỏi "làm thế nào" → chỉ rõ vào trang nào, bấm nút gì
-4. Tham chiếu các cuộc trò chuyện trước (trong SUMMARY/FACTS) khi liên quan — vd "Anh hôm qua đã hỏi về ...."
+4. Tham chiếu các cuộc trò chuyện trước (trong SUMMARY/FACTS) khi liên quan
 5. Khi không chắc → hỏi lại thay vì đoán
-6. Có thể dùng **bold** + emoji + xuống dòng cho dễ đọc`;
+6. Có thể dùng **bold** + emoji + xuống dòng cho dễ đọc
+7. **NẾU USER HỎI VƯỢT QUYỀN** → trả lời lịch sự: "Anh/chị không có quyền xem [chủ đề]. Vui lòng liên hệ admin (chủ DN) để được hỗ trợ." KHÔNG được tiết lộ số liệu`;
     },
 
     /* ============================================================

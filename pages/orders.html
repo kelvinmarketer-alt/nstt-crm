@@ -245,10 +245,10 @@
       </div>
       <div class="section-h">Hành động khác</div>
       <div style="display:flex;flex-direction:column;gap:8px">
-        <button class="btn btn-primary">📤 Gửi đơn cho shipper</button>
-        <button class="btn btn-navy">🖨 In phiếu giao hàng</button>
-        <button class="btn btn-ghost">📱 Gửi SMS cho khách</button>
-        <button class="btn btn-ghost">🔗 Sao chép link tracking</button>
+        <button class="btn btn-primary" onclick="window.printOrder && window.printOrder(window._currentOrderCode)">🖨 In phiếu xác nhận / giao / xuất kho</button>
+        <button class="btn btn-navy" onclick="window.openInvoiceFromOrder && window.openInvoiceFromOrder(window._currentOrderCode)">🧾 Tạo Hóa đơn từ đơn này</button>
+        <button class="btn btn-ghost" onclick="window.sendOrderToShipper && window.sendOrderToShipper(window._currentOrderCode)">📤 Gửi đơn cho shipper qua Telegram</button>
+        <button class="btn btn-ghost" onclick="window.copyOrderTrackingLink && window.copyOrderTrackingLink(window._currentOrderCode)">🔗 Sao chép link tracking</button>
       </div>
     </div>
 

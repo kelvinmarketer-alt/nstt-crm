@@ -527,3 +527,6 @@
   window.renderAppShell('invoices', 'Hóa đơn VAT');
   render();
 })();
+
+/* Lưu ý: window.openInvoiceFromOrder ĐÃ MOVE sang scripts/cross-module-hooks.js
+   để gọi được từ Orders drawer (file đó load global trên mọi page). */

@@ -367,6 +367,18 @@ Mong quý khách thu xếp thanh toán sớm. Cảm ơn!
     });
   };
 
+  /* Đổi mẫu nhắc theo mức độ Nhẹ/Trung/Mạnh */
+  window.refreshBulkTemplate = function() {
+    const lv = (document.getElementById('bulkLevel') || {}).value || 'medium';
+    const tpl = {
+      soft:   'Kính gửi {name}, xin nhắc nhẹ khoản công nợ {debt} ₫{days}. Khi rảnh quý khách thu xếp giúp ạ. Cảm ơn! — Hotline NSTT 0903 111 222',
+      medium: 'Kính gửi {name}, NSTT xin nhắc nhở khoản công nợ {debt} ₫{days} đang chờ thanh toán. Mong quý khách thu xếp sớm. Cảm ơn! — Hotline NSTT 0903 111 222',
+      strong: '⚠️ Kính gửi {name}, khoản nợ {debt} ₫{days} đã quá hạn lâu. Vui lòng thanh toán trước 7 ngày tới để tránh tạm dừng giao hàng. NSTT 0903 111 222',
+    };
+    const ta = document.getElementById('bulkTemplate');
+    if (ta) ta.value = tpl[lv] || tpl.medium;
+  };
+
   window.bulkSelectAll = function(on) {
     document.querySelectorAll('[data-bulk-id]').forEach(cb => cb.checked = on);
     document.getElementById('bulkCount').textContent =

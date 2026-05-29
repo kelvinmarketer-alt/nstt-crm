@@ -84,6 +84,17 @@
     return window._piLoadingPromise;
   };
 
+  /* Auto-inject cross-module-hooks.js vào mọi page sau khi DOM ready.
+     File này wire các luồng: orders→inventory, orders→customer.debt,
+     returns→stock, adspend→cashEntries, payroll→cashEntries. */
+  if (!document.querySelector('script[src*="cross-module-hooks"]')) {
+    const s = document.createElement('script');
+    s.src = '../scripts/cross-module-hooks.js';
+    s.async = false;
+    /* Đợi STORE load xong rồi inject */
+    setTimeout(() => document.head.appendChild(s), 50);
+  }
+
   /* Register service worker (chỉ trên HTTPS / localhost) */
   if ('serviceWorker' in navigator && (location.protocol === 'https:' || location.hostname === 'localhost')) {
     window.addEventListener('load', () => {

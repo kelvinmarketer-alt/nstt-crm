@@ -395,6 +395,7 @@
   window.openOrder = function(code) {
     const o = orders.find(x => x.code === code);
     if (!o) return;
+    window._currentOrderCode = code;   /* dùng cho action buttons trong tab Hành động */
     const svc = SVC[o.serviceType] || {icon:'❓', label:o.serviceType, color:'#666'};
     const tm = o.transportMode ? TM[o.transportMode] : null;
     const st = STATUS[o.status];
@@ -467,21 +468,10 @@
         setTimeout(() => window.closeDrawer(), 400);
       };
     }
-    const actBtns = drawer.querySelectorAll('.tab-pane[data-pane="actions"] button');
-    /* 0=Gửi shipper · 1=In phiếu · 2=SMS · 3=Copy tracking */
-    if (actBtns[0]) actBtns[0].onclick = () => window.sendOrderToShipper(code);
-    if (actBtns[1]) actBtns[1].onclick = () => window.printOrder(code);
-    if (actBtns[2]) actBtns[2].onclick = () => {
-      const customers = window.STORE.get('customers', window.CUSTOMERS || []);
-      const c = customers.find(x => x.id === o.cust);
-      const phone = c && c.phone ? c.phone.replace(/\s/g, '') : '';
-      if (!phone) { window.toast('KH chưa có SĐT', 'warn'); return; }
-      const stLabel = STATUS[o.status] ? STATUS[o.status].label : o.status;
-      const msg = `[Tuấn Tú Farm] Đơn ${o.code} (${stLabel}) — ${o.goods}. Liên hệ 0903 111 222.`;
-      window.location.href = 'sms:' + phone + '?body=' + encodeURIComponent(msg);
-    };
-    if (actBtns[3]) actBtns[3].onclick = async () => {
-      const url = `${location.origin}${location.pathname}?track=${o.code}`;
+    /* Actions tab buttons dùng inline onclick (HTML), gọi window.* trực tiếp
+       — wire copy tracking helper vào window để inline gọi được */
+    window.copyOrderTrackingLink = async function (code) {
+      const url = `${location.origin}${location.pathname}?track=${code}`;
       try { await navigator.clipboard.writeText(url); window.toast('✓ Đã sao chép link tracking', 'success'); }
       catch (e) { window.toast('Copy fail — link: ' + url, 'warn'); }
     };

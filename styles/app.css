@@ -367,7 +367,7 @@ select.status-select[title]:hover::before {
 .drawer-bg.open{display:block}
 .drawer{
   position:fixed; top:0; right:0; bottom:0;
-  width:min(680px, 95vw);
+  width:min(780px, 95vw);
   background:#fff;
   box-shadow:var(--shadow-lg);
   z-index:51;
@@ -400,11 +400,11 @@ select.status-select[title]:hover::before {
   display:grid; grid-template-columns:repeat(4,1fr); gap:0;
   background:#FAFAFB; border-bottom:1px solid var(--line);
 }
-.drawer-stats .s{padding:12px 16px; border-right:1px solid var(--line)}
+.drawer-stats .s{padding:12px 14px; border-right:1px solid var(--line); min-width:0}
 .drawer-stats .s:last-child{border-right:none}
-.drawer-stats .s .lab{font-size:11px; color:var(--muted); text-transform:uppercase; letter-spacing:0.5px; font-weight:600}
-.drawer-stats .s .val{font-size:16px; font-weight:800; color:var(--navy); margin-top:2px; line-height:1.1}
-.drawer-stats .s .sub{font-size:11px; color:var(--muted); margin-top:2px}
+.drawer-stats .s .lab{font-size:10.5px; color:var(--muted); text-transform:uppercase; letter-spacing:0.4px; font-weight:600; white-space:nowrap}
+.drawer-stats .s .val{font-size:15.5px; font-weight:800; color:var(--navy); margin-top:2px; line-height:1.15; white-space:nowrap; overflow:hidden; text-overflow:ellipsis}
+.drawer-stats .s .sub{font-size:10.5px; color:var(--muted); margin-top:2px; white-space:nowrap; overflow:hidden; text-overflow:ellipsis}
 
 .tabs{
   display:flex; padding:0 16px;
@@ -631,4 +631,40 @@ select.status-select[title]:hover::before {
 .cell-textarea {
   min-height: 60px;
   resize: vertical;
+}
+
+/* ============================================================
+   FIX-13: nowrap + responsive cho KPI inline + drawer popups
+   ============================================================ */
+/* 1. Mọi label uppercase nhỏ trong KPI cards inline KHÔNG được wrap */
+.kpi-mini-lab, .stat-lab, .drawer-stats .lab {
+  white-space: nowrap;
+}
+
+/* 2. Inventory + Recurring KPI 4-5 cột → auto-fit responsive */
+#invKpis, #roKpis {
+  grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)) !important;
+}
+
+/* 3. Tag + pill không bị xé 2 dòng */
+.tag, .staff-pill, .status-pill, .alert-badge, .svc-tag, .tm-tag {
+  white-space: nowrap;
+}
+
+/* 4. Cell số trong table không bị wrap (tiền, ngày, badge) */
+td.num, td.hide-md {
+  white-space: nowrap;
+}
+
+/* 5. Drawer head: số liệu lớn không vỡ */
+.drawer-stats .s .val { white-space: nowrap; overflow: hidden; text-overflow: ellipsis }
+
+/* 6. Card supplier/shipper: KPI bên phải không wrap */
+.sup-stat .v, .sup-stat .s, .sup-stat div { white-space: nowrap }
+
+/* 7. Mobile: drawer-stats giảm font khi quá hẹp */
+@media (max-width: 480px) {
+  .drawer-stats .s { padding: 8px 10px }
+  .drawer-stats .s .val { font-size: 14px }
+  .drawer-stats .s .lab, .drawer-stats .s .sub { font-size: 10px }
 }
