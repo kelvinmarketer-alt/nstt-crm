@@ -39,7 +39,7 @@
     const customers = window.STORE.get('customers', window.CUSTOMERS || []) || [];
     const products  = window.STORE.get('products', window.PRODUCTS || []) || [];
     const staff     = window.STORE.get('staff', window.STAFFS || []) || [];
-    const drivers   = window.STORE.get('drivers', window.DRIVERS || []) || [];
+    const drivers   = window.STORE.get('shippers', window.DRIVERS || []) || [];
     const ads       = window.STORE.get('adspend', window.ADSPEND || []) || [];
     const timesheet = window.STORE.get('timesheet', window.TIMESHEET || []) || [];
 

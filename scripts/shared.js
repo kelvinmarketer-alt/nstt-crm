@@ -198,6 +198,7 @@ window.NAV = [
     { id: 'quotes',     label: 'Báo giá',     icon: '📝', href: 'quotes.html' },
     { id: 'recurring',  label: 'Đơn định kỳ', icon: '🔁', href: 'recurring.html' },
     { id: 'customers',  label: 'Khách hàng',  icon: '👥', href: 'customers.html', badge: 28 },
+    { id: 'customers-360', label: 'Chân dung KH 360°', icon: '🔍', href: 'customers-360.html' },
     { id: 'leads',      label: 'Lead/Tiềm năng', icon: '🎯', href: 'leads.html' },
     { id: 'shippers',   label: 'Shipper',     icon: '🛵', href: 'shippers.html' },
   ]},
@@ -213,6 +214,7 @@ window.NAV = [
     { id: 'debt',       label: 'Công nợ',     icon: '📉', href: 'debt.html', badge: 7 },
     { id: 'invoices',   label: 'Hóa đơn',     icon: '🧾', href: 'invoices.html' },
     { id: 'adspend',    label: 'Chi phí Ads', icon: '📣', href: 'adspend.html' },
+    { id: 'loyalty',    label: 'Loyalty (tích điểm)', icon: '⭐', href: 'loyalty.html' },
   ]},
   { section: 'Quản trị', items: [
     { id: 'staff',      label: 'Nhân viên',   icon: '🧑‍💼', href: 'staff.html' },
@@ -220,6 +222,7 @@ window.NAV = [
     { id: 'reports',    label: 'Báo cáo',     icon: '📈', href: 'reports.html' },
     { id: 'marketing',  label: 'Email/Zalo blast', icon: '📨', href: 'marketing.html' },
     { id: 'audit',      label: 'Nhật ký',     icon: '📋', href: 'audit.html' },
+    { id: 'tg-bot',     label: 'Telegram Bot 2 chiều', icon: '🤖', href: 'tg-bot.html' },
     { id: 'settings',   label: 'Cài đặt',     icon: '⚙️', href: 'settings.html' },
     { id: 'docs',       label: 'Hướng dẫn',   icon: '📖', href: 'docs.html' },
   ]},

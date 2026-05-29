@@ -13,21 +13,8 @@ window.SUPABASE_CONFIG = {
      - 'supabase': đồng bộ cloud — đang BẬT. DB đã có 120 SP + 28 KH + 706 đơn + 5 NV. */
   mode:    'supabase',                // 'localStorage' | 'supabase'
 
-  /* Mapping STORE keys → Supabase tables */
-  tableMap: {
-    customers:        'customers',
-    orders:           'orders',
-    vehicles:         'vehicles',
-    drivers:          'drivers',
-    partners:         'partners',
-    staff:            'staff',
-    paymentAccounts:  'payment_accounts',
-    cashEntries:      'cash_entries',
-    invoices:         'invoices',
-    companyInfo:      'company_info',
-    activityLogs:     'activity_logs',
-    /* master data (md_*) lưu trong bảng master_data theo key */
-  },
+  /* Mapping STORE keys → Supabase tables — XEM TABLE_MAP TRONG store.js
+     (Trước đây nhân đôi ở đây — đã dọn dead code, source of truth nằm ở store.js) */
 
   /* Auto-switch sang supabase khi cả URL + key đều được set */
   isReady() {

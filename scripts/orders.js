@@ -467,7 +467,7 @@
     /* Vehicle pane: Gọi shipper / Zalo / Đổi shipper */
     const vBtns = drawer.querySelectorAll('.tab-pane[data-pane="vehicle"] button');
     if (vBtns[0] && vBtns[1]) {
-      const drivers = window.STORE.get('drivers', window.DRIVERS || []);
+      const drivers = window.STORE.get('shippers', window.DRIVERS || []);
       const dr = drivers.find(d => d.id === o.driver || d.name === o.driverName);
       const phone = dr && dr.phone ? dr.phone.replace(/\s/g, '') : '';
       vBtns[0].disabled = !phone;
@@ -526,7 +526,7 @@
   /* === Create order modal === */
   window.openCreateOrder = function(prefillCustId) {
     const customers = window.STORE.get('customers', []);
-    const drivers = window.STORE.get('drivers', window.DRIVERS || []);
+    const drivers = window.STORE.get('shippers', window.DRIVERS || []);
     const vehicles = window.STORE.get('vehicles', window.VEHICLES || []);
     const partners = window.STORE.get('partners', window.PARTNERS || []).filter(p => p.active);
     const svcOpts = window.MD.options('services');
@@ -1194,7 +1194,7 @@ CHỈ TRẢ JSON, không giải thích gì thêm.`;
     if (!freight) { window.toast('Nhập cước', 'warn'); return; }
 
     const customers = window.STORE.get('customers', []);
-    const drivers = window.STORE.get('drivers', window.DRIVERS || []);
+    const drivers = window.STORE.get('shippers', window.DRIVERS || []);
     const cust = customers.find(c => c.id === custId);
 
     const drvId = window.formVal('#oDriver');
@@ -1375,7 +1375,7 @@ ${o.note ? `\n📝 Ghi chú: ${o.note}` : ''}
   window.sendOrderToShipper = function (code) {
     const o = orders.find(x => x.code === code);
     if (!o) return;
-    const drivers = window.STORE.get('drivers', window.DRIVERS || []);
+    const drivers = window.STORE.get('shippers', window.DRIVERS || []);
     const dr = drivers.find(d => d.id === o.driver || d.name === o.driverName);
     if (!dr || !o.driver || o.driver === '—') {
       window.toast('Đơn chưa gán shipper — cần gán shipper trước', 'warn');
@@ -1428,7 +1428,7 @@ ${o.note ? `\n📝 Ghi chú: ${o.note}` : ''}
 
   window.doSendOrderTg = async function (code, drId) {
     const msg = document.getElementById('shipperMsgBox').value;
-    const drivers = window.STORE.get('drivers', window.DRIVERS || []);
+    const drivers = window.STORE.get('shippers', window.DRIVERS || []);
     const dr = drivers.find(d => d.id === drId);
     const tg = window.STORE.get('int_telegram', {});
     try {
@@ -1472,7 +1472,7 @@ ${o.note ? `\n📝 Ghi chú: ${o.note}` : ''}
 
   window.doSendOrderEmail = function (code, drId) {
     const msg = document.getElementById('shipperMsgBox').value;
-    const drivers = window.STORE.get('drivers', window.DRIVERS || []);
+    const drivers = window.STORE.get('shippers', window.DRIVERS || []);
     const dr = drivers.find(d => d.id === drId);
     const subject = `[NSTT] Đơn giao ${code}`;
     const mailto = `mailto:${dr.email || ''}?subject=${encodeURIComponent(subject)}&body=${encodeURIComponent(msg)}`;

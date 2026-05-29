@@ -13,20 +13,36 @@
   /* === Seed version === : khi đổi dữ liệu mẫu (data/*.js) thì tăng version này.
      App sẽ tự xoá các key dữ liệu cũ trong localStorage để nạp lại bản mới
      (giữ nguyên đăng nhập + cấu hình tích hợp). Tránh tình trạng "kẹt data cũ". */
-  const SEED_VERSION = 'nstt-2026-05-28-supabase-cloud-v1';
+  const SEED_VERSION = 'nstt-2026-05-29-shippers-fix-v2';
   try {
     if (localStorage.getItem(PREFIX + 'seedVersion') !== SEED_VERSION) {
+      /* Migration: chuyển dữ liệu 'drivers' cũ → 'shippers' nếu user đã có */
+      try {
+        const oldDrivers = localStorage.getItem(PREFIX + 'drivers');
+        const hasShippers = localStorage.getItem(PREFIX + 'shippers');
+        if (oldDrivers && !hasShippers) {
+          localStorage.setItem(PREFIX + 'shippers', oldDrivers);
+          console.log('[STORE] Migrated drivers → shippers');
+        }
+      } catch (e) {}
+
       [
-        /* Core 12 bảng cũ */
+        /* Core bảng */
         'customers', 'orders', 'drivers', 'vehicles', 'partners', 'products',
-        'adspend', 'staff', 'paymentAccounts', 'cashEntries', 'invoices', 'activityLogs',
+        'shippers', 'adspend', 'staff', 'paymentAccounts', 'cashEntries', 'invoices', 'activityLogs',
         /* Bảng mới đợt 2-3 */
         'inventory', 'suppliers', 'purchases', 'returns',
         'recurring_orders', 'quotes', 'leads',
         /* Bảng động đợt 4-5-7 */
         'cust_prefs', 'audit_log', 'snapshots', 'budget_2026',
         'pod_photos', 'inv_movements', 'marketing_tpls', 'loyalty_rules',
-      ].forEach(k => localStorage.removeItem(PREFIX + k));
+      ].forEach(k => {
+        /* Giữ shippers nếu vừa migrate từ drivers */
+        if (k === 'shippers') return;
+        localStorage.removeItem(PREFIX + k);
+      });
+      /* Xoá luôn drivers cũ sau khi migrate */
+      localStorage.removeItem(PREFIX + 'drivers');
       /* Xoá master data + chat history per user */
       Object.keys(localStorage).filter(k =>
         k.startsWith(PREFIX + 'md_') ||
@@ -34,7 +50,7 @@
         k.startsWith(PREFIX + 'hb_')
       ).forEach(k => localStorage.removeItem(k));
       localStorage.setItem(PREFIX + 'seedVersion', SEED_VERSION);
-      console.log('[STORE] Seed version mới → đã nạp lại 26 bảng + reset chat/audit history');
+      console.log('[STORE] Seed version mới → đã nạp lại bảng + reset chat/audit history');
     }
   } catch (e) {}
 
@@ -42,7 +58,7 @@
   const _subs = {};
   const _preloaded = new Set();
 
-  /* Mapping STORE key → Supabase table name (NSTT 14 bảng nông sản) */
+  /* Mapping STORE key → Supabase table name (NSTT 17 bảng — 11 core + 6 extra) */
   const TABLE_MAP = {
     customers:        'customers',
     products:         'products',
@@ -55,6 +71,13 @@
     paymentAccounts:  'payment_accounts',
     cashEntries:      'cash_entries',
     activityLogs:     'activity_logs',
+    /* Extra (đợt 2) */
+    inventory:        'inventory',
+    purchases:        'purchases',
+    quotes:           'quotes',
+    recurring_orders: 'recurring_orders',
+    returns:          'returns',
+    adspend:          'adspend',
   };
 
   /* ID column khác `id` cho 1 số bảng */
@@ -145,18 +168,58 @@
       return _data[key];
     },
 
-    /* Set toàn bộ (chủ yếu dùng cho object đơn lẻ như companyInfo) */
+    /* Set toàn bộ — DIFF-SYNC: nếu là array và TABLE_MAP có key,
+       sẽ so sánh cache cũ với value mới rồi push delta (insert/update/delete) lên Supabase. */
     set(key, value) {
+      const oldArr = Array.isArray(_data[key]) ? _data[key].slice() : [];
       _data[key] = value;
       _save(key);
-      /* Đẩy lên Supabase async (chỉ với companyInfo dùng singleton table) */
+
+      /* CompanyInfo dùng singleton table */
       if (isSupabaseMode() && key === 'companyInfo' && value && window.SB_DATA?.setCompanyInfo) {
         window.SB_DATA.setCompanyInfo(value).catch(e => console.warn('[STORE set → SB]', e));
+        return;
       }
       /* Master data lưu vào bảng master_data */
       if (isSupabaseMode() && key.startsWith('md_') && window.SB_DATA?.setMasterData) {
         window.SB_DATA.setMasterData(key.slice(3), value).catch(e => console.warn('[STORE md → SB]', e));
+        return;
       }
+
+      /* Array tables: diff + push (chỉ chạy nếu key có TABLE_MAP và value là array) */
+      if (!isSupabaseMode() || !TABLE_MAP[key] || !Array.isArray(value)) return;
+
+      const table = TABLE_MAP[key];
+      const idCol = ID_COLUMN[key] || 'id';
+      const keyOf = (it) => it[idCol] || it.id || it.code || it.no;
+
+      const oldMap = new Map(oldArr.map(x => [keyOf(x), x]));
+      const newMap = new Map(value.map(x => [keyOf(x), x]));
+
+      /* Items mới hoặc thay đổi */
+      value.forEach(item => {
+        const id = keyOf(item);
+        if (id == null) return;
+        const old = oldMap.get(id);
+        if (!old) {
+          /* New item → insert */
+          window.SB_DATA.insert(table, item)
+            .catch(e => console.warn(`[STORE set→insert ${key}]`, e));
+        } else if (JSON.stringify(old) !== JSON.stringify(item)) {
+          /* Changed → update */
+          window.SB_DATA.update(table, id, item, idCol)
+            .catch(e => console.warn(`[STORE set→update ${key}]`, e));
+        }
+      });
+
+      /* Items bị xoá: có ở oldMap nhưng không ở newMap */
+      oldArr.forEach(item => {
+        const id = keyOf(item);
+        if (id != null && !newMap.has(id)) {
+          window.SB_DATA.remove(table, id, idCol)
+            .catch(e => console.warn(`[STORE set→remove ${key}]`, e));
+        }
+      });
     },
 
     /* Thêm item vào mảng */

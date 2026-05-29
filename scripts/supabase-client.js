@@ -46,14 +46,22 @@
       from: { price_history:'priceHistory', stock_threshold:'stockThreshold', supplier_id:'supplierId' },
     },
     orders: {
+      /* DB columns: code, order_date, customer_id, cust_name, service_type, transport_mode,
+         pickup_addr, drop_addr, goods, qty, weight, unit, items, freight, cod, pay_by,
+         shipper_id, driver_name, vehicle, status, return_reason, staff, delivered_at,
+         delivery_time, taken_by, notes */
       to:   { date:'order_date', custName:'cust_name', cust:'customer_id', serviceType:'service_type',
               transportMode:'transport_mode', pickup:'pickup_addr', drop:'drop_addr', payBy:'pay_by',
               driverName:'driver_name', returnReason:'return_reason', deliveryTime:'delivery_time',
-              takenBy:'taken_by', deliveredAt:'delivered_at', shipperId:'shipper_id' },
+              takenBy:'taken_by', deliveredAt:'delivered_at', shipperId:'shipper_id',
+              note:'notes',
+              /* drop legacy VTY fields */
+              driver: null, external: null, partner: null },
       from: { order_date:'date', cust_name:'custName', customer_id:'cust', service_type:'serviceType',
               transport_mode:'transportMode', pickup_addr:'pickup', drop_addr:'drop', pay_by:'payBy',
               driver_name:'driverName', return_reason:'returnReason', delivery_time:'deliveryTime',
-              taken_by:'takenBy', delivered_at:'deliveredAt', shipper_id:'shipperId' },
+              taken_by:'takenBy', delivered_at:'deliveredAt', shipper_id:'shipperId',
+              notes:'note' },
     },
     invoices: {
       to:   { date:'invoice_date', desc:'description', vatRate:'vat_rate', paidDate:'paid_date',
@@ -64,24 +72,39 @@
               customer_id:'customerId' },
     },
     suppliers: {
-      /* data/suppliers.js dùng: contact, category, paymentTerm, debt, totalSpend, rating, note */
-      to:   { paymentTerm:'payment_term', totalSpend:'total_spend',
-              /* fallback nếu code dùng camelCase mới */
-              contactPerson:'contact', supplyCategories:'category', paymentTerms:'payment_term' },
-      from: { payment_term:'paymentTerm', total_spend:'totalSpend',
-              contact_person:'contact', supply_categories:'category', payment_terms:'paymentTerm' },
+      /* DB columns: id, code, name, contact_person, phone, email, address, tax,
+         supply_categories(TEXT[]), payment_terms, balance, active, notes
+         JS dùng: contact, category, paymentTerm, debt, totalSpend, rating, note */
+      to:   { contact:'contact_person', category:'supply_categories',
+              paymentTerm:'payment_terms', debt:'balance', note:'notes',
+              /* drop column không có trong DB */
+              totalSpend: null, rating: null,
+              /* alias mới nếu code dùng camelCase */
+              contactPerson:'contact_person', supplyCategories:'supply_categories',
+              paymentTerms:'payment_terms' },
+      from: { contact_person:'contact', supply_categories:'category',
+              payment_terms:'paymentTerm', balance:'debt', notes:'note' },
     },
     shippers: {
-      to:   { ordersToday:'orders_today', kpiTotal:'kpi_total' },
+      to:   { ordersToday:'orders_today', kpiTotal:'kpi_total',
+              /* DB không có các field này → drop */
+              status: null, joinDate: null, telegramChatId: null,
+              canDrive: null, trips30d: null, revenue30d: null,
+              rating: null, recentTrips: null, address: null,
+              code: null /* shippers DB không có code, dùng id */ },
       from: { orders_today:'ordersToday', kpi_total:'kpiTotal' },
     },
     leads: {
-      /* data/leads.js dùng: contact, interest, note, lastTouch, createdAt, estValue */
-      to:   { estValue:'est_value', value:'est_value', lastTouch:'last_touch',
-              createdAt:'created_at_vn', lastContact:'last_touch',
-              convertedTo:'converted_to', lostReason:'lost_reason' },
-      from: { est_value:'estValue', last_touch:'lastTouch',
-              created_at_vn:'createdAt', last_contact:'lastContact',
+      /* DB columns: id, name, phone, email, address, source, stage, est_value,
+         owner, notes, last_contact, converted_to, lost_reason
+         JS dùng: contact, interest, note, lastTouch, createdAt, estValue, value */
+      to:   { note:'notes', estValue:'est_value', value:'est_value',
+              lastTouch:'last_contact', lastContact:'last_contact',
+              convertedTo:'converted_to', lostReason:'lost_reason',
+              /* drop field không có trong DB */
+              contact: null, interest: null, createdAt: null },
+      from: { notes:'note', est_value:'estValue',
+              last_contact:'lastTouch',
               converted_to:'convertedTo', lost_reason:'lostReason' },
     },
     staff: {
@@ -97,6 +120,41 @@
               relatedOrder:'related_order', relatedInvoice:'related_invoice' },
       from: { entry_date:'date', entry_type:'type', description:'desc',
               related_order:'relatedOrder', related_invoice:'relatedInvoice' },
+    },
+    /* === 6 bảng phụ trợ (đợt 2) === */
+    inventory: {
+      to:   { productId:'product_id', minStock:'min_stock', maxStock:'max_stock',
+              avgDaily:'avg_daily', lastIn:'last_in', lastOut:'last_out' },
+      from: { product_id:'productId', min_stock:'minStock', max_stock:'maxStock',
+              avg_daily:'avgDaily', last_in:'lastIn', last_out:'lastOut' },
+    },
+    purchases: {
+      to:   { supplierId:'supplier_id' },
+      from: { supplier_id:'supplierId' },
+    },
+    quotes: {
+      to:   { custId:'cust_id', custName:'cust_name', validUntil:'valid_until',
+              staffOwner:'staff_owner', convertedOrderId:'converted_order_id' },
+      from: { cust_id:'custId', cust_name:'custName', valid_until:'validUntil',
+              staff_owner:'staffOwner', converted_order_id:'convertedOrderId' },
+    },
+    recurring_orders: {
+      to:   { custId:'cust_id', custName:'cust_name', daysOfWeek:'days_of_week',
+              deliverAt:'deliver_at', nextRun:'next_run', lastRun:'last_run',
+              staffOwner:'staff_owner', createdAt:'created_at_vn' },
+      from: { cust_id:'custId', cust_name:'custName', days_of_week:'daysOfWeek',
+              deliver_at:'deliverAt', next_run:'nextRun', last_run:'lastRun',
+              staff_owner:'staffOwner', created_at_vn:'createdAt' },
+    },
+    returns: {
+      to:   { orderCode:'order_code', custName:'cust_name',
+              refundTotal:'refund_total', podPhoto:'pod_photo', handledBy:'handled_by' },
+      from: { order_code:'orderCode', cust_name:'custName',
+              refund_total:'refundTotal', pod_photo:'podPhoto', handled_by:'handledBy' },
+    },
+    adspend: {
+      to:   {}, /* tất cả field đã trùng tên DB */
+      from: {},
     },
   };
 

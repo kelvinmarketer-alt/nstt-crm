@@ -1,11 +1,12 @@
 /* =========================================================
    Nông Sản Tuấn Tú Hà Nội — Quản lý Shipper (CRUD)
-   Dùng chung STORE key 'drivers' với dropdown gán shipper ở Đơn hàng.
+   Dùng chung STORE key 'shippers' với dropdown gán shipper ở Đơn hàng.
+   (data/fleet.js vẫn export window.DRIVERS làm fallback cho mock-data.)
    ========================================================= */
 (function () {
   let currentFilter = 'all';
 
-  function shippers() { return window.STORE.get('drivers', window.DRIVERS || []); }
+  function shippers() { return window.STORE.get('shippers', window.DRIVERS || []); }
 
   /* ============================================================
      LIVE STATUS — Logic ƯU TIÊN từ trên xuống:
@@ -459,13 +460,13 @@
       telegramChatId: window.formVal('#sTgChat') || '',
     };
     if (id) {
-      window.STORE.update('drivers', id, patch);
+      window.STORE.update('shippers', id, patch);
       window.toast('✓ Đã cập nhật ' + name, 'success');
     } else {
       const all = shippers();
-      window.STORE.add('drivers', {
+      window.STORE.add('shippers', {
         id: 'DR' + String(Date.now()).slice(-6),
-        code: window.STORE.nextId('drivers', 'TX'),
+        code: window.STORE.nextId('shippers', 'TX'),
         ...patch, canDrive: [], trips30d: 0, revenue30d: 0, rating: 5.0, recentTrips: [],
       });
       window.toast('✓ Đã thêm shipper ' + name, 'success');
@@ -477,14 +478,14 @@
   window.deleteShipper = function (id) {
     const s = shippers().find(x => x.id === id);
     window.confirmDelete('Xóa shipper "' + (s ? s.name : id) + '"?', () => {
-      window.STORE.remove('drivers', id);
+      window.STORE.remove('shippers', id);
       window.toast('Đã xóa', 'danger');
       render();
     });
   };
 
   /* init */
-  window.STORE.subscribe('drivers', render);
+  window.STORE.subscribe('shippers', render);
   window.STORE.subscribe('orders', render);       /* đơn đổi → status đổi */
   window.STORE.subscribe('timesheet', render);    /* chấm công đổi → status đổi */
   window.STORE.subscribe('staff', render);

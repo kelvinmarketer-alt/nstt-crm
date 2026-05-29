@@ -26,7 +26,7 @@
 
   /* === Auto-assign: tìm shipper rảnh nhất (ít đơn confirmed/pickup/transit hôm nay nhất) === */
   function findFreeShipper() {
-    const drivers = window.STORE.get('drivers', window.DRIVERS || []) || [];
+    const drivers = window.STORE.get('shippers', window.DRIVERS || []) || [];
     const activeDrivers = drivers.filter(d => !d.freelancer || d.freelancer);  /* All including freelance */
     if (!activeDrivers.length) return null;
     const orders = window.STORE.get('orders', []) || [];
@@ -135,7 +135,7 @@
     if (st === 'paused') rows = rows.filter(r => !r.active);
     const host = document.getElementById('roList');
     if (!rows.length) { host.innerHTML = `<div style="background:#fff;border:1px solid var(--line);border-radius:10px;padding:40px;text-align:center;color:var(--muted)">Chưa có mẫu định kỳ nào. Bấm "+ Tạo mẫu" để bắt đầu.</div>`; return; }
-    const drivers = window.STORE.get('drivers', window.DRIVERS || []) || [];
+    const drivers = window.STORE.get('shippers', window.DRIVERS || []) || [];
     host.innerHTML = rows.map(r => {
       const days = [0,1,2,3,4,5,6].map(d => `<span class="day-chip ${(r.daysOfWeek||[]).includes(d) ? 'on' : 'off'}">${DAY_LABELS[d]}</span>`).join('');
       const items = (r.items||[]).slice(0,6).map(it => `<span class="ro-item-pill">${it.name} ${it.qty}kg</span>`).join('');
@@ -259,7 +259,7 @@
     };
     const custs = window.STORE.get('customers', window.CUSTOMERS || []) || [];
     const prods = window.STORE.get('products', window.PRODUCTS || []) || [];
-    const drivers = window.STORE.get('drivers', window.DRIVERS || []) || [];
+    const drivers = window.STORE.get('shippers', window.DRIVERS || []) || [];
     const staff = window.STORE.get('staff', window.STAFFS || []) || [];
     const salesStaff = staff.filter(s => s.department === 'Sales' || s.position?.includes('Sale') || s.position?.includes('Kinh doanh') || s.position?.includes('Chủ DN'));
     if (!salesStaff.length) salesStaff.push(...['Trần Lan','Phạm Hùng','Hoàng Mai','Tuấn Tú'].map(n => ({name:n})));
