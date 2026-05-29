@@ -135,7 +135,7 @@
       const phoneClean = (c.phone || '').replace(/\s/g,'');
       return `<tr data-id="${c.id}">
         <td onclick="event.stopPropagation()"><div class="checkbox" onclick="this.classList.toggle('on')"></div></td>
-        <td>
+        <td data-field="name" title="Click để sửa tên KH">
           <div class="cust-cell">
             <div class="cust-ava" style="background:${col}">${ava}</div>
             <div class="cust-info">
@@ -144,11 +144,11 @@
             </div>
           </div>
         </td>
-        <td class="hide-sm"><span class="tag" style="background:${tm.color}1f;color:${tm.color}">${tm.label}</span></td>
-        <td class="hide-sm"><span class="tag ${groupTag}">${c.group}</span></td>
-        <td class="hide-md">${c.province}</td>
-        <td class="hide-md" style="font-size:12px;color:var(--muted)">${freqLabel(c.orderFreq)}</td>
-        <td class="hide-md"><span class="staff-pill">${c.staffOwner}</span></td>
+        <td class="hide-sm" data-field="type"><span class="tag" style="background:${tm.color}1f;color:${tm.color}">${tm.label}</span></td>
+        <td class="hide-sm" data-field="group"><span class="tag ${groupTag}">${c.group}</span></td>
+        <td class="hide-md" data-field="province">${c.province}</td>
+        <td class="hide-md" data-field="orderFreq" style="font-size:12px;color:var(--muted)">${freqLabel(c.orderFreq)}</td>
+        <td class="hide-md" data-field="staffOwner"><span class="staff-pill">${c.staffOwner}</span></td>
         <td class="num">${c.orders}</td>
         <td class="num">${window.fmt(c.revenue)}</td>
         <td class="num debt-cell ${debtCls}">${debtVal}${overdueBadge}</td>
@@ -158,12 +158,39 @@
             <button class="ra-zalo" title="Nhắn Zalo: ${c.phone}" data-act="zalo" data-id="${c.id}"><span style="font-size:13px;font-weight:700">Z</span></button>
             <button class="ra-call" title="Gọi: ${c.phone}" data-act="call" data-id="${c.id}">📞</button>
             <button title="Tạo đơn" data-act="order" data-id="${c.id}">📦</button>
-            <button title="Sửa" data-act="edit" data-id="${c.id}">✏️</button>
+            <button title="Sửa chi tiết (mở drawer)" data-act="edit" data-id="${c.id}">✏️</button>
             <button title="Xóa" data-act="del" data-id="${c.id}" style="color:var(--danger)">🗑</button>
           </div>
         </td>
       </tr>`;
     }).join('');
+
+    /* === Inline edit: click cell = sửa nhanh === */
+    if (window.attachInlineEdit) {
+      const tbl = tbody.closest('table');
+      if (tbl) {
+        if (!tbl.id) tbl.id = 'tblCustomers';
+        window.attachInlineEdit('#' + tbl.id, {
+          store: 'customers',
+          fields: {
+            name:       { type: 'text', format: v => v },
+            type:       { type: 'select',
+                          options: () => window.MD.get('custTypes').map(t => ({ value: t.id, label: t.label })),
+                          format: v => { const m = typeMeta(v); return `<span class="tag" style="background:${m.color}1f;color:${m.color}">${m.label}</span>`; } },
+            group:      { type: 'select',
+                          options: () => window.MD.get('custGroups').map(g => ({ value: g.id, label: g.label || g.id })),
+                          format: v => { const cls = v==='VIP'?'tag-vip':v==='Mới'?'tag-moi':v==='Inactive'?'tag-inact':'tag-thuong'; return `<span class="tag ${cls}">${v}</span>`; } },
+            province:   { type: 'select',
+                          options: () => (window.MD.get('provinces')||[]).map(p => typeof p==='string'?p:p.label||p.id),
+                          format: v => v || '—' },
+            orderFreq:  { type: 'select',
+                          options: () => window.MD.get('orderFreq').map(o => ({ value: o.id, label: o.label })),
+                          format: v => freqLabel(v) },
+            staffOwner: { type: 'text', format: v => `<span class="staff-pill">${v||'—'}</span>` },
+          }
+        });
+      }
+    }
 
     /* Bind row clicks (mở drawer) + action buttons */
     tbody.querySelectorAll('tr[data-id]').forEach(tr => {

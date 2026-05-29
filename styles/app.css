@@ -596,3 +596,39 @@ select.status-select[title]:hover::before {
   .kpis{grid-template-columns:1fr}
   .pager button{min-width:28px;height:28px;font-size:11px;padding:0 6px}
 }
+
+/* ============================================================
+   INLINE EDIT — cell click-to-edit
+   ============================================================ */
+.cell-editable {
+  cursor: text;
+  position: relative;
+  transition: background 0.12s;
+}
+.cell-editable:hover {
+  background: linear-gradient(transparent 70%, rgba(232, 163, 61, 0.18) 70%);
+}
+.cell-editable.cell-saved {
+  background: rgba(34, 197, 94, 0.18) !important;
+  transition: background 1s;
+}
+.cell-input {
+  width: 100%;
+  padding: 4px 8px;
+  font: inherit;
+  font-size: 13px;
+  border: 2px solid var(--navy);
+  border-radius: 6px;
+  outline: none;
+  background: #fff;
+  color: var(--navy);
+  box-shadow: 0 0 0 3px rgba(27, 94, 32, 0.12);
+}
+.cell-input:focus {
+  border-color: var(--gold);
+  box-shadow: 0 0 0 3px rgba(232, 163, 61, 0.25);
+}
+.cell-textarea {
+  min-height: 60px;
+  resize: vertical;
+}

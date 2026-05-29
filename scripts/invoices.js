@@ -37,11 +37,11 @@
       ).join('');
       return `<tr data-no="${i.no}">
         <td><b style="font-family:ui-monospace,monospace">${i.no}</b></td>
-        <td style="font-size:12px;color:var(--muted)">${i.date}</td>
-        <td>${i.cust}</td>
-        <td class="hide-md" style="font-family:ui-monospace,monospace;font-size:12px">${i.tax}</td>
-        <td class="num">${window.fmt(i.net)}</td>
-        <td class="num">${window.fmt(i.vat)}</td>
+        <td data-field="date" title="Click để sửa ngày" style="font-size:12px;color:var(--muted)">${i.date}</td>
+        <td data-field="cust" title="Click để sửa tên KH">${i.cust}</td>
+        <td class="hide-md" data-field="tax" title="Click để sửa MST" style="font-family:ui-monospace,monospace;font-size:12px">${i.tax}</td>
+        <td class="num" data-field="net" title="Click để sửa tiền hàng">${window.fmt(i.net)}</td>
+        <td class="num" data-field="vat" title="Click để sửa VAT">${window.fmt(i.vat)}</td>
         <td class="num"><b>${window.fmt(total)}</b></td>
         <td onclick="event.stopPropagation()">
           <select class="status-select" data-no="${i.no}"
@@ -66,6 +66,26 @@
         </td>
       </tr>`;
     }).join('') || `<tr><td colspan="9" style="padding:40px;text-align:center;color:var(--muted)">Không có HĐ.</td></tr>`;
+
+    /* Inline edit (click cell = sửa nhanh) */
+    if (window.attachInlineEdit) {
+      const tb = document.getElementById('invTbody');
+      const tbl = tb.closest('table');
+      if (tbl) {
+        if (!tbl.id) tbl.id = 'tblInvoices';
+        window.attachInlineEdit('#' + tbl.id, {
+          store: 'invoices',
+          idAttr: 'data-no',
+          fields: {
+            date: { type: 'text', format: v => v },
+            cust: { type: 'text' },
+            tax:  { type: 'text' },
+            net:  { type: 'number', parse: v => +String(v).replace(/[^0-9.-]/g,'')||0, format: v => window.fmt(v) },
+            vat:  { type: 'number', parse: v => +String(v).replace(/[^0-9.-]/g,'')||0, format: v => window.fmt(v) },
+          }
+        });
+      }
+    }
 
     /* Wire dropdown trạng thái — đổi → ghi vào STORE + toast */
     document.querySelectorAll('#invTbody select.status-select').forEach(sel => {

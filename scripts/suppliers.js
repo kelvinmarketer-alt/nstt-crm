@@ -54,13 +54,13 @@
       const numPur = pur.filter(p => p.supplierId === s.id).length;
       const cats = (s.category||[]).map(c => `<span class="tag" style="background:#F0FDF4;color:#15803D">${CATS[c]||c}</span>`).join(' ');
       const termClr = { 'COD':'#16A34A', 'NET 7':'#0EA5E9', 'NET 14':'#A16207', 'NET 30':'#DC2626' };
-      return `<div class="sup-card" onclick="window.openSupDrawer('${s.id}')" style="cursor:pointer">
+      return `<div class="sup-card" data-id="${s.id}" onclick="window.openSupDrawer('${s.id}')" style="cursor:pointer">
         <div class="sup-av" style="background:${window.avatarColor(s.id)}">${window.initials(s.name)}</div>
         <div class="sup-info">
-          <div class="n1">${s.name} ${s.active ? '' : '<span style="color:var(--muted);font-weight:500;font-size:11px">· Ngưng</span>'}</div>
-          <div class="n2">${s.id} · ${s.contact} · ${s.phone} · ${s.address}</div>
+          <div class="n1" data-field="name" title="Click để sửa tên NCC">${s.name} ${s.active ? '' : '<span style="color:var(--muted);font-weight:500;font-size:11px">· Ngưng</span>'}</div>
+          <div class="n2"><span data-field="contact" title="Click để sửa người liên hệ">${s.contact}</span> · <span data-field="phone" title="Click để sửa SĐT">${s.phone}</span> · <span data-field="address" title="Click để sửa địa chỉ">${s.address}</span></div>
           <div style="margin-top:4px;display:flex;gap:6px;flex-wrap:wrap">${cats}
-            <span class="tag" style="background:${termClr[s.paymentTerm]||'#F1F5F9'}1f;color:${termClr[s.paymentTerm]||'#475569'}">${s.paymentTerm}</span>
+            <span class="tag" data-field="paymentTerm" title="Click để đổi điều khoản TT" style="background:${termClr[s.paymentTerm]||'#F1F5F9'}1f;color:${termClr[s.paymentTerm]||'#475569'}">${s.paymentTerm}</span>
           </div>
         </div>
         <div class="sup-stat">
@@ -71,6 +71,23 @@
         </div>
       </div>`;
     }).join('');
+
+    /* Inline edit (click cell = sửa nhanh) */
+    if (window.attachInlineEdit) {
+      if (!host.id) host.id = 'supList';
+      window.attachInlineEdit('#' + host.id, {
+        store: 'suppliers',
+        fields: {
+          name:        { type: 'text', format: (v, row) => `${v} ${row?.active ? '' : '<span style="color:var(--muted);font-weight:500;font-size:11px">· Ngưng</span>'}` },
+          contact:     { type: 'text' },
+          phone:       { type: 'text' },
+          address:     { type: 'text' },
+          paymentTerm: { type: 'select',
+                         options: () => ['COD', 'NET 7', 'NET 14', 'NET 30'],
+                         format: v => v },
+        }
+      });
+    }
   }
 
   window.openSupDrawer = function (id) {

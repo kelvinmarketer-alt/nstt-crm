@@ -91,17 +91,17 @@
               <span class="svc-tag" style="background:${svc.color}20;color:${svc.color}">${svc.icon} ${svc.label}</span>
               ${tm ? `<span class="tm-tag">${tm.icon} ${tm.label}</span>` : ''}
             </div></td>
-        <td class="hide-sm" style="font-size:12px;color:var(--muted)">${o.date}</td>
+        <td class="hide-sm" data-field="date" title="Click để sửa ngày đặt" style="font-size:12px;color:var(--muted)">${o.date}</td>
         <td>
-          <div style="font-weight:600">${o.custName}</div>
-          <div style="font-size:11.5px;color:var(--muted)">${o.cust} · ${o.staff}</div>
+          <div style="font-weight:600" data-field="custName" title="Click để sửa tên KH">${o.custName}</div>
+          <div style="font-size:11.5px;color:var(--muted)">${o.cust} · <span data-field="staff" title="Click để đổi NV phụ trách">${o.staff}</span></div>
         </td>
-        <td class="hide-md" style="font-size:12px">${(o.drop || '—').split(',').slice(0, 2).join(',')}</td>
+        <td class="hide-md" data-field="drop" title="Click để sửa địa chỉ giao" style="font-size:12px">${(o.drop || '—').split(',').slice(0, 2).join(',')}</td>
         <td class="hide-md" style="font-size:12px">${o.qty} ${o.unit.toLowerCase()}${o.weight ? ' · '+o.weight+'kg' : ''}</td>
-        <td class="num">${window.fmt(o.freight)}</td>
-        <td class="num hide-md">${o.cod ? window.fmt(o.cod) : '—'}</td>
+        <td class="num" data-field="freight" title="Click để sửa tiền hàng">${window.fmt(o.freight)}</td>
+        <td class="num hide-md" data-field="cod" title="Click để sửa COD">${o.cod ? window.fmt(o.cod) : '—'}</td>
         <td class="hide-md" style="font-size:12px">
-          <div>${o.driverName}${o.external?' <span class="alert-badge warn" style="font-size:9px">ĐT ngoài</span>':''}</div>
+          <div><span data-field="driverName" title="Click để đổi shipper">${o.driverName}</span>${o.external?' <span class="alert-badge warn" style="font-size:9px">ĐT ngoài</span>':''}</div>
           <div style="color:var(--muted);font-size:11px">${o.vehicle}${o.external && o.partnerCost?' · '+window.fmtShort(o.partnerCost)+'đ':''}</div>
         </td>
         <td onclick="event.stopPropagation()">
@@ -143,6 +143,28 @@
       };
       sel.onclick = e => e.stopPropagation();
     });
+
+    /* Inline edit (click cell = sửa nhanh) */
+    if (window.attachInlineEdit) {
+      const tb = document.getElementById('tbody');
+      const tbl = tb.closest('table');
+      if (tbl) {
+        if (!tbl.id) tbl.id = 'tblOrders';
+        window.attachInlineEdit('#' + tbl.id, {
+          store: 'orders',
+          idAttr: 'data-code',
+          fields: {
+            date:       { type: 'text' },
+            custName:   { type: 'text' },
+            staff:      { type: 'text' },
+            drop:       { type: 'textarea', format: v => (v || '—').split(',').slice(0, 2).join(',') },
+            freight:    { type: 'number', parse: v => +String(v).replace(/[^0-9.-]/g,'')||0, format: v => window.fmt(v) },
+            cod:        { type: 'number', parse: v => +String(v).replace(/[^0-9.-]/g,'')||0, format: v => v ? window.fmt(v) : '—' },
+            driverName: { type: 'text' },
+          }
+        });
+      }
+    }
   }
 
   function match(o) {

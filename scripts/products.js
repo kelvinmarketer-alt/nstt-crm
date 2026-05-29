@@ -247,11 +247,11 @@
       const e = window.priceEntryOn(p, window.todayISO());
       const buy = e ? e.buy : 0, sell = e ? e.sell : 0;
       const margin = sell - buy;
-      return `<tr>
+      return `<tr data-id="${p.id}">
         <td>${p.img ? `<img src="${p.img}" alt="" loading="lazy" style="width:42px;height:42px;object-fit:cover;border-radius:7px;background:#eef3ee" onerror="this.style.visibility='hidden'">` : ''}</td>
-        <td><b>${p.name}</b><div style="color:var(--muted);font-size:11px">${p.en || p.note || ''}</div></td>
-        <td><span class="tag" style="background:${cat.color}20;color:${cat.color}">${cat.icon} ${cat.label}</span></td>
-        <td style="color:var(--muted)">/${p.unit}</td>
+        <td data-field="name" title="Click để sửa tên SP"><b>${p.name}</b><div style="color:var(--muted);font-size:11px">${p.en || p.note || ''}</div></td>
+        <td data-field="cat" title="Click để đổi nhóm"><span class="tag" style="background:${cat.color}20;color:${cat.color}">${cat.icon} ${cat.label}</span></td>
+        <td data-field="unit" title="Click để sửa đơn vị tính" style="color:var(--muted)">/${p.unit}</td>
         <td class="num"><input class="cat-price" data-id="${p.id}" data-field="buy" type="number" value="${buy}" style="width:96px;text-align:right;padding:5px 7px;border:1px solid var(--line);border-radius:6px;color:var(--muted)"></td>
         <td class="num"><input class="cat-price" data-id="${p.id}" data-field="sell" type="number" value="${sell}" style="width:100px;text-align:right;padding:5px 7px;border:1px solid var(--line);border-radius:6px;font-weight:700"></td>
         <td class="num cat-margin" data-id="${p.id}" style="color:${margin > 0 ? 'var(--ok)' : 'var(--muted)'}">${window.fmt(margin)}</td>
@@ -278,10 +278,31 @@
         </table>
       </div>`;
 
-    /* Wire inline edit */
+    /* Wire inline edit cho giá (input có sẵn) */
     document.querySelectorAll('#catalogView .cat-price').forEach(inp => {
       inp.addEventListener('change', () => savePriceInline(inp.dataset.id, inp.dataset.field, parseInt(inp.value, 10) || 0));
     });
+
+    /* Inline edit cho name/cat/unit (click cell = sửa) */
+    if (window.attachInlineEdit) {
+      const tbl = document.querySelector('#catalogView .mini-table');
+      if (tbl) {
+        if (!tbl.id) tbl.id = 'tblProducts';
+        window.attachInlineEdit('#' + tbl.id, {
+          store: 'products',
+          fields: {
+            name: { type: 'text',
+                    format: (v, row) => `<b>${v}</b><div style="color:var(--muted);font-size:11px">${row?.en || row?.note || ''}</div>` },
+            cat:  { type: 'select',
+                    options: () => window.MD.get('services').map(s => ({ value: s.id, label: (s.icon||'') + ' ' + s.label })),
+                    format: v => { const m = catMeta(v); return `<span class="tag" style="background:${m.color}20;color:${m.color}">${m.icon} ${m.label}</span>`; } },
+            unit: { type: 'select',
+                    options: () => window.MD.get('units').map(u => u.id),
+                    format: v => `/${v}` },
+          }
+        });
+      }
+    }
   }
 
   /* Lưu giá inline → cập nhật priceHistory hôm nay */

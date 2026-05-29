@@ -210,7 +210,7 @@
         .filter(o => o.driver === s.id && (o.status === 'delivered' || o.status === 'reconciled'))
         .reduce((sum, o) => sum + (o.freight||0), 0);
 
-      return `<tr>
+      return `<tr data-id="${s.id}">
         <td style="font-size:12.5px;font-weight:600;color:var(--navy)" title="${codeTip}">${s.code || s.id}</td>
         <td>
           <div style="display:flex;align-items:center;gap:10px">
@@ -219,8 +219,8 @@
               <span style="position:absolute;bottom:-2px;right:-2px;width:12px;height:12px;border-radius:50%;background:${live.color};border:2px solid #fff" title="${live.label}"></span>
             </div>
             <div style="min-width:0">
-              <div style="display:flex;align-items:center;gap:6px"><b style="font-size:13.5px">${s.name}</b>${typeBadge}</div>
-              <div style="color:var(--muted);font-size:11.5px;margin-top:1px">${s.phone || '—'} · ${s.primaryPlate || ''}</div>
+              <div style="display:flex;align-items:center;gap:6px"><b style="font-size:13.5px" data-field="name" title="Click để sửa tên">${s.name}</b>${typeBadge}</div>
+              <div style="color:var(--muted);font-size:11.5px;margin-top:1px"><span data-field="phone" title="Click để sửa SĐT">${s.phone || '—'}</span> · <span data-field="primaryPlate" title="Click để sửa biển số">${s.primaryPlate || ''}</span></div>
             </div>
           </div>
         </td>
@@ -264,7 +264,22 @@
       </tr>`;
     }).join('') || `<tr><td colspan="7" style="padding:30px;text-align:center;color:var(--muted)">Không có shipper nào khớp filter.</td></tr>`;
 
-    document.getElementById('shipBody').innerHTML = rows;
+    const shipBody = document.getElementById('shipBody');
+    shipBody.innerHTML = rows;
+
+    /* Inline edit (click cell = sửa nhanh) */
+    if (window.attachInlineEdit) {
+      const tbl = shipBody.closest('table') || shipBody;
+      if (!tbl.id) tbl.id = 'tblShippers';
+      window.attachInlineEdit('#' + tbl.id, {
+        store: 'shippers',
+        fields: {
+          name:         { type: 'text', format: v => v },
+          phone:        { type: 'text' },
+          primaryPlate: { type: 'text' },
+        }
+      });
+    }
   }
 
   window.filterShip = function (f) { currentFilter = f; render(); };

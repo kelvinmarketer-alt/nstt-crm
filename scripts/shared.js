@@ -207,6 +207,137 @@ window.priceOn = function(productId, dateISO) {
   return e ? e.sell : 0;
 };
 
+/* ============================================================
+   INLINE EDIT — click cell = sửa nhanh, không cần nút Edit
+   ────────────────────────────────────────────────────────────
+   Dùng:
+     window.attachInlineEdit('#tableSelector', {
+       store: 'customers',                  // STORE key
+       idAttr: 'data-id',                   // attribute trên <tr> chứa id
+       fields: {                            // map theo data-field trên <td>
+         name:       { type: 'text' },
+         phone:      { type: 'text', validate: v => /^[0-9\s+()-]{6,15}$/.test(v) || 'SĐT không hợp lệ' },
+         group:      { type: 'select', options: () => window.MD.get('custGroups').map(g => g.id) },
+         note:       { type: 'textarea' },
+         revenue:    { type: 'number', format: v => window.fmt(v), parse: v => +String(v).replace(/[^0-9.-]/g,'')||0 },
+       }
+     });
+   ============================================================ */
+window.attachInlineEdit = function (tableSel, cfg) {
+  const tbl = document.querySelector(tableSel);
+  if (!tbl) return 0;
+  const idAttr = cfg.idAttr || 'data-id';
+  const store  = cfg.store;
+  if (!store || !window.STORE) return 0;
+
+  let bound = 0;
+  /* Container có data-id (linh hoạt: <tr> bảng HOẶC <div class="card">) */
+  tbl.querySelectorAll(`[${idAttr}]`).forEach(rowEl => {
+    const id = rowEl.getAttribute(idAttr);
+    if (!id) return;
+    rowEl.querySelectorAll('[data-field]').forEach(cellEl => {
+      const field = cellEl.dataset.field;
+      const fc = cfg.fields?.[field];
+      if (!fc) return;
+      if (cellEl.dataset.editBound === '1') return;
+      cellEl.dataset.editBound = '1';
+      cellEl.classList.add('cell-editable');
+      cellEl.title = cellEl.title || 'Click để sửa nhanh';
+      cellEl.addEventListener('click', (e) => {
+        e.stopPropagation();
+        _openEditor(cellEl, id, field, fc, cfg);
+      });
+      cellEl.addEventListener('dblclick', (e) => e.stopPropagation());
+      bound++;
+    });
+  });
+  return bound;
+};
+
+function _openEditor(td, id, field, fc, cfg) {
+  if (td.querySelector('input, select, textarea')) return; /* đã mở */
+  const originalHtml = td.innerHTML;
+  /* Lấy raw value từ STORE thay vì parse text — chuẩn xác hơn */
+  const arr = window.STORE.get(cfg.store, []) || [];
+  const row = arr.find(x => (x.id === id || x.code === id || x.no === id));
+  let rawVal = row ? row[field] : td.textContent.trim();
+  if (fc.format && typeof rawVal !== 'undefined' && rawVal !== null) {
+    /* nothing — rawVal is the raw value */
+  }
+  let inputEl;
+  if (fc.type === 'select') {
+    const opts = typeof fc.options === 'function' ? fc.options(row) : (fc.options || []);
+    inputEl = document.createElement('select');
+    inputEl.className = 'cell-input';
+    opts.forEach(o => {
+      const val = typeof o === 'object' ? (o.value ?? o.id ?? o.label) : o;
+      const lbl = typeof o === 'object' ? (o.label ?? o.name ?? val) : o;
+      const opt = document.createElement('option');
+      opt.value = val; opt.textContent = lbl;
+      if (val == rawVal) opt.selected = true;
+      inputEl.appendChild(opt);
+    });
+  } else if (fc.type === 'textarea') {
+    inputEl = document.createElement('textarea');
+    inputEl.className = 'cell-input cell-textarea';
+    inputEl.rows = 3;
+    inputEl.value = rawVal == null ? '' : String(rawVal);
+  } else {
+    inputEl = document.createElement('input');
+    inputEl.className = 'cell-input';
+    inputEl.type = fc.type === 'number' ? 'text' : (fc.type || 'text');
+    inputEl.value = rawVal == null ? '' : String(rawVal);
+  }
+  td.innerHTML = '';
+  td.appendChild(inputEl);
+  inputEl.focus();
+  if (inputEl.select) inputEl.select();
+
+  let saved = false;
+  const restore = (newVal, ok) => {
+    if (saved) return;
+    saved = true;
+    if (ok && newVal !== rawVal) {
+      try {
+        if (row) row[field] = newVal;
+        if (typeof fc.afterSave === 'function') fc.afterSave(row, newVal);
+        window.STORE.update(cfg.store, id, { [field]: newVal });
+        td.innerHTML = (fc.format ? fc.format(newVal, row) : (newVal == null ? '' : String(newVal)));
+        td.classList.add('cell-saved');
+        setTimeout(() => td.classList.remove('cell-saved'), 1200);
+        if (window.toast) window.toast('✓ Đã lưu', 'success');
+      } catch (e) {
+        td.innerHTML = originalHtml;
+        if (window.toast) window.toast('Lỗi lưu: ' + e.message, 'warn');
+      }
+    } else {
+      td.innerHTML = originalHtml;
+    }
+  };
+
+  const commit = () => {
+    let v = inputEl.value;
+    if (fc.parse) v = fc.parse(v);
+    else if (fc.type === 'number') v = +String(v).replace(/[^0-9.-]/g,'') || 0;
+    else v = (typeof v === 'string') ? v.trim() : v;
+    if (fc.validate) {
+      const r = fc.validate(v);
+      if (r !== true) { if (window.toast) window.toast(r || 'Giá trị không hợp lệ', 'warn'); inputEl.focus(); return; }
+    }
+    restore(v, true);
+  };
+  const cancel = () => restore(null, false);
+
+  inputEl.addEventListener('blur', commit);
+  inputEl.addEventListener('keydown', (e) => {
+    if (e.key === 'Enter' && (fc.type !== 'textarea' || e.ctrlKey || e.metaKey)) {
+      e.preventDefault(); inputEl.blur();
+    } else if (e.key === 'Escape') {
+      e.preventDefault(); saved = true; td.innerHTML = originalHtml;
+    }
+  });
+}
+
 /* ============ Navigation config ============ */
 window.NAV = [
   { section: 'Vận hành', items: [
