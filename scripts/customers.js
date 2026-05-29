@@ -165,6 +165,31 @@
       </tr>`;
     }).join('');
 
+    /* === Bulk operations: tick + xoá/export hàng loạt === */
+    if (window.attachBulkOps) {
+      const tbl = tbody.closest('table');
+      if (tbl) {
+        if (!tbl.id) tbl.id = 'tblCustomers';
+        window.attachBulkOps({
+          tableSelector: '#' + tbl.id,
+          store: 'customers',
+          label: 'KH',
+          actions: {
+            changeStatus: {
+              label: '🔄 Đổi nhóm',
+              field: 'group',
+              options: [
+                {id:'VIP', label:'⭐ VIP'},
+                {id:'Thường', label:'👤 Thường'},
+                {id:'Mới', label:'🆕 Mới'},
+                {id:'Inactive', label:'⚫ Inactive'},
+              ]
+            }
+          }
+        });
+      }
+    }
+
     /* === Inline edit: click cell = sửa nhanh === */
     if (window.attachInlineEdit) {
       const tbl = tbody.closest('table');

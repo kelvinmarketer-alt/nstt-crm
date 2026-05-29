@@ -36,6 +36,7 @@
         `<option value="${o.id}" ${o.id===i.status?'selected':''}>${o.lab}</option>`
       ).join('');
       return `<tr data-no="${i.no}">
+        <td onclick="event.stopPropagation()"><div class="checkbox" onclick="this.classList.toggle('on')"></div></td>
         <td><b style="font-family:ui-monospace,monospace">${i.no}</b></td>
         <td data-field="date" title="Click để sửa ngày" style="font-size:12px;color:var(--muted)">${i.date}</td>
         <td data-field="cust" title="Click để sửa tên KH">${i.cust}</td>
@@ -65,7 +66,34 @@
           </div>
         </td>
       </tr>`;
-    }).join('') || `<tr><td colspan="9" style="padding:40px;text-align:center;color:var(--muted)">Không có HĐ.</td></tr>`;
+    }).join('') || `<tr><td colspan="10" style="padding:40px;text-align:center;color:var(--muted)">Không có HĐ.</td></tr>`;
+
+    /* Bulk operations cho hoá đơn */
+    if (window.attachBulkOps) {
+      const tb = document.getElementById('invTbody');
+      const tbl = tb.closest('table');
+      if (tbl) {
+        if (!tbl.id) tbl.id = 'tblInvoices';
+        window.attachBulkOps({
+          tableSelector: '#' + tbl.id,
+          store: 'invoices',
+          idAttr: 'data-no',
+          label: 'HĐ',
+          actions: {
+            changeStatus: {
+              label: '🔄 Đổi trạng thái',
+              field: 'status',
+              options: [
+                {id:'draft', label:'📝 Nháp'},
+                {id:'pending', label:'⏳ Chờ TT'},
+                {id:'paid', label:'✓ Đã TT'},
+                {id:'overdue', label:'⚠ Quá hạn'},
+              ]
+            }
+          }
+        });
+      }
+    }
 
     /* Inline edit (click cell = sửa nhanh) */
     if (window.attachInlineEdit) {

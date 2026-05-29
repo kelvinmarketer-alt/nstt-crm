@@ -144,6 +144,35 @@
       sel.onclick = e => e.stopPropagation();
     });
 
+    /* Bulk operations: chọn nhiều đơn → xoá/export/đổi trạng thái */
+    if (window.attachBulkOps) {
+      const tb = document.getElementById('tbody');
+      const tbl = tb.closest('table');
+      if (tbl) {
+        if (!tbl.id) tbl.id = 'tblOrders';
+        window.attachBulkOps({
+          tableSelector: '#' + tbl.id,
+          store: 'orders',
+          idAttr: 'data-code',
+          label: 'đơn',
+          actions: {
+            changeStatus: {
+              label: '🔄 Đổi trạng thái',
+              field: 'status',
+              options: [
+                {id:'new', label:'🆕 Mới'},
+                {id:'confirmed', label:'✓ Đã xác nhận'},
+                {id:'pickup', label:'📦 Lấy hàng'},
+                {id:'transit', label:'🚚 Đang giao'},
+                {id:'delivered', label:'✓ Đã giao'},
+                {id:'cancelled', label:'❌ Hủy'},
+              ]
+            }
+          }
+        });
+      }
+    }
+
     /* Inline edit (click cell = sửa nhanh) */
     if (window.attachInlineEdit) {
       const tb = document.getElementById('tbody');

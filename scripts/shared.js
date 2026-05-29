@@ -356,6 +356,158 @@ function _openEditor(td, id, field, fc, cfg) {
   });
 }
 
+/* ============================================================
+   BULK OPERATIONS — checkbox select + bulk toolbar
+   ────────────────────────────────────────────────────────────
+   Dùng:
+     window.attachBulkOps({
+       tableSelector:   '#tblCustomers',
+       store:           'customers',
+       idAttr:          'data-id',          // hoặc data-code, data-no
+       label:           'KH',
+       actions: {                            // optional custom actions
+         changeStatus: { label: '🔄 Đổi trạng thái', options: ['active','inactive'] }
+       }
+     });
+   Bulk toolbar tự xuất hiện khi ≥1 row được tick.
+   ============================================================ */
+window.attachBulkOps = function (opts) {
+  const tbl = document.querySelector(opts.tableSelector);
+  if (!tbl) return;
+  const idAttr = opts.idAttr || 'data-id';
+  const store = opts.store;
+  const label = opts.label || 'mục';
+
+  /* Lấy hoặc tạo toolbar */
+  let toolbar = document.querySelector(`#bulk-toolbar-${store}`);
+  if (!toolbar) {
+    toolbar = document.createElement('div');
+    toolbar.id = 'bulk-toolbar-' + store;
+    toolbar.className = 'bulk-toolbar';
+    toolbar.style.cssText = 'position:fixed;bottom:20px;left:50%;transform:translateX(-50%);background:var(--navy);color:#fff;padding:10px 18px;border-radius:99px;box-shadow:0 8px 24px rgba(0,0,0,0.25);display:none;z-index:1000;gap:10px;align-items:center;font-size:13px';
+    document.body.appendChild(toolbar);
+  }
+
+  /* Wire checkbox cells (đã có .checkbox div trong td đầu) */
+  function getSelectedIds() {
+    const rows = tbl.querySelectorAll(`tr[${idAttr}]`);
+    const selected = [];
+    rows.forEach(r => {
+      const cb = r.querySelector('.checkbox.on, input[type="checkbox"]:checked');
+      if (cb) selected.push(r.getAttribute(idAttr));
+    });
+    return selected;
+  }
+
+  function updateToolbar() {
+    const ids = getSelectedIds();
+    if (ids.length === 0) {
+      toolbar.style.display = 'none';
+      return;
+    }
+    toolbar.style.display = 'flex';
+    const customActions = opts.actions || {};
+    let actionsHtml = '';
+    if (customActions.changeStatus) {
+      const opts2 = customActions.changeStatus.options.map(o => `<option value="${typeof o==='object'?o.id:o}">${typeof o==='object'?o.label:o}</option>`).join('');
+      actionsHtml += `<select id="bulk-status-${store}" style="background:#fff;color:var(--navy);border:none;border-radius:6px;padding:5px 8px;font-weight:600;font-size:12.5px;cursor:pointer">
+        <option value="">${customActions.changeStatus.label || 'Đổi TT'}</option>${opts2}
+      </select>`;
+    }
+    toolbar.innerHTML = `
+      <span style="font-weight:700">✓ Đã chọn ${ids.length} ${label}</span>
+      <button onclick="window._bulkClear_${store}()" style="background:transparent;color:#fff;border:1px solid rgba(255,255,255,0.3);padding:5px 11px;border-radius:6px;font-size:12.5px;cursor:pointer">Bỏ chọn</button>
+      <button onclick="window._bulkExport_${store}()" style="background:#fff;color:var(--navy);border:none;padding:5px 11px;border-radius:6px;font-weight:600;font-size:12.5px;cursor:pointer">📥 Export CSV</button>
+      ${actionsHtml}
+      <button onclick="window._bulkDelete_${store}()" style="background:var(--danger);color:#fff;border:none;padding:5px 11px;border-radius:6px;font-weight:600;font-size:12.5px;cursor:pointer">🗑 Xóa ${ids.length}</button>
+    `;
+    /* Wire bulk status change */
+    const statusSel = document.getElementById(`bulk-status-${store}`);
+    if (statusSel) statusSel.onchange = () => {
+      if (!statusSel.value) return;
+      const ids = getSelectedIds();
+      if (!ids.length) return;
+      const fieldName = (opts.actions && opts.actions.changeStatus && opts.actions.changeStatus.field) || 'status';
+      if (!confirm(`Đổi ${fieldName === 'status' ? 'trạng thái' : fieldName} của ${ids.length} ${label} thành "${statusSel.value}"?`)) return;
+      const list = window.STORE.get(store, []) || [];
+      let count = 0;
+      ids.forEach(id => {
+        const item = list.find(x => x.id === id || x.code === id || x.no === id);
+        if (item) { item[fieldName] = statusSel.value; count++; }
+      });
+      window.STORE.set(store, list);
+      window.toast?.(`✓ Đã đổi ${count} ${label}`, 'success');
+      window[`_bulkClear_${store}`]();
+    };
+  }
+
+  /* Expose bulk actions vào window */
+  window[`_bulkClear_${store}`] = function () {
+    tbl.querySelectorAll('.checkbox.on, input[type="checkbox"]:checked').forEach(cb => {
+      if (cb.classList) cb.classList.remove('on');
+      if (cb.checked != null) cb.checked = false;
+    });
+    updateToolbar();
+  };
+  window[`_bulkDelete_${store}`] = function () {
+    const ids = getSelectedIds();
+    if (!ids.length) return;
+    if (!confirm(`⚠️ Xóa ${ids.length} ${label}? Hành động này KHÔNG THỂ HOÀN TÁC.`)) return;
+    ids.forEach(id => window.STORE.remove(store, id));
+    window.toast?.(`🗑 Đã xóa ${ids.length} ${label}`, 'danger');
+    window[`_bulkClear_${store}`]();
+  };
+  window[`_bulkExport_${store}`] = function () {
+    const ids = getSelectedIds();
+    if (!ids.length) return;
+    const list = window.STORE.get(store, []) || [];
+    const selected = list.filter(x => ids.includes(x.id || x.code || x.no));
+    if (!selected.length) return;
+    /* CSV header từ keys của item đầu */
+    const keys = Object.keys(selected[0]).filter(k => !k.startsWith('_') && typeof selected[0][k] !== 'object');
+    const csv = [keys.join(',')].concat(
+      selected.map(it => keys.map(k => `"${String(it[k]||'').replace(/"/g,'""')}"`).join(','))
+    ).join('\n');
+    const blob = new Blob(['﻿' + csv], { type: 'text/csv;charset=utf-8' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url; a.download = `${store}-export-${new Date().toISOString().slice(0,10)}.csv`;
+    a.click();
+    URL.revokeObjectURL(url);
+    window.toast?.(`⬇ Đã xuất ${selected.length} ${label}`, 'success');
+  };
+
+  /* Bind checkbox clicks (delegate) */
+  tbl.addEventListener('click', (e) => {
+    const cb = e.target.closest('.checkbox, input[type="checkbox"]');
+    if (cb && tbl.contains(cb)) {
+      e.stopPropagation();
+      setTimeout(updateToolbar, 50);
+    }
+  });
+
+  /* Header "select all" checkbox */
+  const headerCb = tbl.querySelector('thead .checkbox, thead input[type="checkbox"]');
+  if (headerCb) {
+    headerCb.addEventListener('click', (e) => {
+      e.stopPropagation();
+      setTimeout(() => {
+        const turnOn = headerCb.classList ? headerCb.classList.contains('on') : headerCb.checked;
+        tbl.querySelectorAll('tbody .checkbox, tbody input[type="checkbox"]').forEach(cb => {
+          if (cb.classList) {
+            if (turnOn) cb.classList.add('on'); else cb.classList.remove('on');
+          }
+          if (cb.checked != null) cb.checked = turnOn;
+        });
+        updateToolbar();
+      }, 50);
+    });
+  }
+
+  /* Init: update toolbar on initial render */
+  updateToolbar();
+};
+
 /* ============ Navigation config ============ */
 window.NAV = [
   { section: 'Vận hành', items: [
