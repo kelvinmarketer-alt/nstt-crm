@@ -67,6 +67,23 @@
     m3.content = 'Nông Sản Tuấn Tú Hà Nội';
     document.head.appendChild(m3);
   }
+  /* Lazy-load PRODUCT_IMAGES (3.8MB) — only khi UI cần (PDF, catalogue, quote preview).
+     Bỏ khỏi <script> đồng bộ ở page → tránh delay 1-2s khi chuyển module. */
+  window.loadProductImages = function () {
+    if (window.PRODUCT_IMAGES) return Promise.resolve(window.PRODUCT_IMAGES);
+    if (window._piLoadingPromise) return window._piLoadingPromise;
+    window._piLoadingPromise = new Promise((resolve) => {
+      const s = document.createElement('script');
+      /* Relative path từ /pages/*.html */
+      s.src = '../data/product-images.js';
+      s.async = true;
+      s.onload  = () => resolve(window.PRODUCT_IMAGES || {});
+      s.onerror = () => { console.warn('[shared] load product-images.js failed'); resolve({}); };
+      document.head.appendChild(s);
+    });
+    return window._piLoadingPromise;
+  };
+
   /* Register service worker (chỉ trên HTTPS / localhost) */
   if ('serviceWorker' in navigator && (location.protocol === 'https:' || location.hostname === 'localhost')) {
     window.addEventListener('load', () => {

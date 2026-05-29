@@ -25,10 +25,11 @@
   Cache-Control: public, max-age=86400
 
 /scripts/*
-  Cache-Control: public, max-age=3600
+  Cache-Control: public, max-age=86400
 
+# Mock data + product images (3.8MB) — 7 ngày cache (rất ít đổi)
 /data/*
-  Cache-Control: public, max-age=3600
+  Cache-Control: public, max-age=604800
 
 /assets/*
   Cache-Control: public, max-age=604800

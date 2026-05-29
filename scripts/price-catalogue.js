@@ -159,8 +159,10 @@ footer b{color:#1f7a3d}
   async function fetchImagesPooled(products, concurrency, onProgress) {
     const map = {}; let done = 0, fail = 0;
     const queue = [];
-    /* === TẦNG 0: dùng PRODUCT_IMAGES (base64 embed sẵn) — instant, không fetch === */
-    const embedded = window.PRODUCT_IMAGES || {};
+    /* === TẦNG 0: dùng PRODUCT_IMAGES (base64 embed sẵn) — instant, không fetch ===
+       Lazy-load nếu chưa có (tránh block 3.8MB sync trên page load). */
+    const embedded = window.PRODUCT_IMAGES
+      || (window.loadProductImages ? await window.loadProductImages() : {});
     products.forEach(p => {
       if (embedded[p.id]) {
         map[p.id] = embedded[p.id];   /* HIT — không cần fetch */

@@ -196,7 +196,11 @@
      PDF Báo giá — chuẩn nhận diện thương hiệu TUẤN TÚ FARM
      A4 portrait · logo + header + items + tổng + chữ ký + watermark
      ============================================================ */
-  window.qtPrint = function (id) {
+  window.qtPrint = async function (id) {
+    if (window.loadProductImages && !window.PRODUCT_IMAGES) {
+      window.toast && window.toast('⏳ Đang nạp ảnh SP cho PDF...', 'info');
+      await window.loadProductImages();
+    }
     const q = getQ().find(x => x.id === id);
     if (!q) return;
     const c = getCusts().find(x => x.id === q.custId) || {};

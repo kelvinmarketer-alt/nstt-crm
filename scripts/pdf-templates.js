@@ -58,7 +58,12 @@
   /* ============================================================
      TEMPLATE 1 — PHIẾU XÁC NHẬN ĐƠN cho KHÁCH HÀNG (A5 portrait)
      ============================================================ */
-  window.printOrderForCustomer = function (code) {
+  window.printOrderForCustomer = async function (code) {
+    /* Lazy-load PRODUCT_IMAGES (3.8MB) nếu chưa có — chỉ khi user thực sự export PDF */
+    if (window.loadProductImages && !window.PRODUCT_IMAGES) {
+      window.toast && window.toast('⏳ Đang nạp ảnh SP cho PDF...', 'info');
+      await window.loadProductImages();
+    }
     const o = getOrder(code);
     if (!o) { window.toast && window.toast('Không tìm thấy đơn ' + code, 'warn'); return; }
     const c = getCust(o);
@@ -252,7 +257,11 @@ ${FAV ? `<link rel="icon" type="image/svg+xml" href="${FAV}">` : ''}
      TEMPLATE 2 — PHIẾU GIAO HÀNG cho SHIPPER (A5 portrait)
      Tối ưu cho cầm trên xe — font to, địa chỉ to, có ô tick
      ============================================================ */
-  window.printOrderForShipper = function (code) {
+  window.printOrderForShipper = async function (code) {
+    if (window.loadProductImages && !window.PRODUCT_IMAGES) {
+      window.toast && window.toast('⏳ Đang nạp ảnh SP cho PDF...', 'info');
+      await window.loadProductImages();
+    }
     const o = getOrder(code);
     if (!o) { window.toast && window.toast('Không tìm thấy đơn ' + code, 'warn'); return; }
     const c = getCust(o);
