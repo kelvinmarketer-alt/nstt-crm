@@ -476,13 +476,45 @@
         <!-- ⚡ Tài nguyên / Usage Monitor -->
         <div id="setUsage" class="set-panel" style="display:none">
           <h2>⚡ Theo dõi tài nguyên</h2>
-          <div class="desc">
-            📍 Số liệu đo lường <b>RIÊNG cho máy/trình duyệt này</b> — không gộp với các máy khác.
-            Nếu muốn xem tổng toàn DN → cộng tay số từng máy NV.
+
+          <!-- Explainer poll + egress -->
+          <details style="background:#FEF9E7;border:1px solid #F5E0A6;border-radius:10px;padding:12px 14px;margin-bottom:14px">
+            <summary style="cursor:pointer;font-weight:700;color:#854D0E">📖 Poll, Egress, AI tokens là gì? (click mở)</summary>
+            <div style="margin-top:10px;font-size:13px;line-height:1.7">
+              <div style="margin-bottom:10px">
+                <b>🔄 POLL = "Thăm dò cloud"</b><br>
+                App tự gọi Supabase mỗi <b>5 phút (mặc định)</b> để hỏi: "có data mới không?". Nếu có → app cập nhật UI ngay.<br>
+                Ví dụ: NV A tạo đơn lúc 10:00, NV B sẽ thấy đơn đó lúc 10:05 (≤ 5 phút sau) mà không cần F5.
+              </div>
+              <div style="margin-bottom:10px">
+                <b>☁️ EGRESS = "Lưu lượng tải về"</b><br>
+                Tổng <b>dữ liệu</b> Supabase trả về cho app (KH, đơn, SP, hoá đơn…). Đơn vị: MB → GB.<br>
+                Poll càng nhiều → Egress càng cao. Bù lại: cập nhật càng nhanh.<br>
+                Free tier Supabase cấp <b>5GB egress/tháng/project</b> (tổng toàn DN, không per-máy).
+              </div>
+              <div style="margin-bottom:10px">
+                <b>🤖 AI TOKENS = "Đơn vị tính phí AI"</b><br>
+                Mỗi lần NV hỏi trợ lý AI, model tính tiền theo số <b>tokens</b> (≈ 0.75 token = 1 từ tiếng Anh).<br>
+                Tokens IN = nội dung gửi đi, Tokens OUT = AI trả lời.<br>
+                Gemini Flash FREE 1500 calls/ngày/key. Claude/OpenAI tính phí cả input + output.
+              </div>
+              <div style="font-size:12px;color:#854D0E;padding-top:8px;border-top:1px dashed #F5E0A6">
+                💡 <b>Mối quan hệ:</b> Bạn không cần lo egress nếu poll 5+ phút. Chi phí lớn là <b>AI tokens</b> khi dùng nhiều.
+              </div>
+            </div>
+          </details>
+
+          <!-- Tab switcher -->
+          <div class="usage-tabs" style="display:flex;gap:0;border-bottom:1px solid var(--line);margin-bottom:14px">
+            <div class="usage-tab active" data-tab="local" style="padding:9px 16px;cursor:pointer;border-bottom:2px solid var(--red);color:var(--navy);font-weight:700;font-size:13px">📍 Máy này</div>
+            <div class="usage-tab" data-tab="org" style="padding:9px 16px;cursor:pointer;border-bottom:2px solid transparent;color:var(--muted);font-size:13px">🏢 Toàn doanh nghiệp</div>
           </div>
 
           <div id="usageReport" style="margin-top:14px">
             <div style="padding:18px;text-align:center;color:var(--muted)">Đang tải báo cáo...</div>
+          </div>
+          <div id="usageReportOrg" style="margin-top:14px;display:none">
+            <div style="padding:18px;text-align:center;color:var(--muted)">Đang tải báo cáo toàn DN...</div>
           </div>
         </div>
 
@@ -1004,8 +1036,113 @@
     if (k === 'security')  setTimeout(() => { renderActivityHistory(); loadTwoFAStatus(); }, 50);
     if (k === 'telegram')  setTimeout(tgLoadConfig, 50);
     if (k === 'backup')    setTimeout(renderSnapshots, 50);
-    if (k === 'usage')     setTimeout(renderUsageReport, 50);
+    if (k === 'usage')     setTimeout(() => { renderUsageReport(); wireUsageTabs(); }, 50);
   };
+
+  function wireUsageTabs() {
+    document.querySelectorAll('.usage-tab').forEach(t => {
+      t.onclick = () => {
+        document.querySelectorAll('.usage-tab').forEach(x => {
+          x.classList.remove('active');
+          x.style.borderBottomColor = 'transparent';
+          x.style.color = 'var(--muted)';
+          x.style.fontWeight = '400';
+        });
+        t.classList.add('active');
+        t.style.borderBottomColor = 'var(--red)';
+        t.style.color = 'var(--navy)';
+        t.style.fontWeight = '700';
+        const tab = t.dataset.tab;
+        if (tab === 'local') {
+          document.getElementById('usageReport').style.display = 'block';
+          document.getElementById('usageReportOrg').style.display = 'none';
+        } else {
+          document.getElementById('usageReport').style.display = 'none';
+          document.getElementById('usageReportOrg').style.display = 'block';
+          renderOrgReport();
+        }
+      };
+    });
+  }
+
+  async function renderOrgReport() {
+    const host = document.getElementById('usageReportOrg');
+    host.innerHTML = '<div style="padding:18px;text-align:center;color:var(--muted)">⏳ Đang tải tổng toàn DN từ cloud...</div>';
+    if (!window.USAGE || !window.USAGE.getOrgReport) {
+      host.innerHTML = '<div style="padding:20px;color:var(--danger)">Tracker chưa load. Reload trang thử.</div>';
+      return;
+    }
+    const r = await window.USAGE.getOrgReport();
+    if (!r) {
+      host.innerHTML = `<div style="padding:20px;background:#FEF2F2;border:1px solid #FCA5A5;border-radius:10px;color:var(--danger)">
+        ❌ Không lấy được dữ liệu từ cloud. Kiểm tra:<br>
+        1. Đã chạy SQL <code>08-ai-usage-log.sql</code> chưa?<br>
+        2. Connection Supabase OK chưa? (Settings → Tích hợp)
+      </div>`;
+      return;
+    }
+    const totalTokens = r.totalIn + r.totalOut;
+    const modelHtml = Object.entries(r.byModel).map(([m, d]) => {
+      const cost = r.costUSD[m] || '0.0000';
+      const icon = m.startsWith('claude') ? '🤖' : m.startsWith('gemini') ? '✨' : m.startsWith('openai') ? '🟢' : '🔵';
+      return `<tr>
+        <td>${icon} <b>${m}</b></td>
+        <td class="num">${d.calls}</td>
+        <td class="num">${d.in.toLocaleString('vi-VN')}</td>
+        <td class="num">${d.out.toLocaleString('vi-VN')}</td>
+        <td class="num">$${cost}</td>
+      </tr>`;
+    }).join('') || '<tr><td colspan="5" style="text-align:center;padding:14px;color:var(--muted)">Chưa có call AI nào tháng này</td></tr>';
+
+    const userHtml = Object.entries(r.byUser).sort((a,b) => b[1].calls - a[1].calls).slice(0, 10).map(([u, d]) => `<tr>
+      <td><b>${u}</b></td>
+      <td class="num">${d.calls}</td>
+      <td class="num">${(d.in + d.out).toLocaleString('vi-VN')}</td>
+    </tr>`).join('') || '<tr><td colspan="3" style="text-align:center;padding:14px;color:var(--muted)">Chưa có data</td></tr>';
+
+    host.innerHTML = `
+      <div style="background:#F0FDF4;border:1px solid #86EFAC;border-radius:10px;padding:12px 14px;margin-bottom:14px">
+        🏢 <b>Tổng tất cả NV / tất cả máy</b> trong tháng ${r.month} — số liệu lấy trực tiếp từ cloud Supabase.
+      </div>
+
+      <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(180px,1fr));gap:12px;margin-bottom:18px">
+        <div class="kpi"><div class="kpi-label">🤖 TỔNG AI CALLS</div><div class="kpi-value">${r.totalCalls.toLocaleString('vi-VN')}</div><div class="kpi-trend">${r.uniqueDevices} máy đã dùng</div></div>
+        <div class="kpi"><div class="kpi-label">📥 TỔNG TOKENS IN</div><div class="kpi-value">${r.totalIn.toLocaleString('vi-VN')}</div></div>
+        <div class="kpi"><div class="kpi-label">📤 TỔNG TOKENS OUT</div><div class="kpi-value">${r.totalOut.toLocaleString('vi-VN')}</div></div>
+        <div class="kpi" style="border-left:4px solid var(--ok)"><div class="kpi-label">💰 TỔNG CHI PHÍ AI</div><div class="kpi-value" style="color:var(--ok)">$${r.costUSD.TOTAL || '0.0000'}</div><div class="kpi-trend">≈ ${(parseFloat(r.costUSD.TOTAL||'0') * 25000).toLocaleString('vi-VN', {maximumFractionDigits:0})} VNĐ</div></div>
+      </div>
+
+      <div class="section-h">🤖 AI tokens theo model (toàn DN)</div>
+      <table class="mini-table" style="margin-bottom:14px">
+        <thead><tr><th>Model</th><th class="num">Calls</th><th class="num">Tokens IN</th><th class="num">Tokens OUT</th><th class="num">Chi phí</th></tr></thead>
+        <tbody>${modelHtml}</tbody>
+      </table>
+
+      <div class="section-h">👥 Top 10 NV dùng AI</div>
+      <table class="mini-table" style="margin-bottom:14px">
+        <thead><tr><th>Nhân viên</th><th class="num">Calls</th><th class="num">Tổng tokens</th></tr></thead>
+        <tbody>${userHtml}</tbody>
+      </table>
+
+      <div class="section-h">☁️ Egress Supabase (lưu lượng tải về)</div>
+      <div style="background:#EFF6FF;border:1px solid #BFDBFE;border-radius:10px;padding:14px 16px;margin-bottom:14px">
+        <div style="font-size:13px;color:#1E40AF;margin-bottom:8px">
+          Egress tổng KHÔNG track được trong app (cần permission API admin). Xem chính xác ở Supabase Dashboard:
+        </div>
+        <a href="https://supabase.com/dashboard/project/edhyvdstmewshurxucka/settings/billing/usage" target="_blank" class="btn btn-primary btn-sm" style="text-decoration:none">
+          🔗 Mở Supabase Dashboard → Usage
+        </a>
+        <div style="font-size:11.5px;color:var(--muted);margin-top:8px">
+          Tab Usage hiển thị: egress, database size, auth users, storage, edge functions invocations.
+        </div>
+      </div>
+
+      <div style="display:flex;gap:8px;flex-wrap:wrap">
+        <button class="btn btn-ghost btn-sm" onclick="renderOrgReport()">🔄 Làm mới</button>
+      </div>
+    `;
+  }
+  window.renderOrgReport = renderOrgReport;
 
   /* === ⚡ USAGE REPORT === */
   function renderUsageReport() {

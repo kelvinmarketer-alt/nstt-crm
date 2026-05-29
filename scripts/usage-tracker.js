@@ -127,9 +127,59 @@
       m.in += (tokensIn || 0);
       m.out += (tokensOut || 0);
       _saveStats(s);
+      /* Log lên Supabase để tổng hợp TOÀN DN (sum across all machines) */
+      if (window.SB && window.SUPABASE_CONFIG?.mode === 'supabase') {
+        try {
+          window.SB.from('ai_usage_log').insert({
+            device_id: DEVICE_ID,
+            user_name: (window.CURRENT_USER || {}).name || 'guest',
+            model,
+            tokens_in: tokensIn || 0,
+            tokens_out: tokensOut || 0,
+          }).then(() => {}).catch(()=>{});
+        } catch (e) {}
+      }
     },
     /* Helper exposes deviceId */
     deviceId() { return DEVICE_ID; },
+
+    /* === Fetch TOÀN DN — sum tokens tất cả máy trong tháng hiện tại === */
+    async getOrgReport() {
+      if (!window.SB) return null;
+      const thisMonth = new Date().toISOString().slice(0, 7);
+      const startISO = thisMonth + '-01T00:00:00Z';
+      try {
+        const { data, error } = await window.SB
+          .from('ai_usage_log')
+          .select('model, tokens_in, tokens_out, device_id, user_name')
+          .gte('ts', startISO);
+        if (error) throw error;
+        const byModel = {};
+        const byUser = {};
+        const devices = new Set();
+        let totalIn = 0, totalOut = 0, totalCalls = 0;
+        (data || []).forEach(row => {
+          devices.add(row.device_id);
+          totalIn += row.tokens_in || 0;
+          totalOut += row.tokens_out || 0;
+          totalCalls++;
+          const m = byModel[row.model] = byModel[row.model] || { calls: 0, in: 0, out: 0 };
+          m.calls++; m.in += row.tokens_in || 0; m.out += row.tokens_out || 0;
+          const u = byUser[row.user_name || '?'] = byUser[row.user_name || '?'] || { calls: 0, in: 0, out: 0 };
+          u.calls++; u.in += row.tokens_in || 0; u.out += row.tokens_out || 0;
+        });
+        const costUSD = window.USAGE_PRICING ? window.USAGE_PRICING.computeCostByModel(byModel) : { TOTAL: '0.0000' };
+        return {
+          month: thisMonth,
+          totalCalls, totalIn, totalOut,
+          uniqueDevices: devices.size,
+          byModel, byUser, costUSD,
+        };
+      } catch (e) {
+        console.warn('[USAGE getOrgReport]', e.message);
+        return null;
+      }
+    },
     getReport() {
       const s = _ensureCurrentMonth();
       const dayOfMonth = new Date().getDate();
