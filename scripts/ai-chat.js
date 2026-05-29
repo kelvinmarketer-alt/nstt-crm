@@ -345,6 +345,11 @@ ${recent}`;
           });
           const j = await r.json();
           if (!r.ok) throw new Error(j.error?.message || 'Claude ' + r.status);
+          /* Track usage */
+          if (window.USAGE && j.usage) {
+            window.USAGE.trackAI('claude-' + (provider.model || 'haiku'),
+              j.usage.input_tokens || 0, j.usage.output_tokens || 0);
+          }
           return j.content?.[0]?.text || '';
         }
 
@@ -368,6 +373,11 @@ ${recent}`;
           );
           const j = await r.json();
           if (!r.ok) throw new Error(j.error?.message || 'Gemini ' + r.status);
+          /* Track usage */
+          if (window.USAGE && j.usageMetadata) {
+            window.USAGE.trackAI('gemini-' + (provider.model || 'flash'),
+              j.usageMetadata.promptTokenCount || 0, j.usageMetadata.candidatesTokenCount || 0);
+          }
           return (j.candidates?.[0]?.content?.parts || []).map(x=>x.text).join('') || '';
         }
 

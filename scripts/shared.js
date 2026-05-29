@@ -84,15 +84,18 @@
     return window._piLoadingPromise;
   };
 
-  /* Auto-inject cross-module-hooks.js vào mọi page sau khi DOM ready.
-     File này wire các luồng: orders→inventory, orders→customer.debt,
-     returns→stock, adspend→cashEntries, payroll→cashEntries. */
+  /* Auto-inject cross-module-hooks.js + usage-tracker.js vào mọi page */
   if (!document.querySelector('script[src*="cross-module-hooks"]')) {
     const s = document.createElement('script');
     s.src = '../scripts/cross-module-hooks.js';
     s.async = false;
-    /* Đợi STORE load xong rồi inject */
     setTimeout(() => document.head.appendChild(s), 50);
+  }
+  if (!document.querySelector('script[src*="usage-tracker"]')) {
+    const s2 = document.createElement('script');
+    s2.src = '../scripts/usage-tracker.js';
+    s2.async = false;
+    setTimeout(() => document.head.appendChild(s2), 100);
   }
 
   /* Register service worker (chỉ trên HTTPS / localhost) */
@@ -486,14 +489,34 @@ window.attachBulkOps = function (opts) {
     }
   });
 
-  /* Header "select all" checkbox */
-  const headerCb = tbl.querySelector('thead .checkbox, thead input[type="checkbox"]');
-  if (headerCb) {
+  /* Header "select all" checkbox — tìm ở nhiều vị trí:
+     1. opts.selectAllSelector (custom)
+     2. thead .checkbox (trong header table)
+     3. .table-head .checkbox (panel trên table - customers/orders pattern)
+     4. parent của table có .checkbox (cards pattern) */
+  let headerCb = null;
+  if (opts.selectAllSelector) headerCb = document.querySelector(opts.selectAllSelector);
+  if (!headerCb) headerCb = tbl.querySelector('thead .checkbox, thead input[type="checkbox"]');
+  if (!headerCb) {
+    /* Tìm checkbox trong .table-head sibling */
+    const tableCard = tbl.closest('.table-card');
+    if (tableCard) headerCb = tableCard.querySelector('.table-head .checkbox, .table-head input[type="checkbox"]');
+  }
+  if (!headerCb) {
+    /* Tìm trong parent container (suppliers card layout) */
+    const parent = tbl.parentElement;
+    if (parent) headerCb = parent.querySelector(':scope > .checkbox');
+  }
+
+  if (headerCb && !headerCb.dataset.bulkBound) {
+    headerCb.dataset.bulkBound = '1';
     headerCb.addEventListener('click', (e) => {
       e.stopPropagation();
       setTimeout(() => {
         const turnOn = headerCb.classList ? headerCb.classList.contains('on') : headerCb.checked;
-        tbl.querySelectorAll('tbody .checkbox, tbody input[type="checkbox"]').forEach(cb => {
+        /* Tích tất cả checkbox row (cả trong tbody của table HOẶC sub-divs của container) */
+        const rowCbs = tbl.querySelectorAll('tbody .checkbox, tbody input[type="checkbox"], [data-id] > .checkbox, .sup-card .checkbox');
+        rowCbs.forEach(cb => {
           if (cb.classList) {
             if (turnOn) cb.classList.add('on'); else cb.classList.remove('on');
           }

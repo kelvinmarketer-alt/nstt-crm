@@ -103,6 +103,7 @@
     'cust_prefs',      /* Thói quen mua KH — MED */
     'pod_photos',      /* Ảnh giao hàng — MED (base64 lớn) */
     'telegramChannels', /* Cấu hình routing (legacy, deprecated) */
+    'usage_stats',     /* Tracker tài nguyên (poll/AI tokens/egress) */
   ]);
 
   function isSupabaseMode() {

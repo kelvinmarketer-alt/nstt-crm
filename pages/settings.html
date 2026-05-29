@@ -179,6 +179,7 @@
         <div class="item" onclick="switchSet(event,'telegram')">✈️ Telegram Bot</div>
         <div class="item" onclick="switchSet(event,'security')">🔒 Bảo mật</div>
         <div class="item" onclick="switchSet(event,'backup')">💾 Sao lưu</div>
+        <div class="item" onclick="switchSet(event,'usage')">⚡ Tài nguyên</div>
       </nav>
 
       <div>
@@ -470,6 +471,16 @@
             </div>
           </div>
 
+        </div>
+
+        <!-- ⚡ Tài nguyên / Usage Monitor -->
+        <div id="setUsage" class="set-panel" style="display:none">
+          <h2>⚡ Theo dõi tài nguyên</h2>
+          <div class="desc">Đo lường lưu lượng (egress Supabase), poll requests và token AI sử dụng hằng tháng. Tránh vượt free tier 5GB Supabase + 1500 calls Gemini/ngày.</div>
+
+          <div id="usageReport" style="margin-top:14px">
+            <div style="padding:18px;text-align:center;color:var(--muted)">Đang tải báo cáo...</div>
+          </div>
         </div>
 
       </div>
@@ -989,7 +1000,112 @@
     if (k === 'security')  setTimeout(() => { renderActivityHistory(); loadTwoFAStatus(); }, 50);
     if (k === 'telegram')  setTimeout(tgLoadConfig, 50);
     if (k === 'backup')    setTimeout(renderSnapshots, 50);
+    if (k === 'usage')     setTimeout(renderUsageReport, 50);
   };
+
+  /* === ⚡ USAGE REPORT === */
+  function renderUsageReport() {
+    if (!window.USAGE) {
+      document.getElementById('usageReport').innerHTML = '<div style="padding:20px;color:var(--danger)">Usage tracker chưa load. Reload trang thử.</div>';
+      return;
+    }
+    const r = window.USAGE.getReport();
+    const pollSec = (window.STORE.getPollInterval && window.STORE.getPollInterval()) || 300;
+    const pollMin = (pollSec / 60).toFixed(1);
+
+    /* Tính phần trăm so với free tier */
+    const egressPct = Math.min(100, (r.forecast.egressMB / 1024 / r.limits.supabase_egress_GB * 100)).toFixed(1);
+    const egressColor = egressPct > 80 ? 'var(--danger)' : egressPct > 50 ? 'var(--warn)' : 'var(--ok)';
+    const totalTokensMonth = r.tokensIn + r.tokensOut;
+
+    /* By model breakdown */
+    const modelHtml = Object.entries(r.byModel).map(([m, d]) => {
+      const totalCost = (m.includes('claude') ? (d.in * 0.0000008 + d.out * 0.000004) : (d.in * 0.0000001 + d.out * 0.0000004)).toFixed(4);
+      return `<tr>
+        <td><b>${m}</b></td>
+        <td class="num">${d.calls}</td>
+        <td class="num">${d.in.toLocaleString('vi-VN')}</td>
+        <td class="num">${d.out.toLocaleString('vi-VN')}</td>
+        <td class="num">~$${totalCost}</td>
+      </tr>`;
+    }).join('') || '<tr><td colspan="5" style="text-align:center;padding:14px;color:var(--muted)">Chưa có call AI nào tháng này</td></tr>';
+
+    /* History 12 tháng gần */
+    const histHtml = (r.history || []).slice(0, 6).map(h => `<tr>
+      <td><b>${h.month}</b></td>
+      <td class="num">${h.polls.toLocaleString('vi-VN')}</td>
+      <td class="num">${h.egressMB.toFixed(1)}MB</td>
+      <td class="num">${h.aiCalls}</td>
+      <td class="num">${(h.tokensIn + h.tokensOut).toLocaleString('vi-VN')}</td>
+    </tr>`).join('') || '<tr><td colspan="5" style="text-align:center;padding:14px;color:var(--muted)">Chưa có lịch sử (mới setup)</td></tr>';
+
+    document.getElementById('usageReport').innerHTML = `
+      <!-- KPIs -->
+      <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(180px,1fr));gap:12px;margin-bottom:18px">
+        <div class="kpi" style="border-left:4px solid ${egressColor}">
+          <div class="kpi-label">☁️ EGRESS Supabase</div>
+          <div class="kpi-value" style="color:${egressColor}">${r.egressMB.toFixed(1)} MB</div>
+          <div class="kpi-trend">Forecast tháng: <b>${(r.forecast.egressMB / 1024).toFixed(2)} GB</b> / 5GB free<br>= <b>${egressPct}%</b> free tier</div>
+        </div>
+        <div class="kpi" style="border-left:4px solid var(--navy)">
+          <div class="kpi-label">🔄 POLL REQUESTS</div>
+          <div class="kpi-value">${r.polls.toLocaleString('vi-VN')}</div>
+          <div class="kpi-trend">Forecast tháng: ${r.forecast.polls.toLocaleString('vi-VN')}<br>Interval: <b>${pollMin} phút</b></div>
+        </div>
+        <div class="kpi" style="border-left:4px solid var(--gold)">
+          <div class="kpi-label">🤖 AI CALLS</div>
+          <div class="kpi-value">${r.aiCalls}</div>
+          <div class="kpi-trend">Σ tokens: <b>${totalTokensMonth.toLocaleString('vi-VN')}</b><br>In ${r.tokensIn.toLocaleString('vi-VN')} · Out ${r.tokensOut.toLocaleString('vi-VN')}</div>
+        </div>
+        <div class="kpi" style="border-left:4px solid var(--ok)">
+          <div class="kpi-label">💰 CHI PHÍ AI</div>
+          <div class="kpi-value">$${(parseFloat(r.costUSD.gemini_flash) + parseFloat(r.costUSD.claude_haiku)).toFixed(4)}</div>
+          <div class="kpi-trend">Gemini: $${r.costUSD.gemini_flash}<br>Claude: $${r.costUSD.claude_haiku}</div>
+        </div>
+      </div>
+
+      <!-- Poll Adjust -->
+      <div class="section-h" style="margin-top:18px">🔄 Chỉnh nhịp đồng bộ (Poll Interval)</div>
+      <div style="background:#FAFBFC;border:1px solid var(--line);border-radius:10px;padding:14px 16px;margin-bottom:14px">
+        <div style="font-size:13px;color:var(--text);margin-bottom:8px">
+          Hiện tại: <b>${pollMin} phút</b> (${pollSec}s). Nhỏ hơn → cập nhật nhanh nhưng tốn egress hơn.
+        </div>
+        <div style="display:flex;gap:6px;flex-wrap:wrap">
+          <button class="btn btn-ghost btn-sm" onclick="window.STORE.setPollInterval(60); window.toast('Đã đặt 1 phút', 'success'); renderUsageReport();">⚡ 1 phút (realtime nhanh, tốn egress)</button>
+          <button class="btn btn-ghost btn-sm" onclick="window.STORE.setPollInterval(180); window.toast('Đã đặt 3 phút', 'success'); renderUsageReport();">3 phút</button>
+          <button class="btn ${pollSec === 300 ? 'btn-primary' : 'btn-ghost'} btn-sm" onclick="window.STORE.setPollInterval(300); window.toast('Đã đặt 5 phút', 'success'); renderUsageReport();">✅ 5 phút (khuyên dùng)</button>
+          <button class="btn btn-ghost btn-sm" onclick="window.STORE.setPollInterval(600); window.toast('Đã đặt 10 phút', 'success'); renderUsageReport();">🪶 10 phút (tiết kiệm)</button>
+          <button class="btn btn-ghost btn-sm" onclick="window.STORE.setPollInterval(1800); window.toast('Đã đặt 30 phút', 'success'); renderUsageReport();">💤 30 phút (siêu tiết kiệm)</button>
+        </div>
+        <div style="font-size:11.5px;color:var(--muted);margin-top:8px">
+          💡 50 NV × 8h × 5 phút ≈ ~7GB egress/tháng (free tier 5GB → vượt nhẹ).<br>
+          💡 50 NV × 8h × 10 phút ≈ ~3.5GB egress/tháng (an toàn).<br>
+          💡 Settings chỉ áp dụng máy này. Mỗi NV/máy có thể đặt riêng.
+        </div>
+      </div>
+
+      <!-- AI by Model -->
+      <div class="section-h">🤖 AI tokens theo model (tháng ${r.month})</div>
+      <table class="mini-table" style="margin-bottom:14px">
+        <thead><tr><th>Model</th><th class="num">Calls</th><th class="num">Tokens IN</th><th class="num">Tokens OUT</th><th class="num">Chi phí</th></tr></thead>
+        <tbody>${modelHtml}</tbody>
+      </table>
+
+      <!-- History -->
+      <div class="section-h">📊 Lịch sử 6 tháng gần</div>
+      <table class="mini-table">
+        <thead><tr><th>Tháng</th><th class="num">Polls</th><th class="num">Egress</th><th class="num">AI calls</th><th class="num">AI tokens</th></tr></thead>
+        <tbody>${histHtml}</tbody>
+      </table>
+
+      <!-- Actions -->
+      <div style="margin-top:14px;display:flex;gap:8px;flex-wrap:wrap">
+        <button class="btn btn-ghost btn-sm" onclick="renderUsageReport()">🔄 Làm mới</button>
+        <button class="btn btn-ghost btn-sm" onclick="if(confirm('Reset counter tháng này về 0?')){window.USAGE.resetMonth();renderUsageReport();window.toast('Đã reset','info')}" style="color:var(--danger)">↺ Reset tháng này</button>
+      </div>
+    `;
+  }
+  window.renderUsageReport = renderUsageReport;
 
   /* === 2FA TOGGLE === */
   function loadTwoFAStatus() {

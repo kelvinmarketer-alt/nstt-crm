@@ -1,7 +1,7 @@
 /* =========================================================
    Nông Sản Tuấn Tú Hà Nội — Service Worker (PWA offline + cache)
    ========================================================= */
-const CACHE_VERSION = "nstt-v67";
+const CACHE_VERSION = "nstt-v68";
 const CORE_ASSETS = [
   '/',
   '/index.html',
