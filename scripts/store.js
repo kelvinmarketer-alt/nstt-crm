@@ -140,6 +140,30 @@
         }
         return;
       }
+      /* === Integrations (int_telegram, int_ai-engine, int_gmail...) ===
+         Bảng `integrations` (key, enabled, config) — sync để cấu hình
+         token/API key hoạt động trên mọi máy/trình duyệt. */
+      if (key.startsWith('int_') && window.SB_DATA?.getIntegration) {
+        const intKey = key.slice(4);
+        const cfg = await window.SB_DATA.getIntegration(intKey);
+        if (cfg && Object.keys(cfg).length > 1) {
+          /* Supabase có config → dùng, ghi đè local */
+          _data[key] = cfg;
+          try { localStorage.setItem(PREFIX + key, JSON.stringify(cfg)); } catch (e) {}
+          (_subs[key] || []).forEach(fn => fn(cfg));
+          console.log(`[STORE] Synced ${key} ← Supabase`);
+        } else {
+          /* Supabase trống → MIGRATION: push local lên Supabase nếu có cấu hình */
+          const localCfg = _data[key];
+          if (localCfg && typeof localCfg === 'object' && Object.keys(localCfg).length > 0
+              && (localCfg.botToken || localCfg.apiKey || localCfg.accessToken || localCfg.channels)) {
+            window.SB_DATA.setIntegration(intKey, localCfg)
+              .then(() => console.log(`[STORE] ⬆ Migrated ${key} → Supabase`))
+              .catch(e => console.warn(`[STORE migrate ${key}]`, e));
+          }
+        }
+        return;
+      }
       /* Bảng table-mapped: customers, orders, products, ... */
       const table = TABLE_MAP[key];
       if (!table) return;
@@ -160,9 +184,9 @@
     /* Lấy dữ liệu — sync, return cache instantly */
     get(key, fallback) {
       if (!(key in _data)) _data[key] = _load(key, fallback);
-      /* Fire-and-forget preload từ Supabase lần đầu — TABLE_MAP keys + companyInfo + md_* */
+      /* Fire-and-forget preload từ Supabase — TABLE_MAP keys + companyInfo + md_* + int_* */
       if (isSupabaseMode() && !_preloaded.has(key) &&
-          (TABLE_MAP[key] || key === 'companyInfo' || key.startsWith('md_'))) {
+          (TABLE_MAP[key] || key === 'companyInfo' || key.startsWith('md_') || key.startsWith('int_'))) {
         _preloadFromSupabase(key);
       }
       return _data[key];
@@ -183,6 +207,13 @@
       /* Master data lưu vào bảng master_data */
       if (isSupabaseMode() && key.startsWith('md_') && window.SB_DATA?.setMasterData) {
         window.SB_DATA.setMasterData(key.slice(3), value).catch(e => console.warn('[STORE md → SB]', e));
+        return;
+      }
+      /* Integrations (Telegram bot, AI keys, Gmail, Zalo...)
+         → bảng integrations(key, enabled, config). Sync để token/key
+         dùng được trên mọi máy/trình duyệt. */
+      if (isSupabaseMode() && key.startsWith('int_') && window.SB_DATA?.setIntegration && value) {
+        window.SB_DATA.setIntegration(key.slice(4), value).catch(e => console.warn('[STORE int → SB]', e));
         return;
       }
 

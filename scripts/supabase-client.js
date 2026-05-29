@@ -281,6 +281,29 @@
       const { error } = await client.from('company_info').upsert({ id: 1, ...info, updated_at: new Date().toISOString() });
       return !error;
     },
+
+    /* === Integrations (Telegram bot, Gmail, AI keys, Zalo OA...) ===
+       Schema: integrations(key TEXT PK, enabled BOOL, config JSONB, updated_at)
+       Helper được STORE.get('int_*')/STORE.set('int_*') gọi để sync cloud.
+       Key trong DB là dạng "telegram"/"ai-engine" (bỏ prefix "int_"). */
+    async getIntegration(key) {
+      const { data, error } = await client.from('integrations').select('config, enabled').eq('key', key).single();
+      if (error || !data) return null;
+      /* Merge enabled vào config để app dùng 1 object thống nhất */
+      return { ...(data.config || {}), enabled: data.enabled };
+    },
+    async setIntegration(key, cfg) {
+      const enabled = !!cfg.enabled;
+      /* Tách enabled ra column riêng, phần còn lại lưu JSON config */
+      const config = { ...cfg };
+      delete config.enabled;
+      const { error } = await client.from('integrations').upsert({
+        key, enabled, config,
+        updated_at: new Date().toISOString(),
+      });
+      if (error) console.warn('[SB setIntegration]', key, error.message);
+      return !error;
+    },
   };
 
   /* === Supabase Auth API === */
