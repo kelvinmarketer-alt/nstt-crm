@@ -359,7 +359,7 @@
 
     /* Show drawer */
     drawer.classList.add('open');
-    document.querySelector('.drawer-bg')?.classList.add('open');
+    document.getElementById('drawerBg')?.classList.add('open');
   };
 
   console.log('[NSTT] ✓ Payroll approval drawer ready — window.openPayslipDrawer(staffId, month)');
