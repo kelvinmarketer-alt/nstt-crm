@@ -44,27 +44,30 @@ function doPost(e) {
     const rows = data.rows || [];
     const mode = data.mode || 'append';  // 'append' hoặc 'replace'
 
-    if (!rows.length) {
-      return ContentService.createTextOutput(JSON.stringify({
-        ok: true, message: 'No data', count: 0
-      })).setMimeType(ContentService.MimeType.JSON);
-    }
-
     const ss = SpreadsheetApp.getActiveSpreadsheet();
     let sheet = ss.getSheetByName(sheetName);
     if (!sheet) {
       sheet = ss.insertSheet(sheetName);
     }
 
+    // Replace mode: chỉ xóa CONTENT (giữ formatting/banding/conditional/frozen)
     if (mode === 'replace') {
-      sheet.clear();
+      // Xóa từ row 2 trở đi (giữ header row 1 + format)
+      const lastRow = sheet.getLastRow();
+      if (lastRow > 1) {
+        sheet.getRange(2, 1, lastRow - 1, sheet.getLastColumn()).clearContent();
+      }
+    }
+
+    if (!rows.length) {
+      return jsonResponse({ ok: true, message: 'Cleared (no new data)', count: 0 });
     }
 
     // Lấy header từ row đầu (nếu là object)
     if (rows.length > 0 && typeof rows[0] === 'object' && !Array.isArray(rows[0])) {
       const headers = Object.keys(rows[0]);
-      // Nếu sheet trống hoặc chế độ replace → ghi headers
-      if (sheet.getLastRow() === 0 || mode === 'replace') {
+      // Nếu sheet trống hoàn toàn → ghi headers (sheet mới, chưa có format)
+      if (sheet.getLastRow() === 0) {
         sheet.getRange(1, 1, 1, headers.length).setValues([headers])
           .setFontWeight('bold').setBackground('#1B5E20').setFontColor('#fff');
       }
@@ -75,32 +78,35 @@ function doPost(e) {
         if (typeof v === 'object') return JSON.stringify(v);
         return v;
       }));
-      sheet.getRange(sheet.getLastRow() + 1, 1, data2D.length, headers.length).setValues(data2D);
+      // Append từ row 2 (sau header)
+      const startRow = mode === 'replace' ? 2 : (sheet.getLastRow() + 1);
+      sheet.getRange(startRow, 1, data2D.length, headers.length).setValues(data2D);
     } else {
-      // Rows đã là 2D array
+      // Rows đã là 2D array (legacy)
       sheet.getRange(sheet.getLastRow() + 1, 1, rows.length, rows[0].length).setValues(rows);
     }
 
-    // Auto-resize columns
-    sheet.autoResizeColumns(1, sheet.getLastColumn());
-
-    return ContentService.createTextOutput(JSON.stringify({
+    return jsonResponse({
       ok: true, sheet: sheetName, count: rows.length,
       ts: new Date().toISOString()
-    })).setMimeType(ContentService.MimeType.JSON);
+    });
   } catch (err) {
-    return ContentService.createTextOutput(JSON.stringify({
-      ok: false, error: err.toString()
-    })).setMimeType(ContentService.MimeType.JSON);
+    return jsonResponse({ ok: false, error: err.toString() });
   }
 }
 
 function doGet(e) {
-  return ContentService.createTextOutput(JSON.stringify({
-    ok: true, app: 'NSTT Sync', version: '1.0',
+  return jsonResponse({
+    ok: true, app: 'NSTT Sync', version: '2.0',
     message: 'Use POST to push data. Body: {sheet:"name", rows:[...], mode:"append"|"replace"}',
     ts: new Date().toISOString()
-  })).setMimeType(ContentService.MimeType.JSON);
+  });
+}
+
+/* Helper: trả JSON với CORS headers */
+function jsonResponse(obj) {
+  return ContentService.createTextOutput(JSON.stringify(obj))
+    .setMimeType(ContentService.MimeType.JSON);
 }
 
 // ========== END CODE PASTE ==========

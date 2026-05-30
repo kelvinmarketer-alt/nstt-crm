@@ -95,23 +95,37 @@
     }));
   }
 
-  /* === Push 1 sheet === */
+  /* === Push 1 sheet ===
+     Dùng Content-Type 'text/plain' để tránh CORS preflight.
+     Apps Script ContentService trả về JSON với CORS headers OK.
+     KHÔNG dùng mode:'no-cors' → đọc response để báo lỗi rõ ràng. */
   async function pushSheet(sheetName, rows) {
     const cfg = getCfg();
     if (!cfg.webhookUrl) throw new Error('Chưa cấu hình webhook URL');
     if (!rows.length) return { ok: true, skip: true };
-    /* Apps Script Web App không support CORS preflight → dùng no-cors mode.
-       Trade-off: không đọc được response, nhưng dữ liệu vẫn được POST. */
     try {
-      await fetch(cfg.webhookUrl, {
+      const res = await fetch(cfg.webhookUrl, {
         method: 'POST',
-        mode: 'no-cors',
         headers: { 'Content-Type': 'text/plain;charset=utf-8' },
         body: JSON.stringify({ sheet: sheetName, rows, mode: 'replace' }),
+        redirect: 'follow',
       });
-      return { ok: true, count: rows.length };
+      if (!res.ok) {
+        return { ok: false, error: `HTTP ${res.status} ${res.statusText}` };
+      }
+      const text = await res.text();
+      let json;
+      try { json = JSON.parse(text); } catch (e) {
+        /* Trả về HTML thay vì JSON → Apps Script chưa deploy đúng */
+        if (text.includes('<html') || text.includes('Sign in')) {
+          return { ok: false, error: 'Apps Script chưa deploy với Access "Anyone" — kiểm tra Settings' };
+        }
+        return { ok: false, error: 'Response không phải JSON: ' + text.slice(0, 100) };
+      }
+      if (json.ok === false) return { ok: false, error: json.error || 'unknown' };
+      return { ok: true, count: rows.length, ts: json.ts };
     } catch (e) {
-      return { ok: false, error: e.message };
+      return { ok: false, error: e.message || 'Network error' };
     }
   }
 
@@ -127,18 +141,28 @@
       return;
     }
     window.toast?.('⏳ Đang đồng bộ 4 sheets...', 'info');
-    const results = await Promise.all([
-      pushSheet('Orders', buildOrdersRows()),
-      pushSheet('Customers', buildCustomersRows()),
-      pushSheet('CashEntries', buildCashEntriesRows()),
-      pushSheet('Invoices', buildInvoicesRows()),
-    ]);
-    const ok = results.filter(r => r.ok).length;
+    const sheets = [
+      { name: 'Orders', rows: buildOrdersRows() },
+      { name: 'Customers', rows: buildCustomersRows() },
+      { name: 'CashEntries', rows: buildCashEntriesRows() },
+      { name: 'Invoices', rows: buildInvoicesRows() },
+    ];
+    const results = await Promise.all(sheets.map(s => pushSheet(s.name, s.rows)));
+    const failures = results.filter(r => !r.ok);
     const total = results.reduce((s, r) => s + (r.count || 0), 0);
-    window.toast?.(`✓ Đồng bộ ${ok}/4 sheets · ${total} dòng`, ok === 4 ? 'success' : 'warn');
+
+    if (failures.length === 0) {
+      window.toast?.(`✓ Đồng bộ 4/4 sheets · ${total} dòng`, 'success');
+    } else {
+      /* Hiển thị lỗi chi tiết */
+      const errMsg = failures.map((f, i) => `${sheets[results.indexOf(f)].name}: ${f.error}`).join(' · ');
+      console.error('[GSheets sync errors]', failures);
+      window.toast?.(`❌ Lỗi ${failures.length}/4 sheets: ${errMsg.slice(0, 200)}`, 'danger');
+    }
     /* Lưu lastSync */
     cfg.lastSyncAt = new Date().toLocaleString('vi-VN');
     cfg.lastSyncCount = total;
+    cfg.lastSyncErrors = failures.length;
     window.STORE.set('int_google-sheets', cfg);
   };
 
