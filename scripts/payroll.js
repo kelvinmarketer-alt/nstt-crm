@@ -491,6 +491,19 @@
   function renderPayroll() {
     const staffs = STAFF(); const wd = workdaysInMonth();
     const extra = window.STORE.get('payrollInlineExtras', {});
+    /* === NEW: đọc payslips đã lập (array) cho tháng đang chọn === */
+    const allPayslips = window.STORE.get('payrollExtra', []) || [];
+    const monthPayslips = Array.isArray(allPayslips)
+      ? allPayslips.filter(p => p && p.month === month)
+      : [];
+    const psByStaff = Object.fromEntries(monthPayslips.map(p => [p.staffId, p]));
+    const STATUS_BADGE = {
+      'draft':     '<span style="background:#FEF3C7;color:#854D0E;padding:2px 7px;border-radius:5px;font-size:10px;font-weight:700">📝 NHÁP</span>',
+      'submitted': '<span style="background:#DBEAFE;color:#1E40AF;padding:2px 7px;border-radius:5px;font-size:10px;font-weight:700">📤 CHỜ DUYỆT</span>',
+      'approved':  '<span style="background:#DCFCE7;color:#15803D;padding:2px 7px;border-radius:5px;font-size:10px;font-weight:700">✓ ĐÃ DUYỆT</span>',
+      'paid':      '<span style="background:#E0E7FF;color:#3730A3;padding:2px 7px;border-radius:5px;font-size:10px;font-weight:700">💵 ĐÃ TRẢ</span>',
+    };
+
     let totalAll = 0; let totalLateDed = 0; let totalBonus = 0;
     const rows = staffs.map(s => {
       const sh = sheetOf(s.id); const md = metaOf(s.id);
@@ -509,8 +522,32 @@
       const auto = computeBonusFromConfig(s);
       totalBonus += auto.amount;
       const e = extra[s.id] || { bonus: 0, deduction: 0 };
-      const total = luongCo + auto.amount + (e.bonus || 0) - (e.deduction || 0) - lateDed;
+
+      /* === NEW: nếu đã có phiếu lương → dùng total phiếu thay cho công thức inline === */
+      const ps = psByStaff[s.id];
+      let total, totalCellHTML;
+      if (ps && typeof ps.total === 'number') {
+        total = ps.total;
+        const bonusSum = (ps.bonuses || []).reduce((sum, b) => sum + (+b.amount || 0), 0);
+        const penSum   = (ps.penalties || []).reduce((sum, p) => sum + (+p.amount || 0), 0);
+        const extraInfo = [
+          bonusSum ? `+${window.fmtShort(bonusSum)} thưởng` : '',
+          penSum   ? `-${window.fmtShort(penSum)} phạt` : '',
+          ps.advance ? `-${window.fmtShort(ps.advance)} tạm ứng` : '',
+          ps.bhxh ? `-${window.fmtShort(ps.bhxh)} BHXH` : '',
+        ].filter(Boolean).join(' · ');
+        totalCellHTML = `
+          <b style="color:var(--red);font-size:14px">${window.fmt(total)}</b>
+          <div style="font-size:10px;color:var(--muted);margin-top:2px">${STATUS_BADGE[ps.status] || ''}</div>
+          ${extraInfo ? `<div style="font-size:10px;color:var(--muted);margin-top:2px;max-width:170px;line-height:1.3">${extraInfo}</div>` : ''}
+        `;
+      } else {
+        total = luongCo + auto.amount + (e.bonus || 0) - (e.deduction || 0) - lateDed;
+        totalCellHTML = `<b style="color:var(--red);font-size:14px">${window.fmt(total)}</b>
+          <div style="font-size:10px;color:var(--muted);margin-top:2px">— chưa lập phiếu</div>`;
+      }
       totalAll += total;
+
       return `<tr>
         <td><div style="display:flex;align-items:center;gap:8px">
           <div style="width:28px;height:28px;border-radius:50%;background:${window.avatarColor(s.name)};color:#fff;display:grid;place-items:center;font-size:11px;font-weight:700">${window.initials(s.name)}</div>
@@ -532,7 +569,7 @@
         </td>
         <td class="num"><input type="number" data-sid="${s.id}" data-field="bonus" value="${e.bonus || 0}" class="pay-extra" ${canEdit()?'':'disabled'} style="width:85px;text-align:right;padding:4px 6px;border:1px solid var(--line);border-radius:5px;${canEdit()?'':'background:#FAFAFB;color:var(--muted)'}"></td>
         <td class="num"><input type="number" data-sid="${s.id}" data-field="deduction" value="${e.deduction || 0}" class="pay-extra" ${canEdit()?'':'disabled'} style="width:85px;text-align:right;padding:4px 6px;border:1px solid var(--line);border-radius:5px;${canEdit()?'':'background:#FAFAFB;color:var(--muted)'}"></td>
-        <td class="num"><b style="color:var(--red);font-size:14px">${window.fmt(total)}</b></td>
+        <td class="num">${totalCellHTML}</td>
         <td class="num">
           <button class="btn btn-navy btn-sm" onclick="window.openPayslipDrawer('${s.id}', '${month}')" title="Phiếu duyệt lương chi tiết (thưởng/phạt/BHXH/tạm ứng)">💼 Phiếu lương</button>
         </td>
