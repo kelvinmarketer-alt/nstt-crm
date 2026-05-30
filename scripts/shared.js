@@ -103,6 +103,12 @@
     s3.async = false;
     setTimeout(() => document.head.appendChild(s3), 150);
   }
+  if (!document.querySelector('script[src*="google-sheets-sync"]')) {
+    const s4 = document.createElement('script');
+    s4.src = '../scripts/google-sheets-sync.js';
+    s4.async = false;
+    setTimeout(() => document.head.appendChild(s4), 200);
+  }
 
   /* Register service worker (chỉ trên HTTPS / localhost) */
   if ('serviceWorker' in navigator && (location.protocol === 'https:' || location.hostname === 'localhost')) {
@@ -1262,16 +1268,16 @@ window.INTEGRATIONS = [
     id: 'google-sheets',
     icon: '📊', color: '#15803D',
     name: 'Google Sheets',
-    desc: 'Đồng bộ doanh thu / công nợ / KH lên Sheets cho kế toán xem',
+    desc: 'Đồng bộ Orders / KH / Sổ quỹ / HĐ lên Sheets · qua Apps Script Webhook (miễn phí)',
     guideKey: 'google-sheets',
     fields: [
-      { key:'spreadsheetId', label:'Spreadsheet ID', type:'text', placeholder:'1AbC...xyz (từ URL Sheets)', guideKey:'google-sheets' },
-      { key:'serviceAccountEmail', label:'Service Account Email', type:'text', placeholder:'xxx@xxx.iam.gserviceaccount.com' },
-      { key:'privateKey', label:'Service Account Private Key', type:'textarea', placeholder:'-----BEGIN PRIVATE KEY-----\\n...' },
+      { key:'webhookUrl', label:'Apps Script Web App URL', type:'text',
+        placeholder:'https://script.google.com/macros/s/AKfy.../exec', guideKey:'google-sheets' },
       { key:'syncFreq', label:'Tần suất đồng bộ', type:'select', options:[
         {v:'realtime', l:'Real-time (mỗi khi có thay đổi)'},
         {v:'hourly', l:'Mỗi giờ'},
         {v:'daily', l:'Hằng ngày (23:00)'},
+        {v:'manual', l:'Thủ công (bấm nút)'},
       ]},
     ],
   },

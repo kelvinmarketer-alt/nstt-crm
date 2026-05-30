@@ -1010,24 +1010,55 @@
       </div>`;
     }).join('');
 
+    /* Special: google-sheets → custom modal với hướng dẫn 5 bước inline */
+    const gsheetsGuide = id === 'google-sheets' ? `
+      <details style="margin-bottom:14px;background:#FEF9E7;border:1px solid #F5E0A6;border-radius:8px;padding:10px 14px">
+        <summary style="cursor:pointer;font-weight:700;color:#854D0E">📖 Hướng dẫn 5 phút setup (click mở)</summary>
+        <ol style="margin:10px 0 0 0;padding-left:20px;font-size:12.5px;line-height:1.7">
+          <li>Tạo Sheet mới ở <a href="https://sheets.google.com" target="_blank" style="color:#1976D2;font-weight:600">sheets.google.com</a> → đặt tên "NSTT - Kế toán"</li>
+          <li>Menu <b>Extensions → Apps Script</b> → cửa sổ mới mở</li>
+          <li>XÓA code mặc định → COPY-PASTE <a href="https://github.com/kelvinmarketer-alt/nstt-crm/blob/main/scripts/google-apps-script-template.js" target="_blank" style="color:#1976D2;font-weight:600">code template</a> vào</li>
+          <li>Bấm <b>Deploy</b> → New deployment → Type: <b>Web app</b> → Execute as: <b>Me</b> → Access: <b>Anyone</b> → Deploy → Authorize</li>
+          <li>Copy <b>Web app URL</b> (dạng <code>https://script.google.com/macros/s/.../exec</code>) → paste vào ô bên dưới</li>
+        </ol>
+        <div style="margin-top:8px;padding:8px;background:#fff;border-radius:5px;font-size:11.5px;color:var(--muted)">
+          💡 Sau khi xong, app tự đồng bộ 4 sheets: <b>Orders, Customers, CashEntries, Invoices</b>
+        </div>
+      </details>
+    ` : '';
+
+    /* Custom action buttons cho google-sheets */
+    const gsheetsActions = id === 'google-sheets' ? `
+      <button class="btn btn-ghost" onclick="window.gsheetsTest && window.gsheetsTest()">🧪 Test webhook</button>
+      <button class="btn btn-navy" onclick="window.gsheetsSyncAll && window.gsheetsSyncAll()">🔄 Đồng bộ ngay 4 sheets</button>
+    ` : `<button class="btn btn-ghost" onclick="window.testIntegration('${id}')">🔌 Test kết nối</button>`;
+
     window.openModal('⚙ Cấu hình ' + meta.name, `
       <div style="margin-bottom:14px;padding:10px 14px;background:${meta.color}15;border-left:4px solid ${meta.color};border-radius:7px;font-size:13px">
         ${meta.icon} <b>${meta.name}</b><br>
         <span style="font-size:12px;color:var(--muted)">${meta.desc}</span>
       </div>
 
-      <button class="btn btn-ghost btn-sm" style="margin-bottom:14px" onclick="window.openHelpGuide('${meta.guideKey}')">📖 Xem hướng dẫn chi tiết tích hợp này</button>
+      ${gsheetsGuide}
+
+      ${id !== 'google-sheets' ? `<button class="btn btn-ghost btn-sm" style="margin-bottom:14px" onclick="window.openHelpGuide('${meta.guideKey}')">📖 Xem hướng dẫn chi tiết tích hợp này</button>` : ''}
 
       ${fieldsHTML}
 
+      ${cfg.lastSyncAt && id === 'google-sheets' ? `
+        <div style="margin-top:10px;padding:8px 12px;background:#F0FDF4;border-radius:7px;font-size:12px;color:#15803D">
+          ✓ Đồng bộ cuối: ${cfg.lastSyncAt} · ${cfg.lastSyncCount || 0} dòng
+        </div>
+      ` : ''}
+
       <div style="margin-top:14px;padding:10px 12px;background:#FAFAFB;border-radius:7px;font-size:11.5px;color:var(--muted)">
-        🔒 <b>Bảo mật:</b> API key / token được mã hóa lưu trong localStorage browser. Không gửi đi đâu khác (prototype).
+        🔒 <b>Bảo mật:</b> API key / token được mã hóa lưu trong localStorage browser. Không gửi đi đâu khác.
       </div>
     `, {
       footer: `<button class="btn btn-ghost" onclick="closeModal()">Hủy</button>
-               <button class="btn btn-ghost" onclick="window.testIntegration('${id}')">🔌 Test kết nối</button>
+               ${gsheetsActions}
                <button class="btn btn-primary" onclick="window.saveIntConfig('${id}')">💾 Lưu cấu hình</button>`,
-      width: '620px'
+      width: '680px'
     });
   };
 
