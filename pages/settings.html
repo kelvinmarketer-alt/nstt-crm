@@ -331,20 +331,60 @@
             <button class="btn btn-navy" onclick="window.tgSendDailyTest()">📊 Gửi báo cáo ngày TEST</button>
           </div>
 
-          <div class="section-h" style="margin-top:24px">⏰ Lịch gửi báo cáo tự động</div>
+          <div class="section-h" style="margin-top:24px">⏰ Lịch + trigger cho 4 loại routing</div>
           <div style="background:#FAFAFB;border:1px solid var(--line);border-radius:10px;padding:14px 16px">
-            <div class="form-row">
-              <div><label>Giờ gửi báo cáo ngày</label><input id="tgDailyHour" type="time" value="18:30"></div>
-              <div>
-                <label>Bật tự động</label>
-                <select id="tgAutoEnabled">
-                  <option value="0">Tắt — chỉ gửi thủ công</option>
-                  <option value="1">Bật — gửi mỗi 18:30 hàng ngày (cần host)</option>
-                </select>
+
+            <!-- 1. Báo cáo ngày -->
+            <div style="padding:10px 0;border-bottom:1px dashed var(--line)">
+              <div style="font-weight:700;font-size:13.5px;color:var(--navy);margin-bottom:6px">📊 Báo cáo ngày</div>
+              <div class="form-row" style="margin-bottom:4px">
+                <div><label style="font-size:12px">Giờ gửi (mỗi ngày)</label><input id="tgDailyHour" type="time" value="18:30"></div>
+                <div>
+                  <label style="font-size:12px">Bật tự động</label>
+                  <select id="tgAutoEnabled">
+                    <option value="0">Tắt — chỉ gửi thủ công</option>
+                    <option value="1">Bật — gửi mỗi 18:30 (khi tab mở)</option>
+                  </select>
+                </div>
               </div>
             </div>
-            <div style="font-size:11.5px;color:var(--muted);margin-top:10px;padding:8px;background:#FEF3C7;border-radius:6px">
-              💡 Lịch tự động cần worker chạy nền (Cloudflare Cron / GitHub Actions). App web tĩnh không gửi được khi không mở. Hiện tại chỉ lưu cấu hình + nút gửi thủ công.
+
+            <!-- 2. Cảnh báo nội bộ -->
+            <div style="padding:10px 0;border-bottom:1px dashed var(--line)">
+              <div style="font-weight:700;font-size:13.5px;color:var(--navy);margin-bottom:6px">⚠️ Cảnh báo nội bộ (đơn quá hạn, công nợ, KH bỏ đặt)</div>
+              <div class="form-row" style="margin-bottom:4px">
+                <div><label style="font-size:12px">Giờ gửi (mỗi ngày)</label><input id="tgAlertHour" type="time" value="09:00"></div>
+                <div>
+                  <label style="font-size:12px">Bật tự động</label>
+                  <select id="tgAlertEnabled">
+                    <option value="0">Tắt — chỉ gửi thủ công</option>
+                    <option value="1">Bật — gửi mỗi ngày 9:00 (khi tab mở)</option>
+                  </select>
+                </div>
+              </div>
+              <button class="btn btn-ghost btn-sm" onclick="window.sendAlertNow && window.sendAlertNow().then(ok => window.toast(ok?'✓ Đã gửi cảnh báo':'❌ Chưa cấu hình kênh', ok?'success':'warn'))" style="margin-top:4px">📤 Gửi cảnh báo ngay (test)</button>
+            </div>
+
+            <!-- 3. Phân đơn shipper -->
+            <div style="padding:10px 0;border-bottom:1px dashed var(--line)">
+              <div style="font-weight:700;font-size:13.5px;color:var(--navy);margin-bottom:6px">🚚 Phân đơn cho Shipper</div>
+              <div style="font-size:12px;color:var(--muted);padding:8px 10px;background:#F0FDF4;border-radius:6px">
+                ⚡ <b>Trigger event-based</b>: Tự gửi NGAY khi đơn chuyển sang status "Đã xác nhận" — không cần lịch.
+                Bật kênh 'Phân đơn shipper' ở routing bên trên là đủ.
+              </div>
+            </div>
+
+            <!-- 4. Bảng giá -->
+            <div style="padding:10px 0">
+              <div style="font-weight:700;font-size:13.5px;color:var(--navy);margin-bottom:6px">💰 Cập nhật bảng giá</div>
+              <div style="font-size:12px;color:var(--muted);padding:8px 10px;background:#F0FDF4;border-radius:6px">
+                ⚡ <b>Trigger event-based</b>: Tự gửi NGAY khi NV lưu bảng giá mới có thay đổi.
+                Cấu hình chi tiết ở mục "Sản phẩm &amp; Giá" → nút "⚙️ Auto-send bảng giá".
+              </div>
+            </div>
+
+            <div style="font-size:11.5px;color:var(--muted);margin-top:12px;padding:8px;background:#FEF3C7;border-radius:6px">
+              💡 Scheduler hoạt động khi <b>1 NV mở app</b> ít nhất (browser nền vẫn count). Đối với gửi 24/7 cần backend riêng (~$5/tháng Cloudflare Workers).
             </div>
           </div>
 
@@ -1409,10 +1449,14 @@
     const cid = document.getElementById('tgChatId');
     const hr  = document.getElementById('tgDailyHour');
     const ae  = document.getElementById('tgAutoEnabled');
+    const ahr = document.getElementById('tgAlertHour');
+    const aen = document.getElementById('tgAlertEnabled');
     if (tok) tok.value = cfg.botToken || '';
     if (cid) cid.value = cfg.chatId || '';
     if (hr)  hr.value  = cfg.dailyHour || '18:30';
     if (ae)  ae.value  = cfg.autoEnabled ? '1' : '0';
+    if (ahr) ahr.value = cfg.alertHour || '09:00';
+    if (aen) aen.value = cfg.alertEnabled ? '1' : '0';
     const st = document.getElementById('tgStatus');
     if (st) {
       const ok = cfg.botToken && cfg.chatId;
@@ -1551,9 +1595,11 @@
     cfg.chatId       = document.getElementById('tgChatId').value.trim();
     cfg.dailyHour    = document.getElementById('tgDailyHour').value || '18:30';
     cfg.autoEnabled  = document.getElementById('tgAutoEnabled').value === '1';
+    cfg.alertHour    = (document.getElementById('tgAlertHour')||{}).value || '09:00';
+    cfg.alertEnabled = (document.getElementById('tgAlertEnabled')||{}).value === '1';
     if (!cfg.botToken || !cfg.chatId) { window.toast('Cần nhập đủ Bot Token + Chat ID', 'warn'); return; }
     window.STORE.set('int_telegram', cfg);
-    window.toast('✓ Đã lưu cấu hình Telegram', 'success');
+    window.toast('✓ Đã lưu cấu hình Telegram + lịch', 'success');
     tgLoadConfig();
   };
 

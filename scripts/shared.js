@@ -97,6 +97,12 @@
     s2.async = false;
     setTimeout(() => document.head.appendChild(s2), 100);
   }
+  if (!document.querySelector('script[src*="tg-auto-trigger"]')) {
+    const s3 = document.createElement('script');
+    s3.src = '../scripts/tg-auto-trigger.js';
+    s3.async = false;
+    setTimeout(() => document.head.appendChild(s3), 150);
+  }
 
   /* Register service worker (chỉ trên HTTPS / localhost) */
   if ('serviceWorker' in navigator && (location.protocol === 'https:' || location.hostname === 'localhost')) {
