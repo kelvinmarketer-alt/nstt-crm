@@ -533,6 +533,9 @@
         <td class="num"><input type="number" data-sid="${s.id}" data-field="bonus" value="${e.bonus || 0}" class="pay-extra" ${canEdit()?'':'disabled'} style="width:85px;text-align:right;padding:4px 6px;border:1px solid var(--line);border-radius:5px;${canEdit()?'':'background:#FAFAFB;color:var(--muted)'}"></td>
         <td class="num"><input type="number" data-sid="${s.id}" data-field="deduction" value="${e.deduction || 0}" class="pay-extra" ${canEdit()?'':'disabled'} style="width:85px;text-align:right;padding:4px 6px;border:1px solid var(--line);border-radius:5px;${canEdit()?'':'background:#FAFAFB;color:var(--muted)'}"></td>
         <td class="num"><b style="color:var(--red);font-size:14px">${window.fmt(total)}</b></td>
+        <td class="num">
+          <button class="btn btn-navy btn-sm" onclick="window.openPayslipDrawer('${s.id}', '${month}')" title="Phiếu duyệt lương chi tiết (thưởng/phạt/BHXH/tạm ứng)">💼 Phiếu lương</button>
+        </td>
       </tr>`;
     }).join('');
 
@@ -571,6 +574,7 @@
             <th class="num">Thưởng thêm</th>
             <th class="num">Khấu trừ khác</th>
             <th class="num">Thực lĩnh</th>
+            <th class="num">Duyệt lương</th>
           </tr></thead>
           <tbody>${rows}</tbody>
         </table>

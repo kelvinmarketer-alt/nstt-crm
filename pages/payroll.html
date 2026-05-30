@@ -43,6 +43,12 @@
     <div class="rpt-tabs" id="payTabs"></div>
     <div id="payView"></div>
   </main>
+
+  <!-- Drawer container for "Phiếu duyệt lương" -->
+  <div class="drawer-bg" onclick="closeDrawer()"></div>
+  <aside class="drawer" id="drawer">
+    <div id="drawerContent"></div>
+  </aside>
 </div>
 
 <script src="https://cdn.sheetjs.com/xlsx-0.20.3/package/dist/xlsx.full.min.js"></script>
@@ -59,6 +65,8 @@
 <script>if(window.AUTH) window.AUTH.requireAuth();</script>
 <script src="../data/staff.js"></script>
 <script src="../data/timesheet.js"></script>
+<script src="../scripts/payroll-formula.js"></script>
+<script src="../scripts/payroll-approval.js"></script>
 <script src="../scripts/payroll.js"></script>
 <script src="../scripts/ai-fill.js"></script>
 <script src="../scripts/cust-search-box.js"></script>
