@@ -1201,13 +1201,12 @@ window.INTEGRATIONS = [
     id: 'telegram',
     icon: '✈️', color: '#0088CC',
     name: 'Telegram Bot',
-    desc: 'Nhận chat KH → AI tự điền form · báo cáo cuối ngày tự động',
+    desc: 'Bot gửi báo cáo + bảng giá + phân đơn shipper · cảnh báo tự động',
     guideKey: 'tg-bot-token',
     detailPage: 'telegram', // có tab riêng trong Settings
     fields: [
       { key:'botToken', label:'Bot Token', type:'password', placeholder:'7891234567:AAH...', guideKey:'tg-bot-token' },
-      { key:'groupChatId', label:'Group chat ID (nội bộ)', type:'text', placeholder:'-1001234567890', guideKey:'tg-group-chat-id' },
-      { key:'adminChatId', label:'Admin chat ID', type:'text', placeholder:'123456789', guideKey:'tg-admin-chat-id' },
+      { key:'chatId', label:'Chat ID mặc định', type:'text', placeholder:'-1001234567890 hoặc 123456789', guideKey:'tg-chat-id' },
     ],
   },
   {

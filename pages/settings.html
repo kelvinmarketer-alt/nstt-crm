@@ -908,7 +908,13 @@
     /* Check required fields filled */
     const meta = window.INTEGRATIONS.find(x => x.id === id);
     const required = (meta?.fields||[]).filter(f => f.type !== 'checkbox' && !f.optional);
-    const filled = required.every(f => cfg[f.key]);
+    let filled = required.every(f => cfg[f.key]);
+    /* Special-case Telegram: coi đủ nếu có botToken + (chatId mặc định HOẶC ≥1 channel phụ có chatId) */
+    if (id === 'telegram' && cfg.botToken) {
+      const hasDefault = !!cfg.chatId;
+      const hasChannel = (cfg.channels || []).some(c => c.chatId && c.enabled !== false);
+      filled = hasDefault || hasChannel;
+    }
     if (!filled) return { cls:'partial', label:'🟡 Chưa cấu hình đủ', color:'var(--warn)' };
     return { cls:'on', label:'🟢 Đang hoạt động', color:'var(--ok)' };
   }
