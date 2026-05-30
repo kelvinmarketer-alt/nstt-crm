@@ -148,6 +148,122 @@
     if (subBtn) subBtn.style.display = canCalc() ? '' : 'none';
     const cfoBtn = document.querySelector('[onclick*="openPayslipBatchReview"]');
     if (cfoBtn) cfoBtn.style.display = canApprove() ? '' : 'none';
+    const polBtn = document.querySelector('[onclick*="openLatePolicy"]');
+    if (polBtn) polBtn.style.display = (hasP('all') || hasP('payroll.edit')) ? '' : 'none';
+  };
+
+  /* =========================================================
+     SETTINGS — Cấu hình khung phạt đi muộn (admin only)
+     ========================================================= */
+  window.openLatePolicySettings = function () {
+    if (!(hasP('all') || hasP('payroll.edit'))) {
+      window.toast?.('🔒 Bạn không có quyền sửa khung phạt (cần payroll.edit hoặc all)', 'warn');
+      return;
+    }
+    const PF = window.PayrollFormula;
+    const cur = PF.getLatePolicy();
+
+    function tierRow(t, i) {
+      return `<div class="lp-tier" data-idx="${i}" style="display:grid;grid-template-columns:90px 1fr 140px 32px;gap:8px;padding:8px 0;border-bottom:1px dashed var(--line);align-items:center">
+        <div style="display:flex;gap:4px;align-items:center">
+          <span style="font-size:11px;color:var(--muted)">≥</span>
+          <input class="lp-tier-min" type="number" min="0" max="480" value="${t.thresholdMinutes}" style="width:64px;text-align:right;padding:5px 7px;font-size:12.5px;border:1px solid var(--line);border-radius:5px">
+          <span style="font-size:11px;color:var(--muted)">p</span>
+        </div>
+        <input class="lp-tier-label" type="text" value="${(t.label||'').replace(/"/g,'&quot;')}" placeholder="VD: > 10 phút" style="padding:5px 8px;font-size:12.5px;border:1px solid var(--line);border-radius:5px">
+        <input class="lp-tier-amount" type="text" inputmode="numeric" value="${(+t.amount||0).toLocaleString('vi-VN')}" data-raw="${+t.amount||0}" placeholder="0" style="padding:5px 8px;text-align:right;font-size:12.5px;font-weight:700;color:#DC2626;border:1px solid var(--line);border-radius:5px">
+        <button onclick="window._lpRemoveTier(${i})" style="background:transparent;border:none;color:#DC2626;cursor:pointer;font-size:16px">×</button>
+      </div>`;
+    }
+
+    const html = `
+      <div style="font-size:12.5px;color:var(--muted);line-height:1.7;background:#FEF3C7;border:1px solid #FCD34D;border-radius:8px;padding:10px 12px;margin-bottom:14px">
+        ⚙ <b>Khung phạt đi muộn</b> — khi NV bị chấm <code>L</code> ở tab Chấm công và phút muộn vượt grace, app sẽ tự cộng phạt vào phiếu lương theo mức tier dưới đây.<br>
+        Mỗi lần muộn áp <b>1 mức duy nhất</b> = tier có ngưỡng cao nhất mà NV vượt qua.
+      </div>
+
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:14px;margin-bottom:14px">
+        <div>
+          <label style="font-size:11px;color:var(--muted);font-weight:600;text-transform:uppercase">Chế độ tính phạt</label>
+          <select id="lpMode" style="width:100%;padding:7px 10px;font-size:13px;border:1px solid var(--line);border-radius:6px">
+            <option value="tier" ${cur.mode==='tier'?'selected':''}>Theo mức (tier) — Recommended</option>
+            <option value="perMinute" ${cur.mode==='perMinute'?'selected':''}>Theo phút (gracePerMin)</option>
+          </select>
+        </div>
+        <div>
+          <label style="font-size:11px;color:var(--muted);font-weight:600;text-transform:uppercase">Miễn phạt nếu muộn ≤ (phút)</label>
+          <input id="lpGrace" type="number" min="0" max="60" value="${cur.graceMinutes}" style="width:100%;padding:7px 10px;font-size:13px;border:1px solid var(--line);border-radius:6px;text-align:right;font-weight:700">
+        </div>
+      </div>
+
+      <div id="lpTierSection" style="${cur.mode==='perMinute'?'display:none':''}">
+        <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:6px">
+          <b style="font-size:13px">📊 Các mức phạt (tier)</b>
+          <button class="btn btn-ghost btn-sm" onclick="window._lpAddTier()">➕ Thêm mức</button>
+        </div>
+        <div id="lpTierList" style="background:#FAFBFC;border:1px solid var(--line);border-radius:8px;padding:8px 12px;margin-bottom:14px">
+          ${(cur.tiers || []).map((t, i) => tierRow(t, i)).join('')}
+        </div>
+        <div style="font-size:11.5px;color:var(--muted);background:#F0FDF4;border-left:3px solid #15803D;padding:8px 12px;border-radius:6px;margin-bottom:14px;line-height:1.6">
+          💡 <b>VD áp dụng:</b> NV đi muộn 35 phút (grace 10p) → áp tier có ngưỡng cao nhất mà 35 ≥ ngưỡng → tier <b>"> 30 phút"</b> → phạt <b>50.000 ₫</b>
+        </div>
+      </div>
+
+      <div id="lpPerMinSection" style="${cur.mode==='tier'?'display:none':''}">
+        <label style="font-size:11px;color:var(--muted);font-weight:600;text-transform:uppercase">Mức phạt mỗi phút (sau grace)</label>
+        <input id="lpRate" type="text" inputmode="numeric" value="${(cur.perMinuteRate||5000).toLocaleString('vi-VN')}" data-raw="${cur.perMinuteRate||5000}" style="width:100%;padding:7px 10px;font-size:13px;border:1px solid var(--line);border-radius:6px;text-align:right;font-weight:700">
+        <div style="font-size:11px;color:var(--muted);margin-top:4px">VD: 5.000 ₫/phút × (phút muộn − grace) — cách cũ NSTT</div>
+      </div>
+    `;
+    window.openModal('⚙ Cấu hình phạt đi muộn', html, 'Lưu cài đặt', () => {
+      const mode = document.getElementById('lpMode')?.value || 'tier';
+      const graceMinutes = parseInt(document.getElementById('lpGrace')?.value, 10) || 0;
+      const parseRaw = (el) => parseInt((el?.dataset.raw ?? el?.value ?? '').toString().replace(/[^\d-]/g, ''), 10) || 0;
+      const tiers = Array.from(document.querySelectorAll('.lp-tier')).map(el => ({
+        thresholdMinutes: parseInt(el.querySelector('.lp-tier-min')?.value, 10) || 0,
+        label: el.querySelector('.lp-tier-label')?.value || '',
+        amount: parseRaw(el.querySelector('.lp-tier-amount')),
+      })).filter(t => t.thresholdMinutes > 0).sort((a, b) => a.thresholdMinutes - b.thresholdMinutes);
+      const perMinuteRate = parseRaw(document.getElementById('lpRate'));
+      const policy = { mode, graceMinutes, tiers, perMinuteRate };
+      window.STORE.set('latePolicy', policy);
+      window.toast?.('✓ Đã lưu khung phạt đi muộn — ' + tiers.length + ' mức', 'success');
+      window.closeModal?.();
+      render();
+    }, 600);
+
+    /* Wire mode toggle */
+    document.getElementById('lpMode')?.addEventListener('change', e => {
+      const isTier = e.target.value === 'tier';
+      document.getElementById('lpTierSection').style.display = isTier ? '' : 'none';
+      document.getElementById('lpPerMinSection').style.display = isTier ? 'none' : '';
+    });
+    /* Wire money format for tier amount + perMinRate */
+    const wireMoney = (root) => {
+      root.querySelectorAll('input[inputmode="numeric"]').forEach(el => {
+        el.addEventListener('focus', e => { e.target.value = e.target.dataset.raw || '0'; e.target.select(); });
+        el.addEventListener('blur',  e => {
+          const n = parseInt(String(e.target.value).replace(/[^\d-]/g, ''), 10) || 0;
+          e.target.dataset.raw = n;
+          e.target.value = n.toLocaleString('vi-VN');
+        });
+      });
+    };
+    wireMoney(document.body);
+
+    /* Helpers */
+    window._lpAddTier = function () {
+      const list = document.getElementById('lpTierList');
+      const idx = list.querySelectorAll('.lp-tier').length;
+      const tmp = document.createElement('div');
+      tmp.innerHTML = tierRow({ thresholdMinutes: 60, label: 'Mới', amount: 100000 }, idx);
+      list.appendChild(tmp.firstElementChild);
+      wireMoney(list);
+    };
+    window._lpRemoveTier = function (idx) {
+      const el = document.querySelector('.lp-tier[data-idx="' + idx + '"]');
+      el?.remove();
+    };
   };
 
   function renderAttend() {
@@ -511,6 +627,8 @@
       ? allPayslips.filter(p => p && p.month === month)
       : [];
     const psByStaff = Object.fromEntries(monthPayslips.map(p => [p.staffId, p]));
+    /* === Read latePolicy để tính phạt muộn auto từ chấm công === */
+    const PF = window.PayrollFormula;
     const STATUS_BADGE = {
       'draft':     '<span style="background:#FEF3C7;color:#854D0E;padding:3px 9px;border-radius:5px;font-size:10.5px;font-weight:700">📝 NHÁP</span>',
       'submitted': '<span style="background:#DBEAFE;color:#1E40AF;padding:3px 9px;border-radius:5px;font-size:10.5px;font-weight:700">📤 CHỜ DUYỆT</span>',
@@ -532,24 +650,31 @@
       const ps = psByStaff[s.id];
       let workActual, bonusSum, penSum, bhxh, advance, baseSalary, total, statusBadge, hasPhieu;
 
+      /* Phạt muộn auto từ chấm công + latePolicy */
+      const lateAuto = PF
+        ? PF.computeLateAutoForMonth(s.id, month)
+        : { count: 0, total: 0, detail: [] };
+
       if (ps && typeof ps.total === 'number') {
         hasPhieu = true;
         countByStatus[ps.status] = (countByStatus[ps.status] || 0) + 1;
         workActual = ps.workActual || 0;
         bonusSum = (ps.bonuses || []).reduce((sum, b) => sum + (+b.amount || 0), 0);
-        penSum   = (ps.penalties || []).reduce((sum, p) => sum + (+p.amount || 0), 0);
+        const manualPen = (ps.penalties || []).reduce((sum, p) => sum + (+p.amount || 0), 0);
+        penSum = manualPen + lateAuto.total;
         bhxh = +ps.bhxh || 0;
         advance = +ps.advance || 0;
         baseSalary = +ps.baseSalary || luongCo;
-        total = ps.total;
+        /* Recompute total tính cả lateAuto — đảm bảo chấm muộn mới luôn áp dụng */
+        total = Math.max(0, baseSalary + (+ps.allowance || 0) + bonusSum - manualPen - lateAuto.total - bhxh - advance);
         statusBadge = STATUS_BADGE[ps.status] || '';
       } else {
         hasPhieu = false;
         countByStatus.none++;
         workActual = paid;
-        bonusSum = 0; penSum = 0; bhxh = 0; advance = 0;
+        bonusSum = 0; penSum = lateAuto.total; bhxh = 0; advance = 0;
         baseSalary = luongCo;
-        total = luongCo;
+        total = Math.max(0, luongCo - lateAuto.total);
         statusBadge = '<span style="color:var(--muted);font-size:10.5px">— chưa lập</span>';
       }
 
@@ -569,7 +694,7 @@
         <td class="num"><b style="color:#0369A1">${workActual % 1 === 0 ? workActual : workActual.toFixed(2)}</b><div style="font-size:10px;color:var(--muted)">/${wd % 1 === 0 ? wd : wd.toFixed(1)}</div></td>
         <td class="num"><b>${window.fmt(baseSalary)}</b></td>
         <td class="num" style="color:#15803D">${bonusSum ? '<b>+' + window.fmt(bonusSum) + '</b>' : '<span style="color:var(--muted)">—</span>'}</td>
-        <td class="num" style="color:#DC2626">${penSum ? '<b>−' + window.fmt(penSum) + '</b>' : '<span style="color:var(--muted)">—</span>'}</td>
+        <td class="num" style="color:#DC2626" title="${lateAuto.count ? lateAuto.count + ' lần muộn = ' + window.fmt(lateAuto.total) + 'đ (auto từ chấm công) + phạt khác' : 'Phạt thủ công'}">${penSum ? '<b>−' + window.fmt(penSum) + '</b>' + (lateAuto.count ? '<div style="font-size:10px;color:#A16207;font-weight:400">⏰ ' + lateAuto.count + ' lần muộn</div>' : '') : '<span style="color:var(--muted)">—</span>'}</td>
         <td class="num" style="color:#7C3AED">${bhxh ? '<b>−' + window.fmt(bhxh) + '</b>' : '<span style="color:var(--muted)">—</span>'}</td>
         <td class="num" style="color:#A16207">${advance ? '<b>−' + window.fmt(advance) + '</b>' : '<span style="color:var(--muted)">—</span>'}</td>
         <td class="num"><b style="color:var(--red);font-size:14px">${window.fmt(total)}</b></td>

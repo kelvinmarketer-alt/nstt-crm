@@ -94,6 +94,7 @@
     'timesheet',       /* Chấm công NV — CRITICAL */
     'timesheetMeta',   /* Giờ vào muộn, lý do — CRITICAL */
     'payrollExtra',    /* Bảng lương chi tiết — CRITICAL */
+    'latePolicy',      /* Khung phạt đi muộn — CRITICAL (admin cấu hình) */
     'audit_log',       /* Truy vết NV — HIGH */
     'inv_movements',   /* Sổ xuất nhập kho — HIGH */
     'snapshots',       /* Auto-backup — HIGH */

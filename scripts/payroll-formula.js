@@ -67,10 +67,84 @@
   /* === Round nhẹ 1 nghìn đồng cho gọn === */
   function roundK(n) { return Math.round(n / 1000) * 1000; }
 
+  /* =========================================================
+     CHÍNH SÁCH PHẠT ĐI MUỘN (link chấm công ↔ phiếu lương)
+     - mode='tier' (mặc định): mỗi lần muộn áp 1 mức theo tier cao nhất NV vượt qua
+     - mode='perMinute': phạt theo phút sau grace
+     - Admin sửa qua Settings (lưu vào STORE key 'latePolicy')
+     ========================================================= */
+  const LATE_POLICY_DEFAULT = {
+    mode: 'tier',
+    graceMinutes: 10,
+    tiers: [
+      { thresholdMinutes: 10,  amount:  20000, label: '> 10 phút' },
+      { thresholdMinutes: 30,  amount:  50000, label: '> 30 phút' },
+      { thresholdMinutes: 60,  amount: 100000, label: '> 1 tiếng' },
+      { thresholdMinutes: 180, amount: 300000, label: '> 3 tiếng (nửa buổi)' },
+    ],
+    perMinuteRate: 5000, /* dùng nếu mode='perMinute' */
+  };
+
+  function getLatePolicy() {
+    if (!window.STORE) return LATE_POLICY_DEFAULT;
+    const saved = window.STORE.get('latePolicy', null);
+    return saved && saved.tiers ? saved : LATE_POLICY_DEFAULT;
+  }
+
+  /* 1 lần muộn X phút → trả về {amount, tier} */
+  function applyLatePolicy(lateMin, policy) {
+    policy = policy || getLatePolicy();
+    lateMin = +lateMin || 0;
+    const grace = +policy.graceMinutes || 0;
+    if (lateMin <= grace) return { amount: 0, tier: null };
+
+    if (policy.mode === 'perMinute') {
+      const rate = +policy.perMinuteRate || 5000;
+      const amount = Math.round((lateMin - grace) * rate);
+      return { amount, tier: { label: `${lateMin - grace}p × ${rate.toLocaleString('vi-VN')}đ/p` } };
+    }
+
+    /* Tier mode — chọn tier có threshold cao nhất mà NV vượt qua */
+    const tiers = [...(policy.tiers || [])].sort((a, b) => (b.thresholdMinutes || 0) - (a.thresholdMinutes || 0));
+    for (const t of tiers) {
+      if (lateMin >= (+t.thresholdMinutes || 0)) {
+        return { amount: +t.amount || 0, tier: t };
+      }
+    }
+    return { amount: 0, tier: null };
+  }
+
+  /* Compute tổng phạt muộn của 1 NV trong 1 tháng từ chấm công */
+  function computeLateAutoForMonth(staffId, month, policy) {
+    policy = policy || getLatePolicy();
+    if (!window.STORE) return { count: 0, total: 0, detail: [] };
+
+    const sheets = window.STORE.get('timesheet', []) || [];
+    const sheet = sheets.find(t => t.staffId === staffId && t.month === month);
+    if (!sheet || !Array.isArray(sheet.days)) return { count: 0, total: 0, detail: [] };
+
+    const allMeta = window.STORE.get('timesheetMeta', {}) || {};
+    const meta = allMeta[staffId + '_' + month] || {};
+
+    let total = 0;
+    const detail = [];
+    sheet.days.forEach((status, idx) => {
+      if (status !== 'L') return;
+      const dayN = idx + 1;
+      const lateMin = (meta[dayN] && meta[dayN].lateMin) || 0;
+      const r = applyLatePolicy(lateMin, policy);
+      if (r.amount > 0) {
+        total += r.amount;
+        detail.push({ day: dayN, lateMin, amount: r.amount, tierLabel: r.tier?.label || '' });
+      }
+    });
+    return { count: detail.length, total, detail };
+  }
+
   /* === Tính 1 dòng lương đầy đủ === */
   function computePayslip(input) {
     /* input = {
-         basicSalary, contractType, dept, workActual,
+         basicSalary, contractType, dept, workActual, staffId, month,
          workStandardOverride, allowanceOverride,
          bonuses: [{name, amount}, ...],
          penalties: [{name, amount}, ...],
@@ -98,7 +172,13 @@
     const bhxh = +input.bhxh || 0;
     const advance = +input.advance || 0;
 
-    const total = baseSalary + allowance + totalBonus - totalPenalty - bhxh - advance;
+    /* === NEW: Phạt đi muộn (auto từ chấm công + latePolicy) === */
+    let lateAuto = { count: 0, total: 0, detail: [] };
+    if (input.staffId && input.month) {
+      lateAuto = computeLateAutoForMonth(input.staffId, input.month);
+    }
+
+    const total = baseSalary + allowance + totalBonus - totalPenalty - bhxh - advance - lateAuto.total;
 
     return {
       ...input,
@@ -111,6 +191,7 @@
       totalPenalty,
       bhxh,
       advance,
+      lateAuto,
       total: Math.max(0, total),
       breakdown: {
         formula: `${formatVND(basicSalary)} × ${(ratio*100).toFixed(0)}% ÷ ${workStandard} × ${workActual}`,
@@ -152,6 +233,11 @@
     DEPT_CONFIG,
     formatVND,
     roundK,
+    /* Late policy */
+    LATE_POLICY_DEFAULT,
+    getLatePolicy,
+    applyLatePolicy,
+    computeLateAutoForMonth,
   };
 
   console.log('[NSTT] ✓ Payroll formula engine ready');

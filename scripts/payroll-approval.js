@@ -113,7 +113,11 @@
   window.openPayslipDrawer = function (staffId, month) {
     month = month || '2026-' + String(new Date().getMonth()+1).padStart(2,'0');
     const p = getOrCreatePayslip(staffId, month);
+    /* Đảm bảo computePayslip có staffId + month để tính lateAuto */
+    p.staffId = p.staffId || staffId;
+    p.month = p.month || month;
     const computed = PF.computePayslip(p);
+    const lateAuto = computed.lateAuto || { count: 0, total: 0, detail: [] };
 
     /* === Permission detection === */
     const hasPerm = (perm) => !!(window.AUTH && window.AUTH.hasPerm && window.AUTH.hasPerm(perm));
@@ -250,6 +254,25 @@
           ${penaltyRows(p.penalties)}
         </div>
 
+        <!-- ⏰ Phạt đi muộn AUTO (link với chấm công) -->
+        <div style="background:${lateAuto.count?'#FEF2F2':'#F9FAFB'};border:1px solid ${lateAuto.count?'#FECACA':'var(--line)'};border-radius:10px;padding:12px 14px;margin-bottom:14px">
+          <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:6px">
+            <div>
+              <b style="color:${lateAuto.count?'#DC2626':'var(--muted)'};font-size:13px">⏰ Phạt đi muộn (tự tính từ chấm công)</b>
+              <div style="font-size:11px;color:var(--muted);margin-top:2px">${lateAuto.count?lateAuto.count+' lần muộn':'Không có lần nào'}
+                · <a href="javascript:window.openLatePolicySettings && window.openLatePolicySettings()" style="color:#1E40AF">Sửa khung phạt</a></div>
+            </div>
+            <span style="font-size:15px;font-weight:800;color:${lateAuto.count?'#DC2626':'var(--muted)'}">${lateAuto.count?'− '+PF.formatVND(lateAuto.total)+' ₫':'— 0 ₫'}</span>
+          </div>
+          ${lateAuto.count ? `
+            <details style="margin-top:6px">
+              <summary style="cursor:pointer;font-size:11.5px;color:#DC2626">📋 Chi tiết ${lateAuto.count} lần</summary>
+              <div style="padding:6px 0 0 12px;font-size:11.5px;color:#7F1D1D;line-height:1.7">
+                ${lateAuto.detail.map(d => `Ngày ${d.day}: muộn ${d.lateMin}p (${d.tierLabel || 'tier'}) → <b>${PF.formatVND(d.amount)} đ</b>`).join('<br>')}
+              </div>
+            </details>` : ''}
+        </div>
+
         <!-- BHXH + TẠM ỨNG -->
         <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:14px">
           <div>
@@ -272,8 +295,8 @@
         <div style="background:linear-gradient(135deg,#1B5E20,#15803D);color:#fff;padding:18px 20px;border-radius:12px;text-align:center">
           <div style="font-size:13px;opacity:0.9;margin-bottom:6px">TỔNG THỰC LĨNH</div>
           <div style="font-size:28px;font-weight:800" id="psTotal">${PF.formatVND(computed.total)} ₫</div>
-          <div style="font-size:11px;opacity:0.85;margin-top:6px">
-            ${PF.formatVND(computed.baseSalary)} + ${PF.formatVND(computed.allowance)} + ${PF.formatVND(computed.totalBonus)} − ${PF.formatVND(computed.totalPenalty)} − ${PF.formatVND(computed.bhxh)} − ${PF.formatVND(computed.advance)}
+          <div style="font-size:11px;opacity:0.85;margin-top:6px" id="psBreakdownText">
+            ${PF.formatVND(computed.baseSalary)} + ${PF.formatVND(computed.allowance)} + ${PF.formatVND(computed.totalBonus)} − ${PF.formatVND(computed.totalPenalty)} − ${PF.formatVND(lateAuto.total)}<sub>muộn</sub> − ${PF.formatVND(computed.bhxh)} − ${PF.formatVND(computed.advance)}
           </div>
         </div>
 
@@ -346,13 +369,19 @@
     }
     function refreshComputed() {
       const d = collect();
+      /* Đảm bảo lateAuto luôn được tính lại theo chấm công + latePolicy hiện tại */
+      d.staffId = d.staffId || staffId;
+      d.month = d.month || month;
       const c = PF.computePayslip(d);
+      const la = c.lateAuto || { count: 0, total: 0 };
       document.getElementById('psBaseSalary').textContent = PF.formatVND(c.baseSalary) + ' ₫';
       document.getElementById('psBaseFormula').textContent = c.breakdown.baseSalaryDetail;
       document.getElementById('psAllowance').textContent = PF.formatVND(c.allowance) + ' ₫';
       document.getElementById('psBonusTotal').textContent = '+ ' + PF.formatVND(c.totalBonus) + ' ₫';
       document.getElementById('psPenaltyTotal').textContent = '− ' + PF.formatVND(c.totalPenalty) + ' ₫';
       document.getElementById('psTotal').textContent = PF.formatVND(c.total) + ' ₫';
+      const bt = document.getElementById('psBreakdownText');
+      if (bt) bt.innerHTML = `${PF.formatVND(c.baseSalary)} + ${PF.formatVND(c.allowance)} + ${PF.formatVND(c.totalBonus)} − ${PF.formatVND(c.totalPenalty)} − ${PF.formatVND(la.total)}<sub>muộn</sub> − ${PF.formatVND(c.bhxh)} − ${PF.formatVND(c.advance)}`;
     }
 
     /* Bind inputs */

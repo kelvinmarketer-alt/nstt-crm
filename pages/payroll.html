@@ -36,6 +36,7 @@
       </div>
       <div class="head-actions">
         <input type="month" id="payMonth" value="2026-05" onchange="window.setPayMonth(this.value)">
+        <button class="btn btn-ghost" onclick="window.openLatePolicySettings && window.openLatePolicySettings()" title="Cấu hình mức phạt đi muộn (admin)">⚙ Khung phạt muộn</button>
         <button class="btn btn-ghost" onclick="window.openUploadTimesheet()">📥 Upload Excel chấm công</button>
         <button class="btn btn-navy" onclick="window.submitAllDrafts && window.submitAllDrafts(document.getElementById('payMonth').value)" title="HR gửi tất cả phiếu draft + tự lập phiếu cho NV chưa có">📤 Gửi tất cả CFO duyệt</button>
         <button class="btn btn-primary" onclick="window.openPayslipBatchReview && window.openPayslipBatchReview(document.getElementById('payMonth').value)" title="CFO xem hàng loạt + duyệt nhanh">📊 Bảng dự kiến CFO duyệt</button>
