@@ -490,7 +490,7 @@
 
   function renderPayroll() {
     const staffs = STAFF(); const wd = workdaysInMonth();
-    const extra = window.STORE.get('payrollExtra', {});
+    const extra = window.STORE.get('payrollInlineExtras', {});
     let totalAll = 0; let totalLateDed = 0; let totalBonus = 0;
     const rows = staffs.map(s => {
       const sh = sheetOf(s.id); const md = metaOf(s.id);
@@ -596,9 +596,9 @@
     document.querySelectorAll('.pay-extra').forEach(inp => {
       inp.addEventListener('change', () => {
         const sid = inp.dataset.sid, field = inp.dataset.field, val = parseInt(inp.value, 10) || 0;
-        const ex = { ...window.STORE.get('payrollExtra', {}) };
+        const ex = { ...window.STORE.get('payrollInlineExtras', {}) };
         ex[sid] = { ...(ex[sid] || {}), [field]: val };
-        window.STORE.set('payrollExtra', ex);
+        window.STORE.set('payrollInlineExtras', ex);
         renderPayroll();
       });
     });

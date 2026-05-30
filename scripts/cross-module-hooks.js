@@ -213,21 +213,25 @@
        (payroll module sử dụng key 'payrollExtra' để lưu)
        ============================================================ */
     window.STORE.subscribe('payrollExtra', payroll => {
+      /* Schema mới: array of payslip {status, total, paidAt, staffName, month, ...} */
+      if (!Array.isArray(payroll)) return; /* tránh ghi đè khi format sai */
       let changed = false;
-      const list = payroll || [];
+      const list = payroll;
       const cash = window.STORE.get('cashEntries', []) || [];
       list.forEach(p => {
-        if (p.paid && !p._cashApplied && p.amount > 0) {
+        const amount = +p.total || +p.amount || 0;
+        const isPaid = p.status === 'paid' || p.paid === true;
+        if (isPaid && !p._cashApplied && amount > 0) {
           const no = 'PC-LU-' + (p.id || Date.now()).toString().slice(-8);
           if (!cash.some(c => c.no === no)) {
             cash.unshift({
               no,
-              date: p.payDate || '',
+              date: (p.paidAt || p.payDate || new Date().toISOString()).slice(0, 10),
               type: 'out',
               party: p.staffName || p.name || 'NV',
               description: `Lương tháng ${p.month||''} — ${p.staffName||p.name||''}`,
               account: 'Tiền mặt',
-              amount: p.amount,
+              amount,
               staff: (window.CURRENT_USER||{}).name || 'Hệ thống',
               relatedOrder: '',
               relatedInvoice: '',

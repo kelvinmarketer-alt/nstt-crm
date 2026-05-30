@@ -670,7 +670,7 @@
     const staffs = (window.STORE.get('staff', window.STAFFS || []) || [])
       .filter(s => s.status === 'active');
     const sheets = window.STORE.get('timesheet', window.TIMESHEET || []) || [];
-    const extra = window.STORE.get('payrollExtra', {}) || {};
+    const extra = window.STORE.get('payrollInlineExtras', {}) || {};
     const monthKey = yy + '-' + String(mm).padStart(2, '0');
     /* NC chuẩn = số ngày trong tháng trừ Chủ nhật */
     const last = new Date(yy, mm, 0).getDate();
