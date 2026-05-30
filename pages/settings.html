@@ -915,6 +915,16 @@
       const hasChannel = (cfg.channels || []).some(c => c.chatId && c.enabled !== false);
       filled = hasDefault || hasChannel;
     }
+    /* Special-case AI Form Filler: data save trong cfg.providers[] không phải flat fields.
+       Coi đủ nếu ≥1 provider enabled có apiKey. */
+    if (id === 'ai-engine') {
+      const providers = cfg.providers || [];
+      filled = providers.some(p => p.enabled !== false && p.apiKey && p.apiKey.length > 5);
+    }
+    /* Special-case Google Sheets: data save trong cfg.webhookUrl */
+    if (id === 'google-sheets') {
+      filled = !!cfg.webhookUrl && cfg.webhookUrl.startsWith('http');
+    }
     if (!filled) return { cls:'partial', label:'🟡 Chưa cấu hình đủ', color:'var(--warn)' };
     return { cls:'on', label:'🟢 Đang hoạt động', color:'var(--ok)' };
   }
