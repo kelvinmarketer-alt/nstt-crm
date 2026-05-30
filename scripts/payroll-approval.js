@@ -31,6 +31,45 @@
 
   const PF = window.PayrollFormula;
 
+  /* === Money input helper — format khi blur, raw khi focus === */
+  function parseMoney(s) {
+    return parseInt(String(s == null ? '' : s).replace(/[^\d\-]/g, ''), 10) || 0;
+  }
+  function fmtMoney(n) {
+    return (parseMoney(n)).toLocaleString('vi-VN');
+  }
+  /* Money input HTML helper — type="text" + format */
+  function moneyInput(id, value, opts) {
+    opts = opts || {};
+    const readonly = opts.readonly ? 'readonly' : '';
+    const placeholder = opts.placeholder || '';
+    const style = opts.style || 'width:100%;padding:7px 10px;font-size:13px;border:1px solid var(--line);border-radius:6px;text-align:right;font-weight:700';
+    const cls = opts.cls || 'ps-money';
+    return `<input id="${id}" type="text" inputmode="numeric" class="${cls}" value="${fmtMoney(value)}" data-raw="${parseMoney(value)}" placeholder="${placeholder}" ${readonly} style="${style}">`;
+  }
+  /* Wire money inputs trong drawer — focus=raw, blur=format */
+  function wireMoneyInputs(root) {
+    if (!root) return;
+    root.querySelectorAll('.ps-money').forEach(el => {
+      el.addEventListener('focus', e => {
+        e.target.value = e.target.dataset.raw || '0';
+        e.target.select();
+      });
+      el.addEventListener('blur', e => {
+        const n = parseMoney(e.target.value);
+        e.target.dataset.raw = n;
+        e.target.value = fmtMoney(n);
+      });
+    });
+  }
+  /* Đọc raw từ input money (kể cả khi đang focus) */
+  function getMoneyRaw(id) {
+    const el = document.getElementById(id);
+    if (!el) return 0;
+    /* Nếu đang focus thì value là raw, otherwise dùng dataset */
+    return parseMoney(el === document.activeElement ? el.value : (el.dataset.raw ?? el.value));
+  }
+
   /* === Lưu/lấy phiếu lương từ STORE === */
   function getPayslips()      { return window.STORE.get('payrollExtra', []) || []; }
   function savePayslips(list) { window.STORE.set('payrollExtra', list); }
@@ -108,18 +147,18 @@
     /* Render bonus + penalty rows editable */
     function bonusRows(arr) {
       return (arr || []).map((b, i) => `
-        <div class="ps-line ps-bonus" data-idx="${i}" style="display:grid;grid-template-columns:1fr 140px 32px;gap:8px;padding:6px 0;border-bottom:1px dashed var(--line)">
+        <div class="ps-line ps-bonus" data-idx="${i}" style="display:grid;grid-template-columns:1fr 160px 32px;gap:8px;padding:6px 0;border-bottom:1px dashed var(--line)">
           <input class="ps-bonus-name" data-idx="${i}" value="${(b.name||'').replace(/"/g,'&quot;')}" placeholder="VD: Doanh số 3% nhà X" ${canEdit?'':'readonly'} style="border:1px solid var(--line);border-radius:6px;padding:5px 8px;font-size:12.5px">
-          <input class="ps-bonus-amount num" data-idx="${i}" type="number" value="${b.amount||0}" placeholder="0" ${canEdit?'':'readonly'} style="border:1px solid var(--line);border-radius:6px;padding:5px 8px;text-align:right;font-size:12.5px;font-weight:700;color:#15803D">
+          <input class="ps-bonus-amount ps-money" data-idx="${i}" type="text" inputmode="numeric" value="${fmtMoney(b.amount||0)}" data-raw="${parseMoney(b.amount||0)}" placeholder="0" ${canEdit?'':'readonly'} style="border:1px solid var(--line);border-radius:6px;padding:5px 8px;text-align:right;font-size:12.5px;font-weight:700;color:#15803D">
           ${canEdit ? `<button onclick="window._psRemoveBonus(${i})" style="background:transparent;border:none;color:#DC2626;cursor:pointer;font-size:16px">×</button>` : '<span></span>'}
         </div>
       `).join('') || `<div style="padding:8px;color:var(--muted);text-align:center;font-size:12px">Chưa có khoản thưởng</div>`;
     }
     function penaltyRows(arr) {
       return (arr || []).map((p, i) => `
-        <div class="ps-line ps-pen" data-idx="${i}" style="display:grid;grid-template-columns:1fr 140px 32px;gap:8px;padding:6px 0;border-bottom:1px dashed var(--line)">
+        <div class="ps-line ps-pen" data-idx="${i}" style="display:grid;grid-template-columns:1fr 160px 32px;gap:8px;padding:6px 0;border-bottom:1px dashed var(--line)">
           <input class="ps-pen-name" data-idx="${i}" value="${(p.name||'').replace(/"/g,'&quot;')}" placeholder="VD: Đi muộn > 10p × 3 ngày" ${canEdit?'':'readonly'} style="border:1px solid var(--line);border-radius:6px;padding:5px 8px;font-size:12.5px">
-          <input class="ps-pen-amount num" data-idx="${i}" type="number" value="${p.amount||0}" placeholder="0" ${canEdit?'':'readonly'} style="border:1px solid var(--line);border-radius:6px;padding:5px 8px;text-align:right;font-size:12.5px;font-weight:700;color:#DC2626">
+          <input class="ps-pen-amount ps-money" data-idx="${i}" type="text" inputmode="numeric" value="${fmtMoney(p.amount||0)}" data-raw="${parseMoney(p.amount||0)}" placeholder="0" ${canEdit?'':'readonly'} style="border:1px solid var(--line);border-radius:6px;padding:5px 8px;text-align:right;font-size:12.5px;font-weight:700;color:#DC2626">
           ${canEdit ? `<button onclick="window._psRemovePenalty(${i})" style="background:transparent;border:none;color:#DC2626;cursor:pointer;font-size:16px">×</button>` : '<span></span>'}
         </div>
       `).join('') || `<div style="padding:8px;color:var(--muted);text-align:center;font-size:12px">Không có khoản phạt</div>`;
@@ -147,7 +186,7 @@
         <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:14px">
           <div>
             <label style="font-size:11px;color:var(--muted);text-transform:uppercase;font-weight:600">Lương cơ bản (₫)</label>
-            <input id="psBasic" type="number" value="${p.basicSalary}" ${canEdit?'':'readonly'} style="width:100%;padding:7px 10px;font-size:13px;border:1px solid var(--line);border-radius:6px;text-align:right;font-weight:700">
+            ${moneyInput('psBasic', p.basicSalary, { readonly: !canEdit })}
           </div>
           <div>
             <label style="font-size:11px;color:var(--muted);text-transform:uppercase;font-weight:600">Loại HĐ</label>
@@ -187,7 +226,10 @@
             </div>
             <span style="font-size:15px;font-weight:800;color:#1E40AF" id="psAllowance">${PF.formatVND(computed.allowance)} ₫</span>
           </div>
-          ${canEdit ? `<input id="psAllowanceOverride" type="number" placeholder="Ghi đè mức phụ cấp (để trống = dùng mặc định)" value="${p.allowanceOverride||''}" style="width:100%;padding:6px 10px;font-size:12px;border:1px solid #BFDBFE;border-radius:6px;background:#fff">` : ''}
+          ${canEdit ? moneyInput('psAllowanceOverride', p.allowanceOverride || 0, {
+            placeholder: 'Ghi đè mức phụ cấp (để trống/0 = mặc định)',
+            style: 'width:100%;padding:6px 10px;font-size:12px;border:1px solid #BFDBFE;border-radius:6px;background:#fff;text-align:right'
+          }) : ''}
         </div>
 
         <!-- THƯỞNG -->
@@ -212,11 +254,11 @@
         <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:14px">
           <div>
             <label style="font-size:11px;color:var(--muted);text-transform:uppercase;font-weight:600">🛡 BHXH (₫/tháng)</label>
-            <input id="psBhxh" type="number" value="${p.bhxh}" placeholder="0 hoặc 578000" ${canEdit?'':'readonly'} style="width:100%;padding:7px 10px;font-size:13px;border:1px solid var(--line);border-radius:6px;text-align:right">
+            ${moneyInput('psBhxh', p.bhxh, { readonly: !canEdit, placeholder: '0 hoặc 578.000' })}
           </div>
           <div>
             <label style="font-size:11px;color:var(--muted);text-transform:uppercase;font-weight:600">💵 Tạm ứng đã ứng (₫)</label>
-            <input id="psAdvance" type="number" value="${p.advance}" ${canEdit?'':'readonly'} style="width:100%;padding:7px 10px;font-size:13px;border:1px solid var(--line);border-radius:6px;text-align:right">
+            ${moneyInput('psAdvance', p.advance, { readonly: !canEdit, placeholder: '0' })}
           </div>
         </div>
 
@@ -277,24 +319,28 @@
 
     function collect() {
       const d = window._psCurrentDraft;
-      d.basicSalary = +(document.getElementById('psBasic')?.value || 0);
+      d.basicSalary = getMoneyRaw('psBasic');
       d.contractType = document.getElementById('psContract')?.value || 'official';
       d.workActual = +(document.getElementById('psWorkActual')?.value || 0);
       const wsv = document.getElementById('psWorkStd')?.value;
       d.workStandardOverride = wsv ? +wsv : null;
-      const ao = document.getElementById('psAllowanceOverride')?.value;
-      d.allowanceOverride = ao ? +ao : null;
-      d.bhxh = +(document.getElementById('psBhxh')?.value || 0);
-      d.advance = +(document.getElementById('psAdvance')?.value || 0);
+      const ao = getMoneyRaw('psAllowanceOverride');
+      d.allowanceOverride = ao || null;
+      d.bhxh = getMoneyRaw('psBhxh');
+      d.advance = getMoneyRaw('psAdvance');
       d.notes = document.getElementById('psNotes')?.value || '';
-      /* Collect bonus/penalty từ DOM */
+      /* Collect bonus/penalty từ DOM — đọc raw từ data-raw nếu blur, value nếu đang focus */
+      const readAmount = (el) => {
+        if (!el) return 0;
+        return parseMoney(el === document.activeElement ? el.value : (el.dataset.raw ?? el.value));
+      };
       d.bonuses = Array.from(document.querySelectorAll('.ps-bonus')).map(el => ({
         name: el.querySelector('.ps-bonus-name')?.value || '',
-        amount: +(el.querySelector('.ps-bonus-amount')?.value || 0),
+        amount: readAmount(el.querySelector('.ps-bonus-amount')),
       })).filter(b => b.amount > 0 || b.name);
       d.penalties = Array.from(document.querySelectorAll('.ps-pen')).map(el => ({
         name: el.querySelector('.ps-pen-name')?.value || '',
-        amount: +(el.querySelector('.ps-pen-amount')?.value || 0),
+        amount: readAmount(el.querySelector('.ps-pen-amount')),
       })).filter(p => p.amount > 0 || p.name);
       return d;
     }
@@ -314,6 +360,8 @@
       el.addEventListener('input', refreshComputed);
       el.addEventListener('change', refreshComputed);
     });
+    /* Money inputs: format on blur, raw on focus */
+    wireMoneyInputs(dc);
 
     /* === Action helpers (expose to window) === */
     window._psAddBonus = function () {
@@ -326,6 +374,7 @@
         el.addEventListener('input', refreshComputed);
         el.addEventListener('change', refreshComputed);
       });
+      wireMoneyInputs(list);
     };
     window._psRemoveBonus = function (idx) {
       const d = collect();
@@ -337,6 +386,7 @@
         el.addEventListener('input', refreshComputed);
         el.addEventListener('change', refreshComputed);
       });
+      wireMoneyInputs(list);
       refreshComputed();
     };
     window._psAddPenalty = function () {
@@ -349,6 +399,7 @@
         el.addEventListener('input', refreshComputed);
         el.addEventListener('change', refreshComputed);
       });
+      wireMoneyInputs(list);
     };
     window._psRemovePenalty = function (idx) {
       const d = collect();
@@ -360,6 +411,7 @@
         el.addEventListener('input', refreshComputed);
         el.addEventListener('change', refreshComputed);
       });
+      wireMoneyInputs(list);
       refreshComputed();
     };
 
@@ -590,5 +642,117 @@
     document.getElementById('drawerBg')?.classList.add('open');
   };
 
-  console.log('[NSTT] ✓ Payroll workflow ready — openPayslipDrawer / openPayslipBatchReview');
+  /* =========================================================
+     BATCH SUBMIT — HR gửi TẤT CẢ phiếu (draft + chưa lập) cho CFO
+     ========================================================= */
+  window.submitAllDrafts = function (month) {
+    month = month || '2026-' + String(new Date().getMonth()+1).padStart(2,'0');
+    const hasPerm = (perm) => !!(window.AUTH && window.AUTH.hasPerm && window.AUTH.hasPerm(perm));
+    const isAdmin = hasPerm('all');
+    const isHR = isAdmin || hasPerm('payroll.calc') || hasPerm('payroll.submit');
+    if (!isHR) {
+      window.toast?.('🔒 Bạn không có quyền gửi phiếu lương cho CFO (cần perm payroll.submit/payroll.calc)', 'warn');
+      return;
+    }
+
+    const staffs = (window.STORE.get('staff', []) || []).filter(s => s.status === 'active');
+    const list = getPayslips();
+    const monthPayslipsByStaff = Object.fromEntries(
+      list.filter(p => p.month === month).map(p => [p.staffId, p])
+    );
+
+    /* Phân loại: draft (sẽ submit), none (sẽ auto-tạo + submit), submitted+ (bỏ qua) */
+    const toSubmit = [];   /* draft existing → đổi status */
+    const toCreate = [];   /* NV chưa có phiếu → tạo phiếu mặc định */
+    const skipped = [];    /* submitted/approved/paid */
+    staffs.forEach(s => {
+      const ps = monthPayslipsByStaff[s.id];
+      if (!ps) toCreate.push(s);
+      else if (ps.status === 'draft') toSubmit.push(ps);
+      else skipped.push({ staffName: s.name, status: ps.status });
+    });
+
+    const totalAffect = toSubmit.length + toCreate.length;
+    if (totalAffect === 0) {
+      window.toast?.('Không có phiếu nháp nào để gửi · ' + skipped.length + ' phiếu đã submit trước đó', 'warn');
+      return;
+    }
+
+    const msg = [
+      `Gửi TẤT CẢ ${totalAffect} phiếu lương tháng ${month} cho CFO duyệt?`,
+      '',
+      `📤 ${toSubmit.length} phiếu NHÁP → CHỜ DUYỆT`,
+      `➕ ${toCreate.length} NV chưa lập → tự tạo phiếu + gửi`,
+      skipped.length ? `⏭ ${skipped.length} phiếu bỏ qua (đã submit/duyệt/trả)` : '',
+      '',
+      'Sau khi gửi anh/chị KHÔNG sửa được nữa — chỉ CFO mới sửa được.',
+    ].filter(Boolean).join('\n');
+    if (!confirm(msg)) return;
+
+    const now = new Date().toISOString();
+    const user = (window.AUTH && window.AUTH.currentUser()) || {};
+    const submitterName = user.name || user.email || 'NS';
+    let totalAmount = 0;
+
+    /* 1) Đổi status draft → submitted (giữ nguyên data) */
+    toSubmit.forEach(ps => {
+      const c = PF.computePayslip(ps);
+      Object.assign(ps, {
+        baseSalary: c.baseSalary, allowance: c.allowance, total: c.total,
+        status: 'submitted',
+        submittedBy: submitterName,
+        submittedAt: now,
+      });
+      totalAmount += c.total;
+    });
+
+    /* 2) Auto-tạo phiếu cho NV chưa có — dùng default từ staff + công đầy đủ */
+    const sheets = window.STORE.get('timesheet', []) || [];
+    toCreate.forEach(s => {
+      const sheet = sheets.find(t => t.staffId === s.id && t.month === month);
+      const workActual = sheet
+        ? sheet.days.filter(d => d === 'X' || d === 'P').length
+        : (PF.getDeptConfig(s.dept, s.contractType).workStandard);
+      const draft = {
+        id: 'PR-' + month + '-' + s.id,
+        month,
+        staffId: s.id,
+        staffName: s.name,
+        dept: s.dept || 'VP',
+        role: s.role || '',
+        contractType: s.contractType || 'official',
+        basicSalary: s.salary || 0,
+        workActual,
+        workStandardOverride: null,
+        allowanceOverride: null,
+        bonuses: [],
+        penalties: [],
+        bhxh: s.hasBHXH ? 578000 : 0,
+        advance: 0,
+        notes: '(Tự tạo bởi HR khi gửi hàng loạt)',
+        createdAt: now,
+        status: 'submitted',
+        submittedBy: submitterName,
+        submittedAt: now,
+        approvedBy: null,
+        approvedAt: null,
+        paidAt: null,
+      };
+      const c = PF.computePayslip(draft);
+      draft.baseSalary = c.baseSalary;
+      draft.allowance = c.allowance;
+      draft.total = c.total;
+      totalAmount += c.total;
+      list.push(draft);
+    });
+
+    savePayslips(list);
+    window.toast?.(`📤 Đã gửi ${totalAffect} phiếu cho CFO duyệt · Tổng ${PF.formatVND(totalAmount)} ₫`, 'success');
+
+    /* Refresh view nếu đang ở trang Bảng lương */
+    if (typeof window.renderPayrollPublic === 'function') window.renderPayrollPublic();
+    else location.reload();
+  };
+
+  console.log('[NSTT] ✓ Payroll workflow ready — openPayslipDrawer / openPayslipBatchReview / submitAllDrafts');
 })();

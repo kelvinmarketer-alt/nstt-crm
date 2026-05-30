@@ -9,9 +9,15 @@
   let tab = 'attend';
 
   /* === Perm helpers === */
-  function canViewAll() { return !!(window.AUTH && window.AUTH.hasPerm('payroll.viewAll')); }
-  function canEdit()    { return !!(window.AUTH && window.AUTH.hasPerm('payroll.edit')); }
-  function canUpload()  { return !!(window.AUTH && window.AUTH.hasPerm('payroll.upload')); }
+  function hasP(perm) { return !!(window.AUTH && window.AUTH.hasPerm && window.AUTH.hasPerm(perm)); }
+  function canViewAll() { return hasP('payroll.viewAll') || hasP('all'); }
+  function canEdit()    { return hasP('payroll.edit') || hasP('all'); }
+  function canUpload()  { return hasP('payroll.upload') || hasP('all'); }
+  /* === NEW: quyền liên quan workflow phiếu lương === */
+  function canCalc()    { return hasP('payroll.calc') || hasP('payroll.submit') || hasP('all'); }
+  function canApprove() { return hasP('payroll.approve') || hasP('all'); }
+  /* Mở/sửa/duyệt phiếu lương = ai cần xem chi tiết phiếu */
+  function canOpenPayslip() { return canCalc() || canApprove() || canViewAll(); }
   function meStaffId()  { const u = window.AUTH && window.AUTH.currentUser(); return u ? u.staffId : null; }
 
   /* =========================================================
@@ -134,6 +140,15 @@
   }
   window.setPayTab = t => { tab = t; render(); };
   window.setPayMonth = m => { month = m; render(); };
+  /* Expose để batch submit gọi refresh không cần reload */
+  window.renderPayrollPublic = () => { if (tab === 'payroll') renderPayroll(); else render(); };
+  /* Hide nút header theo perm — call sau init render */
+  window.applyPayrollHeaderPerms = function () {
+    const subBtn = document.querySelector('[onclick*="submitAllDrafts"]');
+    if (subBtn) subBtn.style.display = canCalc() ? '' : 'none';
+    const cfoBtn = document.querySelector('[onclick*="openPayslipBatchReview"]');
+    if (cfoBtn) cfoBtn.style.display = canApprove() ? '' : 'none';
+  };
 
   function renderAttend() {
     const staffs = STAFF();
@@ -490,155 +505,156 @@
 
   function renderPayroll() {
     const staffs = STAFF(); const wd = workdaysInMonth();
-    const extra = window.STORE.get('payrollInlineExtras', {});
-    /* === NEW: đọc payslips đã lập (array) cho tháng đang chọn === */
+    /* === Đọc payslips đã lập (array) cho tháng đang chọn === */
     const allPayslips = window.STORE.get('payrollExtra', []) || [];
     const monthPayslips = Array.isArray(allPayslips)
       ? allPayslips.filter(p => p && p.month === month)
       : [];
     const psByStaff = Object.fromEntries(monthPayslips.map(p => [p.staffId, p]));
     const STATUS_BADGE = {
-      'draft':     '<span style="background:#FEF3C7;color:#854D0E;padding:2px 7px;border-radius:5px;font-size:10px;font-weight:700">📝 NHÁP</span>',
-      'submitted': '<span style="background:#DBEAFE;color:#1E40AF;padding:2px 7px;border-radius:5px;font-size:10px;font-weight:700">📤 CHỜ DUYỆT</span>',
-      'approved':  '<span style="background:#DCFCE7;color:#15803D;padding:2px 7px;border-radius:5px;font-size:10px;font-weight:700">✓ ĐÃ DUYỆT</span>',
-      'paid':      '<span style="background:#E0E7FF;color:#3730A3;padding:2px 7px;border-radius:5px;font-size:10px;font-weight:700">💵 ĐÃ TRẢ</span>',
+      'draft':     '<span style="background:#FEF3C7;color:#854D0E;padding:3px 9px;border-radius:5px;font-size:10.5px;font-weight:700">📝 NHÁP</span>',
+      'submitted': '<span style="background:#DBEAFE;color:#1E40AF;padding:3px 9px;border-radius:5px;font-size:10.5px;font-weight:700">📤 CHỜ DUYỆT</span>',
+      'approved':  '<span style="background:#DCFCE7;color:#15803D;padding:3px 9px;border-radius:5px;font-size:10.5px;font-weight:700">✓ ĐÃ DUYỆT</span>',
+      'paid':      '<span style="background:#E0E7FF;color:#3730A3;padding:3px 9px;border-radius:5px;font-size:10.5px;font-weight:700">💵 ĐÃ TRẢ</span>',
     };
 
-    let totalAll = 0; let totalLateDed = 0; let totalBonus = 0;
+    let totalAll = 0; let totalBonusAll = 0; let totalPenAll = 0;
+    let totalBhxhAll = 0; let totalAdvAll = 0; let totalCongAll = 0;
+    let countByStatus = { draft: 0, submitted: 0, approved: 0, paid: 0, none: 0 };
+
     const rows = staffs.map(s => {
-      const sh = sheetOf(s.id); const md = metaOf(s.id);
+      const sh = sheetOf(s.id);
       const days = sh ? sh.days : defaultDays();
-      const c = counts(days, md);
       const paid = paidDays(days);
       const luongNgay = wd ? Math.round((s.salary || 0) / wd) : 0;
       const luongCo = Math.round(luongNgay * paid);
-      /* Khấu trừ đi muộn — chỉ phần > grace */
-      let lateDed = 0;
-      Object.values(md).forEach(meta => {
-        if (meta && meta.lateMin > LATE_GRACE_MIN) lateDed += (meta.lateMin - LATE_GRACE_MIN) * LATE_DEDUCT_PER_MIN;
-      });
-      totalLateDed += lateDed;
-      /* Hoa hồng / thưởng theo salaryConfig */
-      const auto = computeBonusFromConfig(s);
-      totalBonus += auto.amount;
-      const e = extra[s.id] || { bonus: 0, deduction: 0 };
 
-      /* === NEW: nếu đã có phiếu lương → dùng total phiếu thay cho công thức inline === */
       const ps = psByStaff[s.id];
-      let total, totalCellHTML;
+      let workActual, bonusSum, penSum, bhxh, advance, baseSalary, total, statusBadge, hasPhieu;
+
       if (ps && typeof ps.total === 'number') {
+        hasPhieu = true;
+        countByStatus[ps.status] = (countByStatus[ps.status] || 0) + 1;
+        workActual = ps.workActual || 0;
+        bonusSum = (ps.bonuses || []).reduce((sum, b) => sum + (+b.amount || 0), 0);
+        penSum   = (ps.penalties || []).reduce((sum, p) => sum + (+p.amount || 0), 0);
+        bhxh = +ps.bhxh || 0;
+        advance = +ps.advance || 0;
+        baseSalary = +ps.baseSalary || luongCo;
         total = ps.total;
-        const bonusSum = (ps.bonuses || []).reduce((sum, b) => sum + (+b.amount || 0), 0);
-        const penSum   = (ps.penalties || []).reduce((sum, p) => sum + (+p.amount || 0), 0);
-        const extraInfo = [
-          bonusSum ? `+${window.fmtShort(bonusSum)} thưởng` : '',
-          penSum   ? `-${window.fmtShort(penSum)} phạt` : '',
-          ps.advance ? `-${window.fmtShort(ps.advance)} tạm ứng` : '',
-          ps.bhxh ? `-${window.fmtShort(ps.bhxh)} BHXH` : '',
-        ].filter(Boolean).join(' · ');
-        totalCellHTML = `
-          <b style="color:var(--red);font-size:14px">${window.fmt(total)}</b>
-          <div style="font-size:10px;color:var(--muted);margin-top:2px">${STATUS_BADGE[ps.status] || ''}</div>
-          ${extraInfo ? `<div style="font-size:10px;color:var(--muted);margin-top:2px;max-width:170px;line-height:1.3">${extraInfo}</div>` : ''}
-        `;
+        statusBadge = STATUS_BADGE[ps.status] || '';
       } else {
-        total = luongCo + auto.amount + (e.bonus || 0) - (e.deduction || 0) - lateDed;
-        totalCellHTML = `<b style="color:var(--red);font-size:14px">${window.fmt(total)}</b>
-          <div style="font-size:10px;color:var(--muted);margin-top:2px">— chưa lập phiếu</div>`;
+        hasPhieu = false;
+        countByStatus.none++;
+        workActual = paid;
+        bonusSum = 0; penSum = 0; bhxh = 0; advance = 0;
+        baseSalary = luongCo;
+        total = luongCo;
+        statusBadge = '<span style="color:var(--muted);font-size:10.5px">— chưa lập</span>';
       }
+
       totalAll += total;
+      totalBonusAll += bonusSum;
+      totalPenAll += penSum;
+      totalBhxhAll += bhxh;
+      totalAdvAll += advance;
+      totalCongAll += workActual;
 
       return `<tr>
         <td><div style="display:flex;align-items:center;gap:8px">
           <div style="width:28px;height:28px;border-radius:50%;background:${window.avatarColor(s.name)};color:#fff;display:grid;place-items:center;font-size:11px;font-weight:700">${window.initials(s.name)}</div>
-          <div><b>${s.name}</b><div style="color:var(--muted);font-size:11px">${s.role}</div></div>
+          <div><b>${s.name}</b><div style="color:var(--muted);font-size:11px">${s.role} · ${s.dept || ''}</div></div>
         </div></td>
-        <td class="num">${window.fmtShort(s.salary || 0)}</td>
-        <td class="num">${wd % 1 === 0 ? wd : wd.toFixed(1)}</td>
-        <td class="num" style="color:#15803D">${c.X}</td>
-        <td class="num" style="color:#C2410C">${c.L}${c.lateMin?'<div style="font-size:10px">⏰'+c.lateMin+'p</div>':''}</td>
-        <td class="num" style="color:#A16207">${c.H}</td>
-        <td class="num" style="color:#A16207">${c.P}</td>
-        <td class="num" style="color:#B91C1C">${c.V}</td>
-        <td class="num"><b style="color:#0369A1">${paid % 1 === 0 ? paid : paid.toFixed(1)}</b></td>
-        <td class="num">${window.fmt(luongNgay)}</td>
-        <td class="num">${window.fmt(luongCo)}</td>
-        <td class="num" style="color:${lateDed?'var(--danger)':'var(--muted)'}">${lateDed?'-'+window.fmt(lateDed):'—'}</td>
+        <td class="num"><b>${window.fmt(s.salary || 0)}</b></td>
+        <td class="num"><b style="color:#0369A1">${workActual % 1 === 0 ? workActual : workActual.toFixed(2)}</b><div style="font-size:10px;color:var(--muted)">/${wd % 1 === 0 ? wd : wd.toFixed(1)}</div></td>
+        <td class="num"><b>${window.fmt(baseSalary)}</b></td>
+        <td class="num" style="color:#15803D">${bonusSum ? '<b>+' + window.fmt(bonusSum) + '</b>' : '<span style="color:var(--muted)">—</span>'}</td>
+        <td class="num" style="color:#DC2626">${penSum ? '<b>−' + window.fmt(penSum) + '</b>' : '<span style="color:var(--muted)">—</span>'}</td>
+        <td class="num" style="color:#7C3AED">${bhxh ? '<b>−' + window.fmt(bhxh) + '</b>' : '<span style="color:var(--muted)">—</span>'}</td>
+        <td class="num" style="color:#A16207">${advance ? '<b>−' + window.fmt(advance) + '</b>' : '<span style="color:var(--muted)">—</span>'}</td>
+        <td class="num"><b style="color:var(--red);font-size:14px">${window.fmt(total)}</b></td>
+        <td class="num">${statusBadge}</td>
         <td class="num">
-          ${auto.amount ? `<b style="color:var(--ok)">+${window.fmt(auto.amount)}</b><div style="font-size:10px;color:var(--muted);font-weight:400;line-height:1.3;max-width:160px">${auto.label}</div>` : `<span style="color:var(--muted);font-size:11px">${auto.label}</span>`}
-        </td>
-        <td class="num"><input type="number" data-sid="${s.id}" data-field="bonus" value="${e.bonus || 0}" class="pay-extra" ${canEdit()?'':'disabled'} style="width:85px;text-align:right;padding:4px 6px;border:1px solid var(--line);border-radius:5px;${canEdit()?'':'background:#FAFAFB;color:var(--muted)'}"></td>
-        <td class="num"><input type="number" data-sid="${s.id}" data-field="deduction" value="${e.deduction || 0}" class="pay-extra" ${canEdit()?'':'disabled'} style="width:85px;text-align:right;padding:4px 6px;border:1px solid var(--line);border-radius:5px;${canEdit()?'':'background:#FAFAFB;color:var(--muted)'}"></td>
-        <td class="num">${totalCellHTML}</td>
-        <td class="num">
-          <button class="btn btn-navy btn-sm" onclick="window.openPayslipDrawer('${s.id}', '${month}')" title="Phiếu duyệt lương chi tiết (thưởng/phạt/BHXH/tạm ứng)">💼 Phiếu lương</button>
+          ${canOpenPayslip()
+            ? `<button class="btn btn-navy btn-sm" onclick="window.openPayslipDrawer('${s.id}', '${month}')" title="${hasPhieu ? 'Xem/sửa phiếu lương' : 'Tạo phiếu lương'}">${hasPhieu ? '👁 Xem' : '➕ Lập'}</button>`
+            : `<span style="color:var(--muted);font-size:11px;opacity:0.6" title="Bạn không có quyền duyệt lương">🔒</span>`}
         </td>
       </tr>`;
     }).join('');
 
-    const totalPaid = staffs.reduce((s, x) => {
-      const sh = sheetOf(x.id); return s + paidDays(sh ? sh.days : defaultDays());
-    }, 0);
-
     const wdFmt = wd % 1 === 0 ? wd : wd.toFixed(1);
+    const draftCount = countByStatus.draft || 0;
+    const submittedCount = countByStatus.submitted || 0;
+    const approvedCount = countByStatus.approved || 0;
+    const paidCount = countByStatus.paid || 0;
+    const noneCount = countByStatus.none || 0;
+    const hasDraftOrNone = draftCount + noneCount;
+    const submitAllVisible = canCalc() && hasDraftOrNone > 0;
+    const approveAllVisible = canApprove() && submittedCount > 0;
+
     document.getElementById('payView').innerHTML = `
       <section class="kpis" style="margin-bottom:14px">
-        <div class="kpi k-1"><div class="kpi-label">Tổng quỹ lương T${month.slice(5)}/${month.slice(0, 4)}</div><div class="kpi-value">${window.fmtShort(totalAll)}</div><div class="kpi-trend">${staffs.length} NV</div><div class="kpi-icon">💰</div></div>
-        <div class="kpi k-2"><div class="kpi-label">Ngày công chuẩn</div><div class="kpi-value">${wdFmt}</div><div class="kpi-trend">T2-T6×1 + T7×0.5, trừ CN</div><div class="kpi-icon">📅</div></div>
-        <div class="kpi k-3"><div class="kpi-label">Tổng công tính</div><div class="kpi-value">${totalPaid % 1 === 0 ? totalPaid : totalPaid.toFixed(1)}</div><div class="kpi-trend">X+L+P + ½H · T7×0.5</div><div class="kpi-icon">✓</div></div>
-        <div class="kpi k-4"><div class="kpi-label">Lương TB/NV</div><div class="kpi-value">${window.fmtShort(staffs.length ? totalAll / staffs.length : 0)}</div><div class="kpi-trend">bình quân</div><div class="kpi-icon">🧮</div></div>
-        <div class="kpi k-5"><div class="kpi-label">Hoa hồng/Thưởng auto</div><div class="kpi-value" style="color:var(--ok)">${window.fmtShort(totalBonus)}</div><div class="kpi-trend">% DT / đơn / KPI</div><div class="kpi-icon">💰</div></div>
+        <div class="kpi k-1"><div class="kpi-label">Tổng quỹ lương T${month.slice(5)}/${month.slice(0, 4)}</div><div class="kpi-value">${window.fmtShort(totalAll)}</div><div class="kpi-trend">${staffs.length} NV · NC chuẩn ${wdFmt}</div><div class="kpi-icon">💰</div></div>
+        <div class="kpi k-2"><div class="kpi-label">Tổng thưởng tháng</div><div class="kpi-value" style="color:var(--ok)">${window.fmtShort(totalBonusAll)}</div><div class="kpi-trend">lễ + chuyên cần + hoa hồng + ship</div><div class="kpi-icon">🎁</div></div>
+        <div class="kpi k-3"><div class="kpi-label">Tổng phạt + BHXH</div><div class="kpi-value" style="color:var(--danger)">${window.fmtShort(totalPenAll + totalBhxhAll)}</div><div class="kpi-trend">Phạt ${window.fmtShort(totalPenAll)} + BHXH ${window.fmtShort(totalBhxhAll)}</div><div class="kpi-icon">⚠️</div></div>
+        <div class="kpi k-4"><div class="kpi-label">Tạm ứng đã ứng</div><div class="kpi-value" style="color:#A16207">${window.fmtShort(totalAdvAll)}</div><div class="kpi-trend">trừ vào lương cuối tháng</div><div class="kpi-icon">💵</div></div>
+        <div class="kpi k-5"><div class="kpi-label">Lương TB/NV</div><div class="kpi-value">${window.fmtShort(staffs.length ? totalAll / staffs.length : 0)}</div><div class="kpi-trend">bình quân</div><div class="kpi-icon">🧮</div></div>
       </section>
-      <div style="font-size:11.5px;color:var(--muted);padding:8px 12px;background:#F5F3FF;border-left:3px solid #7C3AED;border-radius:6px;margin-bottom:10px">
-        ⏰ <b>Khấu trừ đi muộn tháng này:</b> <b style="color:${totalLateDed?'var(--danger)':'var(--ok)'}">${totalLateDed?'-'+window.fmt(totalLateDed)+'đ':'0đ'}</b>
-        · Mức phạt: ${LATE_DEDUCT_PER_MIN.toLocaleString('vi-VN')}đ/phút sau ${LATE_GRACE_MIN}p miễn phạt
-        · Giờ check muộn: <b>Văn phòng từ ${SHIFT_DEFAULT.morn[0]}</b> · <b>Shipper từ ${SHIFT_SHIPPER.morn[0]}</b>
+
+      <!-- Status summary + batch actions -->
+      <div style="background:#fff;border:1px solid var(--line);border-radius:10px;padding:12px 16px;margin-bottom:12px;display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:12px">
+        <div style="display:flex;gap:18px;flex-wrap:wrap;align-items:center;font-size:12.5px">
+          <div><b style="color:#854D0E">📝 ${draftCount}</b> nháp</div>
+          <div><b style="color:#1E40AF">📤 ${submittedCount}</b> chờ duyệt</div>
+          <div><b style="color:#15803D">✓ ${approvedCount}</b> đã duyệt</div>
+          <div><b style="color:#3730A3">💵 ${paidCount}</b> đã trả</div>
+          ${noneCount ? `<div><b style="color:var(--muted)">○ ${noneCount}</b> chưa lập</div>` : ''}
+        </div>
+        <div style="display:flex;gap:8px">
+          ${submitAllVisible ? `<button class="btn btn-navy" onclick="window.submitAllDrafts && window.submitAllDrafts('${month}')" title="HR gửi tất cả phiếu draft + tự lập phiếu cho NV chưa có">📤 Gửi tất cả CFO duyệt (${hasDraftOrNone})</button>` : ''}
+          ${approveAllVisible ? `<button class="btn btn-primary" onclick="window.openPayslipBatchReview && window.openPayslipBatchReview('${month}')" title="CFO duyệt hàng loạt">✓ Duyệt hàng loạt (${submittedCount})</button>` : ''}
+        </div>
       </div>
+
       <div class="chart-card" style="overflow:auto">
-        <table class="mini-table" style="min-width:1480px">
+        <table class="mini-table" style="min-width:1320px">
           <thead><tr>
-            <th>Nhân viên</th><th class="num">Lương CB</th><th class="num">NC chuẩn</th>
-            <th class="num" title="Có mặt full">X</th>
-            <th class="num" title="Đi muộn">L</th>
-            <th class="num" title="½ phép">½</th>
-            <th class="num" title="Phép cả">P</th>
-            <th class="num" title="Vắng">V</th>
-            <th class="num">Công tính</th>
-            <th class="num">Lương/ngày</th>
-            <th class="num">Lương theo công</th>
-            <th class="num">Khấu trừ muộn</th>
-            <th class="num" style="background:#F0FDF4">💰 Hoa hồng / Thưởng auto</th>
-            <th class="num">Thưởng thêm</th>
-            <th class="num">Khấu trừ khác</th>
-            <th class="num">Thực lĩnh</th>
-            <th class="num">Duyệt lương</th>
+            <th style="min-width:200px">Nhân viên</th>
+            <th class="num" title="Lương cơ bản hợp đồng">Lương CB</th>
+            <th class="num" title="Công thực tế / NC chuẩn">Công</th>
+            <th class="num" title="LCB ÷ NC × công × hệ số HĐ + phụ cấp">Lương theo công</th>
+            <th class="num" style="background:#F0FDF4;color:#15803D">Thưởng</th>
+            <th class="num" style="background:#FEF2F2;color:#DC2626">Phạt</th>
+            <th class="num" style="background:#FAF5FF;color:#7C3AED">BHXH</th>
+            <th class="num" style="background:#FFFBEB;color:#A16207">Tạm ứng</th>
+            <th class="num" style="background:#FEE2E2">💰 Thực lĩnh</th>
+            <th class="num">Trạng thái</th>
+            <th class="num">Phiếu</th>
           </tr></thead>
           <tbody>${rows}</tbody>
+          <tfoot><tr style="background:#F9FAFB;font-weight:700;border-top:2px solid var(--navy)">
+            <td>TỔNG ${staffs.length} NV</td>
+            <td class="num">—</td>
+            <td class="num">${totalCongAll.toFixed(1)}</td>
+            <td class="num">—</td>
+            <td class="num" style="color:#15803D">${window.fmt(totalBonusAll)}</td>
+            <td class="num" style="color:#DC2626">−${window.fmt(totalPenAll)}</td>
+            <td class="num" style="color:#7C3AED">−${window.fmt(totalBhxhAll)}</td>
+            <td class="num" style="color:#A16207">−${window.fmt(totalAdvAll)}</td>
+            <td class="num"><b style="color:var(--red);font-size:14px">${window.fmt(totalAll)}</b></td>
+            <td class="num">—</td>
+            <td class="num">—</td>
+          </tr></tfoot>
         </table>
       </div>
-      <div style="font-size:12px;color:var(--muted);margin-top:10px;padding:12px 14px;background:#FAFAFB;border-radius:7px;border-left:3px solid var(--navy);line-height:1.7">
-        💡 <b>Công thức lương — lịch làm T2-T6 full + T7 sáng + CN nghỉ:</b><br>
-        • <b>Trọng số công/ngày:</b> T2-T6 = 1.0 · T7 = 0.5 (chỉ sáng) · CN = 0<br>
-        • <b>NC chuẩn</b> = Σ trọng số ngày trong tháng (vd T5/2026 = 21 × 1 + 5 × 0.5 = 23.5)<br>
-        • <b>Công tính</b> per NV = Σ (status × trọng số ngày) — X/L/P × sf · H × sf × 0.5 · V × 0<br>
-        • <b>Lương/ngày</b> = Lương cơ bản ÷ NC chuẩn · <b>Lương theo công</b> = Lương/ngày × Công tính<br>
-        • <b>Khấu trừ muộn</b> = (phút muộn − ${LATE_GRACE_MIN}p) × ${LATE_DEDUCT_PER_MIN.toLocaleString('vi-VN')}đ (chỉ phần sau ${LATE_GRACE_MIN}p miễn phạt)<br>
-        • <b style="color:var(--ok)">💰 Hoa hồng/Thưởng auto</b> = compute từ <b>Cấu hình lương</b> của từng NV (vào Nhân viên → click NV → "💰 Cấu hình lương"):
-        <br>&nbsp;&nbsp;&nbsp;◦ <b>Sales/CSKH</b>: % doanh thu × DT đơn KH phụ trách trong tháng
-        <br>&nbsp;&nbsp;&nbsp;◦ <b>Shipper</b>: Thưởng cố định × số đơn giao thành công
-        <br>&nbsp;&nbsp;&nbsp;◦ <b>KPI</b>: Đạt 100% mục tiêu → thưởng full · ≥80% → 50% · &lt;80% → 0
-        <br>&nbsp;&nbsp;&nbsp;◦ <b>Custom</b>: ghi chú tự tính, tự nhập vào "Thưởng thêm"<br>
-        • <b>Thực lĩnh</b> = Lương theo công + Hoa hồng/Thưởng auto + Thưởng thêm − Khấu trừ muộn − Khấu trừ khác
+
+      <div style="font-size:12px;color:var(--muted);margin-top:10px;padding:12px 14px;background:#F0FDF4;border-radius:7px;border-left:3px solid #15803D;line-height:1.7">
+        🧮 <b>Cách tính lương theo công thức NSTT:</b> Lương thực lĩnh = <b>(LCB × hệ số HĐ ÷ Công chuẩn × Công thực tế)</b> + <b>Phụ cấp</b> + <b>Thưởng</b> − <b>Phạt</b> − <b>BHXH</b> − <b>Tạm ứng</b><br>
+        • <b>Công chuẩn:</b> Văn phòng 24 · Kho chính thức 29 · Kho thử việc / Part-time / Ship 30<br>
+        • <b>Hệ số HĐ:</b> Chính thức 100% · Thử việc 85% · Thực tập / Part-time 100%<br>
+        • <b>Phụ cấp mặc định:</b> VP 650k · Kho 500k · Ship 1.5M · Part-time 0<br>
+        • <b>Chi tiết thưởng/phạt/BHXH/tạm ứng</b> được cấu hình trong phiếu lương (bấm nút <b>Phiếu</b> bên phải mỗi NV)
       </div>`;
-    document.querySelectorAll('.pay-extra').forEach(inp => {
-      inp.addEventListener('change', () => {
-        const sid = inp.dataset.sid, field = inp.dataset.field, val = parseInt(inp.value, 10) || 0;
-        const ex = { ...window.STORE.get('payrollInlineExtras', {}) };
-        ex[sid] = { ...(ex[sid] || {}), [field]: val };
-        window.STORE.set('payrollInlineExtras', ex);
-        renderPayroll();
-      });
-    });
   }
 
   /* ====== Upload Excel chấm công ====== */
@@ -732,6 +748,8 @@
 
   /* === init === */
   window.STORE.subscribe('timesheet', render);
+  window.STORE.subscribe('payrollExtra', () => { if (tab === 'payroll') renderPayroll(); });
   window.renderAppShell('payroll', 'Chấm công & Lương');
   render();
+  window.applyPayrollHeaderPerms?.();
 })();
