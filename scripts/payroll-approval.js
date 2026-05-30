@@ -1,13 +1,26 @@
 /* =========================================================
-   Nông Sản Tuấn Tú Hà Nội — Phiếu duyệt lương (Boss approval)
+   Nông Sản Tuấn Tú Hà Nội — Phiếu duyệt lương (4-step workflow)
    ─────────────────────────────────────────────────────────
-   Drawer chi tiết theo định dạng "BẢNG LƯƠNG tháng X" của NSTT.
-   Boss xem từng dòng thưởng/phạt + edit số tiền + duyệt.
+   Workflow theo quy trình NSTT thực tế:
 
-   Workflow: draft → approved → paid
-   - draft:    nháp, ai cũng sửa được
-   - approved: đã duyệt, lock không sửa được nữa (trừ admin)
-   - paid:     đã trả, tạo phiếu chi vào cashEntries
+   ┌──────────┐    ┌──────────────┐    ┌─────────────┐    ┌────────┐
+   │  draft   │ → │  submitted   │ → │  approved   │ → │  paid  │
+   │ (NS tính)│    │ (gửi CFO)    │    │ (CFO duyệt) │    │ (trả)  │
+   └──────────┘    └──────────────┘    └─────────────┘    └────────┘
+
+   Roles:
+   - HR/NS (perm 'payroll.calc'+'payroll.submit'): nhập công, tính lương,
+     submit gửi CFO. Không duyệt được.
+   - CFO (perm 'payroll.approve' hoặc 'all'): sửa MỌI thông số nếu thấy
+     không phù hợp, sau đó approve. Có thể trả về 'draft' nếu cần sửa.
+   - Admin/CEO (perm 'all'): toàn quyền mọi step.
+   - View-only ('payroll.viewAll'): xem mọi phiếu, không sửa.
+
+   Status:
+   - draft:     NS đang nhập, sửa thoải mái
+   - submitted: NS đã gửi CFO, lock các field NS, CFO có thể edit
+   - approved:  CFO đã duyệt, lock hoàn toàn (trừ admin)
+   - paid:      Đã trả lương, tự tạo cashEntries phiếu chi
    ========================================================= */
 (function () {
 
@@ -63,14 +76,27 @@
     const p = getOrCreatePayslip(staffId, month);
     const computed = PF.computePayslip(p);
 
-    const isLocked = p.status === 'approved' || p.status === 'paid';
-    const canEdit = !isLocked || (window.AUTH && window.AUTH.hasPerm('all'));
+    /* === Permission detection === */
+    const hasPerm = (perm) => !!(window.AUTH && window.AUTH.hasPerm && window.AUTH.hasPerm(perm));
+    const isAdmin = hasPerm('all');
+    const isCFO = isAdmin || hasPerm('payroll.approve');
+    const isHR = isAdmin || hasPerm('payroll.calc') || hasPerm('payroll.submit');
+    const canView = isAdmin || isCFO || isHR || hasPerm('payroll.viewAll');
+
+    /* === Edit permission per status === */
+    let canEdit = false;
+    if (p.status === 'draft')      canEdit = isHR || isCFO;     /* NS hoặc CFO sửa */
+    if (p.status === 'submitted')  canEdit = isCFO;             /* Chỉ CFO sửa */
+    if (p.status === 'approved')   canEdit = isAdmin;           /* Chỉ admin */
+    if (p.status === 'paid')       canEdit = false;             /* Lock hoàn toàn */
 
     const statusBadge = p.status === 'draft'
-      ? '<span style="background:#FEF3C7;color:#854D0E;padding:3px 10px;border-radius:99px;font-size:11px;font-weight:700">📝 NHÁP</span>'
+      ? '<span style="background:#FEF3C7;color:#854D0E;padding:3px 10px;border-radius:99px;font-size:11px;font-weight:700">📝 NHÁP (NS đang tính)</span>'
+      : p.status === 'submitted'
+      ? '<span style="background:#DBEAFE;color:#1E40AF;padding:3px 10px;border-radius:99px;font-size:11px;font-weight:700">📤 CHỜ CFO DUYỆT</span>'
       : p.status === 'approved'
-      ? '<span style="background:#DCFCE7;color:#15803D;padding:3px 10px;border-radius:99px;font-size:11px;font-weight:700">✓ ĐÃ DUYỆT</span>'
-      : '<span style="background:#DBEAFE;color:#1E40AF;padding:3px 10px;border-radius:99px;font-size:11px;font-weight:700">💵 ĐÃ TRẢ</span>';
+      ? '<span style="background:#DCFCE7;color:#15803D;padding:3px 10px;border-radius:99px;font-size:11px;font-weight:700">✓ CFO ĐÃ DUYỆT</span>'
+      : '<span style="background:#E0E7FF;color:#3730A3;padding:3px 10px;border-radius:99px;font-size:11px;font-weight:700">💵 ĐÃ TRẢ</span>';
 
     const drawer = document.getElementById('drawer');
     const dc = document.getElementById('drawerContent');
@@ -211,12 +237,36 @@
 
       </div>
 
-      <!-- Footer actions -->
-      <div style="padding:12px 18px;border-top:1px solid var(--line);background:#fff;display:flex;gap:8px;flex-wrap:wrap">
-        ${canEdit ? '<button class="btn btn-ghost" onclick="window._psSave()">💾 Lưu nháp</button>' : ''}
-        ${p.status === 'draft' && canEdit ? '<button class="btn btn-navy" onclick="window._psApprove()">✓ Duyệt phiếu</button>' : ''}
-        ${p.status === 'approved' ? '<button class="btn btn-primary" onclick="window._psPay()">💵 Đã trả lương</button>' : ''}
-        ${p.status === 'paid' ? '<span style="color:var(--ok);padding:8px 14px;font-weight:600">✓ Đã hoàn tất</span>' : ''}
+      <!-- Footer actions theo 4-step workflow -->
+      <div style="padding:12px 18px;border-top:1px solid var(--line);background:#fff;display:flex;gap:8px;flex-wrap:wrap;align-items:center">
+        ${(() => {
+          /* Status: draft */
+          if (p.status === 'draft') {
+            return `
+              ${canEdit ? '<button class="btn btn-ghost" onclick="window._psSave()">💾 Lưu nháp</button>' : ''}
+              ${isHR ? '<button class="btn btn-navy" onclick="window._psSubmit()" title="Gửi bảng lương dự kiến cho CFO duyệt">📤 Gửi CFO duyệt</button>' : ''}
+              ${isCFO && !isHR ? '<button class="btn btn-primary" onclick="window._psApprove()" title="Duyệt thẳng (admin/CFO)">✓ Duyệt thẳng</button>' : ''}
+            `;
+          }
+          /* Status: submitted — chờ CFO duyệt */
+          if (p.status === 'submitted') {
+            if (isCFO) return `
+              ${canEdit ? '<button class="btn btn-ghost" onclick="window._psSave()" title="Lưu thay đổi (CFO sửa)">💾 Lưu chỉnh sửa</button>' : ''}
+              <button class="btn btn-ghost" onclick="window._psReturnDraft()" style="color:#A16207" title="Trả về NS sửa lại">↩ Trả về sửa</button>
+              <button class="btn btn-primary" onclick="window._psApprove()" title="Duyệt phiếu lương">✓ Duyệt phiếu</button>
+            `;
+            return `<span style="background:#FEF3C7;color:#854D0E;padding:8px 14px;border-radius:7px;font-size:12.5px">⏳ Đang chờ CFO duyệt — không được sửa</span>`;
+          }
+          /* Status: approved */
+          if (p.status === 'approved') {
+            return `
+              ${isAdmin ? '<button class="btn btn-ghost" onclick="window._psReturnDraft()" title="Mở lại để sửa (admin only)">↩ Mở lại sửa</button>' : ''}
+              ${isCFO || isAdmin ? '<button class="btn btn-primary" onclick="window._psPay()">💵 Đã trả lương</button>' : '<span style="color:var(--ok);padding:8px 14px;font-weight:600">✓ Đã duyệt — đợi NS trả</span>'}
+            `;
+          }
+          /* Status: paid */
+          return `<span style="color:var(--ok);padding:8px 14px;font-weight:600">✓ Đã hoàn tất · Phiếu chi đã tạo ở Sổ quỹ</span>`;
+        })()}
         <div style="flex:1"></div>
         <button class="btn btn-ghost" onclick="closeDrawer()">Đóng</button>
       </div>
@@ -324,6 +374,28 @@
       window.toast?.('✓ Đã lưu phiếu nháp', 'success');
     };
 
+    /* === HR/NS gửi CFO duyệt === */
+    window._psSubmit = function () {
+      if (!confirm('Gửi phiếu lương ' + p.staffName + ' cho CFO duyệt?\n\nSau khi gửi anh/chị KHÔNG sửa được nữa — chỉ CFO mới sửa được.')) return;
+      const d = collect();
+      const c = PF.computePayslip(d);
+      const user = (window.AUTH && window.AUTH.currentUser()) || {};
+      const final = {
+        ...d,
+        baseSalary: c.baseSalary, allowance: c.allowance, total: c.total,
+        status: 'submitted',
+        submittedBy: user.name || user.email || 'NS',
+        submittedAt: new Date().toISOString(),
+      };
+      const list = getPayslips();
+      const i = list.findIndex(x => x.id === final.id);
+      if (i >= 0) list[i] = final; else list.push(final);
+      savePayslips(list);
+      window.toast?.('📤 Đã gửi CFO · ' + PF.formatVND(c.total) + ' ₫', 'success');
+      closeDrawer();
+    };
+
+    /* === CFO duyệt phiếu === */
     window._psApprove = function () {
       if (!confirm('Duyệt phiếu lương cho ' + p.staffName + '?\n\nSau khi duyệt sẽ KHÔNG sửa được (trừ admin).')) return;
       const d = collect();
@@ -333,14 +405,33 @@
         ...d,
         baseSalary: c.baseSalary, allowance: c.allowance, total: c.total,
         status: 'approved',
-        approvedBy: user.name || user.email || 'sếp',
+        approvedBy: user.name || user.email || 'CFO',
         approvedAt: new Date().toISOString(),
       };
       const list = getPayslips();
       const i = list.findIndex(x => x.id === final.id);
       if (i >= 0) list[i] = final; else list.push(final);
       savePayslips(list);
-      window.toast?.('✓ Đã duyệt phiếu lương ' + PF.formatVND(c.total) + ' ₫', 'success');
+      window.toast?.('✓ CFO đã duyệt · ' + PF.formatVND(c.total) + ' ₫', 'success');
+      closeDrawer();
+    };
+
+    /* === CFO/Admin trả về NS sửa === */
+    window._psReturnDraft = function () {
+      const reason = prompt('Trả về NS sửa lại — Lý do (gửi cho NS biết để sửa):');
+      if (!reason) return;
+      const d = collect();
+      const final = {
+        ...d,
+        status: 'draft',
+        returnReason: reason,
+        returnedAt: new Date().toISOString(),
+      };
+      const list = getPayslips();
+      const i = list.findIndex(x => x.id === final.id);
+      if (i >= 0) list[i] = final; else list.push(final);
+      savePayslips(list);
+      window.toast?.('↩ Đã trả phiếu về NS sửa', 'warn');
       closeDrawer();
     };
 
@@ -362,5 +453,142 @@
     document.getElementById('drawerBg')?.classList.add('open');
   };
 
-  console.log('[NSTT] ✓ Payroll approval drawer ready — window.openPayslipDrawer(staffId, month)');
+  /* =========================================================
+     BẢNG LƯƠNG DỰ KIẾN — CFO xem hàng loạt + duyệt nhanh
+     ========================================================= */
+  window.openPayslipBatchReview = function (month) {
+    month = month || '2026-' + String(new Date().getMonth()+1).padStart(2,'0');
+    const hasPerm = (perm) => !!(window.AUTH && window.AUTH.hasPerm && window.AUTH.hasPerm(perm));
+    const isAdmin = hasPerm('all');
+    const isCFO = isAdmin || hasPerm('payroll.approve');
+    if (!isCFO) {
+      window.toast?.('⚠ Chỉ CFO mới xem được bảng dự kiến', 'warn');
+      return;
+    }
+
+    const payslips = getPayslips().filter(p => p.month === month);
+    const staffs = (window.STORE.get('staff', []) || []).filter(s => s.status === 'active');
+
+    /* Gom phiếu theo status */
+    const submitted = payslips.filter(p => p.status === 'submitted');
+    const approved = payslips.filter(p => p.status === 'approved');
+    const paid = payslips.filter(p => p.status === 'paid');
+    const draft = payslips.filter(p => p.status === 'draft');
+
+    const totalSubmit = submitted.reduce((s, p) => s + (p.total || 0), 0);
+    const totalApproved = approved.reduce((s, p) => s + (p.total || 0), 0);
+    const totalPaid = paid.reduce((s, p) => s + (p.total || 0), 0);
+
+    const drawer = document.getElementById('drawer');
+    const dc = document.getElementById('drawerContent');
+    if (!drawer || !dc) return;
+
+    /* Render list NV với status */
+    function renderRow(s) {
+      const ps = payslips.find(p => p.staffId === s.id);
+      const status = ps?.status || 'none';
+      const total = ps?.total || 0;
+      const statusBadge = {
+        'none':      '<span style="color:var(--muted);font-size:11px">— Chưa lập</span>',
+        'draft':     '<span style="background:#FEF3C7;color:#854D0E;padding:2px 8px;border-radius:6px;font-size:10.5px;font-weight:700">NHÁP</span>',
+        'submitted': '<span style="background:#DBEAFE;color:#1E40AF;padding:2px 8px;border-radius:6px;font-size:10.5px;font-weight:700">📤 CHỜ DUYỆT</span>',
+        'approved':  '<span style="background:#DCFCE7;color:#15803D;padding:2px 8px;border-radius:6px;font-size:10.5px;font-weight:700">✓ DUYỆT</span>',
+        'paid':      '<span style="background:#E0E7FF;color:#3730A3;padding:2px 8px;border-radius:6px;font-size:10.5px;font-weight:700">💵 TRẢ</span>',
+      }[status];
+      return `<tr style="border-bottom:1px solid var(--line)">
+        <td style="padding:8px 10px"><b>${s.name}</b><div style="color:var(--muted);font-size:11px">${s.dept || '?'}</div></td>
+        <td class="num" style="padding:8px 10px">${PF.formatVND(s.salary || 0)}</td>
+        <td style="padding:8px 10px">${statusBadge}</td>
+        <td class="num" style="padding:8px 10px"><b style="color:var(--red)">${total ? PF.formatVND(total) + ' ₫' : '—'}</b></td>
+        <td class="num" style="padding:8px 10px">
+          <button class="btn btn-ghost btn-sm" onclick="window.openPayslipDrawer('${s.id}', '${month}')">${ps ? '👁 Xem' : '➕ Lập'}</button>
+        </td>
+      </tr>`;
+    }
+
+    dc.innerHTML = `
+      <div style="background:linear-gradient(135deg,#1B5E20 0%,#15803D 100%);color:#fff;padding:18px 22px;position:relative">
+        <button onclick="closeDrawer()" style="position:absolute;top:14px;right:14px;background:rgba(255,255,255,0.15);border:none;color:#fff;width:30px;height:30px;border-radius:6px;cursor:pointer">✕</button>
+        <h2 style="margin:0 0 4px;font-size:18px">📊 BẢNG LƯƠNG DỰ KIẾN — CFO DUYỆT</h2>
+        <div style="font-size:12.5px;opacity:0.9">Tháng ${month} · ${staffs.length} NV active · ${payslips.length} phiếu đã lập</div>
+      </div>
+
+      <!-- 4 KPI status -->
+      <div style="display:grid;grid-template-columns:repeat(4,1fr);gap:8px;padding:14px 16px;background:#FAFBFC;border-bottom:1px solid var(--line)">
+        <div style="background:#FEF3C7;padding:10px 12px;border-radius:7px">
+          <div style="font-size:10.5px;color:#854D0E;text-transform:uppercase;font-weight:700">📝 Nháp</div>
+          <div style="font-size:18px;font-weight:800;color:#854D0E">${draft.length}</div>
+          <div style="font-size:11px;color:#A16207">NS đang tính</div>
+        </div>
+        <div style="background:#DBEAFE;padding:10px 12px;border-radius:7px">
+          <div style="font-size:10.5px;color:#1E40AF;text-transform:uppercase;font-weight:700">📤 Chờ duyệt</div>
+          <div style="font-size:18px;font-weight:800;color:#1E40AF">${submitted.length}</div>
+          <div style="font-size:11px;color:#1E40AF">${PF.formatVND(totalSubmit)} ₫</div>
+        </div>
+        <div style="background:#DCFCE7;padding:10px 12px;border-radius:7px">
+          <div style="font-size:10.5px;color:#15803D;text-transform:uppercase;font-weight:700">✓ Đã duyệt</div>
+          <div style="font-size:18px;font-weight:800;color:#15803D">${approved.length}</div>
+          <div style="font-size:11px;color:#15803D">${PF.formatVND(totalApproved)} ₫</div>
+        </div>
+        <div style="background:#E0E7FF;padding:10px 12px;border-radius:7px">
+          <div style="font-size:10.5px;color:#3730A3;text-transform:uppercase;font-weight:700">💵 Đã trả</div>
+          <div style="font-size:18px;font-weight:800;color:#3730A3">${paid.length}</div>
+          <div style="font-size:11px;color:#3730A3">${PF.formatVND(totalPaid)} ₫</div>
+        </div>
+      </div>
+
+      <!-- Actions hàng loạt -->
+      ${submitted.length > 0 ? `
+      <div style="padding:10px 18px;background:#FEF9E7;border-bottom:1px solid #F5E0A6">
+        <button class="btn btn-primary" onclick="window._psApproveAllSubmitted('${month}')">
+          ✓ DUYỆT TẤT CẢ ${submitted.length} PHIẾU CHỜ — Tổng ${PF.formatVND(totalSubmit)} ₫
+        </button>
+        <span style="font-size:11.5px;color:#854D0E;margin-left:10px">⚠ Nên review từng phiếu trước khi duyệt hàng loạt</span>
+      </div>
+      ` : ''}
+
+      <!-- Table NV -->
+      <div style="padding:14px 18px;max-height:calc(100vh - 320px);overflow-y:auto">
+        <table style="width:100%;border-collapse:collapse;font-size:12.5px">
+          <thead>
+            <tr style="background:#1B5E20;color:#fff">
+              <th style="padding:10px;text-align:left">Nhân viên</th>
+              <th style="padding:10px;text-align:right">LCB (₫)</th>
+              <th style="padding:10px;text-align:left">Trạng thái</th>
+              <th style="padding:10px;text-align:right">Thực lĩnh</th>
+              <th style="padding:10px;text-align:right"></th>
+            </tr>
+          </thead>
+          <tbody>
+            ${staffs.map(renderRow).join('')}
+          </tbody>
+        </table>
+      </div>
+    `;
+
+    /* Approve all submitted */
+    window._psApproveAllSubmitted = function (m) {
+      if (!confirm(`Duyệt TẤT CẢ ${submitted.length} phiếu chờ?\n\nTổng: ${PF.formatVND(totalSubmit)} ₫\n\nHành động này KHÔNG thể hoàn tác.`)) return;
+      const list = getPayslips();
+      const user = (window.AUTH && window.AUTH.currentUser()) || {};
+      const now = new Date().toISOString();
+      let count = 0;
+      list.forEach(p => {
+        if (p.month === m && p.status === 'submitted') {
+          p.status = 'approved';
+          p.approvedBy = user.name || 'CFO';
+          p.approvedAt = now;
+          count++;
+        }
+      });
+      savePayslips(list);
+      window.toast?.(`✓ Đã duyệt ${count} phiếu · Tổng ${PF.formatVND(totalSubmit)} ₫`, 'success');
+      window.openPayslipBatchReview(m); /* refresh */
+    };
+
+    drawer.classList.add('open');
+    document.getElementById('drawerBg')?.classList.add('open');
+  };
+
+  console.log('[NSTT] ✓ Payroll workflow ready — openPayslipDrawer / openPayslipBatchReview');
 })();
