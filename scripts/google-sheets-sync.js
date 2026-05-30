@@ -129,6 +129,35 @@
     }
   }
 
+  /* === Helper: ensure data loaded — fetch trực tiếp từ Supabase nếu cần ===
+     Lý do: khi user ở page Settings, STORE cache có thể rỗng (chưa visit
+     Orders/Customers...) → build*Rows() return []. Fetch fresh từ Supabase
+     để đảm bảo luôn có data đầy đủ. */
+  async function ensureDataLoaded() {
+    if (!window.SB_DATA) return;
+    const tables = [
+      { key: 'orders', table: 'orders' },
+      { key: 'customers', table: 'customers' },
+      { key: 'cashEntries', table: 'cash_entries' },
+      { key: 'invoices', table: 'invoices' },
+    ];
+    for (const { key, table } of tables) {
+      try {
+        const cached = window.STORE.get(key, []);
+        if (!Array.isArray(cached) || cached.length === 0) {
+          console.log(`[GSheets] Fetching fresh ${key} from Supabase...`);
+          const fresh = await window.SB_DATA.getAll(table);
+          if (Array.isArray(fresh) && fresh.length > 0) {
+            window.STORE.set(key, fresh);
+            console.log(`[GSheets] Loaded ${fresh.length} ${key}`);
+          }
+        }
+      } catch (e) {
+        console.warn(`[GSheets ensureData ${key}]`, e.message);
+      }
+    }
+  }
+
   /* === Push tất cả 4 sheets === */
   window.gsheetsSyncAll = async function () {
     const cfg = getCfg();
@@ -140,6 +169,8 @@
       window.toast?.('Chưa nhập Apps Script Web App URL', 'warn');
       return;
     }
+    window.toast?.('⏳ Đang tải dữ liệu từ cloud...', 'info');
+    await ensureDataLoaded();
     window.toast?.('⏳ Đang đồng bộ 4 sheets...', 'info');
     const sheets = [
       { name: 'Orders', rows: buildOrdersRows() },
@@ -147,14 +178,21 @@
       { name: 'CashEntries', rows: buildCashEntriesRows() },
       { name: 'Invoices', rows: buildInvoicesRows() },
     ];
+    /* Log số dòng từng sheet để debug */
+    console.log('[GSheets] Rows count:', sheets.map(s => `${s.name}=${s.rows.length}`).join(', '));
+
     const results = await Promise.all(sheets.map(s => pushSheet(s.name, s.rows)));
     const failures = results.filter(r => !r.ok);
     const total = results.reduce((s, r) => s + (r.count || 0), 0);
+    const skipped = results.filter(r => r.skip).length;
 
     if (failures.length === 0) {
-      window.toast?.(`✓ Đồng bộ 4/4 sheets · ${total} dòng`, 'success');
+      if (total === 0 && skipped === 4) {
+        window.toast?.('⚠ Không có data để đồng bộ — STORE rỗng. Vào trang Orders/Customers trước.', 'warn');
+      } else {
+        window.toast?.(`✓ Đồng bộ 4/4 sheets · ${total} dòng`, 'success');
+      }
     } else {
-      /* Hiển thị lỗi chi tiết */
       const errMsg = failures.map((f, i) => `${sheets[results.indexOf(f)].name}: ${f.error}`).join(' · ');
       console.error('[GSheets sync errors]', failures);
       window.toast?.(`❌ Lỗi ${failures.length}/4 sheets: ${errMsg.slice(0, 200)}`, 'danger');
