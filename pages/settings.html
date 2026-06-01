@@ -494,12 +494,21 @@
             </tbody>
           </table>
 
-          <div class="section-h" style="margin-top:24px">🧹 Xóa cache demo localStorage</div>
+          <div class="section-h" style="margin-top:24px">🗑 Xóa toàn bộ data kinh doanh — bắt đầu nhập data thật</div>
+          <div style="background:#FEF2F2;border:1px solid #FCA5A5;border-radius:10px;padding:14px 16px;margin-bottom:14px">
+            <div style="font-size:13px;color:#991B1B;margin-bottom:10px;line-height:1.7">
+              Xóa <b>SẠCH cả localStorage + cloud</b> các bảng giao dịch để nhập data thật từ đầu:<br>
+              <code>khách hàng · đơn hàng · hóa đơn · công nợ · sổ quỹ · trả hàng · nhập hàng · báo giá · lead · đơn định kỳ · kho xuất nhập · chi phí ads · audit log</code><br>
+              <b style="color:#15803D">✅ GIỮ LẠI:</b> nhân viên (staff) · sản phẩm & giá · phiếu lương · chấm công · khung phạt · settings · tích hợp.
+            </div>
+            <button class="btn" style="background:var(--danger);color:#fff" onclick="if(confirm('⚠️ XÓA TOÀN BỘ data kinh doanh (KH/đơn/HĐ/kho/quỹ...) trên CẢ cloud + máy này?\n\nGIỮ LẠI: nhân viên + sản phẩm + lương + chấm công.\n\nĐã backup trước đó. Tiếp tục?')){window.clearBusinessData && window.clearBusinessData()}">🗑 Xóa toàn bộ data kinh doanh (giữ NV + SP + lương)</button>
+          </div>
+
+          <div class="section-h" style="margin-top:18px">🧹 Chỉ xóa cache demo localStorage (nhẹ)</div>
           <div style="background:#FEF9C3;border:1px solid #FDE047;border-radius:10px;padding:14px 16px;margin-bottom:14px">
             <div style="font-size:13px;color:#854D0E;margin-bottom:10px;line-height:1.6">
-              <b>An toàn — chỉ xóa cache trên máy này.</b> Dùng khi app vẫn show data demo cũ (KH/đơn/HĐ) dù DB cloud đã trống.<br>
-              Sẽ xóa: <code>customers · orders · invoices · returns · purchases · quotes · leads · suppliers · recurring_orders · cashEntries</code>.<br>
-              <b>KHÔNG xóa</b>: settings · integrations · staff · products · payrollExtra · timesheet.
+              <b>Chỉ xóa cache trên máy này, KHÔNG động cloud.</b> Dùng khi app vẫn show demo cũ dù cloud đã trống.<br>
+              Xóa: <code>customers · orders · invoices · returns · purchases · quotes · leads · suppliers · recurring_orders · cashEntries</code>.
             </div>
             <button class="btn btn-navy" onclick="if(confirm('Xóa cache data demo trên máy này? (an toàn — không động vào cloud)')){window.clearDemoCache && window.clearDemoCache()}">🧹 Xóa cache demo localStorage</button>
           </div>

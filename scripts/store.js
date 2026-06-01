@@ -382,6 +382,47 @@
       setTimeout(() => location.reload(), 600);
     },
 
+    /* === Xóa TOÀN BỘ data kinh doanh (đơn/HĐ/KH/kho/quỹ...) ===
+       GIỮ LẠI: nhân viên (staff), sản phẩm (products), lương (payrollExtra),
+                chấm công (timesheet/timesheetMeta), khung phạt (latePolicy),
+                settings, integrations.
+       Xóa cả localStorage + đẩy DELETE lên Supabase cho các bảng table-mapped. */
+    async clearBusinessData() {
+      const BUSINESS_KEYS = [
+        'customers', 'orders', 'invoices', 'returns', 'purchases',
+        'quotes', 'leads', 'suppliers', 'recurring_orders', 'cashEntries',
+        'debt', 'inventory', 'adspend', 'partners',
+        'inv_movements', 'audit_log', 'cust_prefs', 'activityLogs',
+      ];
+
+      /* 1) Xóa Supabase — bulk delete 1 API call/bảng (clearTable) */
+      if (isSupabaseMode() && window.SB_DATA) {
+        for (const key of BUSINESS_KEYS) {
+          const table = TABLE_MAP[key];
+          if (!table) continue;
+          const idCol = ID_COLUMN[key] || 'id';
+          if (window.SB_DATA.clearTable) {
+            await window.SB_DATA.clearTable(table, idCol).catch(() => {});
+          }
+        }
+        /* kv_store keys: inv_movements, audit_log, cust_prefs */
+        for (const kvKey of ['inv_movements', 'audit_log', 'cust_prefs']) {
+          if (window.SB_DATA.deleteKv) await window.SB_DATA.deleteKv(kvKey).catch(() => {});
+        }
+      }
+
+      /* 2) Xóa localStorage + cache RAM */
+      BUSINESS_KEYS.forEach(k => {
+        localStorage.removeItem(PREFIX + k);
+        delete _data[k];
+        _preloaded.delete(k);
+        (_subs[k] || []).forEach(fn => fn([]));
+      });
+
+      window.toast?.('🗑 Đã xóa toàn bộ data kinh doanh (giữ NV + SP + lương) · đang reload…', 'success');
+      setTimeout(() => location.reload(), 800);
+    },
+
     /* Push toàn bộ localStorage hiện tại lên Supabase (migration tool) */
     async migrateToSupabase() {
       if (!isSupabaseMode()) {
@@ -503,8 +544,9 @@
   };
   window.STORE.getPollInterval = function () { return _pollSec; };
 
-  /* Expose clearDemoCache as top-level shortcut */
+  /* Expose clear helpers as top-level shortcut */
   window.clearDemoCache = () => window.STORE.clearDemoCache();
+  window.clearBusinessData = () => window.STORE.clearBusinessData();
 
   if (typeof window !== 'undefined') _startPoll();
 })();

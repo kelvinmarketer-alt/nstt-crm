@@ -318,6 +318,17 @@
       }
       return !error;
     },
+    async deleteKv(key) {
+      const { error } = await client.from('kv_store').delete().eq('key', key);
+      if (error) { console.warn('[SB deleteKv]', key, error.message); return false; }
+      return true;
+    },
+    /* Xóa TẤT CẢ rows trong 1 bảng (1 API call) — filter idCol IS NOT NULL = mọi row */
+    async clearTable(table, idColumn = 'id') {
+      const { error } = await client.from(table).delete().not(idColumn, 'is', null);
+      if (error) { console.warn('[SB clearTable]', table, error.message); return false; }
+      return true;
+    },
 
     /* === Integrations (Telegram bot, Gmail, AI keys, Zalo OA...) ===
        Schema: integrations(key TEXT PK, enabled BOOL, config JSONB, updated_at)
