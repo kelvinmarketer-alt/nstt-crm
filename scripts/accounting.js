@@ -31,6 +31,22 @@
 
   function render() {
     entries = window.STORE.get('cashEntries', INITIAL_ENTRIES);
+    /* === KPI cards động từ sổ quỹ thật === */
+    (function updateAccKpis() {
+      const ins = entries.filter(e => e.type === 'in');
+      const outs = entries.filter(e => e.type === 'out');
+      const sumIn = ins.reduce((s, e) => s + (+e.amount || 0), 0);
+      const sumOut = outs.reduce((s, e) => s + (+e.amount || 0), 0);
+      const cash = entries.filter(e => (e.account || '').toLowerCase().includes('tiền mặt'))
+        .reduce((s, e) => s + (e.type === 'in' ? 1 : -1) * (+e.amount || 0), 0);
+      const f = window.fmtShort || (n => n);
+      const set = (id, v) => { const el = document.getElementById(id); if (el) el.textContent = v; };
+      set('kpiAccIn', f(sumIn) + ' ₫');
+      set('kpiAccOut', f(sumOut) + ' ₫');
+      set('kpiAccNet', f(sumIn - sumOut) + ' ₫');
+      set('kpiAccCash', f(cash) + ' ₫');
+      set('kpiAccCount', entries.length);
+    })();
     const q = document.getElementById('qSearch').value.trim().toLowerCase();
     const t = document.getElementById('fType').value;
     const a = document.getElementById('fAccount').value;

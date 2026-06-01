@@ -20,6 +20,25 @@
 
   function render() {
     invoices = window.STORE.get('invoices', INITIAL);
+    /* === KPI cards động từ data thật === */
+    (function updateInvKpis() {
+      const sum = (arr) => arr.reduce((s, i) => s + (+i.net || 0) + (+i.vat || 0), 0);
+      const paid = invoices.filter(i => i.status === 'paid');
+      const pending = invoices.filter(i => i.status === 'pending');
+      const overdue = invoices.filter(i => i.status === 'overdue');
+      const vatSum = invoices.reduce((s, i) => s + (+i.vat || 0), 0);
+      const f = window.fmtShort || (n => n);
+      const set = (id, v) => { const e = document.getElementById(id); if (e) e.textContent = v; };
+      set('kpiInvTotal', invoices.length);
+      set('kpiInvTotalSum', f(sum(invoices)) + ' ₫');
+      set('kpiInvPaid', paid.length);
+      set('kpiInvPaidSum', f(sum(paid)) + ' ₫');
+      set('kpiInvPending', pending.length);
+      set('kpiInvPendingSum', f(sum(pending)) + ' ₫');
+      set('kpiInvOverdue', overdue.length);
+      set('kpiInvOverdueSum', f(sum(overdue)) + ' ₫');
+      set('kpiInvVat', f(vatSum) + ' ₫');
+    })();
     const rows = invoices.filter(i => cur === 'all' || i.status === cur);
     /* Map trạng thái dùng cho select + cho màu pill */
     const STATUS_OPTS = [

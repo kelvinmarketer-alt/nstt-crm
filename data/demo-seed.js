@@ -257,15 +257,10 @@
     console.log('[DemoSeed] pod_photos seeded for 3 orders');
   }
 
-  /* === Run all seeds after STORE + CURRENT_USER ready === */
-  setTimeout(() => {
-    try {
-      seedCustPrefs();
-      seedAuditLog();
-      seedAiChat();
-      seedSnapshots();
-      seedBudget();
-      seedPodPhotos();
-    } catch (e) { console.warn('[DemoSeed] error', e); }
-  }, 800);
+  /* === DISABLED — app trắng để dùng thật, KHÔNG bơm demo nữa ===
+     (cust_prefs/audit_log/chat/snapshot/budget/pod đều gắn KH demo cũ).
+     Giữ lại các hàm seed* ở trên để tham khảo, nhưng không gọi.
+     Nếu muốn bật lại demo cho mục đích test, bỏ comment khối dưới. */
+  void [seedCustPrefs, seedAuditLog, seedAiChat, seedSnapshots, seedBudget, seedPodPhotos];
+  console.log('[DemoSeed] ⏭ Skipped — app dùng dữ liệu thật');
 })();

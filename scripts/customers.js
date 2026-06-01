@@ -76,6 +76,17 @@
       const el = document.querySelector(`[data-cnt="${k}"]`);
       if (el) el.textContent = counts[k];
     });
+    /* === Cập nhật KPI cards + sub-header (động từ data thật) === */
+    const debtSum = customers.reduce((s, c) => s + (+c.debt || 0), 0);
+    const setTxt = (id, v) => { const e = document.getElementById(id); if (e) e.textContent = v; };
+    setTxt('kpiCustTotal', counts.all);
+    setTxt('kpiCustNew',   counts.new);
+    setTxt('kpiCustDebt',  counts.debt);
+    setTxt('kpiCustVip',   counts.vip);
+    setTxt('kpiCustInact', counts.inact);
+    setTxt('kpiCustNewTrend', `+${counts.new} nhóm "Mới"`);
+    setTxt('kpiCustDebtSum', `↓ Tổng ${window.fmtShort ? window.fmtShort(debtSum) : debtSum} ₫`);
+    setTxt('custSubHead', `Theo dõi ${counts.all} khách hàng`);
   }
 
   /* ============ Render pagination ============ */

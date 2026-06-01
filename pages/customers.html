@@ -32,7 +32,7 @@
     <div class="page-head">
       <div>
         <h1>Quản lý khách hàng</h1>
-        <div class="sub">Theo dõi 28 khách hàng · cập nhật 16/05/2026 14:32</div>
+        <div class="sub" id="custSubHead">Theo dõi khách hàng</div>
       </div>
       <div class="head-actions">
         <button class="btn btn-ghost" onclick="window.exportCustomersCsv()">⬇ Xuất Excel</button>
@@ -43,35 +43,35 @@
       </div>
     </div>
 
-    <!-- KPI -->
+    <!-- KPI (số cập nhật động từ data thật) -->
     <section class="kpis">
       <div class="kpi k-1">
         <div class="kpi-label">Tổng khách hàng</div>
-        <div class="kpi-value">28</div>
-        <div class="kpi-trend up">↑ +3 trong 30 ngày</div>
+        <div class="kpi-value" id="kpiCustTotal">0</div>
+        <div class="kpi-trend" id="kpiCustNewTrend">— trong 30 ngày</div>
         <div class="kpi-icon">👥</div>
       </div>
       <div class="kpi k-2">
         <div class="kpi-label">Mới tháng này</div>
-        <div class="kpi-value">3</div>
-        <div class="kpi-trend up">↑ tốt hơn tháng trước (+50%)</div>
+        <div class="kpi-value" id="kpiCustNew">0</div>
+        <div class="kpi-trend">nhóm "Mới"</div>
         <div class="kpi-icon">✨</div>
       </div>
       <div class="kpi k-3">
         <div class="kpi-label">Đang nợ</div>
-        <div class="kpi-value">7</div>
-        <div class="kpi-trend down">↓ Tổng 42.5 tr ₫ quá hạn</div>
+        <div class="kpi-value" id="kpiCustDebt">0</div>
+        <div class="kpi-trend down" id="kpiCustDebtSum">↓ Tổng 0 ₫</div>
         <div class="kpi-icon">⚠️</div>
       </div>
       <div class="kpi k-4">
         <div class="kpi-label">Khách VIP</div>
-        <div class="kpi-value">5</div>
-        <div class="kpi-trend up">≈ 68% doanh thu</div>
+        <div class="kpi-value" id="kpiCustVip">0</div>
+        <div class="kpi-trend">nhóm VIP</div>
         <div class="kpi-icon">⭐</div>
       </div>
       <div class="kpi k-5">
         <div class="kpi-label">Không hoạt động</div>
-        <div class="kpi-value">4</div>
+        <div class="kpi-value" id="kpiCustInact">0</div>
         <div class="kpi-trend">&gt; 90 ngày không phát sinh</div>
         <div class="kpi-icon">💤</div>
       </div>

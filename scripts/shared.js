@@ -547,10 +547,10 @@ window.attachBulkOps = function (opts) {
 window.NAV = [
   { section: 'Vận hành', items: [
     { id: 'dashboard',  label: 'Dashboard',   icon: '📊', href: 'dashboard.html' },
-    { id: 'orders',     label: 'Đơn hàng',    icon: '📦', href: 'orders.html', badge: 142 },
+    { id: 'orders',     label: 'Đơn hàng',    icon: '📦', href: 'orders.html', badgeKey: 'orders' },
     { id: 'quotes',     label: 'Báo giá',     icon: '📝', href: 'quotes.html' },
     { id: 'recurring',  label: 'Đơn định kỳ', icon: '🔁', href: 'recurring.html' },
-    { id: 'customers',  label: 'Khách hàng',  icon: '👥', href: 'customers.html', badge: 28 },
+    { id: 'customers',  label: 'Khách hàng',  icon: '👥', href: 'customers.html', badgeKey: 'customers' },
     { id: 'customers-360', label: 'Chân dung KH 360°', icon: '🔍', href: 'customers-360.html' },
     { id: 'leads',      label: 'Lead/Tiềm năng', icon: '🎯', href: 'leads.html' },
     { id: 'shippers',   label: 'Shipper',     icon: '🛵', href: 'shippers.html' },
@@ -564,7 +564,7 @@ window.NAV = [
   ]},
   { section: 'Tài chính', items: [
     { id: 'accounting', label: 'Kế toán',     icon: '💰', href: 'accounting.html' },
-    { id: 'debt',       label: 'Công nợ',     icon: '📉', href: 'debt.html', badge: 7 },
+    { id: 'debt',       label: 'Công nợ',     icon: '📉', href: 'debt.html', badgeKey: 'debt' },
     { id: 'invoices',   label: 'Hóa đơn',     icon: '🧾', href: 'invoices.html' },
     { id: 'adspend',    label: 'Chi phí Ads', icon: '📣', href: 'adspend.html' },
     { id: 'loyalty',    label: 'Loyalty (tích điểm)', icon: '⭐', href: 'loyalty.html' },
@@ -715,6 +715,27 @@ window.MD = {
 window.renderAppShell = function(activeId, breadcrumbText) {
   const sb = document.querySelector('.sidebar');
   if (sb) {
+    /* badge động cho sidebar — tính số thực từ STORE (0 → ẩn) */
+    if (!window.navBadgeCount) {
+      window.navBadgeCount = function (key) {
+        try {
+          if (key === 'orders') {
+            const o = window.STORE.get('orders', []) || [];
+            /* đơn đang xử lý (chưa giao xong / chưa hủy) */
+            return o.filter(x => x && !['delivered','done','completed','cancelled','canceled','huy'].includes((x.status||'').toLowerCase())).length || 0;
+          }
+          if (key === 'customers') {
+            return (window.STORE.get('customers', []) || []).length || 0;
+          }
+          if (key === 'debt') {
+            const cs = window.STORE.get('customers', []) || [];
+            return cs.filter(c => (+c.debt || 0) > 0).length || 0;
+          }
+        } catch (e) {}
+        return 0;
+      };
+    }
+
     /* Lấy danh sách page được phép truy cập */
     const allowedPages = window.AUTH ? window.AUTH.getAllowedMenu() : null;
     const filteredNav = window.NAV.map(group => ({
@@ -737,12 +758,16 @@ window.renderAppShell = function(activeId, breadcrumbText) {
       <nav class="nav">
         ${filteredNav.map(group => `
           <div class="nav-section">${group.section}</div>
-          ${group.items.map(item => `
+          ${group.items.map(item => {
+            /* badge động: tính số thực từ STORE theo badgeKey (0 thì ẩn) */
+            let badgeVal = item.badge;
+            if (item.badgeKey && window.navBadgeCount) badgeVal = window.navBadgeCount(item.badgeKey);
+            return `
             <a href="${item.href}" class="${item.id === activeId ? 'active' : ''}">
               <span class="ico">${item.icon}</span> ${item.label}
-              ${item.badge ? `<span class="badge-n">${item.badge}</span>` : ''}
-            </a>
-          `).join('')}
+              ${badgeVal ? `<span class="badge-n">${badgeVal}</span>` : ''}
+            </a>`;
+          }).join('')}
         `).join('')}
       </nav>
       <div class="side-foot">

@@ -56,11 +56,11 @@
 
     <!-- KPI -->
     <section class="kpis">
-      <div class="kpi k-1"><div class="kpi-label">Tổng thu T5</div><div class="kpi-value">218 tr</div><div class="kpi-trend up">↑ +18% vs T4</div><div class="kpi-icon">📈</div></div>
-      <div class="kpi k-3"><div class="kpi-label">Tổng chi T5</div><div class="kpi-value">86 tr</div><div class="kpi-trend">Xăng, bảo dưỡng, lương</div><div class="kpi-icon">📉</div></div>
-      <div class="kpi k-2"><div class="kpi-label">Lợi nhuận gộp T5</div><div class="kpi-value">132 tr</div><div class="kpi-trend up">↑ Biên 60.5%</div><div class="kpi-icon">💰</div></div>
-      <div class="kpi k-4"><div class="kpi-label">Quỹ tiền mặt</div><div class="kpi-value">42 tr</div><div class="kpi-trend">Tại văn phòng</div><div class="kpi-icon">💵</div></div>
-      <div class="kpi k-5"><div class="kpi-label">TK ngân hàng</div><div class="kpi-value">186 tr</div><div class="kpi-trend">Vietcombank · MB</div><div class="kpi-icon">🏦</div></div>
+      <div class="kpi k-1"><div class="kpi-label">Tổng thu</div><div class="kpi-value" id="kpiAccIn">0</div><div class="kpi-trend">phiếu thu</div><div class="kpi-icon">📈</div></div>
+      <div class="kpi k-3"><div class="kpi-label">Tổng chi</div><div class="kpi-value" id="kpiAccOut">0</div><div class="kpi-trend">phiếu chi</div><div class="kpi-icon">📉</div></div>
+      <div class="kpi k-2"><div class="kpi-label">Chênh lệch (Thu − Chi)</div><div class="kpi-value" id="kpiAccNet">0</div><div class="kpi-trend" id="kpiAccNetNote">số dư</div><div class="kpi-icon">💰</div></div>
+      <div class="kpi k-4"><div class="kpi-label">Quỹ tiền mặt</div><div class="kpi-value" id="kpiAccCash">0</div><div class="kpi-trend">tài khoản Tiền mặt</div><div class="kpi-icon">💵</div></div>
+      <div class="kpi k-5"><div class="kpi-label">Số phiếu</div><div class="kpi-value" id="kpiAccCount">0</div><div class="kpi-trend">tổng giao dịch</div><div class="kpi-icon">🏦</div></div>
     </section>
 
     <!-- 2 cột tổng quan -->

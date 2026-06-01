@@ -13,7 +13,7 @@
   /* === Seed version === : khi đổi dữ liệu mẫu (data/*.js) thì tăng version này.
      App sẽ tự xoá các key dữ liệu cũ trong localStorage để nạp lại bản mới
      (giữ nguyên đăng nhập + cấu hình tích hợp). Tránh tình trạng "kẹt data cũ". */
-  const SEED_VERSION = 'nstt-2026-06-01-blank-start';
+  const SEED_VERSION = 'nstt-2026-06-01-blank-start-v2';
   try {
     if (localStorage.getItem(PREFIX + 'seedVersion') !== SEED_VERSION) {
       /* Migration: chuyển dữ liệu 'drivers' cũ → 'shippers' nếu user đã có */
