@@ -5,29 +5,77 @@
    ========================================================= */
 (function () {
 
-  /* Mock users (fallback) — sẽ override khi Supabase Auth sẵn sàng */
+  /* =========================================================
+     5 TÀI KHOẢN THẬT — gắn với NV thật trong DB (staff table)
+     Đăng nhập qua MOCK_USERS fallback (Supabase Auth chưa tạo user).
+     ⚠ Mật khẩu mặc định — đổi sau khi đăng nhập lần đầu.
+     ========================================================= */
   const MOCK_USERS = [
-    { email:'admin@nongsantuantu.com', password:'admin123', staffId:'NV001',
-      name:'Tuấn Tú', role:'Chủ doanh nghiệp', dept:'Ban giám đốc',
-      avatar:'TT', avatarColor:'#339B21', permissions:['Tất cả'], status:'active' },
-    { email:'sales@nongsantuantu.com', password:'sales123', staffId:'NV002',
-      name:'Trần Lan', role:'Trưởng phòng Sales/CSKH', dept:'Sales',
-      avatar:'TL', avatarColor:'#1B5E20',
-      permissions:['Dashboard','Khách hàng','Đơn hàng','Công nợ','Hóa đơn','Báo cáo'], status:'active' },
-    { email:'hung@nongsantuantu.com', password:'sales123', staffId:'NV003',
-      name:'Phạm Hùng', role:'Nhân viên Sales', dept:'Sales',
-      avatar:'PH', avatarColor:'#7C3AED',
-      permissions:['Dashboard','Khách hàng','Đơn hàng','Báo cáo'], status:'active' },
-    { email:'cskh@nongsantuantu.com', password:'cskh123', staffId:'NV004',
-      name:'Hoàng Mai', role:'NV CSKH B2C / Last-mile', dept:'CSKH',
-      avatar:'HM', avatarColor:'#E8A33D',
-      permissions:['Dashboard','Khách hàng','Đơn hàng'], status:'active' },
-    { email:'kt@nongsantuantu.com', password:'kt123', staffId:'NV005',
-      name:'Lê Thị Phương', role:'Kế toán', dept:'Kế toán',
-      avatar:'LP', avatarColor:'#15803D',
-      permissions:['Dashboard','Kế toán','Công nợ','Hóa đơn','Báo cáo',
-                   /* Kế toán được xem giá vốn + lợi nhuận + lương tất cả NV */
-                   'reports.profit','products.editCost','payroll.viewAll'], status:'active' },
+    /* 1) SẾP — Tuấn Tú (NV001) — toàn quyền */
+    { email:'sep@nstt.vn', password:'sep@2026', staffId:'NV001',
+      name:'Tuấn Tú', role:'Sếp (Chủ doanh nghiệp)', dept:'Ban giám đốc',
+      avatar:'TT', avatarColor:'#339B21',
+      permissions:['all'], status:'active' },
+
+    /* 2) SALE — Chu Thị Tố Loan (NV016) */
+    { email:'sale@nstt.vn', password:'sale@2026', staffId:'NV016',
+      name:'Chu Thị Tố Loan', role:'Nhân viên Sale', dept:'Sale',
+      avatar:'CL', avatarColor:'#1B5E20',
+      permissions:[
+        'dashboard.view',
+        'orders.view','orders.create','orders.edit','orders.print',
+        'customers.view','customers.create','customers.edit','customers.debt',
+        'products.view',
+        'quotes.view','quotes.create',
+        'recurring.view','recurring.edit',
+        'leads.view','leads.edit',
+        'reports.view','reports.sales',
+        'payroll.viewSelf',
+      ], status:'active' },
+
+    /* 3) NHÂN SỰ (HR) — Nguyễn Phương Trang (NV010) — tính + gửi lương (KHÔNG duyệt) */
+    { email:'nhansu@nstt.vn', password:'nhansu@2026', staffId:'NV010',
+      name:'Nguyễn Phương Trang', role:'Nhân sự (HR)', dept:'HCNS',
+      avatar:'PT', avatarColor:'#7C3AED',
+      permissions:[
+        'dashboard.view',
+        'staff.view','staff.edit',
+        'payroll.viewSelf','payroll.viewAll','payroll.edit','payroll.upload',
+        'payroll.calc','payroll.submit',   /* HR tính lương + gửi Sếp duyệt */
+        'reports.view',
+      ], status:'active' },
+
+    /* 4) KẾ TOÁN — Nguyễn Thị Thủy (NV015) — tài chính + xem lợi nhuận/giá vốn/lương */
+    { email:'ketoan@nstt.vn', password:'ketoan@2026', staffId:'NV015',
+      name:'Nguyễn Thị Thủy', role:'Kế toán', dept:'Kế toán',
+      avatar:'NT', avatarColor:'#15803D',
+      permissions:[
+        'dashboard.view',
+        'accounting.view','accounting.edit',
+        'debt.view','debt.collect',
+        'invoices.view','invoices.create',
+        'adspend.view','adspend.edit',
+        'suppliers.view',
+        'products.view','products.editCost',
+        'orders.view',
+        'reports.view','reports.profit','reports.daily','reports.export',
+        'payroll.viewSelf','payroll.viewAll',   /* xem lương để chi trả */
+      ], status:'active' },
+
+    /* 5) KHO — Dương Phương Trang (NV023) — kho + nhập hàng + NCC + trả hàng */
+    { email:'kho@nstt.vn', password:'kho@2026', staffId:'NV023',
+      name:'Dương Phương Trang', role:'Quản lý Kho', dept:'Kho',
+      avatar:'DT', avatarColor:'#E8A33D',
+      permissions:[
+        'dashboard.view',
+        'inventory.view','inventory.adjust',
+        'suppliers.view','suppliers.edit',
+        'purchases.view','purchases.create',
+        'returns.view','returns.process',
+        'products.view',
+        'orders.view',   /* xem đơn để soạn hàng */
+        'payroll.viewSelf',
+      ], status:'active' },
   ];
 
   /* ============================================================
