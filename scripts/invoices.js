@@ -2,18 +2,8 @@
    Nông Sản Tuấn Tú Hà Nội — Hóa đơn VAT (Full CRUD)
    ========================================================= */
 (function () {
-  const INITIAL = [
-    { no:'1C25T-0042', date:'16/05/2026', cust:'Cty Bao bì An Phát', tax:'2300456789', net:7_727_273, vat:772_727, status:'paid' },
-    { no:'1C25T-0041', date:'15/05/2026', cust:'Cty CP HN Foods', tax:'0102345678', net:2_545_455, vat:254_545, status:'paid' },
-    { no:'1C25T-0040', date:'15/05/2026', cust:'Cty TNHH Đồ Gỗ Đông Anh', tax:'0104567890', net:14_727_273, vat:1_472_727, status:'paid' },
-    { no:'1C25T-0039', date:'14/05/2026', cust:'Cty TNHH Inax Việt', tax:'0200456123', net:3_818_182, vat:381_818, status:'pending' },
-    { no:'1C25T-0038', date:'13/05/2026', cust:'Cty Dệt may Phú Cường', tax:'0801234567', net:10_454_545, vat:1_045_455, status:'overdue' },
-    { no:'1C25T-0037', date:'12/05/2026', cust:'Cty VLXD Hoàng Phát', tax:'0804567123', net:5_454_545, vat:545_455, status:'overdue' },
-    { no:'1C25T-0036', date:'10/05/2026', cust:'Cty CP XNK Nam Long', tax:'2301122334', net:8_181_818, vat:818_182, status:'paid' },
-    { no:'1C25T-0035', date:'09/05/2026', cust:'Cty Bao bì An Phát', tax:'2300456789', net:7_090_909, vat:709_091, status:'paid' },
-    { no:'1C25T-0034', date:'08/05/2026', cust:'K-Beauty Vietnam', tax:'0109988776', net:4_727_273, vat:472_727, status:'pending' },
-    { no:'(nháp)', date:'16/05/2026', cust:'Cty CP HN Foods', tax:'0102345678', net:2_545_455, vat:254_545, status:'draft' },
-  ];
+  /* App trắng — data thật nhập trên app (lưu Supabase). KHÔNG seed demo. */
+  const INITIAL = [];
 
   let invoices = window.STORE.get('invoices', INITIAL);
   let cur = 'all';
@@ -38,6 +28,18 @@
       set('kpiInvOverdue', overdue.length);
       set('kpiInvOverdueSum', f(sum(overdue)) + ' ₫');
       set('kpiInvVat', f(vatSum) + ' ₫');
+      /* Tab chip counts + header (động) */
+      const chipCounts = {
+        all: invoices.length,
+        paid: paid.length, pending: pending.length, overdue: overdue.length,
+        draft: invoices.filter(i => i.status === 'draft').length,
+      };
+      document.querySelectorAll('[data-q]').forEach(btn => {
+        const span = btn.querySelector('.cnt');
+        if (span && chipCounts[btn.dataset.q] != null) span.textContent = chipCounts[btn.dataset.q];
+      });
+      const hdr = document.querySelector('.table-head .count');
+      if (hdr) hdr.textContent = `${invoices.length} hóa đơn`;
     })();
     const rows = invoices.filter(i => cur === 'all' || i.status === cur);
     /* Map trạng thái dùng cho select + cho màu pill */

@@ -67,13 +67,12 @@
     <div class="acc-grid">
       <div class="acc-card">
         <div class="h"><h3>💵 Quỹ tiền mặt</h3><div class="spc"></div><button class="btn btn-ghost btn-sm" onclick="window.openCashHistory()">Lịch sử</button></div>
-        <div class="acc-row"><div class="lab">Đầu kỳ (01/05)</div><div class="val">28.500.000 ₫</div></div>
-        <div class="acc-row"><div class="lab">Thu trong kỳ</div><div class="val in">+62.300.000 ₫</div></div>
-        <div class="acc-row"><div class="lab">Chi trong kỳ</div><div class="val out">-48.800.000 ₫</div></div>
+        <div class="acc-row"><div class="lab">Thu trong kỳ</div><div class="val in" id="accCashIn">0 ₫</div></div>
+        <div class="acc-row"><div class="lab">Chi trong kỳ</div><div class="val out" id="accCashOut">0 ₫</div></div>
         <div class="balance">
-          <div class="lab">Số dư hiện tại</div>
-          <div class="val">42.000.000 ₫</div>
-          <div class="sub">Kiểm kê ngày 16/05/2026</div>
+          <div class="lab">Số dư tiền mặt</div>
+          <div class="val" id="accCashBal">0 ₫</div>
+          <div class="sub">Tính từ phiếu thu/chi tài khoản Tiền mặt</div>
         </div>
       </div>
 
@@ -82,13 +81,11 @@
           <button class="btn btn-ghost btn-sm" onclick="window.openAccountSettings()">⚙ Quản lý TK</button>
           <button class="btn btn-ghost btn-sm" onclick="window.openBankReconcile()">🔍 Đối soát</button>
         </div>
-        <div class="acc-row"><div class="lab">Vietcombank · 1021xxxxxx</div><div class="val">128.400.000 ₫</div></div>
-        <div class="acc-row"><div class="lab">MB Bank · 0312xxxxxx</div><div class="val">42.800.000 ₫</div></div>
-        <div class="acc-row"><div class="lab">Techcombank · 1903xxxxxx</div><div class="val">14.800.000 ₫</div></div>
+        <div id="accBankList"><div class="acc-row"><div class="lab" style="color:var(--muted)">Chưa có tài khoản — bấm "⚙ Quản lý TK" để thêm</div></div></div>
         <div class="balance" style="background:linear-gradient(135deg,#0EA5E9 0%,#0369A1 100%)">
           <div class="lab">Tổng dư ngân hàng</div>
-          <div class="val">186.000.000 ₫</div>
-          <div class="sub">3 tài khoản · cập nhật 16/05 14:30</div>
+          <div class="val" id="accBankTotal">0 ₫</div>
+          <div class="sub" id="accBankSub">0 tài khoản</div>
         </div>
       </div>
     </div>

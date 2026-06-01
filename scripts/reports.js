@@ -903,7 +903,7 @@
         <div><div style="color:var(--muted);font-size:11px">AOV</div><div style="font-weight:700">${window.fmtShort(t5.length ? rev5 / t5.length : 0)}</div></div>
         <div><div style="color:var(--muted);font-size:11px">KH đặt tháng</div><div style="font-weight:700">${activeCust}/${customers.length}</div></div>
         <div><div style="color:var(--muted);font-size:11px">KH mới 30d</div><div style="font-weight:700;color:var(--ok)">${newCust} KH</div></div>
-        <div><div style="color:var(--muted);font-size:11px">vs T4</div><div style="font-weight:700;color:${rev5>=rev4?'var(--ok)':'var(--danger)'}">${rev5>=rev4?'+':''}${Math.round((rev5-rev4)/rev4*100)}%</div></div>
+        <div><div style="color:var(--muted);font-size:11px">vs T4</div><div style="font-weight:700;color:${rev5>=rev4?'var(--ok)':'var(--danger)'}">${rev4>0?(rev5>=rev4?'+':'')+Math.round((rev5-rev4)/rev4*100)+'%':'—'}</div></div>
       </div>
     `;
 
@@ -955,7 +955,7 @@
       else if (att === 'V') absent++;
     });
     document.getElementById('ovHr').innerHTML = `
-      <h3 style="margin:0 0 10px;display:flex;align-items:center;gap:8px;color:#A16207">🧑‍💼 NHÂN SỰ — Hôm nay 18/05</h3>
+      <h3 style="margin:0 0 10px;display:flex;align-items:center;gap:8px;color:#A16207">🧑‍💼 NHÂN SỰ — Hôm nay ${window.todayDate().toLocaleDateString('vi-VN',{day:'2-digit',month:'2-digit'})}</h3>
       <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;font-size:12.5px">
         <div><div style="color:var(--muted);font-size:11px">Tổng NV active</div><div style="font-size:18px;font-weight:800;color:var(--navy)">${activeStaff.length}</div></div>
         <div><div style="color:var(--muted);font-size:11px">Đi làm hôm nay</div><div style="font-size:18px;font-weight:800;color:var(--ok)">${onDuty}</div></div>

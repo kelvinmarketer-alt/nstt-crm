@@ -39,7 +39,7 @@
     <div class="page-head">
       <div>
         <h1>Công nợ phải thu</h1>
-        <div class="sub">7 khách đang nợ · tổng 101.4 tr ₫ · trong đó 40.0 tr quá hạn &gt; 30 ngày</div>
+        <div class="sub" id="debtSubHead">Theo dõi công nợ phải thu</div>
       </div>
       <div class="head-actions">
         <button class="btn btn-ghost" onclick="window.openBulkReminder()">📧 Nhắc nợ hàng loạt</button>
@@ -48,29 +48,29 @@
       </div>
     </div>
 
-    <!-- Aging -->
+    <!-- Aging (số động từ data thật) -->
     <section class="aging">
-      <div class="aging-card b1"><div class="lab">Trong hạn</div><div class="val">61.4 tr</div><div class="sub">0–30 ngày · 4 KH</div></div>
-      <div class="aging-card b2"><div class="lab">31–60 ngày</div><div class="val">22.0 tr</div><div class="sub">1 KH · Phú Cường</div></div>
-      <div class="aging-card b3"><div class="lab">61–90 ngày</div><div class="val">18.0 tr</div><div class="sub">1 KH · Hoàng Phát</div></div>
-      <div class="aging-card b4"><div class="lab">&gt; 90 ngày</div><div class="val">0 ₫</div><div class="sub">An toàn 🎉</div></div>
-      <div class="aging-card b5"><div class="lab">Khó đòi</div><div class="val">0 ₫</div><div class="sub">Chưa có</div></div>
+      <div class="aging-card b1"><div class="lab">Trong hạn</div><div class="val" id="agB1">0 ₫</div><div class="sub" id="agB1s">0–30 ngày</div></div>
+      <div class="aging-card b2"><div class="lab">31–60 ngày</div><div class="val" id="agB2">0 ₫</div><div class="sub" id="agB2s">—</div></div>
+      <div class="aging-card b3"><div class="lab">61–90 ngày</div><div class="val" id="agB3">0 ₫</div><div class="sub" id="agB3s">—</div></div>
+      <div class="aging-card b4"><div class="lab">&gt; 90 ngày</div><div class="val" id="agB4">0 ₫</div><div class="sub" id="agB4s">An toàn 🎉</div></div>
+      <div class="aging-card b5"><div class="lab">Khó đòi</div><div class="val" id="agB5">0 ₫</div><div class="sub">Chưa có</div></div>
     </section>
 
     <div style="background:#fff;border:1px solid var(--line);border-radius:10px;padding:14px 18px;margin-bottom:14px">
       <div style="display:flex;align-items:center;justify-content:space-between;font-size:12.5px;color:var(--muted)">
         <span>📊 Phân bố tuổi nợ</span>
-        <span>Tổng: <b style="color:var(--navy);font-size:14px">101.400.000 ₫</b></span>
+        <span>Tổng: <b style="color:var(--navy);font-size:14px" id="debtTotal">0 ₫</b></span>
       </div>
-      <div class="aging-bar">
-        <div style="background:var(--ok);width:60.5%" title="Trong hạn"></div>
-        <div style="background:#3B82F6;width:21.7%" title="31-60 ngày"></div>
-        <div style="background:var(--warn);width:17.8%" title="61-90 ngày"></div>
+      <div class="aging-bar" id="debtBar">
+        <div style="background:var(--ok);width:0%" title="Trong hạn"></div>
+        <div style="background:#3B82F6;width:0%" title="31-60 ngày"></div>
+        <div style="background:var(--warn);width:0%" title="61-90 ngày"></div>
       </div>
-      <div style="display:flex;justify-content:space-between;font-size:11px;color:var(--muted)">
-        <span>🟢 Trong hạn 60.5%</span>
-        <span>🔵 31–60d 21.7%</span>
-        <span>🟡 61–90d 17.8%</span>
+      <div style="display:flex;justify-content:space-between;font-size:11px;color:var(--muted)" id="debtBarLegend">
+        <span>🟢 Trong hạn 0%</span>
+        <span>🔵 31–60d 0%</span>
+        <span>🟡 61–90d 0%</span>
       </div>
     </div>
 
@@ -85,11 +85,8 @@
         <option value="warn">31–60 ngày</option>
         <option value="danger">&gt; 60 ngày</option>
       </select>
-      <select>
-        <option>NV phụ trách (tất cả)</option>
-        <option>Trần Lan</option>
-        <option>Phạm Hùng</option>
-        <option>Hoàng Mai</option>
+      <select id="fStaff">
+        <option value="">NV phụ trách (tất cả)</option>
       </select>
     </div>
 
