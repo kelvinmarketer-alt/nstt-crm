@@ -494,20 +494,23 @@
             </tbody>
           </table>
 
-          <div class="section-h" style="margin-top:24px;color:var(--danger);border-bottom-color:var(--danger)">⚠️ Vùng nguy hiểm</div>
+          <div class="section-h" style="margin-top:24px">🧹 Xóa cache demo localStorage</div>
+          <div style="background:#FEF9C3;border:1px solid #FDE047;border-radius:10px;padding:14px 16px;margin-bottom:14px">
+            <div style="font-size:13px;color:#854D0E;margin-bottom:10px;line-height:1.6">
+              <b>An toàn — chỉ xóa cache trên máy này.</b> Dùng khi app vẫn show data demo cũ (KH/đơn/HĐ) dù DB cloud đã trống.<br>
+              Sẽ xóa: <code>customers · orders · invoices · returns · purchases · quotes · leads · suppliers · recurring_orders · cashEntries</code>.<br>
+              <b>KHÔNG xóa</b>: settings · integrations · staff · products · payrollExtra · timesheet.
+            </div>
+            <button class="btn btn-navy" onclick="if(confirm('Xóa cache data demo trên máy này? (an toàn — không động vào cloud)')){window.clearDemoCache && window.clearDemoCache()}">🧹 Xóa cache demo localStorage</button>
+          </div>
+
+          <div class="section-h" style="margin-top:18px;color:var(--danger);border-bottom-color:var(--danger)">⚠️ Vùng nguy hiểm</div>
           <div style="background:#FEF2F2;border:1px solid #FCA5A5;border-radius:10px;padding:14px 16px">
             <div style="font-size:13px;color:var(--danger);margin-bottom:10px">
-              Reset dữ liệu sẽ xóa <b>tất cả thay đổi của bạn</b> và đưa app về trạng thái dữ liệu mẫu ban đầu.
+              Reset toàn bộ sẽ xóa <b>TẤT CẢ thay đổi của bạn trên máy này</b> (kể cả settings, integrations) và reload app. Cloud data KHÔNG bị ảnh hưởng.
             </div>
             <div style="display:flex;gap:8px;flex-wrap:wrap">
-              <button class="btn btn-ghost" onclick="window.resetKey('customers')">↺ Reset Khách hàng</button>
-              <button class="btn btn-ghost" onclick="window.resetKey('orders')">↺ Reset Đơn hàng</button>
-              <button class="btn btn-ghost" onclick="window.resetKey('vehicles')">↺ Reset Xe</button>
-              <button class="btn btn-ghost" onclick="window.resetKey('drivers')">↺ Reset Tài xế</button>
-              <button class="btn btn-ghost" onclick="window.resetKey('staff')">↺ Reset Nhân viên</button>
-              <button class="btn btn-ghost" onclick="window.resetKey('cashEntries')">↺ Reset Sổ quỹ</button>
-              <button class="btn btn-ghost" onclick="window.resetKey('invoices')">↺ Reset Hóa đơn</button>
-              <button class="btn" style="background:var(--danger);color:#fff" onclick="if(confirm('⚠️ Xóa TOÀN BỘ thay đổi và reset app?')){window.STORE.resetAll()}">🔥 Reset TẤT CẢ</button>
+              <button class="btn" style="background:var(--danger);color:#fff" onclick="if(confirm('⚠️ Xóa TOÀN BỘ localStorage + reload?')){window.STORE.resetAll()}">🔥 Reset TẤT CẢ localStorage</button>
             </div>
           </div>
 

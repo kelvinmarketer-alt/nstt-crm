@@ -1037,22 +1037,35 @@ window.toast = function(message, type = 'info') {
   setTimeout(() => { t.style.transition = 'opacity 0.3s'; t.style.opacity = '0'; setTimeout(()=>t.remove(), 300); }, 2800);
 };
 
-/* ============ Modal helper ============ */
+/* ============ Modal helper ============
+   MẶC ĐỊNH: KHÔNG đóng modal khi click backdrop (tránh mất form nhập nửa chừng).
+   Chỉ đóng khi bấm X, Esc, hoặc nút trong footer.
+   Nếu muốn đóng khi click ngoài → truyền opts.dismissOnBackdrop:true */
 window.openModal = function(title, bodyHTML, opts = {}) {
   const existing = document.getElementById('modal-bg');
   if (existing) existing.remove();
+  const backdropClick = opts.dismissOnBackdrop
+    ? `onclick="if(event.target===this)window.closeModal()"`
+    : '';
   const html = `
-    <div id="modal-bg" class="modal-bg open" onclick="if(event.target===this)window.closeModal()">
+    <div id="modal-bg" class="modal-bg open" ${backdropClick}>
       <div class="modal" style="max-width:${opts.width||'520px'}">
         <div class="modal-head">
           <h3>${title}</h3>
-          <button class="modal-close" onclick="window.closeModal()">✕</button>
+          <button class="modal-close" onclick="window.closeModal()" title="Đóng (Esc)">✕</button>
         </div>
         <div class="modal-body">${bodyHTML}</div>
         ${opts.footer ? `<div class="modal-foot">${opts.footer}</div>` : ''}
       </div>
     </div>`;
   document.body.insertAdjacentHTML('beforeend', html);
+  /* Esc đóng modal */
+  if (!window._modalEscHandler) {
+    window._modalEscHandler = (e) => {
+      if (e.key === 'Escape' && document.getElementById('modal-bg')) window.closeModal();
+    };
+    document.addEventListener('keydown', window._modalEscHandler);
+  }
 };
 window.closeModal = function() {
   document.getElementById('modal-bg')?.remove();

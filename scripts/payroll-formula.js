@@ -149,19 +149,51 @@
          bonuses: [{name, amount}, ...],
          penalties: [{name, amount}, ...],
          bhxh, advance,
+         mixedMode (optional): boolean,
+         segments (optional): [{name, basicSalary, contractType, workActual, workStandardOverride?}]
        } */
     const cfg = getDeptConfig(input.dept, input.contractType);
-    const workStandard = input.workStandardOverride || cfg.workStandard;
+    const workStandardDefault = input.workStandardOverride || cfg.workStandard;
     const allowanceMonthly = (input.allowanceOverride != null)
       ? input.allowanceOverride : cfg.allowanceMonthly;
-    const ratio = CONTRACT_RATIO[input.contractType] || 1.00;
 
-    const basicSalary = +input.basicSalary || 0;
-    const workActual = +input.workActual || 0;
+    let baseSalary = 0, workActual = 0, ratio = 1, basicSalary = 0, workStandard = workStandardDefault;
+    const segDetail = []; /* Breakdown cho mixed mode */
 
-    /* Lương theo công */
-    const baseSalary = roundK(basicSalary * ratio / workStandard * workActual);
-    /* Phụ cấp theo công */
+    if (input.mixedMode && Array.isArray(input.segments) && input.segments.length > 0) {
+      /* === MIXED MODE === thử việc + chính thức trong cùng tháng */
+      input.segments.forEach(seg => {
+        const segRatio = CONTRACT_RATIO[seg.contractType] || 1.00;
+        const segWS = seg.workStandardOverride || getDeptConfig(input.dept, seg.contractType).workStandard;
+        const segBasic = +seg.basicSalary || 0;
+        const segWork = +seg.workActual || 0;
+        const segBase = roundK(segBasic * segRatio / segWS * segWork);
+        baseSalary += segBase;
+        workActual += segWork;
+        segDetail.push({
+          name: seg.name || (seg.contractType === 'probation' ? 'Thử việc' : 'Chính thức'),
+          basicSalary: segBasic,
+          contractType: seg.contractType,
+          ratio: segRatio,
+          workStandard: segWS,
+          workActual: segWork,
+          baseSalary: segBase,
+        });
+      });
+      /* Báo cáo basicSalary + ratio trung bình cho display */
+      basicSalary = segDetail.reduce((s, x) => s + x.basicSalary * x.workActual, 0) / (workActual || 1);
+      ratio = segDetail.reduce((s, x) => s + x.ratio * x.workActual, 0) / (workActual || 1);
+    } else {
+      /* === SINGLE MODE === logic cũ */
+      ratio = CONTRACT_RATIO[input.contractType] || 1.00;
+      basicSalary = +input.basicSalary || 0;
+      workActual = +input.workActual || 0;
+      /* Lương theo công */
+      baseSalary = roundK(basicSalary * ratio / workStandardDefault * workActual);
+    }
+    workStandard = workStandardDefault;
+
+    /* Phụ cấp theo TỔNG công (cả mixed lẫn single) */
     const allowance = roundK(allowanceMonthly / workStandard * workActual);
 
     /* Tổng thưởng */
@@ -180,6 +212,16 @@
 
     const total = baseSalary + allowance + totalBonus - totalPenalty - bhxh - advance - lateAuto.total;
 
+    /* Breakdown display — mixed mode liệt kê từng segment */
+    let baseSalaryDetail;
+    if (segDetail.length > 0) {
+      baseSalaryDetail = segDetail.map(s =>
+        `[${s.name}] ${formatVND(s.basicSalary)} × ${(s.ratio*100).toFixed(0)}% ÷ ${s.workStandard} × ${s.workActual} = ${formatVND(s.baseSalary)}`
+      ).join(' · ') + ` → Σ ${formatVND(baseSalary)}`;
+    } else {
+      baseSalaryDetail = `${formatVND(basicSalary)} × ${(ratio*100).toFixed(0)}% ÷ ${workStandard} × ${workActual} = ${formatVND(baseSalary)}`;
+    }
+
     return {
       ...input,
       workStandard,
@@ -192,10 +234,13 @@
       bhxh,
       advance,
       lateAuto,
+      segDetail, /* Mixed mode breakdown */
       total: Math.max(0, total),
       breakdown: {
-        formula: `${formatVND(basicSalary)} × ${(ratio*100).toFixed(0)}% ÷ ${workStandard} × ${workActual}`,
-        baseSalaryDetail: `${formatVND(basicSalary)} × ${(ratio*100).toFixed(0)}% ÷ ${workStandard} × ${workActual} = ${formatVND(baseSalary)}`,
+        formula: segDetail.length > 0
+          ? `Hỗn hợp ${segDetail.length} segment`
+          : `${formatVND(basicSalary)} × ${(ratio*100).toFixed(0)}% ÷ ${workStandard} × ${workActual}`,
+        baseSalaryDetail,
         allowanceDetail: `${formatVND(allowanceMonthly)} ÷ ${workStandard} × ${workActual} = ${formatVND(allowance)}`,
       },
     };

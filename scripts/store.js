@@ -367,6 +367,21 @@
       setTimeout(() => location.reload(), 800);
     },
 
+    /* Chỉ xóa cache business data demo — an toàn, không động settings/staff/products */
+    clearDemoCache() {
+      const DEMO_KEYS = [
+        'customers', 'orders', 'invoices', 'returns', 'purchases',
+        'quotes', 'leads', 'suppliers', 'recurring_orders', 'cashEntries',
+      ];
+      DEMO_KEYS.forEach(k => {
+        localStorage.removeItem(PREFIX + k);
+        delete _data[k];
+        _preloaded.delete(k);
+      });
+      window.toast?.('🧹 Đã xóa cache ' + DEMO_KEYS.length + ' bảng demo · đang reload…', 'success');
+      setTimeout(() => location.reload(), 600);
+    },
+
     /* Push toàn bộ localStorage hiện tại lên Supabase (migration tool) */
     async migrateToSupabase() {
       if (!isSupabaseMode()) {
@@ -487,6 +502,9 @@
     console.log(`[STORE] Poll interval saved: ${sec}s`);
   };
   window.STORE.getPollInterval = function () { return _pollSec; };
+
+  /* Expose clearDemoCache as top-level shortcut */
+  window.clearDemoCache = () => window.STORE.clearDemoCache();
 
   if (typeof window !== 'undefined') _startPoll();
 })();

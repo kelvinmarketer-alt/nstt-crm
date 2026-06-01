@@ -148,6 +148,32 @@
       return;
     }
 
+    /* === Mixed-mode segment helpers === */
+    function defaultSegments(payslip) {
+      /* Default: 1 segment = current single config */
+      return [
+        { name: 'Thử việc', basicSalary: payslip.basicSalary || 0, contractType: 'probation', workActual: 0, workStandardOverride: null },
+        { name: 'Chính thức', basicSalary: payslip.basicSalary || 0, contractType: 'official', workActual: payslip.workActual || 0, workStandardOverride: null },
+      ];
+    }
+    function renderSegmentList(segments, editable) {
+      return (segments || []).map((seg, i) => `
+        <div class="ps-seg" data-idx="${i}" style="display:grid;grid-template-columns:140px 130px 110px 90px 1fr 32px;gap:6px;padding:6px 0;border-bottom:1px dashed #BFDBFE;align-items:center">
+          <input class="ps-seg-name" data-idx="${i}" type="text" value="${(seg.name||'').replace(/"/g,'&quot;')}" placeholder="Tên đoạn" ${editable?'':'readonly'} style="border:1px solid #BFDBFE;border-radius:5px;padding:5px 7px;font-size:12px;background:#fff">
+          <select class="ps-seg-contract" data-idx="${i}" ${editable?'':'disabled'} style="border:1px solid #BFDBFE;border-radius:5px;padding:5px 7px;font-size:12px;background:#fff">
+            <option value="official"  ${seg.contractType==='official'?'selected':''}>Chính thức 100%</option>
+            <option value="probation" ${seg.contractType==='probation'?'selected':''}>Thử việc 85%</option>
+            <option value="intern"    ${seg.contractType==='intern'?'selected':''}>Thực tập 100%</option>
+            <option value="parttime"  ${seg.contractType==='parttime'?'selected':''}>Part-time 100%</option>
+          </select>
+          <input class="ps-seg-basic ps-money" data-idx="${i}" type="text" inputmode="numeric" value="${fmtMoney(seg.basicSalary||0)}" data-raw="${parseMoney(seg.basicSalary||0)}" placeholder="LCB" ${editable?'':'readonly'} style="border:1px solid #BFDBFE;border-radius:5px;padding:5px 7px;font-size:12px;text-align:right;font-weight:700;background:#fff" title="Lương cơ bản đoạn này">
+          <input class="ps-seg-work" data-idx="${i}" type="number" step="0.05" value="${seg.workActual||0}" placeholder="Công" ${editable?'':'readonly'} style="border:1px solid #BFDBFE;border-radius:5px;padding:5px 7px;font-size:12px;text-align:right;font-weight:700;background:#fff" title="Số công đoạn này">
+          <input class="ps-seg-std" data-idx="${i}" type="number" value="${seg.workStandardOverride||''}" placeholder="NC chuẩn (auto)" ${editable?'':'readonly'} style="border:1px solid #BFDBFE;border-radius:5px;padding:5px 7px;font-size:12px;text-align:right;background:#fff" title="Bỏ trống = dùng mặc định theo dept">
+          ${editable ? `<button onclick="window._psRemoveSegment(${i})" style="background:transparent;border:none;color:#DC2626;cursor:pointer;font-size:16px">×</button>` : '<span></span>'}
+        </div>
+      `).join('') || `<div style="padding:8px;color:var(--muted);text-align:center;font-size:12px">Chưa có phân đoạn</div>`;
+    }
+
     /* Render bonus + penalty rows editable */
     function bonusRows(arr) {
       return (arr || []).map((b, i) => `
@@ -186,29 +212,51 @@
       <div style="padding:14px 18px;overflow-y:auto;max-height:calc(100vh - 180px)">
 
         <!-- Cấu hình cơ bản -->
-        <div class="section-h" style="margin-bottom:8px">⚙ Cấu hình lương</div>
-        <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:14px">
-          <div>
-            <label style="font-size:11px;color:var(--muted);text-transform:uppercase;font-weight:600">Lương cơ bản (₫)</label>
-            ${moneyInput('psBasic', p.basicSalary, { readonly: !canEdit })}
+        <div class="section-h" style="margin-bottom:8px;display:flex;align-items:center;justify-content:space-between">
+          <span>⚙ Cấu hình lương</span>
+          <label style="font-size:11.5px;font-weight:600;color:#1E40AF;cursor:pointer;display:flex;align-items:center;gap:6px;text-transform:none" title="Bật khi NV vừa thử việc vừa chính thức trong cùng tháng">
+            <input type="checkbox" id="psMixedMode" ${p.mixedMode?'checked':''} ${canEdit?'':'disabled'}>
+            🔀 Lương hỗn hợp (TV + CT)
+          </label>
+        </div>
+
+        <!-- ==== SINGLE MODE ==== -->
+        <div id="psSingleSection" style="${p.mixedMode?'display:none':''}">
+          <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:14px">
+            <div>
+              <label style="font-size:11px;color:var(--muted);text-transform:uppercase;font-weight:600">Lương cơ bản (₫)</label>
+              ${moneyInput('psBasic', p.basicSalary, { readonly: !canEdit })}
+            </div>
+            <div>
+              <label style="font-size:11px;color:var(--muted);text-transform:uppercase;font-weight:600">Loại HĐ</label>
+              <select id="psContract" ${canEdit?'':'disabled'} style="width:100%;padding:7px 10px;font-size:13px;border:1px solid var(--line);border-radius:6px">
+                <option value="official"  ${p.contractType==='official'?'selected':''}>Chính thức (100%)</option>
+                <option value="probation" ${p.contractType==='probation'?'selected':''}>Thử việc (85%)</option>
+                <option value="intern"    ${p.contractType==='intern'?'selected':''}>Thực tập (100%)</option>
+                <option value="parttime"  ${p.contractType==='parttime'?'selected':''}>Part-time (100%)</option>
+              </select>
+            </div>
+            <div>
+              <label style="font-size:11px;color:var(--muted);text-transform:uppercase;font-weight:600">Công thực tế</label>
+              <input id="psWorkActual" type="number" step="0.05" value="${p.workActual}" ${canEdit?'':'readonly'} style="width:100%;padding:7px 10px;font-size:13px;border:1px solid var(--line);border-radius:6px;text-align:right">
+            </div>
+            <div>
+              <label style="font-size:11px;color:var(--muted);text-transform:uppercase;font-weight:600">Công chuẩn (mặc định ${computed.workStandard})</label>
+              <input id="psWorkStd" type="number" value="${p.workStandardOverride || ''}" placeholder="${computed.workStandard}" ${canEdit?'':'readonly'} style="width:100%;padding:7px 10px;font-size:13px;border:1px solid var(--line);border-radius:6px;text-align:right">
+            </div>
           </div>
-          <div>
-            <label style="font-size:11px;color:var(--muted);text-transform:uppercase;font-weight:600">Loại HĐ</label>
-            <select id="psContract" ${canEdit?'':'disabled'} style="width:100%;padding:7px 10px;font-size:13px;border:1px solid var(--line);border-radius:6px">
-              <option value="official"  ${p.contractType==='official'?'selected':''}>Chính thức (100%)</option>
-              <option value="probation" ${p.contractType==='probation'?'selected':''}>Thử việc (85%)</option>
-              <option value="intern"    ${p.contractType==='intern'?'selected':''}>Thực tập (100%)</option>
-              <option value="parttime"  ${p.contractType==='parttime'?'selected':''}>Part-time (100%)</option>
-            </select>
+        </div>
+
+        <!-- ==== MIXED MODE ==== -->
+        <div id="psMixedSection" style="${p.mixedMode?'':'display:none'};background:#EFF6FF;border:1px solid #BFDBFE;border-radius:10px;padding:12px 14px;margin-bottom:14px">
+          <div style="font-size:11.5px;color:#1E40AF;margin-bottom:8px;line-height:1.5">
+            💡 <b>Lương hỗn hợp:</b> NV có 2+ phân đoạn trong cùng tháng (vd 5 công thử việc + 25 công chính thức).
+            Tổng base = Σ <i>(LCB × hệ số ÷ NC × công)</i> từng đoạn.
           </div>
-          <div>
-            <label style="font-size:11px;color:var(--muted);text-transform:uppercase;font-weight:600">Công thực tế</label>
-            <input id="psWorkActual" type="number" step="0.05" value="${p.workActual}" ${canEdit?'':'readonly'} style="width:100%;padding:7px 10px;font-size:13px;border:1px solid var(--line);border-radius:6px;text-align:right">
+          <div id="psSegList">
+            ${renderSegmentList(p.segments || defaultSegments(p), canEdit)}
           </div>
-          <div>
-            <label style="font-size:11px;color:var(--muted);text-transform:uppercase;font-weight:600">Công chuẩn (mặc định ${computed.workStandard})</label>
-            <input id="psWorkStd" type="number" value="${p.workStandardOverride || ''}" placeholder="${computed.workStandard}" ${canEdit?'':'readonly'} style="width:100%;padding:7px 10px;font-size:13px;border:1px solid var(--line);border-radius:6px;text-align:right">
-          </div>
+          ${canEdit ? `<button class="btn btn-ghost btn-sm" style="margin-top:8px" onclick="window._psAddSegment()">➕ Thêm phân đoạn</button>` : ''}
         </div>
 
         <!-- Khoản TÍNH -->
@@ -342,9 +390,27 @@
 
     function collect() {
       const d = window._psCurrentDraft;
-      d.basicSalary = getMoneyRaw('psBasic');
-      d.contractType = document.getElementById('psContract')?.value || 'official';
-      d.workActual = +(document.getElementById('psWorkActual')?.value || 0);
+      d.mixedMode = !!document.getElementById('psMixedMode')?.checked;
+      if (d.mixedMode) {
+        /* Đọc segments từ DOM */
+        const readSegAmount = (el) => {
+          if (!el) return 0;
+          return parseMoney(el === document.activeElement ? el.value : (el.dataset.raw ?? el.value));
+        };
+        d.segments = Array.from(document.querySelectorAll('.ps-seg')).map(el => ({
+          name: el.querySelector('.ps-seg-name')?.value || '',
+          contractType: el.querySelector('.ps-seg-contract')?.value || 'official',
+          basicSalary: readSegAmount(el.querySelector('.ps-seg-basic')),
+          workActual: +(el.querySelector('.ps-seg-work')?.value || 0),
+          workStandardOverride: +el.querySelector('.ps-seg-std')?.value || null,
+        }));
+        /* Báo cáo workActual tổng + basicSalary trung bình cho display compat */
+        d.workActual = d.segments.reduce((s, x) => s + x.workActual, 0);
+      } else {
+        d.basicSalary = getMoneyRaw('psBasic');
+        d.contractType = document.getElementById('psContract')?.value || 'official';
+        d.workActual = +(document.getElementById('psWorkActual')?.value || 0);
+      }
       const wsv = document.getElementById('psWorkStd')?.value;
       d.workStandardOverride = wsv ? +wsv : null;
       const ao = getMoneyRaw('psAllowanceOverride');
@@ -391,6 +457,54 @@
     });
     /* Money inputs: format on blur, raw on focus */
     wireMoneyInputs(dc);
+
+    /* === Toggle Mixed Mode === */
+    document.getElementById('psMixedMode')?.addEventListener('change', e => {
+      const on = e.target.checked;
+      document.getElementById('psSingleSection').style.display = on ? 'none' : '';
+      document.getElementById('psMixedSection').style.display = on ? '' : 'none';
+      /* Khi BẬT lần đầu chưa có segments → seed default */
+      if (on && (!window._psCurrentDraft.segments || window._psCurrentDraft.segments.length === 0)) {
+        window._psCurrentDraft.segments = defaultSegments(window._psCurrentDraft);
+        document.getElementById('psSegList').innerHTML = renderSegmentList(window._psCurrentDraft.segments, canEdit);
+        /* Rewire money inputs trong segments mới */
+        wireMoneyInputs(document.getElementById('psSegList'));
+        document.querySelectorAll('#psSegList input, #psSegList select').forEach(el => {
+          el.addEventListener('input', refreshComputed);
+          el.addEventListener('change', refreshComputed);
+        });
+      }
+      refreshComputed();
+    });
+
+    /* === Segment add/remove === */
+    window._psAddSegment = function () {
+      const d = collect();
+      if (!d.segments) d.segments = [];
+      d.segments.push({ name: 'Phân đoạn ' + (d.segments.length + 1), basicSalary: 0, contractType: 'official', workActual: 0 });
+      window._psCurrentDraft = d;
+      const list = document.getElementById('psSegList');
+      list.innerHTML = renderSegmentList(d.segments, canEdit);
+      wireMoneyInputs(list);
+      list.querySelectorAll('input, select').forEach(el => {
+        el.addEventListener('input', refreshComputed);
+        el.addEventListener('change', refreshComputed);
+      });
+      refreshComputed();
+    };
+    window._psRemoveSegment = function (idx) {
+      const d = collect();
+      if (d.segments) d.segments.splice(idx, 1);
+      window._psCurrentDraft = d;
+      const list = document.getElementById('psSegList');
+      list.innerHTML = renderSegmentList(d.segments, canEdit);
+      wireMoneyInputs(list);
+      list.querySelectorAll('input, select').forEach(el => {
+        el.addEventListener('input', refreshComputed);
+        el.addEventListener('change', refreshComputed);
+      });
+      refreshComputed();
+    };
 
     /* === Action helpers (expose to window) === */
     window._psAddBonus = function () {

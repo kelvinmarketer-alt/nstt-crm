@@ -695,21 +695,86 @@
       box.innerHTML = '<div style="font-size:12px;color:var(--muted);padding:4px 0">Chưa có mặt hàng. Chọn sản phẩm + số lượng rồi bấm "+ Thêm".</div>';
     } else {
       const total = orderItems.reduce((s, x) => s + x.total, 0);
+      /* Tổng số mã (count) + tổng trọng lượng (kg) */
+      const totalSKU = orderItems.length;
+      const totalKg = orderItems.reduce((s, x) => {
+        const u = (x.unit || '').toLowerCase();
+        return s + (u === 'kg' || u === 'g' ? (+x.qty || 0) * (u === 'g' ? 0.001 : 1) : 0);
+      }, 0);
+      const totalQty = orderItems.reduce((s, x) => s + (+x.qty || 0), 0);
       box.innerHTML = `<table class="mini-table" style="margin:0">
-        <thead><tr><th>Sản phẩm</th><th class="num">SL</th><th class="num">Đơn giá</th><th class="num">Thành tiền</th><th></th></tr></thead>
+        <thead><tr>
+          <th style="width:40px" class="num">STT</th>
+          <th>Sản phẩm</th>
+          <th class="num">SL</th>
+          <th class="num">Đơn giá</th>
+          <th class="num">
+            <span title="Sale có quyền sửa giá theo đối tác — bấm vào ô đơn giá để gõ">✏</span>
+          </th>
+          <th class="num">Thành tiền</th>
+          <th></th>
+        </tr></thead>
         <tbody>${orderItems.map((it, i) => `<tr>
-          <td><div style="display:flex;align-items:center;gap:8px">${it.img ? `<img src="${it.img}" alt="" style="width:30px;height:30px;object-fit:cover;border-radius:5px;flex:none" onerror="this.style.display='none'">` : ''}${it.name}</div></td><td class="num">${it.qty} ${it.unit}</td>
-          <td class="num">${window.fmt(it.price)}</td><td class="num"><b>${window.fmt(it.total)}</b></td>
+          <td class="num" style="color:var(--muted);font-weight:600">${i + 1}</td>
+          <td><div style="display:flex;align-items:center;gap:8px">${it.img ? `<img src="${it.img}" alt="" style="width:30px;height:30px;object-fit:cover;border-radius:5px;flex:none" onerror="this.style.display='none'">` : ''}<div><b>${it.name}</b>${it.priceConfirmed===false?'<div style="font-size:10px;color:#A16207">⚠ chưa xác nhận giá</div>':''}</div></div></td>
+          <td class="num">${it.qty} ${it.unit}</td>
+          <td class="num">
+            <input type="number" min="0" step="100" value="${it.price||0}" data-idx="${i}" class="oi-price" style="width:100px;padding:4px 6px;text-align:right;border:1px solid ${it.priceConfirmed===false?'#FCD34D':'var(--line)'};border-radius:5px;font-size:12.5px;font-weight:600;background:${it.priceConfirmed===false?'#FEF9C3':'#fff'}" title="Sale có quyền sửa giá theo đối tác">
+            ${it.basePrice && it.price !== it.basePrice ? `<div style="font-size:10px;color:var(--muted);margin-top:2px">Gốc: ${window.fmt(it.basePrice)}</div>` : ''}
+          </td>
+          <td class="num"><label style="display:flex;align-items:center;gap:4px;cursor:pointer;font-size:11px">
+            <input type="checkbox" data-idx="${i}" class="oi-confirm" ${it.priceConfirmed!==false?'checked':''} title="Đã xác nhận giá thủ công">
+            ${it.priceConfirmed!==false?'<span style="color:#15803D">✓</span>':'<span style="color:#A16207">!</span>'}
+          </label></td>
+          <td class="num"><b>${window.fmt(it.total)}</b></td>
           <td class="num"><button type="button" class="icon-btn" style="color:var(--danger)" onclick="window.removeOrderItem(${i})" title="Xóa dòng sản phẩm này khỏi đơn">✕</button></td>
         </tr>`).join('')}</tbody>
-        <tfoot><tr><td colspan="3" class="num"><b>Tổng tiền hàng</b></td><td class="num"><b style="color:var(--red)">${window.fmt(total)} ₫</b></td><td></td></tr></tfoot>
+        <tfoot>
+          <tr style="background:#F0FDF4;border-top:2px solid #15803D">
+            <td colspan="2" style="padding:8px"><b style="color:#15803D">📊 Tổng:</b> <span style="color:var(--muted);font-size:12px">${totalSKU} mã · ${totalKg > 0 ? totalKg.toFixed(2) + ' kg · ' : ''}${totalQty.toFixed(2)} đv</span></td>
+            <td class="num"><b>${totalQty.toFixed(2)}</b></td>
+            <td class="num">—</td>
+            <td class="num">${orderItems.filter(x => x.priceConfirmed === false).length ? '<span style="color:#A16207;font-size:11px">⚠ '+orderItems.filter(x => x.priceConfirmed === false).length+' chưa xác nhận</span>' : '<span style="color:#15803D;font-size:11px">✓ đã xác nhận hết</span>'}</td>
+            <td class="num"><b style="color:var(--red);font-size:14px">${window.fmt(total)} ₫</b></td>
+            <td></td>
+          </tr>
+        </tfoot>
       </table>`;
+      /* Wire input giá + checkbox confirm */
+      box.querySelectorAll('.oi-price').forEach(inp => {
+        inp.addEventListener('change', (e) => {
+          const idx = +e.target.dataset.idx;
+          const newPrice = +e.target.value || 0;
+          const it = orderItems[idx];
+          if (!it) return;
+          it.price = newPrice;
+          it.total = Math.round((+it.qty || 0) * newPrice);
+          /* Khi user sửa giá → coi như đã xác nhận thủ công */
+          it.priceConfirmed = true;
+          renderOrderItems();
+        });
+      });
+      box.querySelectorAll('.oi-confirm').forEach(cb => {
+        cb.addEventListener('change', (e) => {
+          const idx = +e.target.dataset.idx;
+          if (orderItems[idx]) {
+            orderItems[idx].priceConfirmed = e.target.checked;
+            renderOrderItems();
+          }
+        });
+      });
     }
     const total = orderItems.reduce((s, x) => s + x.total, 0);
+    const totalKg = orderItems.reduce((s, x) => {
+      const u = (x.unit || '').toLowerCase();
+      return s + (u === 'kg' || u === 'g' ? (+x.qty || 0) * (u === 'g' ? 0.001 : 1) : 0);
+    }, 0);
     const g = document.getElementById('oGoods');
     if (g) g.value = orderItems.map(x => `${x.name} x${x.qty}${x.unit}`).join(', ');
     const f = document.getElementById('oFreight');
     if (f) f.value = total || '';
+    const w = document.getElementById('oWeight');
+    if (w && !w.value && totalKg > 0) w.value = totalKg.toFixed(2);
     if (typeof updateProfit === 'function') updateProfit();
   }
 
@@ -720,13 +785,18 @@
     if (qty <= 0) { window.toast('Nhập số lượng', 'warn'); return; }
     const p = window.productById(id);
     if (!p) return;
-    const price = window.priceOn(id, window.todayISO());
+    const basePrice = window.priceOn(id, window.todayISO());
     const existing = orderItems.find(x => x.id === id);
     if (existing) {
       existing.qty = Math.round((existing.qty + qty) * 100) / 100;
       existing.total = Math.round(existing.qty * existing.price);
     } else {
-      orderItems.push({ id, name: p.name, unit: p.unit, img: p.img, qty, price, total: Math.round(qty * price) });
+      orderItems.push({
+        id, name: p.name, unit: p.unit, img: p.img,
+        qty, price: basePrice, basePrice,
+        priceConfirmed: false, /* Sale phải xác nhận giá thủ công */
+        total: Math.round(qty * basePrice)
+      });
     }
     document.getElementById('oProdQty').value = 1;
     renderOrderItems();
@@ -1240,6 +1310,14 @@ CHỈ TRẢ JSON, không giải thích gì thêm.`;
     if (!custId) { window.toast('Chọn khách hàng', 'warn'); return; }
     if (!goods) { window.toast('Nhập tên hàng hóa', 'warn'); return; }
     if (!freight) { window.toast('Nhập cước', 'warn'); return; }
+
+    /* ===== Bắt sale xác nhận giá thủ công TRƯỚC khi tạo đơn ===== */
+    const unconfirmed = orderItems.filter(x => x.priceConfirmed === false);
+    if (unconfirmed.length > 0) {
+      const names = unconfirmed.map(x => x.name).slice(0, 3).join(', ') + (unconfirmed.length > 3 ? `... (+${unconfirmed.length - 3})` : '');
+      window.toast?.(`⚠ Còn ${unconfirmed.length} mã chưa xác nhận giá: ${names} · Tick ô ✓ ở cột "Đã xác nhận" trước khi tạo đơn`, 'warn');
+      return;
+    }
 
     const customers = window.STORE.get('customers', []);
     const drivers = window.STORE.get('shippers', window.DRIVERS || []);
