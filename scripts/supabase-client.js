@@ -55,6 +55,8 @@
               driverName:'driver_name', returnReason:'return_reason', deliveryTime:'delivery_time',
               takenBy:'taken_by', deliveredAt:'delivered_at', shipperId:'shipper_id',
               note:'notes',
+              /* drop field KHÔNG có cột trong DB orders */
+              custId: null, custPhone: null,
               /* drop legacy VTY fields */
               driver: null, external: null, partner: null },
       from: { order_date:'date', cust_name:'custName', customer_id:'cust', service_type:'serviceType',
@@ -189,12 +191,23 @@
     staff:     { hireDate: false },
   };
 
+  /* Parse tên cột lạ từ lỗi PostgREST:
+     "Could not find the 'X' column of 'table' in the schema cache" */
+  function parseUnknownColumn(msg) {
+    if (!msg) return null;
+    const m = String(msg).match(/Could not find the '([^']+)' column/);
+    return m ? m[1] : null;
+  }
+
   function mapTo(table, obj) {
     if (!obj) return obj;
     const m = FIELD_MAP[table]?.to || {};
     const df = DATE_FIELDS[table] || {};
     const result = {};
     for (const k of Object.keys(obj)) {
+      /* Bỏ field nội bộ/transient (bắt đầu '_') — KHÔNG phải cột DB.
+         VD: _prefRecorded, _source, _cashApplied, _payrollId, _adspendId */
+      if (k.charAt(0) === '_') continue;
       const newKey = m[k] || k;
       if (newKey === null) continue;
       let v = obj[k];
@@ -233,28 +246,42 @@
       return data.map(r => mapFrom(table, r));
     },
 
-    /* Insert 1 record */
+    /* Insert 1 record — auto-strip cột lạ + retry (chống schema mismatch mọi bảng) */
     async insert(table, record) {
       const mapped = mapTo(table, record);
-      const { data, error } = await client.from(table).insert(mapped).select().single();
-      if (error) {
+      for (let attempt = 0; attempt < 6; attempt++) {
+        const { data, error } = await client.from(table).insert(mapped).select().single();
+        if (!error) return mapFrom(table, data);
+        const badCol = parseUnknownColumn(error.message);
+        if (badCol && Object.prototype.hasOwnProperty.call(mapped, badCol)) {
+          delete mapped[badCol];
+          console.warn(`[SB insert] ${table}: bỏ cột lạ '${badCol}' rồi thử lại`);
+          continue;
+        }
         console.error('[SB insert]', table, error);
         window.toast?.('⚠ Lưu cloud lỗi ' + table + ': ' + (error.message||'unknown'), 'warn');
         return null;
       }
-      return mapFrom(table, data);
+      return null;
     },
 
-    /* Update theo id (hoặc code/no) */
+    /* Update theo id — auto-strip cột lạ + retry */
     async update(table, id, patch, idColumn = 'id') {
       const mapped = mapTo(table, patch);
-      const { data, error } = await client.from(table).update(mapped).eq(idColumn, id).select().single();
-      if (error) {
+      for (let attempt = 0; attempt < 6; attempt++) {
+        const { data, error } = await client.from(table).update(mapped).eq(idColumn, id).select().single();
+        if (!error) return mapFrom(table, data);
+        const badCol = parseUnknownColumn(error.message);
+        if (badCol && Object.prototype.hasOwnProperty.call(mapped, badCol)) {
+          delete mapped[badCol];
+          console.warn(`[SB update] ${table}: bỏ cột lạ '${badCol}' rồi thử lại`);
+          continue;
+        }
         console.error('[SB update]', table, error);
         window.toast?.('⚠ Update cloud lỗi ' + table + ': ' + (error.message||'unknown'), 'warn');
         return null;
       }
-      return mapFrom(table, data);
+      return null;
     },
 
     /* Xóa theo id */
