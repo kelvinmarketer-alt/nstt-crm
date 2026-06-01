@@ -212,16 +212,44 @@
       /* Bảng table-mapped: customers, orders, products, ... */
       const table = TABLE_MAP[key];
       if (!table) return;
-      const data = await window.SB_DATA.getAll(table);
-      /* Chỉ replace nếu Supabase có nhiều data hơn (tránh xoá local khi DB trống) */
-      if (Array.isArray(data) && data.length > 0) {
-        _data[key] = data;
-        try { localStorage.setItem(PREFIX + key, JSON.stringify(data)); } catch (e) {}
-        (_subs[key] || []).forEach(fn => fn(_data[key]));
-        console.log(`[STORE] Synced ${key}: ${data.length} records từ Supabase`);
-      }
+      await _mergeTableFromCloud(key, table);
     } catch (e) {
       console.warn(`[STORE preload ${key}]`, e.message);
+    }
+  }
+
+  /* === MERGE + SELF-HEAL: pull cloud + đẩy record local-only (sync fail trước đó) ===
+     Giải quyết: đơn tạo lúc lỗi (FK/RLS) kẹt local → tự đẩy lên khi load/poll
+     → browser khác pull về thấy. Merge thay vì replace để KHÔNG mất record chưa sync. */
+  async function _mergeTableFromCloud(key, table) {
+    if (!window.SB_DATA) return;
+    const cloud = await window.SB_DATA.getAll(table);
+    if (!Array.isArray(cloud)) return;
+    const idCol = ID_COLUMN[key] || 'id';
+    const keyOf = (it) => it && (it[idCol] || it.id || it.code || it.no);
+    const local = Array.isArray(_data[key]) ? _data[key] : (_load(key, []) || []);
+    const cloudIds = new Set(cloud.map(keyOf));
+    const localOnly = local.filter(it => keyOf(it) && !cloudIds.has(keyOf(it)));
+
+    /* Self-heal: đẩy record local-only lên cloud (guard ≤200 tránh mass-push nhầm) */
+    if (localOnly.length > 0 && localOnly.length <= 200) {
+      console.log(`[STORE] ${key}: tự đẩy ${localOnly.length} record local-only lên cloud`);
+      for (const it of localOnly) {
+        await window.SB_DATA.insert(table, it).catch(() => {});
+      }
+    } else if (localOnly.length > 200) {
+      console.warn(`[STORE] ${key}: ${localOnly.length} record local-only — BỎ QUA auto-push (quá nhiều)`);
+    }
+
+    /* Merge: cloud (nguồn chính) + localOnly (vừa đẩy lên) */
+    const keep = localOnly.length <= 200 ? localOnly : [];
+    const merged = cloud.concat(keep);
+    const newJson = JSON.stringify(merged);
+    if (newJson !== JSON.stringify(_data[key] || [])) {
+      _data[key] = merged;
+      try { localStorage.setItem(PREFIX + key, newJson); } catch (e) {}
+      (_subs[key] || []).forEach(fn => fn(merged));
+      console.log(`[STORE] Synced ${key}: ${cloud.length} cloud + ${keep.length} đẩy lên`);
     }
   }
 
@@ -518,17 +546,8 @@
       if (document.hidden) return;
       _preloaded.forEach(key => {
         if (TABLE_MAP[key]) {
-          window.SB_DATA.getAll(TABLE_MAP[key]).then(data => {
-            if (!Array.isArray(data) || data.length === 0) return;
-            const oldJson = JSON.stringify(_data[key] || []);
-            const newJson = JSON.stringify(data);
-            if (oldJson !== newJson) {
-              _data[key] = data;
-              try { localStorage.setItem(PREFIX + key, JSON.stringify(data)); } catch (e) {}
-              (_subs[key] || []).forEach(fn => fn(data));
-              console.log(`[STORE poll] ${key} cập nhật (${data.length} records)`);
-            }
-          }).catch(()=>{});
+          /* Merge + self-heal (đẩy local-only lên + pull cloud về) */
+          _mergeTableFromCloud(key, TABLE_MAP[key]).catch(() => {});
         }
       });
     }, _pollSec * 1000);
@@ -545,6 +564,17 @@
     console.log(`[STORE] Poll interval saved: ${sec}s`);
   };
   window.STORE.getPollInterval = function () { return _pollSec; };
+
+  /* Đồng bộ NGAY tất cả bảng đã load (merge + self-heal) — gọi từ nút hoặc console */
+  window.STORE.syncNow = async function () {
+    if (!isSupabaseMode()) { window.toast?.('Chưa bật chế độ cloud', 'warn'); return; }
+    let n = 0;
+    for (const key of _preloaded) {
+      if (TABLE_MAP[key]) { await _mergeTableFromCloud(key, TABLE_MAP[key]).catch(() => {}); n++; }
+    }
+    window.toast?.('🔄 Đã đồng bộ ' + n + ' bảng với cloud', 'success');
+  };
+  window.syncNow = () => window.STORE.syncNow();
 
   /* Expose clear helpers as top-level shortcut */
   window.clearDemoCache = () => window.STORE.clearDemoCache();
