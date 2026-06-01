@@ -594,6 +594,12 @@
       prodList.map(p => `<option value="${p.id}">${p.name} · ${window.fmt(window.priceOn(p.id, window.todayISO()))}đ/${p.unit}</option>`).join('');
     orderItems = [];
     const nextCode = window.STORE.nextOrderCode();
+    /* NV phụ trách — lấy từ staff thật, default = user đang đăng nhập */
+    const meUser = (window.AUTH && window.AUTH.currentUser && window.AUTH.currentUser()) || {};
+    const staffList = (window.STORE.get('staff', []) || []).filter(s => s.status !== 'inactive');
+    const staffOpts = (staffList.length
+      ? staffList.map(s => `<option value="${s.name}" ${s.name===meUser.name?'selected':''}>${s.name}${s.dept?' · '+s.dept:''}</option>`).join('')
+      : `<option>${meUser.name || '—'}</option>`);
 
     window.openModal('+ Tạo đơn mới', `
       <div style="margin-bottom:14px;padding:10px 12px;background:#F3E8FF;border:1px solid #E9D5FF;border-radius:8px;font-size:12px;color:#7C3AED">
@@ -602,10 +608,7 @@
       <div class="form-row">
         <div><label>Mã đơn</label><input id="oCode" value="${nextCode}" readonly style="background:#FAFAFB;font-family:ui-monospace,monospace;font-weight:600"></div>
         <div><label>NV phụ trách</label>
-          <select id="oStaff">
-            <option>Trần Lan</option><option>Phạm Hùng</option>
-            <option>Hoàng Mai</option><option>Tuấn Tú</option>
-          </select></div>
+          <select id="oStaff">${staffOpts}</select></div>
       </div>
       <div class="form-row">
         <div><label>Khách hàng * ${window.helpTip ? window.helpTip('Gõ tên/SĐT/mã KH — danh sách tự lọc theo bạn gõ. Ấn ↑↓ chọn, Enter xác nhận. Nếu KH mới chưa có, bấm "+ Thêm KH mới" để mở form thêm nhanh.') : ''}</label>
@@ -662,7 +665,7 @@
                <button class="btn btn-ghost" onclick="window.saveAsRecurring()" title="Lưu items + KH hiện tại thành mẫu lặp lại theo lịch">🔁 Lưu thành đơn định kỳ</button>
                <button class="btn btn-ghost" onclick="window.submitCreateOrder('draft')">💾 Lưu nháp</button>
                <button class="btn btn-primary" onclick="window.submitCreateOrder('confirmed')">🚚 Tạo & gửi điều hành</button>`,
-      width:'620px'
+      width:'860px'
     });
     window.onChangeService(document.getElementById('oSvc').value);
     renderOrderItems();
