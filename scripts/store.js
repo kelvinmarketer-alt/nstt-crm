@@ -213,8 +213,31 @@
       const table = TABLE_MAP[key];
       if (!table) return;
       await _mergeTableFromCloud(key, table);
+      /* Bật Realtime — đổi ở máy khác → máy này thấy ngay (<1s) */
+      _subscribeRealtime(key, table);
     } catch (e) {
       console.warn(`[STORE preload ${key}]`, e.message);
+    }
+  }
+
+  /* === REALTIME: subscribe postgres_changes → pull về khi có thay đổi từ máy khác === */
+  const _realtimeSubs = new Set();
+  const _rtTimers = {};
+  function _subscribeRealtime(key, table) {
+    if (_realtimeSubs.has(key) || !window.SB_DATA?.subscribe) return;
+    _realtimeSubs.add(key);
+    try {
+      window.SB_DATA.subscribe(table, () => {
+        /* Debounce 400ms — gộp nhiều change liên tiếp thành 1 lần pull */
+        clearTimeout(_rtTimers[key]);
+        _rtTimers[key] = setTimeout(() => {
+          _mergeTableFromCloud(key, table).catch(() => {});
+        }, 400);
+      });
+      console.log(`[STORE] 🔴 Realtime ON: ${key}`);
+    } catch (e) {
+      console.warn(`[STORE realtime ${key}]`, e.message);
+      _realtimeSubs.delete(key);
     }
   }
 
