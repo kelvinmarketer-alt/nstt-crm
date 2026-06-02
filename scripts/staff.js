@@ -11,10 +11,28 @@
     const st = document.getElementById('fStatus').value;
     const rows = staffs.filter(s =>
       (curDept === 'all' || s.dept === curDept) &&
-      (!q || [s.name, s.phone, s.code].some(x => (x||'').toLowerCase().includes(q))) &&
+      (!q || [s.name, s.phone, s.code, s.id].some(x => (x||'').toLowerCase().includes(q))) &&
       (!st || s.status === st)
     );
     document.getElementById('rowCount').textContent = `${rows.length} / ${staffs.length} nhân viên`;
+    /* === KPI cards + chips động từ data thật === */
+    (function updateStaffKpis() {
+      const active = staffs.filter(s => s.status === 'active');
+      const off = staffs.filter(s => s.status !== 'active');
+      const depts = new Set(staffs.map(s => s.dept).filter(Boolean));
+      const shippers = staffs.filter(s => /giao hàng|shipper|vận hành/i.test((s.dept||'') + ' ' + (s.role||'')));
+      const salarySum = staffs.reduce((sum, s) => sum + (+s.salary || 0), 0);
+      const f = window.fmtShort || (n => n);
+      const set = (id, v) => { const e = document.getElementById(id); if (e) e.textContent = v; };
+      set('kpiStaffTotal', staffs.length);
+      set('kpiStaffDept', depts.size + ' phòng ban');
+      set('kpiStaffActive', active.length);
+      set('kpiStaffOff', off.length + ' nghỉ/khóa');
+      set('kpiStaffShipper', shippers.length);
+      set('kpiStaffSalary', f(salarySum) + ' ₫');
+      set('staffSubHead', `${staffs.length} nhân viên · ${depts.size} phòng ban · phân quyền truy cập module`);
+    })();
+    buildDeptChips(staffs);
     document.getElementById('stTbody').innerHTML = rows.map(s => {
       const col = window.avatarColor(s.id);
       const kpiNum = s.kpi ? parseInt(s.kpi) : null;
@@ -22,7 +40,7 @@
       const perms = (s.permissions||[]).slice(0,2).map(p => `<span class="perm-pill">${p}</span>`).join('')
                   + ((s.permissions||[]).length > 2 ? `<span class="perm-pill">+${s.permissions.length-2}</span>` : '');
       return `<tr data-id="${s.id}">
-        <td><b>${s.code}</b></td>
+        <td><b>${s.code || s.id || '—'}</b></td>
         <td>
           <div class="cust-cell">
             <div class="cust-ava" style="background:${col}">${s.avatar || window.initials(s.name)}</div>
@@ -33,7 +51,7 @@
           </div>
         </td>
         <td class="hide-sm"><span class="staff-pill">${s.dept}</span></td>
-        <td class="hide-md" style="font-size:12px">${s.phone}</td>
+        <td class="hide-md" style="font-size:12px">${s.phone || '—'}</td>
         <td style="font-size:11.5px">${perms}</td>
         <td class="hide-sm">${kpiNum ? `<div style="display:flex;align-items:center;gap:4px"><div class="kpi-bar ${kpiCls}"><div style="width:${kpiNum}%"></div></div><b style="font-size:11px;color:var(--${kpiCls==='warn'?'warn':'ok'})">${s.kpi}</b></div>` : '—'}</td>
         <td class="num hide-md">${s.salary ? window.fmt(s.salary) : '—'}</td>
@@ -368,14 +386,23 @@
     window.toast('✓ Đã cập nhật NV + công thức lương', 'success');
   };
 
-  document.querySelectorAll('.chip').forEach(c => {
-    c.addEventListener('click', () => {
-      document.querySelectorAll('.chip').forEach(x => x.classList.remove('active'));
-      c.classList.add('active');
-      curDept = c.dataset.q;
-      render();
+  /* Build chips phòng ban động từ data thật */
+  let _chipsBuilt = false;
+  function buildDeptChips(staffs) {
+    const box = document.getElementById('staffChips');
+    if (!box) return;
+    const depts = [...new Set(staffs.map(s => s.dept).filter(Boolean))];
+    box.innerHTML =
+      `<button class="chip ${curDept==='all'?'active':''}" data-q="all">Tất cả <span class="cnt">${staffs.length}</span></button>` +
+      depts.map(d => `<button class="chip ${curDept===d?'active':''}" data-q="${d}">${d} <span class="cnt">${staffs.filter(s=>s.dept===d).length}</span></button>`).join('');
+    box.querySelectorAll('.chip').forEach(c => {
+      c.addEventListener('click', () => {
+        curDept = c.dataset.q;
+        render();
+      });
     });
-  });
+    _chipsBuilt = true;
+  }
 
   window.formNv = function() {
     const nextCode = window.STORE.nextId('staff', 'NV');

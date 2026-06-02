@@ -551,8 +551,10 @@ window.NAV = [
     { id: 'quotes',     label: 'Báo giá',     icon: '📝', href: 'quotes.html' },
     { id: 'recurring',  label: 'Đơn định kỳ', icon: '🔁', href: 'recurring.html' },
     { id: 'customers',  label: 'Khách hàng',  icon: '👥', href: 'customers.html', badgeKey: 'customers' },
+    /* Ẩn theo yêu cầu: Chân dung KH 360° + Lead/Tiềm năng
     { id: 'customers-360', label: 'Chân dung KH 360°', icon: '🔍', href: 'customers-360.html' },
     { id: 'leads',      label: 'Lead/Tiềm năng', icon: '🎯', href: 'leads.html' },
+    */
     { id: 'shippers',   label: 'Shipper',     icon: '🛵', href: 'shippers.html' },
   ]},
   { section: 'Kho & Mua hàng', items: [
@@ -567,7 +569,9 @@ window.NAV = [
     { id: 'debt',       label: 'Công nợ',     icon: '📉', href: 'debt.html', badgeKey: 'debt' },
     { id: 'invoices',   label: 'Hóa đơn',     icon: '🧾', href: 'invoices.html' },
     { id: 'adspend',    label: 'Chi phí Ads', icon: '📣', href: 'adspend.html' },
+    /* Ẩn theo yêu cầu: Loyalty (chiết khấu/tích điểm)
     { id: 'loyalty',    label: 'Loyalty (tích điểm)', icon: '⭐', href: 'loyalty.html' },
+    */
   ]},
   { section: 'Quản trị', items: [
     { id: 'staff',      label: 'Nhân viên',   icon: '🧑‍💼', href: 'staff.html' },

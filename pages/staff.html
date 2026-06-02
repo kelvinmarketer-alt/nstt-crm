@@ -32,7 +32,7 @@
     <div class="page-head">
       <div>
         <h1>Quản lý nhân viên</h1>
-        <div class="sub">9 nhân viên · 4 phòng ban · phân quyền truy cập module</div>
+        <div class="sub" id="staffSubHead">Quản lý nhân viên · phân quyền truy cập module</div>
       </div>
       <div class="head-actions">
         <button class="btn btn-ghost" onclick="window.location.href='payroll.html'">📅 Chấm công</button>
@@ -44,20 +44,13 @@
     </div>
 
     <section class="kpis">
-      <div class="kpi k-1"><div class="kpi-label">Tổng NV</div><div class="kpi-value">9</div><div class="kpi-trend">+ 1 NV mới (Phương)</div><div class="kpi-icon">🧑‍💼</div></div>
-      <div class="kpi k-2"><div class="kpi-label">Đang đi làm</div><div class="kpi-value">8</div><div class="kpi-trend up">1 NV nghỉ phép</div><div class="kpi-icon">✓</div></div>
-      <div class="kpi k-4"><div class="kpi-label">KPI TB tháng</div><div class="kpi-value">91%</div><div class="kpi-trend up">↑ +3% vs T4</div><div class="kpi-icon">📈</div></div>
-      <div class="kpi k-3"><div class="kpi-label">Tổng lương T5</div><div class="kpi-value">101 tr</div><div class="kpi-trend">Chi 25/05</div><div class="kpi-icon">💰</div></div>
+      <div class="kpi k-1"><div class="kpi-label">Tổng NV</div><div class="kpi-value" id="kpiStaffTotal">0</div><div class="kpi-trend" id="kpiStaffDept">— phòng ban</div><div class="kpi-icon">🧑‍💼</div></div>
+      <div class="kpi k-2"><div class="kpi-label">Đang đi làm</div><div class="kpi-value" id="kpiStaffActive">0</div><div class="kpi-trend up" id="kpiStaffOff">0 nghỉ</div><div class="kpi-icon">✓</div></div>
+      <div class="kpi k-4"><div class="kpi-label">Shipper / Giao hàng</div><div class="kpi-value" id="kpiStaffShipper">0</div><div class="kpi-trend">đội giao hàng</div><div class="kpi-icon">🛵</div></div>
+      <div class="kpi k-3"><div class="kpi-label">Tổng lương cơ bản</div><div class="kpi-value" id="kpiStaffSalary">0</div><div class="kpi-trend">LCB/tháng</div><div class="kpi-icon">💰</div></div>
     </section>
 
-    <div class="quick-chips">
-      <button class="chip active" data-q="all">Tất cả <span class="cnt">9</span></button>
-      <button class="chip" data-q="Ban giám đốc">Ban GĐ <span class="cnt">1</span></button>
-      <button class="chip" data-q="Sales">Sales <span class="cnt">2</span></button>
-      <button class="chip" data-q="CSKH">CSKH <span class="cnt">1</span></button>
-      <button class="chip" data-q="Kế toán">Kế toán <span class="cnt">1</span></button>
-      <button class="chip" data-q="Vận hành">Vận hành <span class="cnt">4</span></button>
-    </div>
+    <div class="quick-chips" id="staffChips"></div>
 
     <div class="filter-bar">
       <div class="search-in" style="flex:1.5">
