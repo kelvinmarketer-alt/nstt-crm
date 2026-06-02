@@ -253,6 +253,7 @@
     const local = Array.isArray(_data[key]) ? _data[key] : (_load(key, []) || []);
     const cloudIds = new Set(cloud.map(keyOf));
     const localOnly = local.filter(it => keyOf(it) && !cloudIds.has(keyOf(it)));
+    const localById = new Map(local.map(it => [keyOf(it), it]));
 
     /* Self-heal: đẩy record local-only lên cloud (guard ≤200 tránh mass-push nhầm) */
     if (localOnly.length > 0 && localOnly.length <= 200) {
@@ -264,9 +265,19 @@
       console.warn(`[STORE] ${key}: ${localOnly.length} record local-only — BỎ QUA auto-push (quá nhiều)`);
     }
 
-    /* Merge: cloud (nguồn chính) + localOnly (vừa đẩy lên) */
+    /* Merge: cloud (nguồn chính) — GIỮ LẠI flag '_' từ bản local.
+       Flag '_' (vd _invApplied, _debtApplied, _cashApplied, _shipperNotified)
+       là cờ chống-lặp per-device, KHÔNG lưu cloud (bị strip). Nếu không giữ,
+       mỗi lần merge sẽ tưởng "chưa xử lý" → trừ kho/ghi nợ/gửi TG LẶP LẠI. */
+    const cloudMerged = cloud.map(c => {
+      const lr = localById.get(keyOf(c));
+      if (!lr) return c;
+      const flags = {};
+      for (const k of Object.keys(lr)) if (k.charAt(0) === '_') flags[k] = lr[k];
+      return Object.keys(flags).length ? { ...c, ...flags } : c;
+    });
     const keep = localOnly.length <= 200 ? localOnly : [];
-    const merged = cloud.concat(keep);
+    const merged = cloudMerged.concat(keep);
     const newJson = JSON.stringify(merged);
     if (newJson !== JSON.stringify(_data[key] || [])) {
       _data[key] = merged;

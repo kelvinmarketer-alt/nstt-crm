@@ -27,23 +27,45 @@
 
   /* =========================================================
      1. SHIPPER_DISPATCH — trigger khi đơn mới confirmed
+     ─────────────────────────────────────────────────────────
+     Track đơn đã gửi bằng key RIÊNG localStorage (KHÔNG để flag _ trên
+     order object — vì field _ bị strip khi lưu cloud → mỗi lần sync về
+     lại tưởng đơn mới → spam). Baseline lần đầu để không gửi lại đơn cũ.
      ========================================================= */
+  const TG_SENT_KEY = 'vty_tg_shipper_sent';
+  function getSentSet() {
+    try { return new Set(JSON.parse(localStorage.getItem(TG_SENT_KEY) || '[]')); }
+    catch (e) { return new Set(); }
+  }
+  function saveSentSet(set) {
+    try { localStorage.setItem(TG_SENT_KEY, JSON.stringify([...set].slice(-1000))); } catch (e) {}
+  }
+  let _tgBaselined = false;
+
   window.STORE.subscribe('orders', orders => {
     if (!Array.isArray(orders)) return;
-    const list = orders;
-    let changed = false;
-    list.forEach(o => {
-      if (o.status === 'confirmed' && !o._shipperNotified) {
-        o._shipperNotified = true;
-        changed = true;
-        /* Gửi async tránh block render */
+    const sent = getSentSet();
+
+    /* Lần đầu nhận data (load/preload): đánh dấu mọi đơn confirmed hiện có
+       là "đã biết" → KHÔNG gửi lại đơn cũ. Chỉ gửi đơn confirmed MỚI sau đó. */
+    if (!_tgBaselined) {
+      _tgBaselined = true;
+      let added = false;
+      orders.forEach(o => {
+        if (o.status === 'confirmed' && o.code && !sent.has(o.code)) { sent.add(o.code); added = true; }
+      });
+      if (added) saveSentSet(sent);
+      return;
+    }
+
+    let added = false;
+    orders.forEach(o => {
+      if (o.status === 'confirmed' && o.code && !sent.has(o.code)) {
+        sent.add(o.code); added = true;
         setTimeout(() => sendShipperDispatch(o), 0);
       }
     });
-    if (changed) {
-      /* Lưu flag để tránh notify lại */
-      try { window.STORE.set('orders', list); } catch (e) {}
-    }
+    if (added) saveSentSet(sent);
   });
 
   async function sendShipperDispatch(o) {
