@@ -667,10 +667,14 @@ window.MD_DEFAULTS = {
     { id:'receiver', label:'Người nhận trả' },
     { id:'congno',   label:'Công nợ' },
   ],
+  /* 34 tỉnh/thành VN 2026 (sau sáp nhập 1/7/2025) — khu vực Bắc xếp trước */
   provinces: [
-    'Hà Nội','Hải Phòng','TP.HCM','Đà Nẵng','Hải Dương','Bắc Ninh',
-    'Nam Định','Thanh Hóa','Quảng Ninh','Hưng Yên','Thái Bình','Ninh Bình',
-    'Vĩnh Phúc','Phú Thọ','Nghệ An','Bình Dương','Đồng Nai','Cần Thơ',
+    'Hà Nội','Bắc Ninh','Hưng Yên','Ninh Bình','Phú Thọ','Thái Nguyên',
+    'Quảng Ninh','Hải Phòng','Lạng Sơn','Cao Bằng','Tuyên Quang','Lào Cai',
+    'Điện Biên','Lai Châu','Sơn La','Thanh Hóa','Nghệ An','Hà Tĩnh',
+    'Quảng Trị','Huế','Đà Nẵng','Quảng Ngãi','Gia Lai','Đắk Lắk',
+    'Khánh Hòa','Lâm Đồng','Đồng Nai','Tây Ninh','TP. Hồ Chí Minh','Đồng Tháp',
+    'Vĩnh Long','An Giang','Cần Thơ','Cà Mau',
   ],
   departments: [
     { id:'gd',    label:'Ban giám đốc' },
@@ -1074,7 +1078,7 @@ window.openModal = function(title, bodyHTML, opts = {}) {
     : '';
   const html = `
     <div id="modal-bg" class="modal-bg open" ${backdropClick}>
-      <div class="modal" style="max-width:${opts.width||'520px'}">
+      <div class="modal" style="width:min(${opts.width||'520px'},94vw);max-width:${opts.width||'520px'}">
         <div class="modal-head">
           <h3>${title}</h3>
           <button class="modal-close" onclick="window.closeModal()" title="Đóng (Esc)">✕</button>

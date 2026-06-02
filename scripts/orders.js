@@ -665,7 +665,7 @@
                <button class="btn btn-ghost" onclick="window.saveAsRecurring()" title="Lưu items + KH hiện tại thành mẫu lặp lại theo lịch">🔁 Lưu thành đơn định kỳ</button>
                <button class="btn btn-ghost" onclick="window.submitCreateOrder('draft')">💾 Lưu nháp</button>
                <button class="btn btn-primary" onclick="window.submitCreateOrder('confirmed')">🚚 Tạo & gửi điều hành</button>`,
-      width:'860px'
+      width:'980px'
     });
     window.onChangeService(document.getElementById('oSvc').value);
     renderOrderItems();
@@ -720,7 +720,7 @@
         <tbody>${orderItems.map((it, i) => `<tr>
           <td class="num" style="color:var(--muted);font-weight:600">${i + 1}</td>
           <td><div style="display:flex;align-items:center;gap:8px">${it.img ? `<img src="${it.img}" alt="" style="width:30px;height:30px;object-fit:cover;border-radius:5px;flex:none" onerror="this.style.display='none'">` : ''}<div><b>${it.name}</b>${it.priceConfirmed===false?'<div style="font-size:10px;color:#A16207">⚠ chưa xác nhận giá</div>':''}</div></div></td>
-          <td class="num">${it.qty} ${it.unit}</td>
+          <td class="num"><div style="display:flex;align-items:center;gap:4px;justify-content:flex-end"><input type="number" min="0" step="0.5" value="${it.qty}" data-idx="${i}" class="oi-qty" style="width:64px;padding:4px 6px;text-align:right;border:1px solid var(--line);border-radius:5px;font-size:12.5px;font-weight:600" title="Sửa số lượng"><span style="font-size:11px;color:var(--muted)">${it.unit}</span></div></td>
           <td class="num">
             <input type="number" min="0" step="100" value="${it.price||0}" data-idx="${i}" class="oi-price" style="width:100px;padding:4px 6px;text-align:right;border:1px solid ${it.priceConfirmed===false?'#FCD34D':'var(--line)'};border-radius:5px;font-size:12.5px;font-weight:600;background:${it.priceConfirmed===false?'#FEF9C3':'#fff'}" title="Sale có quyền sửa giá theo đối tác">
             ${it.basePrice && it.price !== it.basePrice ? `<div style="font-size:10px;color:var(--muted);margin-top:2px">Gốc: ${window.fmt(it.basePrice)}</div>` : ''}
@@ -743,6 +743,17 @@
           </tr>
         </tfoot>
       </table>`;
+      /* Wire input số lượng */
+      box.querySelectorAll('.oi-qty').forEach(inp => {
+        inp.addEventListener('change', (e) => {
+          const idx = +e.target.dataset.idx;
+          const it = orderItems[idx];
+          if (!it) return;
+          it.qty = +e.target.value || 0;
+          it.total = Math.round(it.qty * (+it.price || 0));
+          renderOrderItems();
+        });
+      });
       /* Wire input giá + checkbox confirm */
       box.querySelectorAll('.oi-price').forEach(inp => {
         inp.addEventListener('change', (e) => {
