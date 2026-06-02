@@ -171,12 +171,15 @@
     const d = `${m[3]}/${m[2]}/${m[1]}`;
     return withTime && m[4] ? `${d} ${m[4]}:${m[5]}` : d;
   }
-  /* Convert VN date → ISO khi save. "18/05/2026 08:29" → "2026-05-18T08:29:00" */
+  /* Convert VN date → ISO khi save. "18/05/2026 08:29" → "2026-05-18T08:29:00"
+     Giá trị KHÔNG phải ngày (vd "—", "", "N/A") → null (cột date nullable nhận được). */
   function vnToIso(s, withTime) {
-    if (!s) return s;
-    if (typeof s !== 'string') return s;
+    if (!s) return null;                 /* '', null, undefined → null */
+    if (typeof s !== 'string') return s; /* đã là Date/ISO */
+    /* Nếu đã là ISO (2026-05-18...) → giữ nguyên */
+    if (/^\d{4}-\d{2}-\d{2}/.test(s)) return s;
     const m = s.match(/(\d{1,2})\/(\d{1,2})\/(\d{2,4})(?:\s+(\d{1,2}):(\d{1,2}))?/);
-    if (!m) return s;
+    if (!m) return null;                 /* "—", "N/A"... → null (không gửi rác xuống cột date) */
     const yr = m[3].length === 2 ? '20' + m[3] : m[3];
     const d = `${yr}-${m[2].padStart(2,'0')}-${m[1].padStart(2,'0')}`;
     return withTime && m[4] ? `${d}T${m[4].padStart(2,'0')}:${(m[5]||'00').padStart(2,'0')}:00` : d;

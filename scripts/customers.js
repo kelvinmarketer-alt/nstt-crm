@@ -521,7 +521,7 @@
       <div class="form-row wide"><label>Địa chỉ</label><input id="addAddress" placeholder="Số nhà, đường, phường, quận, tỉnh"></div>
       <div class="form-row">
         <div><label>Tỉnh/TP</label>
-          <select id="addProvince">${window.MD.get('provinces').map(p=>`<option>${p}</option>`).join('')}</select></div>
+          <select id="addProvince"><option value="">— Chọn —</option>${(window.MD.get('provinces')||[]).map(p=>{const v=(typeof p==='string'?p:(p.label||p.id||''));return `<option value="${v}">${v}</option>`;}).join('')}</select></div>
         <div><label>Tần suất đặt hàng</label>
           <select id="addFreq">${window.MD.options('orderFreq')}</select></div>
       </div>
