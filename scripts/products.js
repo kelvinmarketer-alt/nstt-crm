@@ -34,8 +34,11 @@
     document.querySelectorAll('.pv-tab').forEach(t => t.classList.remove('active'));
     e.currentTarget.classList.add('active');
     document.getElementById('boardView').style.display = view === 'board' ? '' : 'none';
+    document.getElementById('mktView').style.display = view === 'mkt' ? '' : 'none';
     document.getElementById('catalogView').style.display = view === 'catalog' ? '' : 'none';
-    if (view === 'board') renderBoard(); else renderCatalog();
+    if (view === 'board') renderBoard();
+    else if (view === 'mkt') renderMkt();
+    else renderCatalog();
   };
 
   /* ============ BẢNG GIÁ HÔM NAY ============ */
@@ -123,6 +126,139 @@
       renderBoard();
     });
   }
+
+  /* ============ BẢNG GIÁ MARKETING ============
+     Giá riêng để CHÀO HÀNG / CHẠY ADS — KHÔNG ảnh hưởng giá đơn hàng.
+     Giá MKT = giá bán thật ± offset (chỉnh hàng loạt theo "giá"=1.000đ)
+               hoặc override tay từng SP.
+     Lưu kv_store('mktPrices') = { offset, override:{id:price} } */
+  function mktCfg() {
+    const c = window.STORE.get('mktPrices', { offset: 0, override: {} }) || {};
+    return { offset: +c.offset || 0, override: c.override || {} };
+  }
+  function saveMkt(c) { window.STORE.set('mktPrices', c); }
+  function realPrice(p) {
+    return (window.priceEntryOn ? (window.priceEntryOn(p, window.todayISO())?.sell) : null) ?? p.price ?? 0;
+  }
+  function mktPriceOf(p, c) {
+    c = c || mktCfg();
+    if (c.override && c.override[p.id] != null) return +c.override[p.id];
+    return Math.max(0, realPrice(p) + (c.offset || 0));
+  }
+
+  function renderMkt() {
+    const ps = products();
+    const c = mktCfg();
+    const giaK = (c.offset || 0) / 1000;
+    const rows = ps.map(p => {
+      const cat = catMeta(p.cat);
+      const real = realPrice(p);
+      const mkt = mktPriceOf(p, c);
+      const isOverride = c.override && c.override[p.id] != null;
+      const diff = mkt - real;
+      const diffTxt = diff === 0 ? '<span style="color:var(--muted)">=</span>'
+        : `<span style="color:${diff>0?'#DC2626':'#15803D'};font-weight:600">${diff>0?'+':''}${window.fmt(diff)}</span>`;
+      return `<tr>
+        <td><div style="display:flex;align-items:center;gap:8px">
+          ${p.img ? `<img src="${p.img}" alt="" loading="lazy" style="width:32px;height:32px;object-fit:cover;border-radius:6px;background:#eef3ee;flex:none" onerror="this.style.visibility='hidden'">` : ''}
+          <b>${p.name}</b></div></td>
+        <td><span class="tag" style="background:${cat.color}20;color:${cat.color}">${cat.icon} ${cat.label}</span></td>
+        <td style="color:var(--muted)">/${p.unit}</td>
+        <td class="num" style="color:var(--muted)">${window.fmt(real)}</td>
+        <td class="num">
+          <input class="mktprice" data-id="${p.id}" type="number" value="${mkt}" style="width:110px;text-align:right;padding:6px 8px;border:1px solid ${isOverride?'#A16207':'var(--line)'};border-radius:6px;background:${isOverride?'#FEF9C3':'#fff'}" title="${isOverride?'Đã sửa tay':'Tự tính = giá thật + offset'}">
+          ${isOverride ? `<button onclick="window._mktClearOne('${p.id}')" title="Bỏ sửa tay, về công thức" style="background:none;border:none;color:#A16207;cursor:pointer;font-size:11px">↺</button>` : ''}
+        </td>
+        <td class="num">${diffTxt}</td>
+      </tr>`;
+    }).join('');
+
+    document.getElementById('mktView').innerHTML = `
+      <div class="chart-card" style="margin-bottom:14px;border-left:4px solid #7C3AED;background:#FaF5FF">
+        📣 <b style="color:#6D28D9">Bảng giá Marketing</b> — giá đi <b>chào hàng / chạy quảng cáo</b>.
+        <b style="color:#DC2626">KHÔNG dùng cho đơn hàng</b> (đơn vẫn lấy giá bán thật ở tab "Bảng giá hôm nay").
+      </div>
+
+      <div class="chart-card" style="margin-bottom:14px">
+        <div style="display:flex;gap:10px;align-items:flex-end;flex-wrap:wrap">
+          <div>
+            <label style="font-size:12px;color:var(--muted);display:block;margin-bottom:4px">Công thức hàng loạt (so với giá bán thật)</label>
+            <div style="display:flex;gap:6px;align-items:center">
+              <select id="mktOp" style="padding:7px 10px;border:1px solid var(--line);border-radius:7px;font-size:13px">
+                <option value="1" ${c.offset>=0?'selected':''}>+ Cộng</option>
+                <option value="-1" ${c.offset<0?'selected':''}>− Trừ</option>
+              </select>
+              <input type="number" id="mktGia" min="0" step="0.5" value="${Math.abs(giaK)}" style="width:90px;padding:7px 10px;border:1px solid var(--line);border-radius:7px;text-align:right;font-weight:700">
+              <span style="font-size:13px;color:var(--muted)">giá <small>(1 giá = 1.000đ)</small></span>
+              <button class="btn btn-primary btn-sm" onclick="window._mktApplyBulk()">⚡ Áp dụng toàn bộ</button>
+            </div>
+          </div>
+          <div style="flex:1"></div>
+          <button class="btn btn-ghost btn-sm" onclick="window._mktReset()" title="Về đúng giá bán thật (offset 0, xóa sửa tay)">↺ Reset về giá thật</button>
+          <button class="btn btn-ghost btn-sm" onclick="window._mktCopyText()" title="Copy text bảng giá MKT dán Zalo/FB">📋 Copy text</button>
+        </div>
+        ${c.offset!==0 ? `<div style="font-size:12px;color:#6D28D9;margin-top:8px">Đang áp dụng: <b>giá bán thật ${c.offset>0?'+':'−'} ${Math.abs(giaK)} giá</b> (${c.offset>0?'+':''}${window.fmt(c.offset)}đ) cho mọi SP chưa sửa tay.</div>` : ''}
+      </div>
+
+      <div class="chart-card">
+        <table class="mini-table">
+          <thead><tr>
+            <th>Sản phẩm</th><th>Nhóm</th><th>ĐVT</th>
+            <th class="num">Giá bán thật</th><th class="num" style="background:#F5F3FF">Giá Marketing</th><th class="num">Chênh</th>
+          </tr></thead>
+          <tbody>${rows}</tbody>
+        </table>
+      </div>`;
+
+    /* Wire sửa tay từng SP */
+    document.querySelectorAll('.mktprice').forEach(inp => {
+      inp.addEventListener('change', (e) => {
+        const id = e.target.dataset.id;
+        const val = parseInt(e.target.value, 10) || 0;
+        const cfg = mktCfg();
+        cfg.override = cfg.override || {};
+        cfg.override[id] = val;
+        saveMkt(cfg);
+        renderMkt();
+      });
+    });
+  }
+
+  window._mktApplyBulk = function () {
+    const op = parseInt(document.getElementById('mktOp').value, 10) || 1;
+    const gia = parseFloat(document.getElementById('mktGia').value) || 0;
+    const cfg = mktCfg();
+    cfg.offset = op * Math.round(gia * 1000);
+    saveMkt(cfg);
+    renderMkt();
+    window.toast(`⚡ Đã áp dụng giá MKT = giá thật ${op>0?'+':'−'} ${gia} giá`, 'success');
+  };
+  window._mktReset = function () {
+    if (!confirm('Reset bảng giá Marketing về đúng giá bán thật? (xóa công thức + mọi sửa tay)')) return;
+    saveMkt({ offset: 0, override: {} });
+    renderMkt();
+    window.toast('↺ Đã reset giá MKT = giá thật', 'success');
+  };
+  window._mktClearOne = function (id) {
+    const cfg = mktCfg();
+    if (cfg.override) delete cfg.override[id];
+    saveMkt(cfg);
+    renderMkt();
+  };
+  window._mktCopyText = function () {
+    const c = mktCfg();
+    const lines = products().map(p => `• ${p.name}: ${window.fmt(mktPriceOf(p, c))}đ/${p.unit}`);
+    const txt = `📣 BẢNG GIÁ ${window.todayISO ? fmtD(window.todayISO()) : ''}\n` + lines.join('\n');
+    navigator.clipboard?.writeText(txt).then(
+      () => window.toast('📋 Đã copy bảng giá Marketing', 'success'),
+      () => window.toast('Không copy được — bôi đen thủ công', 'warn')
+    );
+  };
+  /* Expose để module khác (ads) dùng giá MKT nếu cần — KHÔNG ảnh hưởng đơn */
+  window.mktPriceOf = function (productId) {
+    const p = products().find(x => x.id === productId);
+    return p ? mktPriceOf(p) : 0;
+  };
 
   /* ====== AI: cập nhật giá từ ảnh bảng giá ====== */
   window.aiFillPrices = function () {

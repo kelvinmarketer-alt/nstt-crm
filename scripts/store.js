@@ -97,6 +97,7 @@
     'timesheetMeta',   /* Giờ vào muộn, lý do — CRITICAL */
     'payrollExtra',    /* Bảng lương chi tiết — CRITICAL */
     'latePolicy',      /* Khung phạt đi muộn — CRITICAL (admin cấu hình) */
+    'mktPrices',       /* Bảng giá Marketing (chào hàng/ads) — KHÔNG ảnh hưởng đơn */
     'audit_log',       /* Truy vết NV — HIGH */
     'inv_movements',   /* Sổ xuất nhập kho — HIGH */
     'snapshots',       /* Auto-backup — HIGH */
