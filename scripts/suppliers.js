@@ -213,15 +213,23 @@
     const list = getSup();
     if (isEdit) {
       const idx = list.findIndex(x => x.id === obj.id);
-      list[idx] = { ...list[idx], ...obj };
+      if (idx < 0) {
+        /* Không tìm thấy (id lệch) → thêm mới thay vì ghi list[-1] */
+        obj.debt = obj.debt || 0; obj.totalSpend = obj.totalSpend || 0;
+        list.push(obj);
+      } else {
+        list[idx] = { ...list[idx], ...obj };
+      }
     } else {
       obj.debt = 0; obj.totalSpend = 0;
       list.push(obj);
     }
     window.STORE.set('suppliers', list);
     if (window.audit) window.audit.log(isEdit ? 'supplier.update' : 'supplier.create', obj.name);
-    window.toast(isEdit ? '✓ Đã cập nhật' : '✓ Đã thêm NCC', 'success');
+    window.toast(isEdit ? '✓ Đã cập nhật NCC' : '✓ Đã thêm NCC', 'success');
     window.closeModal();
+    if (typeof closeDrawer === 'function') closeDrawer();
+    render();
   };
 
   window.paySupplier = function (id) {

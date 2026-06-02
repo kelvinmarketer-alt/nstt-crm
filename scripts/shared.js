@@ -403,15 +403,16 @@ window.attachBulkOps = function (opts) {
     document.body.appendChild(toolbar);
   }
 
-  /* Wire checkbox cells (đã có .checkbox div trong td đầu) */
+  /* Wire checkbox cells — linh hoạt: <tr data-id> bảng HOẶC <div.card data-id>.
+     Chỉ tính row có .checkbox.on bên trong → nút action có data-id không bị lẫn. */
   function getSelectedIds() {
-    const rows = tbl.querySelectorAll(`tr[${idAttr}]`);
+    const rows = tbl.querySelectorAll(`[${idAttr}]`);
     const selected = [];
     rows.forEach(r => {
       const cb = r.querySelector('.checkbox.on, input[type="checkbox"]:checked');
       if (cb) selected.push(r.getAttribute(idAttr));
     });
-    return selected;
+    return [...new Set(selected)];
   }
 
   function updateToolbar() {
