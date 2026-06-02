@@ -60,9 +60,10 @@
     /* Shipper status hôm nay */
     const todaySh = window.todayDate();
     const todayDay = todaySh.getDate();
+    const _curMonth = todaySh.toISOString().slice(0, 7);
     function todayAtt(staffId) {
       if (!staffId) return null;
-      const sh = timesheet.find(t => t.staffId === staffId && t.month === '2026-05');
+      const sh = timesheet.find(t => t.staffId === staffId && t.month === _curMonth);
       return sh ? sh.days[todayDay - 1] : 'X';
     }
     const shippersLive = drivers.map(d => {

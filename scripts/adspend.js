@@ -10,7 +10,9 @@
 
   let objective = (OBJS[0] || {}).id || 'ban-hang';
   let channel = 'all';
-  let month = '2026-05';
+  /* Mặc định tháng HIỆN TẠI (không hardcode) — để data import tháng này hiện ngay */
+  let month = (window.todayDate ? window.todayDate() : new Date()).toISOString().slice(0, 7);
+  window.setAdsMonth = function (m) { if (m) { month = m; render(); } };
 
   const all = () => window.STORE.get('adspend', window.ADSPEND || []);
   const fmtD = iso => { const [y, m, d] = iso.split('-'); return `${d}/${m}`; };
@@ -182,10 +184,11 @@
     const obj = objMeta(objective);
     const ch = channel === 'all' ? 'fb' : channel;
     const cur = all();
-    let n = 0;
+    let n = 0, jumpMonth = null;
     list.forEach(it => {
       const date = normDate(it.date); if (!date) return;
       const spend = toInt(it.spend); if (!spend) return;
+      if (!jumpMonth) jumpMonth = date.slice(0, 7);
       const rec = { date, objective, channel: ch, form: it.form || 'Mess', spend, units: 0, leads: 0, custs: 0, candidates: 0, revenue: 0 };
       obj.steps.forEach(s => { rec[s.key] = toInt(it[s.key]); });
       if (obj.hasRevenue) rec.revenue = toInt(it.revenue);
@@ -194,7 +197,11 @@
       else { rec.id = 'AD-' + Date.now() + '-' + n; window.STORE.add('adspend', rec); }
       n++;
     });
-    window.toast(`🤖 AI đã nhập ${n} ngày chi phí (${obj.label} · ${ch.toUpperCase()}) — kiểm tra lại bảng.`, n ? 'success' : 'warn');
+    if (jumpMonth && jumpMonth !== month) {
+      month = jumpMonth;
+      const el = document.getElementById('adsMonth'); if (el) el.value = month;
+    }
+    window.toast(`🤖 AI đã nhập ${n} ngày chi phí (${obj.label} · ${ch.toUpperCase()})${jumpMonth ? ' · xem tháng ' + jumpMonth.slice(5) + '/' + jumpMonth.slice(0,4) : ''}.`, n ? 'success' : 'warn');
     render();
   }
 
@@ -410,7 +417,7 @@
     if (C.spend < 0) { window.toast('Phải có cột "Chi tiêu"', 'danger'); return; }
 
     const ads = window.STORE.get('adspend', window.ADSPEND || []).slice();
-    let added = 0, skipped = 0;
+    let added = 0, skipped = 0, jumpMonth = null;
     for (let r = 1; r < data.length; r++) {
       const row = data[r]; if (!row || !row.length) continue;
       const sp = parseInt(String(row[C.spend] || '').replace(/\D/g, ''), 10);
@@ -428,6 +435,7 @@
         date = d.toISOString().slice(0, 10);
       }
       if (!date) date = new Date().toISOString().slice(0, 10);
+      if (!jumpMonth) jumpMonth = date.slice(0, 7);
       ads.unshift({
         id: 'AD' + Date.now() + Math.random().toString(36).slice(2, 5),
         date, channel: channelId,
@@ -442,12 +450,20 @@
       added++;
     }
     window.STORE.set('adspend', ads);
+    /* Nhảy tới tháng của data vừa nhập để user thấy ngay */
+    if (jumpMonth && jumpMonth !== month) {
+      month = jumpMonth;
+      const el = document.getElementById('adsMonth'); if (el) el.value = month;
+    }
     window.closeModal();
-    window.toast(`✓ Đã nhập ${added} chiến dịch · ${skipped} bỏ qua`, 'success');
+    render();
+    window.toast(`✓ Đã nhập ${added} chiến dịch · ${skipped} bỏ qua${jumpMonth ? ' · đang xem tháng ' + jumpMonth.slice(5) + '/' + jumpMonth.slice(0,4) : ''}`, 'success');
   };
 
   /* init */
   window.STORE.subscribe('adspend', render);
   window.renderAppShell('adspend', 'Chi phí quảng cáo');
+  /* Set giá trị input tháng = tháng hiện tại */
+  setTimeout(() => { const el = document.getElementById('adsMonth'); if (el) el.value = month; }, 0);
   render();
 })();

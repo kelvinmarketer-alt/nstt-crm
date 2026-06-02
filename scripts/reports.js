@@ -942,10 +942,13 @@
     `;
 
     /* === 4. HR === */
+    const _td = window.todayDate ? window.todayDate() : new Date();
+    const _curMonth = _td.toISOString().slice(0, 7);
+    const _curDayIdx = _td.getDate() - 1;
     function todayAtt(staffId) {
       if (!staffId) return null;
-      const sh = timesheet.find(t => t.staffId === staffId && t.month === '2026-05');
-      return sh ? sh.days[17] : 'X';   /* day 18 = index 17 */
+      const sh = timesheet.find(t => t.staffId === staffId && t.month === _curMonth);
+      return sh ? sh.days[_curDayIdx] : 'X';
     }
     let onDuty = 0, onLeave = 0, absent = 0;
     activeStaff.forEach(s => {

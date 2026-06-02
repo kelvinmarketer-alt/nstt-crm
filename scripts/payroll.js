@@ -5,7 +5,7 @@
    Upload Excel: SheetJS parse file từ máy chấm công → auto-fill
    ========================================================= */
 (function () {
-  let month = '2026-05';
+  let month = (window.todayDate ? window.todayDate() : new Date()).toISOString().slice(0, 7);
   let tab = 'attend';
 
   /* === Perm helpers === */

@@ -33,6 +33,7 @@
         <div class="sub">Theo dõi chi phí ads hằng ngày theo kênh + mục đích chạy (mẫu báo cáo đổi theo mục đích)</div>
       </div>
       <div class="head-actions">
+        <input type="month" id="adsMonth" onchange="window.setAdsMonth && window.setAdsMonth(this.value)" style="padding:7px 10px;border:1px solid var(--line);border-radius:7px;font-size:13px;font-weight:600;color:var(--navy);cursor:pointer">
         <button class="btn btn-ghost" onclick="window.openAdsExcelImport()">📥 Nhập Excel</button>
         <button class="btn btn-ghost" onclick="window.aiFillAds()">📷 Nhập từ ảnh</button>
         <button class="btn btn-primary" onclick="window.openAddAd()">+ Nhập chi phí ngày</button>
