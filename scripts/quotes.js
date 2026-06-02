@@ -518,7 +518,13 @@
           <input type="hidden" id="qf_cust" value="">
         </div>
       </div>
-      <label style="font-size:12px;color:var(--muted);font-weight:600">Mặt hàng báo giá</label>
+      <div style="display:flex;justify-content:space-between;align-items:center;margin-top:4px">
+        <label style="font-size:12px;color:var(--muted);font-weight:600">Mặt hàng báo giá</label>
+        <div style="display:flex;gap:6px">
+          <button type="button" class="btn btn-ghost btn-sm" onclick="window._qfFromImage()" title="AI đọc ảnh chụp list hàng / tin nhắn">📷 Từ ảnh</button>
+          <button type="button" class="btn btn-ghost btn-sm" onclick="window._qfFromExcel()" title="Upload Excel: Sản phẩm · SL · Giá">📥 Từ Excel</button>
+        </div>
+      </div>
       <div id="qf_items"></div>
       <button class="btn btn-ghost btn-sm" onclick="window._qfAdd()" style="margin-top:5px">+ Thêm SP</button>
       <div style="display:flex;justify-content:flex-end;margin-top:10px;font-size:13px">Tổng: <b style="margin-left:8px" id="qf_total">0</b> ₫</div>
@@ -565,10 +571,94 @@
     row.querySelector('.qi_pid').onchange = (e) => {
       const pid = e.target.value;
       if (pid && window.priceOn) {
-        row.querySelector('.qi_price').value = window.priceOn(pid, '2026-05-18');
+        row.querySelector('.qi_price').value = window.priceOn(pid, (window.todayISO ? window.todayISO() : new Date().toISOString().slice(0,10)));
         window._qfRecalc();
       }
     };
+    return row;
+  };
+
+  /* === Tìm SP theo tên (fuzzy) → trả id === */
+  function _qfMatchProduct(name) {
+    const prods = window._qfPRODS || [];
+    if (!name) return null;
+    const n = String(name).toLowerCase().trim();
+    let p = prods.find(x => (x.name || '').toLowerCase() === n);
+    if (!p) p = prods.find(x => (x.name || '').toLowerCase().includes(n) || n.includes((x.name || '').toLowerCase()));
+    return p || null;
+  }
+
+  /* === Thêm 1 dòng đã điền sẵn từ import === */
+  window._qfAddFilled = function (name, qty, price) {
+    const row = window._qfAdd();
+    const p = _qfMatchProduct(name);
+    const todayISO = window.todayISO ? window.todayISO() : new Date().toISOString().slice(0, 10);
+    if (p) {
+      row.querySelector('.qi_pid').value = p.id;
+      if (!price && window.priceOn) price = window.priceOn(p.id, todayISO);
+    } else {
+      /* SP không khớp → thêm option tạm để giữ tên */
+      const sel = row.querySelector('.qi_pid');
+      const opt = document.createElement('option');
+      opt.value = '__custom__'; opt.textContent = name + ' (mới)'; opt.selected = true;
+      opt.dataset.name = name;
+      sel.appendChild(opt);
+    }
+    row.querySelector('.qi_qty').value = qty || 1;
+    row.querySelector('.qi_price').value = price || 0;
+    window._qfRecalc();
+    return row;
+  };
+
+  /* === Import từ Excel: cột Sản phẩm · SL · Giá === */
+  window._qfFromExcel = function () {
+    if (!window.XLSX) { window.toast('SheetJS chưa load', 'warn'); return; }
+    const inp = document.createElement('input');
+    inp.type = 'file'; inp.accept = '.xlsx,.xls,.csv';
+    inp.onchange = async (e) => {
+      const f = e.target.files[0]; if (!f) return;
+      try {
+        const buf = await f.arrayBuffer();
+        const wb = window.XLSX.read(buf, { type: 'array' });
+        const ws = wb.Sheets[wb.SheetNames[0]];
+        const data = window.XLSX.utils.sheet_to_json(ws, { header: 1, defval: '' });
+        const header = (data[0] || []).map(h => String(h || '').toLowerCase().trim());
+        const ix = (keys) => header.findIndex(h => keys.some(k => h.includes(k)));
+        const C = { name: ix(['sản phẩm','sp','tên','mặt hàng']), qty: ix(['sl','số lượng','qty']), price: ix(['giá','price','đơn giá']) };
+        if (C.name < 0) { window.toast('File cần có cột "Sản phẩm"', 'warn'); return; }
+        let n = 0;
+        for (let r = 1; r < data.length; r++) {
+          const row = data[r]; if (!row || !row.length) continue;
+          const name = String(row[C.name] || '').trim(); if (!name) continue;
+          const qty = C.qty >= 0 ? (parseFloat(String(row[C.qty]).replace(/[^\d.]/g, '')) || 1) : 1;
+          const price = C.price >= 0 ? (parseInt(String(row[C.price]).replace(/\D/g, ''), 10) || 0) : 0;
+          window._qfAddFilled(name, qty, price); n++;
+        }
+        window.toast(`✓ Đã thêm ${n} mặt hàng từ Excel`, n ? 'success' : 'warn');
+      } catch (err) { window.toast('Lỗi đọc file: ' + err.message, 'danger'); }
+    };
+    inp.click();
+  };
+
+  /* === Import từ ảnh (AI) === */
+  window._qfFromImage = function () {
+    if (!window.AI) { window.toast('Chưa tải module AI', 'warn'); return; }
+    window.AI.openFillModal({
+      task: 'quote-items',
+      title: '📷 Nhập mặt hàng báo giá từ ảnh',
+      guideHtml: 'Đính ảnh chụp <b>danh sách hàng / tin nhắn đặt hàng</b>. AI đọc và thêm vào báo giá.',
+      prompt: 'Đọc ảnh danh sách hàng (tiếng Việt). Trả JSON mảng: [{"name":"tên sản phẩm","qty": số lượng (số), "price": đơn giá VND (số, 0 nếu không có)}]. CHỈ trả JSON.',
+      onResult: (data) => {
+        const list = Array.isArray(data) ? data : (data.items || data.rows || []);
+        if (!list.length) { window.toast('Không đọc được mặt hàng nào', 'warn'); return; }
+        let n = 0;
+        list.forEach(it => {
+          const name = it.name || it.product || it['sản phẩm']; if (!name) return;
+          window._qfAddFilled(name, +it.qty || 1, parseInt(String(it.price||'').replace(/\D/g,''),10) || 0); n++;
+        });
+        window.toast(`🤖 AI đã thêm ${n} mặt hàng — kiểm tra lại.`, n ? 'success' : 'warn');
+      },
+    });
   };
   window._qfRecalc = function () {
     let total = 0;
