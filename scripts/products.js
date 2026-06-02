@@ -180,24 +180,30 @@
       </div>
 
       <div class="chart-card" style="margin-bottom:14px">
-        <div style="display:flex;gap:10px;align-items:flex-end;flex-wrap:wrap">
-          <div>
-            <label style="font-size:12px;color:var(--muted);display:block;margin-bottom:4px">Công thức hàng loạt (so với giá bán thật)</label>
-            <div style="display:flex;gap:6px;align-items:center">
-              <select id="mktOp" style="padding:7px 10px;border:1px solid var(--line);border-radius:7px;font-size:13px">
-                <option value="1" ${c.offset>=0?'selected':''}>+ Cộng</option>
-                <option value="-1" ${c.offset<0?'selected':''}>− Trừ</option>
-              </select>
-              <input type="number" id="mktGia" min="0" step="0.5" value="${Math.abs(giaK)}" style="width:90px;padding:7px 10px;border:1px solid var(--line);border-radius:7px;text-align:right;font-weight:700">
-              <span style="font-size:13px;color:var(--muted)">giá <small>(1 giá = 1.000đ)</small></span>
-              <button class="btn btn-primary btn-sm" onclick="window._mktApplyBulk()">⚡ Áp dụng toàn bộ</button>
-            </div>
-          </div>
+        <label style="font-size:12px;color:var(--muted);display:block;margin-bottom:6px">Công thức hàng loạt — cộng/trừ <b>"giá"</b> so với giá bán thật <small>(1 giá = 1.000đ)</small></label>
+        <div style="display:flex;gap:6px;align-items:center;flex-wrap:wrap">
+          <button class="btn btn-ghost btn-sm" onclick="window._mktQuick(-2)" style="${c.offset===-2000?'background:#7C3AED;color:#fff':''}">−2 giá</button>
+          <button class="btn btn-ghost btn-sm" onclick="window._mktQuick(-1)" style="${c.offset===-1000?'background:#7C3AED;color:#fff':''}">−1 giá</button>
+          <button class="btn btn-ghost btn-sm" onclick="window._mktQuick(0)" style="${c.offset===0?'background:#15803D;color:#fff':''}">= Giá thật</button>
+          <button class="btn btn-ghost btn-sm" onclick="window._mktQuick(1)" style="${c.offset===1000?'background:#7C3AED;color:#fff':''}">+1 giá</button>
+          <button class="btn btn-ghost btn-sm" onclick="window._mktQuick(2)" style="${c.offset===2000?'background:#7C3AED;color:#fff':''}">+2 giá</button>
+          <button class="btn btn-ghost btn-sm" onclick="window._mktQuick(5)" style="${c.offset===5000?'background:#7C3AED;color:#fff':''}">+5 giá</button>
+          <span style="color:var(--muted);margin:0 4px">hoặc</span>
+          <select id="mktOp" style="padding:7px 8px;border:1px solid var(--line);border-radius:7px;font-size:13px">
+            <option value="1">+ Cộng</option><option value="-1">− Trừ</option>
+          </select>
+          <input type="number" id="mktGia" min="0" step="1" placeholder="số giá" oninput="document.getElementById('mktPrev').textContent='= '+( (parseFloat(this.value)||0)*1000 ).toLocaleString('vi-VN')+'đ'" style="width:80px;padding:7px 8px;border:1px solid var(--line);border-radius:7px;text-align:right;font-weight:700">
+          <span style="font-size:12px;color:var(--muted)">giá <b id="mktPrev" style="color:#6D28D9">= 0đ</b></span>
+          <button class="btn btn-primary btn-sm" onclick="window._mktApplyBulk()">⚡ Áp dụng</button>
           <div style="flex:1"></div>
-          <button class="btn btn-ghost btn-sm" onclick="window._mktReset()" title="Về đúng giá bán thật (offset 0, xóa sửa tay)">↺ Reset về giá thật</button>
-          <button class="btn btn-ghost btn-sm" onclick="window._mktCopyText()" title="Copy text bảng giá MKT dán Zalo/FB">📋 Copy text</button>
+          <button class="btn btn-ghost btn-sm" onclick="window._mktReset()" title="Về đúng giá bán thật">↺ Reset</button>
         </div>
-        ${c.offset!==0 ? `<div style="font-size:12px;color:#6D28D9;margin-top:8px">Đang áp dụng: <b>giá bán thật ${c.offset>0?'+':'−'} ${Math.abs(giaK)} giá</b> (${c.offset>0?'+':''}${window.fmt(c.offset)}đ) cho mọi SP chưa sửa tay.</div>` : ''}
+        <div style="display:flex;gap:6px;margin-top:8px;flex-wrap:wrap">
+          <button class="btn btn-ghost btn-sm" onclick="window._mktCopyText()" title="Copy text dán Zalo/FB">📋 Copy text</button>
+          <button class="btn btn-ghost btn-sm" onclick="window._mktExportPDF()" title="Xuất PDF bảng giá MKT (mẫu đẹp, kèm ảnh)">🖨 Xuất PDF</button>
+          <button class="btn btn-ghost btn-sm" onclick="window._mktExportHTML()" title="Tải file HTML bảng giá MKT (gửi Zalo / mở offline)">📥 Xuất HTML</button>
+          ${c.offset!==0 ? `<div style="flex:1;text-align:right;font-size:12px;color:#6D28D9;align-self:center">Đang áp: <b>giá thật ${c.offset>0?'+':'−'} ${Math.abs(giaK)} giá</b> (${c.offset>0?'+':''}${window.fmt(c.offset)}đ)</div>` : ''}
+        </div>
       </div>
 
       <div class="chart-card">
@@ -224,14 +230,36 @@
     });
   }
 
+  window._mktQuick = function (giaNum) {
+    const cfg = mktCfg();
+    cfg.offset = Math.round(giaNum * 1000);
+    saveMkt(cfg);
+    renderMkt();
+    window.toast(giaNum === 0 ? '↺ Giá MKT = giá thật' : `⚡ Giá MKT = giá thật ${giaNum>0?'+':'−'} ${Math.abs(giaNum)} giá`, 'success');
+  };
   window._mktApplyBulk = function () {
     const op = parseInt(document.getElementById('mktOp').value, 10) || 1;
     const gia = parseFloat(document.getElementById('mktGia').value) || 0;
+    if (gia > 50) { if (!confirm(`Bạn nhập ${gia} giá = ${(gia*1000).toLocaleString('vi-VN')}đ — số khá lớn. Chắc chắn?`)) return; }
     const cfg = mktCfg();
     cfg.offset = op * Math.round(gia * 1000);
     saveMkt(cfg);
     renderMkt();
     window.toast(`⚡ Đã áp dụng giá MKT = giá thật ${op>0?'+':'−'} ${gia} giá`, 'success');
+  };
+  /* Xuất PDF / HTML bảng giá MKT — tái dùng template báo giá, truyền priceFn */
+  window._mktExportPDF = async function () {
+    if (!window.PriceCatalogue) { window.toast('Chưa tải module báo giá', 'warn'); return; }
+    const c = mktCfg();
+    try { await window.PriceCatalogue.exportPDF(window.todayISO(), { priceFn: (p) => mktPriceOf(p, c) }); }
+    catch (e) { window.toast('Lỗi tạo PDF: ' + e.message, 'warn'); }
+  };
+  window._mktExportHTML = async function () {
+    if (!window.PriceCatalogue) { window.toast('Chưa tải module báo giá', 'warn'); return; }
+    const c = mktCfg();
+    window.toast('Đang tạo file HTML bảng giá Marketing…', 'info');
+    try { await window.PriceCatalogue.export(window.todayISO(), { priceFn: (p) => mktPriceOf(p, c) }); }
+    catch (e) { window.toast('Lỗi tạo file: ' + e.message, 'warn'); }
   };
   window._mktReset = function () {
     if (!confirm('Reset bảng giá Marketing về đúng giá bán thật? (xóa công thức + mọi sửa tay)')) return;

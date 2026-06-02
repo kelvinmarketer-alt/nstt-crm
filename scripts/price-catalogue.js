@@ -206,8 +206,10 @@ footer b{color:#1f7a3d}
       const [vn, en] = CAT_MAP[cat.id] || [(cat.label || cat.id).toUpperCase(), ''];
       const cards = items.map(p => {
         stt++;
-        const cur = entryOn(p, dateISO); const sell = cur ? cur.sell : 0;
-        const prev = prevOn(p, dateISO); const old = (prev && prev.sell !== sell) ? prev.sell : null;
+        const cur = entryOn(p, dateISO);
+        /* opts.priceFn(p) override giá (vd bảng giá Marketing) — KHÔNG đụng giá đơn */
+        const sell = opts.priceFn ? (opts.priceFn(p) || 0) : (cur ? cur.sell : 0);
+        const prev = prevOn(p, dateISO); const old = (!opts.priceFn && prev && prev.sell !== sell) ? prev.sell : null;
         const img = imgMap[p.id];
         const imgEl = img ? `<img loading="lazy" src="${img}" alt="${esc(p.name)}">` : `<div class="noimg">No image</div>`;
         return `<div class="card" data-s="${esc((p.name + ' ' + (p.en || '')).toLowerCase())}"><div class="imgwrap">${imgEl}<span class="stt">${stt}</span></div><div class="info"><div class="vn">${esc(p.name)}</div><div class="en">${esc(p.en || '')}</div><div class="price">${old ? `<span class="old">${fmt(old)}</span>` : ''}<b>${fmt(sell)}</b><span class="unit">đ/${esc(p.unit || 'kg')}</span></div></div></div>`;
@@ -281,7 +283,7 @@ ${sections}
           if (finalCall) setTimeout(() => progEl && progEl.remove(), 800);
         }
       };
-      const html = await buildHTML(dateISO, { onProgress, forPrint: true });
+      const html = await buildHTML(dateISO, { onProgress, forPrint: true, priceFn: opts.priceFn });
       /* Inject print CSS — ÉP GIỮ MÀU NỀN + bố cục đẹp khi in PDF */
       const printCss = `<style>
         @page { size: A4; margin: 8mm 6mm; }
@@ -568,7 +570,7 @@ ${sections}
           if (finalCall) setTimeout(() => progEl && progEl.remove(), 800);
         }
       };
-      const html = await buildHTML(dateISO, { onProgress });
+      const html = await buildHTML(dateISO, { onProgress, priceFn: opts.priceFn });
       const filename = `BangGia-TuanTu-${ddmmyy(dateISO)}.html`;
       const blob = new Blob([html], { type: 'text/html;charset=utf-8' });
       /* tải về máy (trừ khi sendOnly) */
