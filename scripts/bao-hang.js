@@ -7,11 +7,14 @@
 (function () {
   function company() {
     const ci = window.STORE.get('companyInfo', null) || {};
+    const origin = (typeof location !== 'undefined' && location.origin && location.origin !== 'null') ? location.origin : 'https://app.nongsantuantuhanoi.vn';
     return {
-      name: ci.name || 'NÔNG SẢN TUẤN TÚ HÀ NỘI',
-      addr: ci.address || '36 Tân Mai, Hoàng Mai, Hà Nội',
-      phone: ci.hotline || '0903 111 222',
+      /* Tên thương hiệu ngắn (KHÔNG dùng tên pháp nhân dài) */
+      name: 'NÔNG SẢN TUẤN TÚ HÀ NỘI',
+      addr: ci.address || '36/147A Tân Mai, Hoàng Mai, Hà Nội',
+      phone: ci.hotline || '0836 676 086',
       website: ci.website || 'nongsantuantuhanoi.com',
+      logo: ci.logo || (origin + '/assets/logo.png'),
     };
   }
 
@@ -44,75 +47,92 @@
         <td class="sl">${fmtQty(g.qty)}</td>
       </tr>`).join('');
     return `<!doctype html><html lang="vi"><head><meta charset="utf-8">
-<title>Phiếu báo hàng — ${o.code}</title>
+<title>DANH SÁCH BÁO HÀNG</title>
 <style>
+  @page{size:A4;margin:14mm 12mm}
   *{box-sizing:border-box;margin:0;padding:0;font-family:'Segoe UI',Arial,sans-serif}
-  body{color:#1a1a1a;font-size:13px;padding:24px 28px;background:#fff}
-  .top{display:flex;justify-content:space-between;align-items:flex-start;border-bottom:3px solid #1B5E20;padding-bottom:12px;margin-bottom:6px}
-  .brand h1{font-size:18px;color:#1B5E20;font-weight:800;letter-spacing:.3px}
-  .brand .sub{font-size:11px;color:#555;margin-top:3px}
-  .seal{text-align:right;font-size:11px;color:#555}
-  .seal .code{font-size:15px;color:#E8A33D;font-weight:800}
-  .title{text-align:center;font-size:21px;font-weight:800;color:#1B5E20;letter-spacing:1px;margin:14px 0 4px}
-  .meta{display:flex;justify-content:space-between;font-size:12.5px;margin:8px 2px}
+  body{color:#1a1a1a;font-size:13px;background:#fff}
+  .wrap{max-width:780px;margin:0 auto;padding:6px 4px}
+  .top{display:flex;align-items:center;gap:16px;border-bottom:3px solid #1B5E20;padding-bottom:12px;margin-bottom:4px}
+  .top img.logo{width:74px;height:74px;object-fit:contain;flex:0 0 auto}
+  .brand{flex:1;min-width:0}
+  .brand h1{font-size:21px;color:#1B5E20;font-weight:800;letter-spacing:.4px;line-height:1.15}
+  .brand .sub{font-size:11.5px;color:#555;margin-top:5px}
+  .title{text-align:center;font-size:23px;font-weight:800;color:#1B5E20;letter-spacing:1.5px;margin:16px 0 2px}
+  .ca{text-align:center;font-size:12.5px;color:#444;margin-bottom:8px}
+  .metabox{border:1px solid #CBD9C4;border-radius:8px;padding:10px 14px;margin:6px 0 10px;background:#F7FBF5}
+  .meta{display:flex;justify-content:space-between;gap:18px;font-size:12.5px;line-height:1.9}
   .meta b{color:#1B5E20}
-  .ca{text-align:center;font-size:12px;color:#444;margin:2px 0}
-  .note{text-align:center;font-size:12.5px;font-weight:700;color:#15803D;margin:8px 0 12px}
+  .note{text-align:center;font-size:12.5px;font-weight:700;color:#15803D;margin:10px 0 12px}
   table{width:100%;border-collapse:collapse;font-size:13px}
-  th,td{border:1px solid #B6C9B0;padding:6px 9px}
-  th{background:#1B5E20;color:#fff;font-weight:700;font-size:12px;text-transform:uppercase;letter-spacing:.3px}
-  td.stt{text-align:center;width:46px;color:#777;font-weight:600}
-  td.sl{text-align:center;width:110px;font-weight:700;color:#1B5E20}
+  th,td{border:1px solid #B6C9B0;padding:7px 10px}
+  th{background:#1B5E20;color:#fff;font-weight:700;font-size:12px;text-transform:uppercase;letter-spacing:.4px}
+  td.stt{text-align:center;width:48px;color:#777;font-weight:600}
+  td.sl{text-align:center;width:120px;font-weight:700;color:#1B5E20}
   td.sp{font-weight:600}
   tbody tr:nth-child(even){background:#F4FAF2}
   tfoot td{background:#E8F5E9;font-weight:800;color:#1B5E20;border-top:2px solid #1B5E20}
-  .sig{display:grid;grid-template-columns:1fr 1fr 1fr;gap:20px;margin-top:30px;text-align:center;font-size:11.5px}
-  .sig .l{padding-top:42px;border-top:1px dotted #aaa}
-  .foot{margin-top:20px;text-align:center;font-size:10.5px;color:#888}
-  @media print{body{padding:8mm}.no-print{display:none}}
-</style></head><body>
+  .sig{display:grid;grid-template-columns:1fr 1fr 1fr;gap:24px;margin-top:34px;text-align:center;font-size:11.5px;color:#333}
+  .sig .role{font-weight:700;color:#1B5E20}
+  .sig .small{font-size:9.5px;color:#999;font-weight:400}
+  .sig .l{margin-top:46px;border-top:1px dotted #aaa}
+</style></head><body><div class="wrap">
   <div class="top">
+    <img class="logo" src="${c.logo}" alt="" onerror="this.style.display='none'">
     <div class="brand">
-      <h1>🌱 ${c.name.toUpperCase()}</h1>
+      <h1>${c.name}</h1>
       <div class="sub">${c.addr} · ☎ ${c.phone} · ${c.website}</div>
     </div>
-    <div class="seal"><div class="code">${o.code || ''}</div><div>NV: ${o.staff || ''}</div></div>
   </div>
   <div class="title">DANH SÁCH BÁO HÀNG</div>
   <div class="ca">Giao hàng ca sáng</div>
-  <div class="meta">
-    <div><b>Nhà hàng:</b> ${o.custName || '............'}</div>
-    <div><b>Thời gian:</b> Ngày ${dd} Tháng ${mm} Năm ${yy}</div>
-  </div>
-  <div class="meta" style="margin-top:0">
-    <div><b>Địa chỉ:</b> ${o.drop || '............'}</div>
-    <div><b>SĐT:</b> ${o.custPhone || ''}</div>
+  <div class="metabox">
+    <div class="meta">
+      <div><b>Nhà hàng:</b> ${o.custName || '............'}</div>
+      <div><b>Thời gian:</b> Ngày ${dd} Tháng ${mm} Năm ${yy}</div>
+    </div>
+    <div class="meta">
+      <div><b>Địa chỉ:</b> ${o.drop || '............'}</div>
+      <div><b>SĐT:</b> ${o.custPhone || '............'}</div>
+    </div>
   </div>
   <div class="note">TẤT CẢ CÁC MÃ HÀNG ĐỀU ĐƯỢC TÍNH ĐƠN VỊ LÀ KG (KILOGRAM)</div>
   <table>
-    <thead><tr><th style="width:46px">STT</th><th>Sản phẩm</th><th style="width:110px">Số lượng</th></tr></thead>
+    <thead><tr><th style="width:48px">STT</th><th>Sản phẩm</th><th style="width:120px">Số lượng</th></tr></thead>
     <tbody>${rowsHtml || '<tr><td colspan="3" style="text-align:center;color:#999;padding:18px">Đơn chưa có mặt hàng</td></tr>'}</tbody>
     <tfoot><tr><td colspan="2" style="text-align:right">TỔNG SẢN LƯỢNG</td><td style="text-align:center">${fmtQty(totalQty)} kg</td></tr></tfoot>
   </table>
   <div class="sig">
-    <div><b>Người lập phiếu</b><div class="l">${o.staff || ''}</div></div>
-    <div><b>Kho / Bếp soạn</b><div class="l"></div></div>
-    <div><b>Khách nhận</b><div class="l"></div></div>
+    <div><div class="role">Người lập phiếu</div><div class="small">(ký, ghi rõ họ tên)</div><div class="l"></div></div>
+    <div><div class="role">Kho / Bếp soạn</div><div class="small">(ký, ghi rõ họ tên)</div><div class="l"></div></div>
+    <div><div class="role">Khách nhận</div><div class="small">(ký, ghi rõ họ tên)</div><div class="l"></div></div>
   </div>
-  <div class="foot">Phiếu xuất từ CRM ${c.name} · ${o.code || ''}</div>
-  <script>window.onload=()=>{setTimeout(()=>window.print(),250)}<\/script>
+</div>
 </body></html>`;
   };
 
-  /* ====== In / xuất PDF ====== */
+  /* ====== In / xuất PDF — qua iframe cùng origin (không còn "about:blank") ====== */
   window.printBaoHang = function (code) {
     const o = (window.STORE.get('orders', []) || []).find(x => x.code === code);
     if (!o) { window.toast?.('Không tìm thấy đơn ' + code, 'warn'); return; }
-    const w = window.open('', '_blank', 'width=800,height=1050');
-    if (!w) { window.toast?.('Trình duyệt chặn popup — cho phép popup rồi thử lại', 'warn'); return; }
-    w.document.write(window.buildBaoHangHTML(o));
-    w.document.close();
-    window.toast?.('📋 Đang mở phiếu báo hàng — Ctrl+P để in hoặc lưu PDF', 'info');
+    const html = window.buildBaoHangHTML(o);
+    const old = document.getElementById('baoHangPrintFrame');
+    if (old) old.remove();
+    const f = document.createElement('iframe');
+    f.id = 'baoHangPrintFrame';
+    f.style.cssText = 'position:fixed;right:0;bottom:0;width:0;height:0;border:0;visibility:hidden';
+    document.body.appendChild(f);
+    const doc = f.contentWindow.document;
+    doc.open(); doc.write(html); doc.close();
+    const fire = () => {
+      try { f.contentWindow.focus(); f.contentWindow.print(); }
+      catch (e) { window.toast?.('Không in được: ' + e.message, 'warn'); }
+    };
+    /* Đợi logo load xong rồi mới in (tránh in thiếu ảnh) */
+    const img = doc.querySelector('img.logo');
+    if (img && !img.complete) { img.onload = () => setTimeout(fire, 120); img.onerror = () => setTimeout(fire, 120); }
+    else setTimeout(fire, 250);
+    window.toast?.('📋 Mở hộp in — bỏ tick "Headers and footers" để ẩn ngày/URL · Đích in chọn "Save as PDF"', 'info');
   };
 
   /* ====== Nội dung Telegram ====== */
