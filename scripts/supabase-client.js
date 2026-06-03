@@ -79,13 +79,14 @@
          JS dùng: contact, category, paymentTerm, debt, totalSpend, rating, note */
       to:   { contact:'contact_person', category:'supply_categories',
               paymentTerm:'payment_terms', debt:'balance', note:'notes',
-              /* drop column không có trong DB */
-              totalSpend: null, rating: null,
+              /* DB đã có cột rating + total_spend → ghi thẳng (trước đây drop nhầm) */
+              totalSpend: 'total_spend',
               /* alias mới nếu code dùng camelCase */
               contactPerson:'contact_person', supplyCategories:'supply_categories',
               paymentTerms:'payment_terms' },
       from: { contact_person:'contact', supply_categories:'category',
-              payment_terms:'paymentTerm', balance:'debt', notes:'note' },
+              payment_terms:'paymentTerm', balance:'debt', notes:'note',
+              total_spend:'totalSpend' },
     },
     shippers: {
       to:   { ordersToday:'orders_today', kpiTotal:'kpi_total',
@@ -224,12 +225,26 @@
     if (!obj) return obj;
     const m = FIELD_MAP[table]?.from || {};
     const df = DATE_FIELDS[table] || {};
+    /* Tên field JS đích của các cột chuẩn (vd contact_person→contact).
+       Nếu DB có cột RÁC trùng tên đích (vd cột 'contact' null song song
+       'contact_person') thì cột chuẩn PHẢI thắng — nếu không, cột rác null
+       đè lên giá trị thật → reload mất dữ liệu vừa sửa. */
+    const mappedTargets = new Set(Object.values(m).filter(Boolean));
     const result = {};
+    /* Lượt 1: cột thô / không map. Bỏ cột trùng tên với 1 đích đã map (để lượt 2 ghi). */
     for (const k of Object.keys(obj)) {
-      const newKey = m[k] || k;
+      if (m[k] !== undefined) continue;          /* xử lý ở lượt 2 */
+      if (mappedTargets.has(k)) continue;        /* cột rác trùng đích → bỏ, cột chuẩn thắng */
+      let v = obj[k];
+      if (df[k] !== undefined) v = isoToVN(v, df[k]);
+      result[k] = v;
+    }
+    /* Lượt 2: cột đã map (chuẩn) — ghi sau cùng nên luôn thắng cột rác. */
+    for (const k of Object.keys(obj)) {
+      const newKey = m[k];
+      if (newKey === undefined) continue;
       if (newKey === null) continue;
       let v = obj[k];
-      /* Convert ISO → VN format for date fields */
       if (df[newKey] !== undefined) v = isoToVN(v, df[newKey]);
       result[newKey] = v;
     }
