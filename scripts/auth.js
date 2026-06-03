@@ -506,10 +506,8 @@
         logs.unshift({ ...entry, at: new Date().toLocaleString('vi-VN'), staffId });
         if (logs.length > 200) logs.length = 200;
         window.STORE.set('activityLogs', logs);
-        /* Push to Supabase */
-        if (isSupabaseAuthMode() && window.SB) {
-          window.SB.from('activity_logs').insert(entry).then(() => {}).catch(() => {});
-        }
+        /* KHÔNG push lên bảng activity_logs (schema cloud lệch → lỗi bigint).
+           Audit chính đã có window.audit → kv_store('audit_log'). */
       } catch (e) { console.warn('Activity log', e); }
     },
 

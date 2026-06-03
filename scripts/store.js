@@ -72,7 +72,9 @@
     staff:            'staff',
     paymentAccounts:  'payment_accounts',
     cashEntries:      'cash_entries',
-    activityLogs:     'activity_logs',
+    /* activityLogs (nhật ký đăng nhập) GIỮ LOCAL — bảng cloud activity_logs schema
+       lệch (id bigint vs 'L...', thiếu cột at_time) gây lỗi insert. Audit chính dùng
+       window.audit → kv_store('audit_log') (JSONB, sync OK). */
     /* Extra (đợt 2) */
     inventory:        'inventory',
     purchases:        'purchases',
