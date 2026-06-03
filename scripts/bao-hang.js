@@ -85,11 +85,11 @@
     </div>
   </div>
   <div class="title">DANH SÁCH BÁO HÀNG</div>
-  <div class="ca">Giao hàng ca sáng</div>
+  <div class="ca">Giao hàng ca ............</div>
   <div class="metabox">
     <div class="meta">
       <div><b>Nhà hàng:</b> ${o.custName || '............'}</div>
-      <div><b>Thời gian:</b> Ngày ${dd} Tháng ${mm} Năm ${yy}</div>
+      <div><b>Thời gian:</b> Ngày ....... Tháng ....... Năm .......</div>
     </div>
     <div class="meta">
       <div><b>Địa chỉ:</b> ${o.drop || '............'}</div>
@@ -102,11 +102,6 @@
     <tbody>${rowsHtml || '<tr><td colspan="3" style="text-align:center;color:#999;padding:18px">Đơn chưa có mặt hàng</td></tr>'}</tbody>
     <tfoot><tr><td colspan="2" style="text-align:right">TỔNG SẢN LƯỢNG</td><td style="text-align:center">${fmtQty(totalQty)} kg</td></tr></tfoot>
   </table>
-  <div class="sig">
-    <div><div class="role">Người lập phiếu</div><div class="small">(ký, ghi rõ họ tên)</div><div class="l"></div></div>
-    <div><div class="role">Kho / Bếp soạn</div><div class="small">(ký, ghi rõ họ tên)</div><div class="l"></div></div>
-    <div><div class="role">Khách nhận</div><div class="small">(ký, ghi rõ họ tên)</div><div class="l"></div></div>
-  </div>
 </div>
 </body></html>`;
   };
