@@ -54,21 +54,27 @@
       const numPur = pur.filter(p => p.supplierId === s.id).length;
       const cats = (s.category||[]).map(c => `<span class="tag" style="background:#F0FDF4;color:#15803D">${CATS[c]||c}</span>`).join(' ');
       const termClr = { 'COD':'#16A34A', 'NET 7':'#0EA5E9', 'NET 14':'#A16207', 'NET 30':'#DC2626' };
+      const empty = '<span style="color:var(--muted);opacity:.6;font-style:italic">—</span>';
+      const has = v => v && String(v).trim() && String(v).trim().toLowerCase() !== 'null';
       return `<div class="sup-card" data-id="${s.id}" onclick="window.openSupDrawer('${s.id}')" style="cursor:pointer;position:relative">
-        <div class="checkbox" onclick="event.stopPropagation();this.classList.toggle('on')" style="position:absolute;top:14px;left:14px;z-index:2"></div>
-        <div class="sup-av" style="background:${window.avatarColor(s.id)};margin-left:24px">${window.initials(s.name)}</div>
+        <div class="checkbox" onclick="event.stopPropagation();this.classList.toggle('on')" style="position:absolute;top:50%;left:14px;transform:translateY(-50%);z-index:2"></div>
+        <div class="sup-av" style="background:${window.avatarColor(s.id)}">${window.initials(s.name)}</div>
         <div class="sup-info">
-          <div class="n1" data-field="name" title="Click để sửa tên NCC">${s.name} ${s.active ? '' : '<span style="color:var(--muted);font-weight:500;font-size:11px">· Ngưng</span>'}</div>
-          <div class="n2"><span data-field="contact" title="Click để sửa người liên hệ">${s.contact}</span> · <span data-field="phone" title="Click để sửa SĐT">${s.phone}</span> · <span data-field="address" title="Click để sửa địa chỉ">${s.address}</span></div>
-          <div style="margin-top:4px;display:flex;gap:6px;flex-wrap:wrap">${cats}
-            <span class="tag" data-field="paymentTerm" title="Click để đổi điều khoản TT" style="background:${termClr[s.paymentTerm]||'#F1F5F9'}1f;color:${termClr[s.paymentTerm]||'#475569'}">${s.paymentTerm}</span>
+          <div class="n1"><span data-field="name" title="Click để sửa tên NCC">${has(s.name)?s.name:'(chưa đặt tên)'}</span>${s.active ? '' : '<span class="tag" style="background:#F1F5F9;color:#64748B;font-weight:600">Ngưng hợp tác</span>'}</div>
+          <div class="sup-meta">
+            <span title="Người liên hệ">👤 <span data-field="contact" title="Click để sửa người liên hệ">${has(s.contact)?s.contact:empty}</span></span>
+            <span title="Số điện thoại">📞 <span data-field="phone" title="Click để sửa SĐT">${has(s.phone)?s.phone:empty}</span></span>
+            <span title="Địa chỉ">📍 <span data-field="address" title="Click để sửa địa chỉ">${has(s.address)?s.address:empty}</span></span>
+          </div>
+          <div class="sup-tags">${cats}
+            <span class="tag" data-field="paymentTerm" title="Click để đổi điều khoản TT" style="background:${termClr[s.paymentTerm]||'#F1F5F9'}1f;color:${termClr[s.paymentTerm]||'#475569'};font-weight:700">${s.paymentTerm||'—'}</span>
           </div>
         </div>
         <div class="sup-stat">
-          <div class="rating-stars">${stars(s.rating)}</div>
-          <div class="v" style="margin-top:2px">${window.fmtShort(s.totalSpend)}</div>
+          <div class="rating-stars" style="margin-bottom:3px">${stars(s.rating)}</div>
+          <div class="v">${window.fmtShort(s.totalSpend)} ₫</div>
           <div class="s">${numPur} phiếu nhập</div>
-          ${s.debt > 0 ? `<div style="color:#DC2626;font-weight:700;font-size:12px;margin-top:2px">Nợ: ${window.fmtShort(s.debt)} ₫</div>` : `<div style="color:var(--ok);font-size:11.5px;margin-top:2px">✓ Đã thanh toán</div>`}
+          ${s.debt > 0 ? `<div style="color:#DC2626;font-weight:700;font-size:12px;margin-top:3px">Nợ: ${window.fmtShort(s.debt)} ₫</div>` : `<div style="color:var(--ok);font-size:11.5px;margin-top:3px">✓ Đã thanh toán</div>`}
         </div>
       </div>`;
     }).join('');
