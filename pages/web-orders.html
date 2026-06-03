@@ -1,0 +1,64 @@
+<!doctype html>
+<html lang="vi">
+<head>
+<meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Đơn từ web · Nông Sản Tuấn Tú</title>
+<link rel="stylesheet" href="../styles/tokens.css"><link rel="stylesheet" href="../styles/app.css">
+<style>
+  .wo-card{background:#fff;border:1px solid var(--line);border-radius:10px;padding:14px 16px;margin-bottom:12px}
+  .wo-card.pending{border-left:4px solid var(--gold)}
+  .wo-top{display:flex;align-items:flex-start;gap:12px;flex-wrap:wrap}
+  .wo-top .who{font-weight:800;color:var(--navy);font-size:15px}
+  .wo-top .meta{font-size:12.5px;color:var(--muted);margin-top:2px;line-height:1.5}
+  .wo-top .total{margin-left:auto;text-align:right;font-weight:800;color:var(--red);font-size:16px;white-space:nowrap}
+  .wo-items{margin-top:10px;border-top:1px dashed var(--line);padding-top:8px;font-size:13px}
+  .wo-items table{width:100%;border-collapse:collapse}
+  .wo-items td{padding:3px 6px;border-bottom:1px solid #F1F3F5}
+  .wo-items td.num{text-align:right;white-space:nowrap}
+  .wo-tags{margin-top:8px;display:flex;gap:6px;flex-wrap:wrap}
+  .wo-actions{margin-top:12px;display:flex;gap:8px;justify-content:flex-end}
+  .wo-empty{text-align:center;color:var(--muted);padding:48px 12px}
+  .pill{display:inline-block;font-size:11.5px;padding:2px 9px;border-radius:99px;background:#F1F3F5;color:var(--text)}
+  .pill.cod{background:#FEF3C7;color:#92400E}.pill.bank{background:#DBEAFE;color:#1E40AF}
+  .pill.recur{background:#DCFCE7;color:#166534}
+  .seg{display:inline-flex;border:1px solid var(--line);border-radius:8px;overflow:hidden}
+  .seg button{border:0;background:#fff;padding:7px 14px;font-size:13px;cursor:pointer;color:var(--muted)}
+  .seg button.active{background:var(--navy);color:#fff;font-weight:700}
+</style>
+</head>
+<body>
+<div class="app">
+  <aside class="sidebar"></aside>
+  <header class="topbar">
+    <div class="breadcrumb"></div><div class="top-spacer"></div>
+    <div class="search-global"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="7"/><path d="m21 21-4.3-4.3"/></svg><input placeholder="Tìm... (Ctrl+K)"></div>
+    <button class="icon-btn" title="Thông báo"><span style="font-size:18px">🔔</span><span class="dot"></span></button>
+    <button class="icon-btn" title="Hướng dẫn" onclick="window.location.href='docs.html'"><span style="font-size:18px">❓</span></button>
+  </header>
+  <main class="main">
+    <div style="display:flex;align-items:center;gap:12px;margin-bottom:14px">
+      <div>
+        <h1 style="margin:0;font-size:22px;color:var(--navy);font-weight:800">🛒 Đơn từ website</h1>
+        <div style="font-size:13px;color:var(--muted);margin-top:2px">Khách đặt trên nongsantuantuhanoi → duyệt để tạo Khách hàng + Đơn chính thức.</div>
+      </div>
+      <div style="flex:1"></div>
+      <div class="seg" id="woFilter">
+        <button data-st="pending" class="active">Chờ duyệt <span id="cPending"></span></button>
+        <button data-st="confirmed">Đã duyệt</button>
+        <button data-st="rejected">Từ chối</button>
+      </div>
+      <button class="btn btn-ghost" onclick="window.woReload()" title="Tải lại">↻</button>
+    </div>
+    <div id="woRoot"><div class="wo-empty">Đang tải đơn từ website…</div></div>
+  </main>
+</div>
+
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<script src="../scripts/supabase-config.js"></script>
+<script src="../scripts/supabase-client.js"></script>
+<script src="../scripts/shared.js"></script><script src="../scripts/store.js"></script>
+<script src="../scripts/auth.js"></script>
+<script>if(window.AUTH) window.AUTH.requireAuth();</script>
+<script src="../scripts/web-orders.js"></script>
+</body>
+</html>

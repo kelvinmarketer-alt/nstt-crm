@@ -549,6 +549,7 @@ window.NAV = [
   { section: 'Vận hành', items: [
     { id: 'dashboard',  label: 'Dashboard',   icon: '📊', href: 'dashboard.html' },
     { id: 'orders',     label: 'Đơn hàng',    icon: '📦', href: 'orders.html', badgeKey: 'orders' },
+    { id: 'web-orders', label: 'Đơn từ web',  icon: '🛒', href: 'web-orders.html', badgeKey: 'web-orders' },
     { id: 'quotes',     label: 'Báo giá',     icon: '📝', href: 'quotes.html' },
     { id: 'recurring',  label: 'Đơn định kỳ', icon: '🔁', href: 'recurring.html' },
     { id: 'customers',  label: 'Khách hàng',  icon: '👥', href: 'customers.html', badgeKey: 'customers' },
@@ -562,6 +563,7 @@ window.NAV = [
     { id: 'products',   label: 'Sản phẩm & Giá', icon: '🥬', href: 'products.html' },
     { id: 'inventory',  label: 'Kho / Tồn',   icon: '📥', href: 'inventory.html' },
     { id: 'suppliers',  label: 'Nhà cung cấp', icon: '🏭', href: 'suppliers.html' },
+    { id: 'procurement', label: 'Gom hàng → NCC', icon: '🧺', href: 'procurement.html' },
     { id: 'purchases',  label: 'Phiếu nhập',  icon: '📦', href: 'purchases.html' },
     { id: 'returns',    label: 'Trả hàng',    icon: '↩️', href: 'returns.html' },
   ]},
@@ -720,6 +722,28 @@ window.MD = {
   },
 };
 
+/* Badge "Đơn từ web" — đếm đơn web_orders status=pending, cập nhật mọi trang + realtime */
+window.refreshWebOrdersBadge = function () {
+  if (!window.SB) return;
+  const apply = (n) => {
+    window.__webOrdersPending = n || 0;
+    const a = document.querySelector('.sidebar .nav a[href="web-orders.html"]');
+    if (!a) return;
+    let b = a.querySelector('.badge-n');
+    if (n > 0) {
+      if (!b) { b = document.createElement('span'); b.className = 'badge-n'; a.appendChild(b); }
+      b.textContent = n;
+    } else if (b) { b.remove(); }
+  };
+  window.SB.from('web_orders').select('id', { count: 'exact', head: true }).eq('status', 'pending')
+    .then(({ count }) => apply(count || 0)).catch(() => {});
+  /* subscribe realtime 1 lần — có đơn web mới → đếm lại + nháy badge */
+  if (!window.__webOrdersSub && window.SB_DATA) {
+    window.__webOrdersSub = true;
+    window.SB_DATA.subscribe('web_orders', () => window.refreshWebOrdersBadge && window.refreshWebOrdersBadge());
+  }
+};
+
 /* Render sidebar — lọc menu theo permissions của user đang login */
 window.renderAppShell = function(activeId, breadcrumbText) {
   const sb = document.querySelector('.sidebar');
@@ -735,6 +759,10 @@ window.renderAppShell = function(activeId, breadcrumbText) {
           }
           if (key === 'customers') {
             return (window.STORE.get('customers', []) || []).length || 0;
+          }
+          if (key === 'web-orders') {
+            /* số đơn web chờ duyệt — cập nhật bất đồng bộ qua refreshWebOrdersBadge */
+            return window.__webOrdersPending || 0;
           }
           if (key === 'debt') {
             const cs = window.STORE.get('customers', []) || [];
@@ -822,6 +850,9 @@ window.renderAppShell = function(activeId, breadcrumbText) {
 
   /* Wire chuông 🔔 thông báo */
   if (typeof window.setupNotifications === 'function') window.setupNotifications();
+
+  /* Badge "Đơn từ web" — đếm đơn web chờ duyệt (mọi trang đều hiện) */
+  if (typeof window.refreshWebOrdersBadge === 'function') window.refreshWebOrdersBadge();
 };
 
 /* ============ NOTIFICATIONS (dropdown chuông — nhóm theo loại) ============ */

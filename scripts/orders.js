@@ -499,6 +499,15 @@
     document.getElementById('iStaff').textContent = o.staff;
     document.getElementById('iDate').textContent  = o.date;
     document.getElementById('iGoods').textContent = `${o.qty} ${o.unit.toLowerCase()} · ${o.goods}` + (o.weight ? ' · ' + o.weight + ' kg' : '');
+    const shipEl = document.getElementById('iShip');
+    if (shipEl) {
+      const parts = [];
+      if (o.deliverDate) parts.push('📅 ' + o.deliverDate);
+      if (o.shipShift) parts.push('ca ' + o.shipShift);
+      if (o.shipTime) parts.push(o.shipTime);
+      const whLabel = { gathering:'· đang gom hàng', confirmed:'· đã chốt hàng', released:'· đã xuất kho' }[o.whStatus] || '';
+      shipEl.textContent = (parts.join(' · ') || '—') + (whLabel ? ' ' + whLabel : '');
+    }
     document.getElementById('iPickup').textContent = o.pickup;
     document.getElementById('iDrop').textContent   = o.drop;
     document.getElementById('iPayBy').textContent  = o.payBy;
@@ -667,6 +676,16 @@
         <div><label>Hình thức giao</label>
           <select id="oMode">${tmOpts}</select></div>
         <div><label>🎯 Giao đến (địa chỉ KH)</label><input id="oDrop" placeholder="Tự lấy theo KH — sửa nếu cần"></div>
+      </div>
+      <!-- ====== YÊU CẦU GIAO CỦA KHÁCH (ngày + ca + giờ) ====== -->
+      <div class="form-row">
+        <div><label>📅 Ngày giao ${window.helpTip ? window.helpTip('Ngày KH muốn nhận hàng — Kho gom đơn + đặt NCC theo ngày này.') : ''}</label><input id="oDeliverDate" type="date" value="${(window.todayDate?window.todayDate():new Date()).toISOString().slice(0,10)}"></div>
+        <div><label>🕐 Ca giao</label>
+          <select id="oShipShift"><option value="">— chọn ca —</option><option value="Sáng">Sáng</option><option value="Trưa">Trưa</option><option value="Chiều">Chiều</option><option value="Tối">Tối</option></select></div>
+      </div>
+      <div class="form-row">
+        <div><label>⏰ Giờ giao yêu cầu</label><input id="oShipTime" placeholder="VD: trước 6h sáng, 14h-15h..."></div>
+        <div></div>
       </div>
       <!-- ====== MẶT HÀNG (đơn giá tự lấy theo bảng giá hôm nay) ====== -->
       <div class="section-h" style="margin:14px 0 8px;display:flex;align-items:center;gap:8px">
@@ -1411,6 +1430,11 @@ CHỈ TRẢ JSON, không giải thích gì thêm.`;
     const newOrder = {
       code: window.formVal('#oCode'),
       date: new Date().toLocaleString('vi-VN'),
+      createdAt: new Date().toISOString(),   /* dùng cho phân bổ ưu tiên đơn đặt trước */
+      deliverDate: window.formVal('#oDeliverDate') || '',
+      shipShift: window.formVal('#oShipShift') || '',
+      shipTime: window.formVal('#oShipTime') || '',
+      whStatus: 'new',   /* trạng thái kho: new → gathering → confirmed → released */
       cust: custId,            /* legacy field — backward compat */
       custId: custId,          /* canonical field — dùng bởi modules mới */
       custName: cust ? cust.name : '—',

@@ -55,6 +55,9 @@
               driverName:'driver_name', returnReason:'return_reason', deliveryTime:'delivery_time',
               takenBy:'taken_by', deliveredAt:'delivered_at', shipperId:'shipper_id',
               note:'notes',
+              /* Quy trình Kho (SQL 19): ngày/ca/giờ giao + trạng thái kho + báo thiếu */
+              createdAt:'created_at', deliverDate:'deliver_date', shipShift:'ship_shift',
+              shipTime:'ship_time', whStatus:'wh_status', shortages:'shortages',
               /* drop field KHÔNG có cột trong DB orders */
               custId: null, custPhone: null,
               /* drop legacy VTY fields */
@@ -63,7 +66,8 @@
               transport_mode:'transportMode', pickup_addr:'pickup', drop_addr:'drop', pay_by:'payBy',
               driver_name:'driverName', return_reason:'returnReason', delivery_time:'deliveryTime',
               taken_by:'takenBy', delivered_at:'deliveredAt', shipper_id:'shipperId',
-              notes:'note' },
+              notes:'note', created_at:'createdAt', deliver_date:'deliverDate',
+              ship_shift:'shipShift', ship_time:'shipTime', wh_status:'whStatus', shortages:'shortages' },
     },
     invoices: {
       to:   { date:'invoice_date', desc:'description', vatRate:'vat_rate', paidDate:'paid_date',
