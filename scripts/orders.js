@@ -107,7 +107,13 @@
             <div style="font-size:11.5px;color:var(--muted)">${o.cust || ''} · <span data-field="staff" title="Click để đổi NV phụ trách">${o.staff || ''}</span></div>
           </td>
           <td class="hide-md" data-field="drop" title="Click để sửa địa chỉ giao" style="font-size:12px">${dropStr}</td>
-          <td class="hide-md" style="font-size:12px">${o.qty || 0} ${unitStr}${o.weight ? ' · '+o.weight+'kg' : ''}</td>
+          <td class="hide-md" style="font-size:12px" title="Tổng sản lượng các mặt hàng trong đơn">${(() => {
+              const its = Array.isArray(o.items) ? o.items : [];
+              const sumKg = its.reduce((s, it) => s + (+it.qty || 0), 0);
+              const nSku = its.length;
+              if (sumKg > 0) return `<b>${sumKg.toFixed(2).replace(/\.?0+$/, '')} kg</b>${nSku ? ` <span style="color:var(--muted)">· ${nSku} mã</span>` : ''}`;
+              return o.weight ? `${o.weight} kg` : `${o.qty || 0} ${unitStr}`;
+            })()}</td>
           <td class="num" data-field="freight" title="Click để sửa tiền hàng">${window.fmt(o.freight || 0)}</td>
           <td class="num hide-md" data-field="cod" title="Click để sửa COD">${o.cod ? window.fmt(o.cod) : '—'}</td>
           <td class="hide-md" style="font-size:12px">
