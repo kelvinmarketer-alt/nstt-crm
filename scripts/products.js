@@ -10,6 +10,43 @@
   let currentCat = null;          // lọc danh mục
   let boardDate = maxDate();      // ngày đang xem ở bảng giá
 
+  /* Lọc + sắp xếp cho bảng giá (board + marketing) */
+  let boardSearch = '', boardCat = '', boardSort = { col: '', dir: 1 };
+  const _norm = s => (s || '').toString().toLowerCase().normalize('NFD').replace(/[̀-ͯ]/g, '').replace(/đ/g, 'd');
+  function applyBoardFilter(list) {
+    let out = list.slice();
+    if (boardSearch) { const q = _norm(boardSearch); out = out.filter(p => _norm(p.name).includes(q)); }
+    if (boardCat) out = out.filter(p => p.cat === boardCat);
+    if (boardSort.col === 'name') out.sort((a, b) => (a.name || '').localeCompare(b.name || '', 'vi') * boardSort.dir);
+    else if (boardSort.col === 'cat') out.sort((a, b) => (catMeta(a.cat).label || '').localeCompare(catMeta(b.cat).label || '', 'vi') * boardSort.dir || (a.name || '').localeCompare(b.name || '', 'vi'));
+    return out;
+  }
+  const _sortArrow = col => boardSort.col === col ? (boardSort.dir > 0 ? ' ▲' : ' ▼') : ' ⇅';
+  window.boardSortBy = function (col) {
+    if (boardSort.col === col) boardSort.dir = -boardSort.dir; else { boardSort.col = col; boardSort.dir = 1; }
+    const v = document.getElementById('boardView');
+    if (v && v.style.display !== 'none') renderBoard(); else renderMkt();
+  };
+  function boardToolbarHTML() {
+    const opts = `<option value="">Tất cả nhóm</option>` + CATS.map(c => `<option value="${c.id}" ${boardCat === c.id ? 'selected' : ''}>${c.icon} ${c.label}</option>`).join('');
+    return `<div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap;margin-bottom:10px">
+        <input id="boardSearch" placeholder="🔍 Tìm tên sản phẩm..." value="${boardSearch.replace(/"/g, '&quot;')}" style="flex:1;min-width:200px;border:1px solid var(--line);border-radius:7px;padding:7px 11px;font-size:13px">
+        <select id="boardCatSel" style="border:1px solid var(--line);border-radius:7px;padding:7px 11px;font-size:13px">${opts}</select>
+        ${(boardSearch || boardCat || boardSort.col) ? `<button class="btn btn-ghost btn-sm" onclick="window.boardClearFilter()">✕ Xóa lọc</button>` : ''}
+      </div>`;
+  }
+  function wireBoardToolbar(rerender) {
+    const s = document.getElementById('boardSearch');
+    if (s) s.oninput = (e) => { boardSearch = e.target.value; const p = s.selectionStart; rerender(); const s2 = document.getElementById('boardSearch'); if (s2) { s2.focus(); try { s2.setSelectionRange(p, p); } catch (e) {} } };
+    const c = document.getElementById('boardCatSel');
+    if (c) c.onchange = (e) => { boardCat = e.target.value; rerender(); };
+  }
+  window.boardClearFilter = function () {
+    boardSearch = ''; boardCat = ''; boardSort = { col: '', dir: 1 };
+    const v = document.getElementById('boardView');
+    if (v && v.style.display !== 'none') renderBoard(); else renderMkt();
+  };
+
   function products() { return window.STORE.get('products', window.PRODUCTS || []); }
 
   function maxDate() {
@@ -44,7 +81,7 @@
   /* ============ BẢNG GIÁ HÔM NAY ============ */
   function renderBoard() {
     const ps = products();
-    const rows = ps.map(p => {
+    const rows = applyBoardFilter(ps).map(p => {
       const cat = catMeta(p.cat);
       const cur = entryExactlyOn(p, boardDate);
       const todaySell = cur ? cur.sell : (window.priceEntryOn(p, boardDate)?.sell ?? 0);
@@ -112,19 +149,23 @@
         </div>
       </div>
       <div class="chart-card">
+        ${boardToolbarHTML()}
         <table class="mini-table">
           <thead><tr>
-            <th>Sản phẩm</th><th>Nhóm</th><th>ĐVT</th>
+            <th onclick="window.boardSortBy('name')" style="cursor:pointer;user-select:none" title="Bấm để sắp xếp theo tên">Sản phẩm${_sortArrow('name')}</th>
+            <th onclick="window.boardSortBy('cat')" style="cursor:pointer;user-select:none" title="Bấm để sắp xếp theo nhóm">Nhóm${_sortArrow('cat')}</th><th>ĐVT</th>
             <th class="num">Giá bán hôm qua</th><th class="num">Giá bán ${fmtD(boardDate)}</th><th class="num">Thay đổi</th>
           </tr></thead>
-          <tbody>${rows}</tbody>
+          <tbody>${rows || '<tr><td colspan="6" style="text-align:center;color:var(--muted);padding:24px">Không có SP nào khớp bộ lọc</td></tr>'}</tbody>
         </table>
+        <div style="font-size:11.5px;color:var(--muted);margin-top:6px">Hiển thị ${applyBoardFilter(ps).length}/${ps.length} sản phẩm</div>
       </div>`;
 
     document.getElementById('boardDateInp').addEventListener('change', e => {
       boardDate = e.target.value || window.todayISO();
       renderBoard();
     });
+    wireBoardToolbar(renderBoard);
   }
 
   /* ============ BẢNG GIÁ MARKETING ============
@@ -150,7 +191,7 @@
     const ps = products();
     const c = mktCfg();
     const giaK = (c.offset || 0) / 1000;
-    const rows = ps.map(p => {
+    const rows = applyBoardFilter(ps).map(p => {
       const cat = catMeta(p.cat);
       const real = realPrice(p);
       const mkt = mktPriceOf(p, c);
@@ -207,13 +248,16 @@
       </div>
 
       <div class="chart-card">
+        ${boardToolbarHTML()}
         <table class="mini-table">
           <thead><tr>
-            <th>Sản phẩm</th><th>Nhóm</th><th>ĐVT</th>
+            <th onclick="window.boardSortBy('name')" style="cursor:pointer;user-select:none" title="Sắp xếp theo tên">Sản phẩm${_sortArrow('name')}</th>
+            <th onclick="window.boardSortBy('cat')" style="cursor:pointer;user-select:none" title="Sắp xếp theo nhóm">Nhóm${_sortArrow('cat')}</th><th>ĐVT</th>
             <th class="num">Giá bán thật</th><th class="num" style="background:#F5F3FF">Giá Marketing</th><th class="num">Chênh</th>
           </tr></thead>
-          <tbody>${rows}</tbody>
+          <tbody>${rows || '<tr><td colspan="6" style="text-align:center;color:var(--muted);padding:24px">Không có SP nào khớp bộ lọc</td></tr>'}</tbody>
         </table>
+        <div style="font-size:11.5px;color:var(--muted);margin-top:6px">Hiển thị ${applyBoardFilter(ps).length}/${ps.length} sản phẩm</div>
       </div>`;
 
     /* Wire sửa tay từng SP */
@@ -228,6 +272,7 @@
         renderMkt();
       });
     });
+    wireBoardToolbar(renderMkt);
   }
 
   window._mktQuick = function (giaNum) {
