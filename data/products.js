@@ -4,6 +4,12 @@
    ========================================================= */
 window.PRODUCT_CATEGORIES = [
   {
+    "id": "rau-cu",
+    "label": "Rau củ",
+    "icon": "🥕",
+    "color": "#CA8A04"
+  },
+  {
     "id": "rau-ta",
     "label": "Rau ta",
     "icon": "🥬",
@@ -38,6 +44,18 @@ window.PRODUCT_CATEGORIES = [
     "label": "Rau lá",
     "icon": "🥦",
     "color": "#65A30D"
+  },
+  {
+    "id": "hoa-qua",
+    "label": "Hoa quả",
+    "icon": "🍊",
+    "color": "#EA580C"
+  },
+  {
+    "id": "hoa-decor",
+    "label": "Hoa decor",
+    "icon": "🌸",
+    "color": "#DB2777"
   },
   {
     "id": "hang-khac",
