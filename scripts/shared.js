@@ -737,10 +737,61 @@ window.refreshWebOrdersBadge = function () {
   };
   window.SB.from('web_orders').select('id', { count: 'exact', head: true }).eq('status', 'pending')
     .then(({ count }) => apply(count || 0)).catch(() => {});
-  /* subscribe realtime 1 lần — có đơn web mới → đếm lại + nháy badge */
+  /* Báo Telegram đơn web mới (kênh 'web_order') */
+  window.notifyNewWebOrders && window.notifyNewWebOrders();
+  /* subscribe realtime 1 lần — có đơn web mới → đếm lại + nháy badge + báo TG */
   if (!window.__webOrdersSub && window.SB_DATA) {
     window.__webOrdersSub = true;
     window.SB_DATA.subscribe('web_orders', () => window.refreshWebOrdersBadge && window.refreshWebOrdersBadge());
+  }
+};
+
+/* === Báo Telegram khi có ĐƠN WEB mới (status=pending) ===
+   - Dedup per-device qua localStorage (nhiều tab không gửi trùng)
+   - Baseline lần đầu: đánh dấu đơn pending hiện có là "đã biết" → KHÔNG spam đơn cũ,
+     chỉ báo đơn đổ về SAU thời điểm này. */
+window.notifyNewWebOrders = async function () {
+  if (!window.SB || !window.sendTgMessage) return;
+  const KEY = 'nstt_weborder_notified';
+  const BASE = 'nstt_weborder_baseline';
+  let sent;
+  try { sent = new Set(JSON.parse(localStorage.getItem(KEY) || '[]')); } catch (e) { sent = new Set(); }
+  let resp;
+  try {
+    resp = await window.SB.from('web_orders')
+      .select('id,cust_name,cust_phone,cust_address,items,total,web_code')
+      .eq('status', 'pending').order('created_at', { ascending: false }).limit(50);
+  } catch (e) { return; }
+  const rows = (resp && resp.data) || [];
+  /* Baseline: lần chạy đầu trên máy này → ghi nhận hết, không gửi */
+  if (!localStorage.getItem(BASE)) {
+    rows.forEach(r => sent.add(r.id));
+    try { localStorage.setItem(KEY, JSON.stringify([...sent])); localStorage.setItem(BASE, '1'); } catch (e) {}
+    return;
+  }
+  const fresh = rows.filter(r => !sent.has(r.id));
+  if (!fresh.length) return;
+  /* chỉ gửi nếu đã cấu hình kênh 'web_order' */
+  if (!window.getTgChannel || !window.getTgChannel('web_order')) {
+    /* chưa cấu hình kênh → vẫn đánh dấu để khỏi dồn khi cấu hình sau */
+    fresh.forEach(r => sent.add(r.id));
+    try { localStorage.setItem(KEY, JSON.stringify([...sent])); } catch (e) {}
+    return;
+  }
+  const fmt = n => (+n || 0).toLocaleString('vi-VN');
+  for (const r of fresh) {
+    const items = Array.isArray(r.items) ? r.items : [];
+    const lines = items.map((it, i) => `${i + 1}. ${it.name} × ${it.qty}${it.unit || ''}`).join('\n');
+    const msg = `🛒 ĐƠN WEB MỚI${r.web_code ? ' — ' + r.web_code : ''}\n`
+      + `👤 ${r.cust_name || '—'} · ☎ ${r.cust_phone || '—'}\n`
+      + (r.cust_address ? `📍 ${r.cust_address}\n` : '')
+      + `─────────────\n${lines || '(không có chi tiết)'}\n─────────────\n`
+      + `💵 Tổng: ${fmt(r.total)} ₫\n\n👉 Vào CRM → "Đơn từ web" để DUYỆT.`;
+    const res = await window.sendTgMessage('web_order', msg).catch(() => ({ ok: false }));
+    if (res && res.ok) {
+      sent.add(r.id);
+      try { localStorage.setItem(KEY, JSON.stringify([...sent])); } catch (e) {}
+    }
   }
 };
 
@@ -1549,6 +1600,7 @@ document.head.appendChild(_styleEl);
 window.TG_PURPOSES = [
   { id: 'daily_report',     icon: '📊', label: 'Báo cáo ngày', desc: 'Gửi tổng kết cuối ngày cho cấp trên' },
   { id: 'shipper_dispatch', icon: '🚚', label: 'Phân đơn cho Shipper', desc: 'Gửi đơn hàng + lịch ship vào group shipper' },
+  { id: 'web_order',        icon: '🛒', label: 'Đơn web mới', desc: 'Báo ngay khi có đơn từ website đổ về (chờ duyệt)' },
   { id: 'bao_hang',         icon: '📋', label: 'Phiếu báo hàng', desc: 'Gửi danh sách báo hàng vào group kho/bếp ngay khi sale lên đơn' },
   { id: 'price_update',     icon: '💰', label: 'Cập nhật bảng giá', desc: 'Gửi bảng giá ngày cho group khách hàng' },
   { id: 'alert',            icon: '⚠️', label: 'Cảnh báo nội bộ', desc: 'Đơn quá hạn, công nợ quá hạn, KH bỏ đặt...' },

@@ -203,7 +203,7 @@
         <div style="grid-column:span 2"><label style="font-size:12px;color:var(--muted)">Địa chỉ</label><input id="sf_addr" value="${s.address}" style="width:100%;border:1px solid var(--line);border-radius:6px;padding:7px;font-size:13px"></div>
         <div><label style="font-size:12px;color:var(--muted)">Điều khoản TT ${window.helpTip('COD=trả ngay · NET 7/14/30 = trả trong 7/14/30 ngày sau nhận hàng.')}</label><select id="sf_term" style="width:100%;border:1px solid var(--line);border-radius:6px;padding:7px;font-size:13px"><option ${s.paymentTerm==='COD'?'selected':''}>COD</option><option ${s.paymentTerm==='NET 7'?'selected':''}>NET 7</option><option ${s.paymentTerm==='NET 14'?'selected':''}>NET 14</option><option ${s.paymentTerm==='NET 30'?'selected':''}>NET 30</option></select></div>
         <div><label style="font-size:12px;color:var(--muted)">Đánh giá (1-5)</label><input id="sf_rating" type="number" step="0.1" min="1" max="5" value="${s.rating}" style="width:100%;border:1px solid var(--line);border-radius:6px;padding:7px;font-size:13px"></div>
-        <div style="grid-column:span 2"><label style="font-size:12px;color:var(--muted)">Sản phẩm cung cấp ${window.helpTip('Mỗi NCC cung cấp các SẢN PHẨM cụ thể (không phải nhóm hàng). Tick SP + nhập giá nhập riêng nếu muốn.')}</label>
+        <div style="grid-column:span 2"><label style="font-size:12px;color:var(--muted)">Sản phẩm cung cấp <span style="color:var(--navy);font-weight:600">(${prods.length} SP từ "Sản phẩm &amp; Giá")</span> ${window.helpTip('Danh sách này LẤY TRỰC TIẾP từ module Sản phẩm & Giá. Thêm/bớt SP ở đó thì danh sách này tự cập nhật. Tick SP + nhập giá nhập riêng nếu muốn.')}</label>
           <input id="sf_prodSearch" placeholder="🔍 Gõ tên SP để lọc nhanh..." oninput="window._supFilterProds(this.value)" style="width:100%;border:1px solid var(--line);border-radius:6px;padding:7px;font-size:13px;margin-top:4px">
           <div id="sf_prodList" style="max-height:210px;overflow:auto;border:1px solid var(--line);border-radius:6px;margin-top:6px;padding:4px">
             ${prods.length ? prods.map(p => {
@@ -319,6 +319,10 @@
 
   ['supQ','supCat','supStatus'].forEach(id => document.getElementById(id).oninput = render);
   ['suppliers','purchases'].forEach(k => window.STORE.subscribe(k, render));
+  /* Preload SẢN PHẨM (cho bộ chọn SP trong form NCC) — lấy từ module Sản phẩm & Giá.
+     Gọi sớm để cloud sync xong trước khi user mở form. */
+  window.STORE.get('products', window.PRODUCTS || []);
+  window.STORE.subscribe('products', () => {});  /* giữ products cache cập nhật realtime */
   render();
 
   /* ============ BULK IMPORT NCC ============ */
