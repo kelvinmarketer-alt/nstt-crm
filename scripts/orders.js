@@ -428,6 +428,49 @@
   };
 
   /* === DRAWER === */
+  /* === Render tab "Hàng hóa" trong drawer: checklist + tổng SL gộp theo SP === */
+  function renderOrderGoodsTab(o) {
+    const host = document.getElementById('iItemsList');
+    if (!host) return;
+    const items = Array.isArray(o.items) ? o.items : [];
+    if (!items.length) {
+      host.innerHTML = '<div style="padding:18px;text-align:center;color:var(--muted);font-size:13px;background:#FAFAFB;border-radius:8px">Đơn này chưa có chi tiết mặt hàng.<br><span style="font-size:11.5px">' + (o.goods || '') + '</span></div>';
+      const c = document.getElementById('iGoodsCount'); if (c) c.textContent = '';
+      return;
+    }
+    /* Gộp các dòng cùng tên SP → tổng số lượng */
+    const norm = s => (s || '').toString().trim().toLowerCase();
+    const map = new Map();
+    items.forEach(it => {
+      const k = norm(it.name);
+      if (!map.has(k)) map.set(k, { name: it.name, qty: 0, unit: it.unit || 'kg', total: 0 });
+      const g = map.get(k);
+      g.qty += (+it.qty || 0);
+      g.total += (+it.total || 0);
+    });
+    const groups = [...map.values()];
+    const totalQty = groups.reduce((s, g) => s + g.qty, 0);
+    const totalAmt = groups.reduce((s, g) => s + g.total, 0);
+    const cnt = document.getElementById('iGoodsCount');
+    if (cnt) cnt.textContent = `· ${groups.length} mã · ${totalQty.toFixed(2).replace(/\.00$/,'')} kg`;
+    host.innerHTML = `
+      <div style="font-size:11.5px;color:var(--muted);margin-bottom:8px">✓ Tick để soạn hàng — số lượng đã <b>gộp theo từng sản phẩm</b>.</div>
+      <table class="mini-table" style="margin:0">
+        <thead><tr><th style="width:34px"></th><th style="width:38px" class="num">STT</th><th>Sản phẩm</th><th class="num">Số lượng</th></tr></thead>
+        <tbody>${groups.map((g, i) => `<tr>
+          <td class="num"><input type="checkbox" class="bh-check" style="width:16px;height:16px;cursor:pointer" onchange="this.closest('tr').style.opacity=this.checked?'0.5':'1';this.closest('tr').style.textDecoration=this.checked?'line-through':'none'"></td>
+          <td class="num" style="color:var(--muted);font-weight:600">${i + 1}</td>
+          <td><b>${g.name}</b></td>
+          <td class="num"><b style="color:var(--navy)">${g.qty.toFixed(2).replace(/\.00$/,'').replace(/(\.\d)0$/,'$1')}</b> <span style="font-size:11px;color:var(--muted)">${g.unit}</span></td>
+        </tr>`).join('')}</tbody>
+        <tfoot><tr style="background:#F0FDF4;border-top:2px solid #15803D">
+          <td></td><td colspan="2" style="padding:8px"><b style="color:#15803D">📊 Tổng cộng</b></td>
+          <td class="num"><b style="color:#15803D">${totalQty.toFixed(2).replace(/\.00$/,'')} kg</b></td>
+        </tr></tfoot>
+      </table>
+      <div style="text-align:right;font-size:12px;color:var(--muted);margin-top:6px">Thành tiền hàng: <b style="color:var(--red)">${window.fmt(totalAmt)} ₫</b></div>`;
+  }
+
   window.openOrder = function(code) {
     const o = orders.find(x => x.code === code);
     if (!o) return;
@@ -463,6 +506,8 @@
     document.getElementById('iNote').textContent   = o.note || '(không có)';
     document.getElementById('iDriver').innerHTML  = o.driverName + (o.external?' <span class="alert-badge warn" style="font-size:10px;margin-left:6px">🤝 Đối tác ngoài</span>':'');
     document.getElementById('iVehicle').textContent = o.vehicle;
+    /* === Tab Hàng hóa: checklist + tổng sản lượng từng SP === */
+    renderOrderGoodsTab(o);
     /* Hiển thị thêm thông tin chi phí đối tác trong tổng thu */
     if (o.external && o.partnerCost) {
       const total = o.freight + (o.cod||0);
@@ -705,7 +750,14 @@
         return s + (u === 'kg' || u === 'g' ? (+x.qty || 0) * (u === 'g' ? 0.001 : 1) : 0);
       }, 0);
       const totalQty = orderItems.reduce((s, x) => s + (+x.qty || 0), 0);
-      box.innerHTML = `<table class="mini-table" style="margin:0">
+      const nUnconf = orderItems.filter(x => x.priceConfirmed === false).length;
+      const bulkBar = `<div style="display:flex;align-items:center;gap:10px;padding:8px 10px;margin-bottom:6px;background:${nUnconf?'#FEF9C3':'#F0FDF4'};border:1px solid ${nUnconf?'#FDE68A':'#BBF7D0'};border-radius:8px;font-size:12.5px">
+          <label style="display:flex;align-items:center;gap:6px;cursor:pointer;font-weight:600;color:#15803D"><input type="checkbox" id="oiSelectAll" ${nUnconf===0?'checked':''} onchange="window.toggleAllPrices(this.checked)"> Chọn/bỏ tất cả</label>
+          <span style="color:var(--muted)">${nUnconf?('⚠ '+nUnconf+' mã chưa xác nhận giá'):('✓ Đã xác nhận hết '+orderItems.length+' mã')}</span>
+          <div style="flex:1"></div>
+          ${nUnconf?`<button type="button" class="btn btn-primary btn-sm" onclick="window.confirmAllPrices()">✓ Xác nhận tất cả giá (${nUnconf})</button>`:''}
+        </div>`;
+      box.innerHTML = bulkBar + `<table class="mini-table" style="margin:0">
         <thead><tr>
           <th style="width:40px" class="num">STT</th>
           <th>Sản phẩm</th>
@@ -818,6 +870,18 @@
 
   window.removeOrderItem = function (i) {
     orderItems.splice(i, 1);
+    renderOrderItems();
+  };
+
+  /* Xác nhận giá hàng loạt — tick hết các mã còn '!' */
+  window.confirmAllPrices = function () {
+    orderItems.forEach(it => { it.priceConfirmed = true; });
+    renderOrderItems();
+    window.toast?.('✓ Đã xác nhận giá cho ' + orderItems.length + ' mã', 'success');
+  };
+  /* Chọn/bỏ tất cả từ ô check header */
+  window.toggleAllPrices = function (on) {
+    orderItems.forEach(it => { it.priceConfirmed = !!on; });
     renderOrderItems();
   };
 
@@ -1374,6 +1438,12 @@ CHỈ TRẢ JSON, không giải thích gì thêm.`;
     window.closeModal();
     const profitMsg = external ? ` · LN ${window.fmtShort(freight - partnerCost)}₫` : '';
     window.toast('✓ Đã tạo ' + newOrder.code + profitMsg, 'success');
+    /* Auto-gửi PHIẾU BÁO HÀNG vào group kho/bếp (chỉ khi đã cấu hình kênh 'bao_hang') */
+    if (window.sendBaoHangTelegram) {
+      window.sendBaoHangTelegram(newOrder.code, true).then(r => {
+        if (r && r.ok) window.toast?.('📋 Đã gửi phiếu báo hàng vào "' + r.channel + '"', 'success');
+      }).catch(() => {});
+    }
   };
 
   /* === Auto-open create modal if ?createFor=KH00X === */

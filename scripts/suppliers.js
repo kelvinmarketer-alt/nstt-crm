@@ -52,7 +52,11 @@
     const pur = getPur();
     host.innerHTML = rows.map(s => {
       const numPur = pur.filter(p => p.supplierId === s.id).length;
-      const cats = (s.category||[]).map(c => `<span class="tag" style="background:#F0FDF4;color:#15803D">${CATS[c]||c}</span>`).join(' ');
+      /* Hiển thị SẢN PHẨM cung cấp (ưu tiên) — fallback nhóm hàng cũ */
+      const prodList = Array.isArray(s.products) ? s.products : [];
+      const cats = prodList.length
+        ? prodList.slice(0, 3).map(p => `<span class="tag" style="background:#F0FDF4;color:#15803D">${p.name}</span>`).join(' ') + (prodList.length > 3 ? ` <span class="tag" style="background:#F1F5F9;color:#64748B">+${prodList.length - 3} SP</span>` : '')
+        : (s.category||[]).map(c => `<span class="tag" style="background:#F0FDF4;color:#15803D">${CATS[c]||c}</span>`).join(' ');
       const termClr = { 'COD':'#16A34A', 'NET 7':'#0EA5E9', 'NET 14':'#A16207', 'NET 30':'#DC2626' };
       const empty = '<span style="color:var(--muted);opacity:.55;font-style:italic">chưa có</span>';
       const has = v => v && String(v).trim() && String(v).trim().toLowerCase() !== 'null';
@@ -143,10 +147,17 @@
         <h3 style="margin:14px 0 8px;font-size:12px;color:var(--muted);text-transform:uppercase;letter-spacing:0.5px">📋 Thông tin chi tiết</h3>
         <div style="background:#FAFBFC;padding:12px;border-radius:8px;font-size:13px;line-height:1.7">
           <div><b>Địa chỉ:</b> ${s.address}</div>
-          <div><b>Nhóm hàng:</b> ${(s.category||[]).map(c => CATS[c]||c).join(', ')}</div>
           <div><b>Điều khoản TT:</b> <span class="tag" style="background:#DBEAFE;color:#1E40AF">${s.paymentTerm}</span> ${window.helpTip('COD = trả ngay khi nhận hàng. NET X = thanh toán trong X ngày.')}</div>
           <div><b>Đánh giá:</b> <span class="rating-stars">${stars(s.rating)}</span> ${s.rating}/5</div>
           <div><b>Ghi chú:</b> ${s.note || '—'}</div>
+        </div>
+
+        <h3 style="margin:18px 0 8px;font-size:12px;color:var(--muted);text-transform:uppercase;letter-spacing:0.5px">🥬 Sản phẩm cung cấp (${(s.products||[]).length})</h3>
+        <div style="background:#FAFBFC;border-radius:8px;overflow:hidden">
+          ${(s.products||[]).length ? (s.products||[]).map(p => `<div style="display:flex;align-items:center;gap:10px;padding:9px 12px;border-bottom:1px solid #F1F5F9;font-size:12.5px">
+            <span style="flex:1"><b>${p.name}</b></span>
+            <span style="color:${p.price?'var(--navy)':'var(--muted)'};font-weight:${p.price?'700':'400'}">${p.price?window.fmt(p.price)+' ₫':'— chưa có giá nhập'}</span>
+          </div>`).join('') : '<div style="padding:14px;text-align:center;color:var(--muted);font-size:12px">Chưa gán sản phẩm — bấm "✏️ Sửa NCC" để chọn SP cung cấp</div>'}
         </div>
 
         <h3 style="margin:18px 0 8px;font-size:12px;color:var(--muted);text-transform:uppercase;letter-spacing:0.5px">📦 Lịch sử nhập hàng (${pur.length})</h3>
@@ -177,6 +188,9 @@
     const s = id ? getSup().find(x => x.id === id) : { id:'NCC' + String(getSup().length+1).padStart(3,'0'),
       name:'', contact:'', phone:'', address:'', category:[], paymentTerm:'COD', debt:0, totalSpend:0, rating:4.5, note:'', active:true };
     const isEdit = !!id;
+    const prods = window.STORE.get('products', window.PRODUCTS || []) || [];
+    const esc = v => String(v == null ? '' : v).replace(/"/g, '&quot;');
+    const normN = v => String(v || '').toLowerCase();
     window.openModal((isEdit?'✏️ Sửa':'+ Thêm') + ' Nhà cung cấp', `
       <div style="background:#EFF6FF;color:#1E40AF;padding:9px 12px;border-radius:7px;font-size:12px;margin-bottom:12px">
         💡 NCC là đối tác cung cấp đầu vào (rau/nấm/hải sản...). Sau khi tạo, vào tab "Phiếu nhập" để ghi nhận từng đợt lấy hàng.
@@ -189,10 +203,19 @@
         <div style="grid-column:span 2"><label style="font-size:12px;color:var(--muted)">Địa chỉ</label><input id="sf_addr" value="${s.address}" style="width:100%;border:1px solid var(--line);border-radius:6px;padding:7px;font-size:13px"></div>
         <div><label style="font-size:12px;color:var(--muted)">Điều khoản TT ${window.helpTip('COD=trả ngay · NET 7/14/30 = trả trong 7/14/30 ngày sau nhận hàng.')}</label><select id="sf_term" style="width:100%;border:1px solid var(--line);border-radius:6px;padding:7px;font-size:13px"><option ${s.paymentTerm==='COD'?'selected':''}>COD</option><option ${s.paymentTerm==='NET 7'?'selected':''}>NET 7</option><option ${s.paymentTerm==='NET 14'?'selected':''}>NET 14</option><option ${s.paymentTerm==='NET 30'?'selected':''}>NET 30</option></select></div>
         <div><label style="font-size:12px;color:var(--muted)">Đánh giá (1-5)</label><input id="sf_rating" type="number" step="0.1" min="1" max="5" value="${s.rating}" style="width:100%;border:1px solid var(--line);border-radius:6px;padding:7px;font-size:13px"></div>
-        <div style="grid-column:span 2"><label style="font-size:12px;color:var(--muted)">Nhóm hàng (chọn nhiều)</label>
-          <div style="display:flex;flex-wrap:wrap;gap:6px;margin-top:4px">
-            ${Object.keys(CATS).map(c => `<label style="display:flex;align-items:center;gap:4px;font-size:12px;cursor:pointer"><input type="checkbox" data-cat="${c}" ${(s.category||[]).includes(c)?'checked':''}> ${CATS[c]}</label>`).join('')}
+        <div style="grid-column:span 2"><label style="font-size:12px;color:var(--muted)">Sản phẩm cung cấp ${window.helpTip('Mỗi NCC cung cấp các SẢN PHẨM cụ thể (không phải nhóm hàng). Tick SP + nhập giá nhập riêng nếu muốn.')}</label>
+          <input id="sf_prodSearch" placeholder="🔍 Gõ tên SP để lọc nhanh..." oninput="window._supFilterProds(this.value)" style="width:100%;border:1px solid var(--line);border-radius:6px;padding:7px;font-size:13px;margin-top:4px">
+          <div id="sf_prodList" style="max-height:210px;overflow:auto;border:1px solid var(--line);border-radius:6px;margin-top:6px;padding:4px">
+            ${prods.length ? prods.map(p => {
+              const sel = (s.products || []).find(x => x.id === p.id);
+              return `<label class="sf-prow" data-name="${esc(normN(p.name))}" style="display:flex;align-items:center;gap:8px;padding:5px 6px;border-radius:5px;font-size:12.5px;cursor:pointer">
+                <input type="checkbox" data-prod="${p.id}" data-pname="${esc(p.name)}" ${sel?'checked':''}>
+                <span style="flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${p.name} <span style="color:var(--muted);font-size:11px">/${p.unit||'kg'}</span></span>
+                <input type="number" min="0" step="100" data-pprice="${p.id}" value="${sel&&sel.price?sel.price:''}" placeholder="giá nhập" onclick="event.stopPropagation()" style="width:96px;text-align:right;border:1px solid var(--line);border-radius:5px;padding:3px 6px;font-size:12px">
+              </label>`;
+            }).join('') : '<div style="padding:12px;text-align:center;color:var(--muted);font-size:12px">Chưa có sản phẩm nào trong danh mục. Vào "Sản phẩm & Giá" để thêm.</div>'}
           </div>
+          <div style="font-size:11px;color:var(--muted);margin-top:3px">Tick SP mà NCC này cung cấp · nhập <b>giá nhập riêng</b> từng SP nếu có. <span id="sf_prodCount"></span></div>
         </div>
         <div style="grid-column:span 2"><label style="font-size:12px;color:var(--muted)">Ghi chú</label><textarea id="sf_note" rows="2" style="width:100%;border:1px solid var(--line);border-radius:6px;padding:7px;font-size:13px">${s.note||''}</textarea></div>
         <div style="grid-column:span 2"><label style="display:flex;align-items:center;gap:6px;font-size:13px"><input type="checkbox" id="sf_active" ${s.active?'checked':''}> Đang hợp tác</label></div>
@@ -200,19 +223,32 @@
     `, {
       footer:`<button class="btn btn-ghost" onclick="window.closeModal()">Hủy</button>
               <button class="btn btn-primary" onclick="window._supSave(${isEdit?'true':'false'})">${isEdit?'Lưu':'Thêm NCC'}</button>`,
-      width:'520px'
+      width:'640px'
+    });
+  };
+
+  /* Lọc nhanh danh sách SP trong form NCC */
+  window._supFilterProds = function (q) {
+    const nq = (q || '').toLowerCase().trim();
+    document.querySelectorAll('#sf_prodList .sf-prow').forEach(row => {
+      row.style.display = (!nq || (row.dataset.name || '').includes(nq)) ? '' : 'none';
     });
   };
 
   window._supSave = function (isEdit) {
-    const cats = [...document.querySelectorAll('[data-cat]:checked')].map(x => x.dataset.cat);
+    /* Đọc sản phẩm NCC cung cấp + giá nhập riêng từng SP */
+    const products = [...document.querySelectorAll('#sf_prodList input[data-prod]:checked')].map(cb => {
+      const pid = cb.dataset.prod;
+      const priceEl = document.querySelector('#sf_prodList [data-pprice="' + pid + '"]');
+      return { id: pid, name: cb.dataset.pname, price: +(priceEl && priceEl.value) || 0 };
+    });
     const obj = {
       id: document.getElementById('sf_id').value,
       name: document.getElementById('sf_name').value.trim(),
       contact: document.getElementById('sf_contact').value.trim(),
       phone: document.getElementById('sf_phone').value.trim(),
       address: document.getElementById('sf_addr').value.trim(),
-      category: cats,
+      products: products,
       paymentTerm: document.getElementById('sf_term').value,
       rating: parseFloat(document.getElementById('sf_rating').value) || 5,
       note: document.getElementById('sf_note').value,

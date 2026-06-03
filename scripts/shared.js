@@ -1518,6 +1518,7 @@ document.head.appendChild(_styleEl);
 window.TG_PURPOSES = [
   { id: 'daily_report',     icon: '📊', label: 'Báo cáo ngày', desc: 'Gửi tổng kết cuối ngày cho cấp trên' },
   { id: 'shipper_dispatch', icon: '🚚', label: 'Phân đơn cho Shipper', desc: 'Gửi đơn hàng + lịch ship vào group shipper' },
+  { id: 'bao_hang',         icon: '📋', label: 'Phiếu báo hàng', desc: 'Gửi danh sách báo hàng vào group kho/bếp ngay khi sale lên đơn' },
   { id: 'price_update',     icon: '💰', label: 'Cập nhật bảng giá', desc: 'Gửi bảng giá ngày cho group khách hàng' },
   { id: 'alert',            icon: '⚠️', label: 'Cảnh báo nội bộ', desc: 'Đơn quá hạn, công nợ quá hạn, KH bỏ đặt...' },
 ];

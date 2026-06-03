@@ -185,6 +185,7 @@
 
   <div class="tabs">
     <div class="tab active" data-tab="info">📋 Thông tin</div>
+    <div class="tab" data-tab="goods">🥬 Hàng hóa</div>
     <div class="tab" data-tab="timeline">⏱ Trạng thái</div>
     <div class="tab" data-tab="vehicle">🚚 Shipper / Xe</div>
     <div class="tab" data-tab="actions">⚡ Hành động</div>
@@ -213,6 +214,14 @@
       </div>
       <div class="section-h">Ghi chú</div>
       <div style="font-size:13px;color:var(--text);padding:8px 12px;background:#FAFAFB;border-radius:7px" id="iNote">—</div>
+    </div>
+
+    <div class="tab-pane" data-pane="goods">
+      <div class="section-h" style="display:flex;align-items:center;gap:8px">🥬 Danh sách hàng hóa <span id="iGoodsCount" style="font-weight:400;color:var(--muted);font-size:12px"></span>
+        <div style="flex:1"></div>
+        <button class="btn btn-ghost btn-sm" onclick="window.printBaoHang && window.printBaoHang(window._currentOrderCode)" title="Xuất phiếu báo hàng theo mẫu">📋 Phiếu báo hàng</button>
+      </div>
+      <div id="iItemsList"></div>
     </div>
 
     <div class="tab-pane" data-pane="timeline">
@@ -247,6 +256,8 @@
       <div style="display:flex;flex-direction:column;gap:8px">
         <button class="btn btn-primary" onclick="window.printOrder && window.printOrder(window._currentOrderCode)">🖨 In phiếu xác nhận / giao / xuất kho</button>
         <button class="btn btn-navy" onclick="window.openInvoiceFromOrder && window.openInvoiceFromOrder(window._currentOrderCode)">🧾 Tạo Hóa đơn từ đơn này</button>
+        <button class="btn btn-navy" onclick="window.printBaoHang && window.printBaoHang(window._currentOrderCode)">📋 In phiếu báo hàng (PDF/HTML)</button>
+        <button class="btn btn-ghost" onclick="window.sendBaoHangTelegram && window.sendBaoHangTelegram(window._currentOrderCode)">📋 Gửi phiếu báo hàng vào group kho/bếp</button>
         <button class="btn btn-ghost" onclick="window.sendOrderToShipper && window.sendOrderToShipper(window._currentOrderCode)">📤 Gửi đơn cho shipper qua Telegram</button>
         <button class="btn btn-ghost" onclick="window.copyOrderTrackingLink && window.copyOrderTrackingLink(window._currentOrderCode)">🔗 Sao chép link tracking</button>
       </div>
@@ -273,6 +284,7 @@
 
 <script src="../scripts/ai-fill.js"></script>
 <script src="../scripts/cust-preferences.js"></script>
+<script src="../scripts/bao-hang.js"></script>
 <script src="../scripts/orders.js"></script>
 <script src="../data/brand-logo.js"></script>
 <script src="../scripts/pdf-templates.js"></script>
