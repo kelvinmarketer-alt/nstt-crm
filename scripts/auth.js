@@ -230,6 +230,7 @@
   const PAGE_PERMS = {
     'dashboard.html':  'dashboard.view',
     'orders.html':     'orders.view',
+    'web-orders.html': 'orders.view',
     'customers.html':  'customers.view',
     'customers-360.html':'customers.view',
     'products.html':   'products.view',
