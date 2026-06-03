@@ -59,7 +59,7 @@
               createdAt:'created_at', deliverDate:'deliver_date', shipShift:'ship_shift',
               shipTime:'ship_time', whStatus:'wh_status', shortages:'shortages',
               /* drop field KHÔNG có cột trong DB orders */
-              custId: null, custPhone: null,
+              custId: null, custPhone: null, source: null,
               /* drop legacy VTY fields */
               driver: null, external: null, partner: null },
       from: { order_date:'date', cust_name:'custName', customer_id:'cust', service_type:'serviceType',

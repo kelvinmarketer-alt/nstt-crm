@@ -65,6 +65,10 @@
 
   function render() {
     orders = window.STORE.get('orders', window.ORDERS || []);
+    /* Migration 1 lần: đơn web cũ status 'new' → 'confirmed' (đồng nhất với đơn tự tạo) */
+    let _migrated = false;
+    orders.forEach(o => { if (o && o.status === 'new') { o.status = 'confirmed'; _migrated = true; } });
+    if (_migrated) window.STORE.set('orders', orders);
     const rows = orders.filter(match);
     document.getElementById('rowCount').textContent =
       `${rows.length} / ${orders.length} đơn`
@@ -82,17 +86,20 @@
 
     document.getElementById('tbody').innerHTML = rows.map(o => {
       try {
-        const st = STATUS[o.status] || {color:'#666', icon:'❓', label:o.status||'?'};
-        const svc = SVC[o.serviceType] || {icon:'❓', label:o.serviceType||'—', color:'#666'};
-        const tm = o.transportMode ? TM[o.transportMode] : null;
+        /* Chuẩn hoá status: đơn web cũ dùng 'new' → coi như 'confirmed' (Mới) */
+        const statusKey = STATUS[o.status] ? o.status : 'confirmed';
+        const st = STATUS[statusKey];
         const unitStr = (o.unit || 'kg').toLowerCase();
         const dropStr = (o.drop || '—').split(',').slice(0, 2).join(',');
+        /* Nguồn đơn: web (qua source HOẶC note 'Đơn từ web' — bền cả sau reload cloud) vs tự tạo */
+        const isWeb = o.source === 'web' || /Đơn từ web/i.test(o.note || '');
+        const src = isWeb ? { icon: '🛒', label: 'Đơn web', color: '#7C3AED' }
+                          : { icon: '✍️', label: 'Tự tạo', color: '#0EA5E9' };
         return `<tr data-code="${o.code}">
           <td onclick="event.stopPropagation()"><div class="checkbox" onclick="this.classList.toggle('on')"></div></td>
           <td><b style="color:var(--navy)">${o.code || '—'}</b>
               <div style="margin-top:2px">
-                <span class="svc-tag" style="background:${svc.color}20;color:${svc.color}">${svc.icon} ${svc.label}</span>
-                ${tm ? `<span class="tm-tag">${tm.icon} ${tm.label}</span>` : ''}
+                <span class="tag" style="background:${src.color}1a;color:${src.color};font-weight:600;font-size:10.5px">${src.icon} ${src.label}</span>
               </div></td>
           <td class="hide-sm" data-field="date" title="Click để sửa ngày đặt" style="font-size:12px;color:var(--muted)">${o.date || '—'}</td>
           <td>
@@ -108,10 +115,10 @@
             <div style="color:var(--muted);font-size:11px">${o.vehicle || ''}${o.external && o.partnerCost?' · '+window.fmtShort(o.partnerCost)+'đ':''}</div>
           </td>
           <td onclick="event.stopPropagation()">
-            <select class="status-select status-select-${o.status}" data-code="${o.code}" data-act="status"
+            <select class="status-select status-select-${statusKey}" data-code="${o.code}" data-act="status"
               title="Đổi trạng thái đơn"
               style="border:1px solid var(--line);border-radius:7px;padding:5px 8px;font-size:11.5px;font-weight:700;cursor:pointer;background:${st.color}15;color:${st.color};min-width:130px">
-              ${ALL_STATUSES.map(k => `<option value="${k}" ${o.status===k?'selected':''}>${STATUS[k].icon} ${STATUS[k].label}</option>`).join('')}
+              ${ALL_STATUSES.map(k => `<option value="${k}" ${statusKey===k?'selected':''}>${STATUS[k].icon} ${STATUS[k].label}</option>`).join('')}
             </select>
           </td>
           <td onclick="event.stopPropagation()">
@@ -1437,6 +1444,7 @@ CHỈ TRẢ JSON, không giải thích gì thêm.`;
       whStatus: 'new',   /* trạng thái kho: new → gathering → confirmed → released */
       cust: custId,            /* legacy field — backward compat */
       custId: custId,          /* canonical field — dùng bởi modules mới */
+      source: 'manual',        /* nguồn đơn: tự tạo (vs 'web') */
       custName: cust ? cust.name : '—',
       custPhone: cust ? cust.phone : '',
       serviceType: svcId,

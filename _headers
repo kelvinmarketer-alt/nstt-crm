@@ -20,12 +20,14 @@
 /index.html
   Cache-Control: public, max-age=300
 
-# === Static assets: aggressive cache (1 ngày) ===
+# === Code (JS/CSS): luôn revalidate qua etag ===
+# Trình duyệt hỏi server mỗi lần tải: file KHÔNG đổi → 304 (vài chục byte, rất nhẹ);
+# file ĐÃ đổi (deploy mới) → tải bản mới NGAY, nhân viên KHÔNG phải hard-refresh tay.
 /styles/*
-  Cache-Control: public, max-age=86400
+  Cache-Control: public, max-age=0, must-revalidate
 
 /scripts/*
-  Cache-Control: public, max-age=86400
+  Cache-Control: public, max-age=0, must-revalidate
 
 # Mock data + product images (3.8MB) — 7 ngày cache (rất ít đổi)
 /data/*

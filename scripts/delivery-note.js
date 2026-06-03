@@ -229,19 +229,24 @@ ${FAV ? `<link rel="icon" type="image/svg+xml" href="${FAV}">` : ''}
     <button class="btn-close" onclick="window.close()">✕ Đóng</button>
   </div>
 
-  <script>window.onload=function(){setTimeout(function(){try{window.focus();window.print()}catch(e){}},300)}<\/script>
+
 </body></html>`;
 
-    const w = window.open('', '_blank', 'width=900,height=1200');
-    if (!w) {
-      window.toast && window.toast('Trình duyệt chặn popup — cho phép popup rồi thử lại', 'warn');
-      return;
-    }
-    w.document.write(html);
-    w.document.close();
-    w.document.title = 'Phiếu xuất kho ' + o.code;
+    /* In qua iframe cùng origin — không cần cho phép popup */
+    const cleaned = html.replace(/<script>[\s\S]*?window\.print\(\)[\s\S]*?<\/script>/gi, '');
+    const old = document.getElementById('dnPrintFrame'); if (old) old.remove();
+    const f = document.createElement('iframe');
+    f.id = 'dnPrintFrame';
+    f.style.cssText = 'position:fixed;right:0;bottom:0;width:0;height:0;border:0;visibility:hidden';
+    document.body.appendChild(f);
+    const doc = f.contentWindow.document;
+    doc.open(); doc.write(cleaned); doc.close();
+    const fire = () => { try { f.contentWindow.focus(); f.contentWindow.print(); } catch (e) {} };
+    const imgs = [...doc.images];
+    if (imgs.length) { let left = imgs.filter(im => !im.complete).length; if (!left) setTimeout(fire, 250); else imgs.forEach(im => { if (!im.complete) { const d = () => { if (--left <= 0) setTimeout(fire, 150); }; im.onload = d; im.onerror = d; } }); }
+    else setTimeout(fire, 250);
     if (window.audit) window.audit.log('order.deliveryNote', 'Xuất phiếu kho ' + o.code + ' cho ' + (c.name || o.custName));
-    window.toast && window.toast('✓ Đã mở phiếu xuất kho ' + o.code + ' — Save as PDF để gửi KH', 'success');
+    window.toast && window.toast('🖨 Phiếu xuất kho ' + o.code + ' — bỏ tick "Headers and footers", Save as PDF', 'info');
   };
 
   /* === Mở rộng modal in của printOrder() để có 3 lựa chọn === */

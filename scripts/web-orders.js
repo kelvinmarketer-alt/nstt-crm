@@ -125,7 +125,8 @@
       qty: items.reduce((s, it) => s + (it.qty || 0), 0), weight: 0, unit: 'kg',
       freight: total, cod: ((r.payment || 'cod') === 'cod' ? total : 0),
       payBy: (PAY_LABEL[(r.payment || 'cod')] || r.payment || 'COD'),
-      external: false, status: 'new', staff: me,
+      external: false, status: 'confirmed', staff: me,
+      source: 'web', createdAt: new Date().toISOString(),
       note: 'Đơn từ web' + (r.web_code ? ' · ' + r.web_code : '') + (r.note ? ' · ' + r.note : ''),
       items,
     });
