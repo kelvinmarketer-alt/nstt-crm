@@ -207,10 +207,19 @@
     return m ? m[1] : null;
   }
 
+  /* Caller (store.js) truyền TÊN BẢNG DB (cash_entries), nhưng FIELD_MAP/DATE_FIELDS
+     key theo TÊN JS (cashEntries). Resolver snake_case → camelCase để tra đúng. */
+  function fmKey(table) {
+    if (FIELD_MAP[table] || DATE_FIELDS[table]) return table;
+    const camel = String(table).replace(/_([a-z])/g, (_, c) => c.toUpperCase());
+    return (FIELD_MAP[camel] || DATE_FIELDS[camel]) ? camel : table;
+  }
+
   function mapTo(table, obj) {
     if (!obj) return obj;
-    const m = FIELD_MAP[table]?.to || {};
-    const df = DATE_FIELDS[table] || {};
+    const key = fmKey(table);
+    const m = FIELD_MAP[key]?.to || {};
+    const df = DATE_FIELDS[key] || {};
     const result = {};
     for (const k of Object.keys(obj)) {
       /* Bỏ field nội bộ/transient (bắt đầu '_') — KHÔNG phải cột DB.
@@ -225,15 +234,16 @@
     }
     /* cash_entries.entry_date NOT NULL — phiếu quỹ tự tạo (hook đơn/ads/lương) thiếu ngày
        → mặc định HÔM NAY để không bị chặn khi sync. Phiếu có ngày hợp lệ KHÔNG bị đụng. */
-    if (table === 'cashEntries' && !result.entry_date) {
+    if (key === 'cashEntries' && !result.entry_date) {
       result.entry_date = new Date().toISOString().slice(0, 10);
     }
     return result;
   }
   function mapFrom(table, obj) {
     if (!obj) return obj;
-    const m = FIELD_MAP[table]?.from || {};
-    const df = DATE_FIELDS[table] || {};
+    const key = fmKey(table);
+    const m = FIELD_MAP[key]?.from || {};
+    const df = DATE_FIELDS[key] || {};
     /* Tên field JS đích của các cột chuẩn (vd contact_person→contact).
        Nếu DB có cột RÁC trùng tên đích (vd cột 'contact' null song song
        'contact_person') thì cột chuẩn PHẢI thắng — nếu không, cột rác null
