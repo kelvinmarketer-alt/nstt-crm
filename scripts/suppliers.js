@@ -208,10 +208,10 @@
           <div id="sf_prodList" style="max-height:210px;overflow:auto;border:1px solid var(--line);border-radius:6px;margin-top:6px;padding:4px">
             ${prods.length ? prods.map(p => {
               const sel = (s.products || []).find(x => x.id === p.id);
-              return `<label class="sf-prow" data-name="${esc(normN(p.name))}" style="display:flex;align-items:center;gap:8px;padding:5px 6px;border-radius:5px;font-size:12.5px;cursor:pointer">
+              return `<label class="sf-prow" data-name="${esc(normN(p.name))}">
                 <input type="checkbox" data-prod="${p.id}" data-pname="${esc(p.name)}" ${sel?'checked':''}>
-                <span style="flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${p.name} <span style="color:var(--muted);font-size:11px">/${p.unit||'kg'}</span></span>
-                <input type="number" min="0" step="100" data-pprice="${p.id}" value="${sel&&sel.price?sel.price:''}" placeholder="giá nhập" onclick="event.stopPropagation()" style="width:96px;text-align:right;border:1px solid var(--line);border-radius:5px;padding:3px 6px;font-size:12px">
+                <span>${p.name} <span style="color:var(--muted);font-size:11px">/${p.unit||'kg'}</span></span>
+                <input type="number" min="0" step="100" data-pprice="${p.id}" value="${sel&&sel.price?sel.price:''}" placeholder="giá nhập" onclick="event.stopPropagation()">
               </label>`;
             }).join('') : '<div style="padding:12px;text-align:center;color:var(--muted);font-size:12px">Chưa có sản phẩm nào trong danh mục. Vào "Sản phẩm & Giá" để thêm.</div>'}
           </div>

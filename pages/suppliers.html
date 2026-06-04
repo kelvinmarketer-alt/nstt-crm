@@ -23,6 +23,12 @@
   .sup-stat .v{font-weight:800;color:var(--navy);font-size:14px;font-variant-numeric:tabular-nums}
   .sup-stat .s{font-size:10.5px;color:var(--muted)}
   .rating-stars{color:#F59E0B;letter-spacing:1px}
+  #sf_prodList .sf-prow{display:flex;align-items:center;gap:8px;padding:5px 7px;border-radius:5px;font-size:12.5px;cursor:pointer;width:100%;box-sizing:border-box}
+  #sf_prodList .sf-prow:hover{background:#F0FDF4}
+  #sf_prodList .sf-prow + .sf-prow{border-top:1px solid #F1F5F9}
+  #sf_prodList .sf-prow input[type=number]{width:96px;flex:none;text-align:right;border:1px solid var(--line);border-radius:5px;padding:3px 6px;font-size:12px}
+  #sf_prodList .sf-prow input[type=checkbox]{flex:none;width:16px;height:16px}
+  #sf_prodList .sf-prow > span{flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
   .tabs2{display:flex;gap:6px;border-bottom:1px solid var(--line);margin-bottom:16px}
   .t2{padding:9px 18px;font-size:14px;font-weight:600;color:var(--muted);cursor:pointer;border-bottom:2px solid transparent;margin-bottom:-1px;display:flex;align-items:center;gap:7px}
   .t2.active{color:var(--navy);border-bottom-color:var(--navy)}
