@@ -230,11 +230,13 @@
   const PAGE_PERMS = {
     'dashboard.html':  'dashboard.view',
     'orders.html':     'orders.view',
+    'orders-hub.html': 'orders.view',
     'web-orders.html': 'orders.view',
     'customers.html':  'customers.view',
     'customers-360.html':'customers.view',
     'products.html':   'products.view',
     'shippers.html':   'shippers.view',
+    'finance.html':    'accounting.view',
     'accounting.html': 'accounting.view',
     'debt.html':       'debt.view',
     'invoices.html':   'invoices.view',

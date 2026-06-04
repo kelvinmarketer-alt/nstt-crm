@@ -554,7 +554,7 @@ window.attachBulkOps = function (opts) {
 window.NAV = [
   { section: 'Vận hành', items: [
     { id: 'dashboard',  label: 'Dashboard',   icon: '📊', href: 'dashboard.html' },
-    { id: 'orders',     label: 'Đơn hàng',    icon: '📦', href: 'orders-hub.html', badgeKey: 'orders' },
+    { id: 'orders',     label: 'Đơn hàng',    icon: '📦', href: 'orders.html', badgeKey: 'orders' },
     { id: 'customers',  label: 'Khách hàng',  icon: '👥', href: 'customers.html', badgeKey: 'customers' },
     /* Ẩn theo yêu cầu: Chân dung KH 360° + Lead/Tiềm năng
     { id: 'customers-360', label: 'Chân dung KH 360°', icon: '🔍', href: 'customers-360.html' },
