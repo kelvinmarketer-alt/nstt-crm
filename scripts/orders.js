@@ -251,10 +251,18 @@
   }
 
   /* Đổi sang trạng thái BẤT KỲ — gọi từ dropdown. Auto adjust doanh thu KH khi cần. */
-  function changeOrderStatus(code, newStatus) {
+  function changeOrderStatus(code, newStatus, skipDeliveryConfirm) {
     const o = orders.find(x => x.code === code);
     if (!o || !STATUS[newStatus] || o.status === newStatus) return;
     const oldStatus = o.status;
+
+    /* CỔNG XÁC NHẬN GIAO: không cho nhảy thẳng "Đã giao" — phải xác nhận đủ/trả/thiếu */
+    if (newStatus === 'delivered' && oldStatus !== 'delivered' && !skipDeliveryConfirm) {
+      const sel = document.querySelector(`#tbody select.status-select[data-code="${code}"]`);
+      if (sel) sel.value = oldStatus;   /* revert dropdown */
+      window.confirmDeliveryModal(code);
+      return;
+    }
 
     /* Confirm cho các trạng thái "kết thúc" hoặc bước nhảy lùi */
     const isFinal = TERMINAL_STATUSES.includes(newStatus);
@@ -316,6 +324,39 @@
   }
   /* Expose để dùng từ chỗ khác nếu cần */
   window.changeOrderStatus = changeOrderStatus;
+
+  /* ===== CỔNG XÁC NHẬN GIAO HÀNG ===== */
+  window.confirmDeliveryModal = function (code) {
+    const o = orders.find(x => x.code === code); if (!o) return;
+    window.openModal('🛵 Xác nhận giao hàng — ' + code, `
+      <div style="font-size:13px;color:#334155;margin-bottom:14px;line-height:1.6">
+        Shipper đã giao đơn <b>${code}</b> cho <b>${o.custName || ''}</b>.<br>Kết quả giao thực tế thế nào?
+      </div>
+      <div style="display:flex;flex-direction:column;gap:10px">
+        <button class="btn btn-primary" style="justify-content:flex-start;background:#15803D;border-color:#15803D" onclick="window._finalizeDelivery('${code}','success')">✅ Giao đủ — thành công</button>
+        <button class="btn btn-ghost" style="justify-content:flex-start;border-color:#F59E0B;color:#B45309" onclick="window._finalizeDelivery('${code}','return')">↩️ Khách trả lại hàng (hỏng / sai)</button>
+        <button class="btn btn-ghost" style="justify-content:flex-start;border-color:#DC2626;color:#B91C1C" onclick="window._finalizeDelivery('${code}','short')">⚠️ Giao thiếu hàng</button>
+      </div>
+      <div style="font-size:11.5px;color:var(--muted);margin-top:12px">Chọn "trả lại" hoặc "thiếu" → tự mở module Trả hàng để ghi nhận. Mọi kết quả đều gửi thông báo Telegram.</div>
+    `, { footer: `<button class="btn btn-ghost" onclick="window.closeModal()">Để sau</button>`, width: '460px' });
+  };
+
+  window._finalizeDelivery = function (code, outcome) {
+    if (window.closeModal) window.closeModal();
+    changeOrderStatus(code, 'delivered', true);   /* set Đã giao, bỏ qua cổng xác nhận */
+    const o = orders.find(x => x.code === code);
+    if (window.sendTgMessage && o) {
+      const base = `📦 ${code} · ${o.custName || ''}`;
+      if (outcome === 'success') window.sendTgMessage('alert', `✅ GIAO THÀNH CÔNG\n${base}`);
+      else if (outcome === 'return') window.sendTgMessage('alert', `↩️ KHÁCH TRẢ HÀNG\n${base}\n👉 Ghi nhận phiếu trả ở module Trả hàng.`);
+      else window.sendTgMessage('alert', `⚠️ GIAO THIẾU HÀNG\n${base}\n👉 Kiểm tra + ghi nhận ở Trả hàng.`);
+    }
+    if (outcome === 'success') { window.toast('✓ Đã xác nhận giao thành công ' + code, 'success'); return; }
+    /* trả / thiếu → sang module Trả hàng, prefill đơn */
+    try { localStorage.setItem('nstt_pending_return', code); } catch (e) {}
+    window.toast('Mở module Trả hàng để ghi nhận…', 'warn');
+    setTimeout(() => { window.location.href = 'returns.html?ret=' + encodeURIComponent(code); }, 600);
+  };
 
   /* === EXPORT CSV (mở bằng Excel) === */
   window.exportOrdersCsv = function () {

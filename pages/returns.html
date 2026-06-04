@@ -327,6 +327,19 @@
   renderRet();
   populatePODSelect();
   renderPodGallery();
+
+  /* Đến từ cổng "Xác nhận giao" (trả/thiếu) → tự mở phiếu trả + chọn sẵn đơn */
+  (function autoOpenReturn() {
+    let pre = new URLSearchParams(location.search).get('ret');
+    if (!pre) { try { pre = localStorage.getItem('nstt_pending_return'); } catch (e) {} }
+    if (!pre) return;
+    try { localStorage.removeItem('nstt_pending_return'); } catch (e) {}
+    setTimeout(() => {
+      window.openReturnModal();
+      const s = document.getElementById('rt_ord');
+      if (s) { s.value = pre; if (s.value === pre) window._rtOnOrder(); }
+    }, 450);
+  })();
 })();
 </script>
 <script src="../scripts/ai-fill.js"></script><script src="../scripts/cust-search-box.js"></script>
