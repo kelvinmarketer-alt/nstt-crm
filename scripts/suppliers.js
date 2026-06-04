@@ -170,7 +170,7 @@
 
         <div style="display:flex;gap:8px;margin-top:18px">
           <button class="btn btn-ghost" style="flex:1" onclick="window.openSupModal('${s.id}')">✏️ Sửa NCC</button>
-          <button class="btn btn-primary" style="flex:1" onclick="window.location.href='purchases.html?createForSup=${s.id}'">+ Tạo phiếu nhập</button>
+          <button class="btn btn-primary" style="flex:1" onclick="${window.openPurForSup ? `window.openPurForSup('${s.id}')` : `window.location.href='purchases.html?createForSup=${s.id}'`}">+ Tạo phiếu nhập</button>
         </div>
         ${s.debt > 0 ? `<button class="btn btn-ghost" style="width:100%;margin-top:8px;color:var(--ok)" onclick="window.paySupplier('${s.id}')">💰 Ghi thanh toán NCC ${window.helpTip('Mở phiếu chi để trả NCC này — số dư công nợ sẽ giảm tương ứng.')}</button>` : ''}
       </div>

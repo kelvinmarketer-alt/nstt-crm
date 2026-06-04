@@ -562,9 +562,8 @@ window.NAV = [
   { section: 'Kho & Mua hàng', items: [
     { id: 'products',   label: 'Sản phẩm & Giá', icon: '🥬', href: 'products.html' },
     { id: 'inventory',  label: 'Kho / Tồn',   icon: '📥', href: 'inventory.html' },
-    { id: 'suppliers',  label: 'Nhà cung cấp', icon: '🏭', href: 'suppliers.html' },
+    { id: 'suppliers',  label: 'NCC & Phiếu nhập', icon: '🏭', href: 'suppliers.html' },
     { id: 'procurement', label: 'Gom hàng → NCC', icon: '🧺', href: 'procurement.html' },
-    { id: 'purchases',  label: 'Phiếu nhập',  icon: '📦', href: 'purchases.html' },
     { id: 'returns',    label: 'Trả hàng',    icon: '↩️', href: 'returns.html' },
   ]},
   { section: 'Tài chính', items: [

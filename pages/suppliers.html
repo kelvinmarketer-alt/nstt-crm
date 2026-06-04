@@ -23,6 +23,20 @@
   .sup-stat .v{font-weight:800;color:var(--navy);font-size:14px;font-variant-numeric:tabular-nums}
   .sup-stat .s{font-size:10.5px;color:var(--muted)}
   .rating-stars{color:#F59E0B;letter-spacing:1px}
+  .tabs2{display:flex;gap:6px;border-bottom:1px solid var(--line);margin-bottom:16px}
+  .t2{padding:9px 18px;font-size:14px;font-weight:600;color:var(--muted);cursor:pointer;border-bottom:2px solid transparent;margin-bottom:-1px;display:flex;align-items:center;gap:7px}
+  .t2.active{color:var(--navy);border-bottom-color:var(--navy)}
+  .t2cnt{background:#E2E8F0;color:#475569;border-radius:99px;font-size:11px;font-weight:700;padding:1px 7px;min-width:18px;text-align:center}
+  .t2.active .t2cnt{background:var(--navy);color:#fff}
+  .pn-table{width:100%;border-collapse:collapse;font-size:13px}
+  .pn-table th{text-align:left;padding:10px 12px;background:#FAFBFC;font-size:11.5px;color:var(--muted);text-transform:uppercase;font-weight:700;border-bottom:1px solid var(--line)}
+  .pn-table td{padding:10px 12px;border-bottom:1px solid #F1F5F9}
+  .st-ordered{background:#FEF3C7;color:#92400E}
+  .st-received{background:#DCFCE7;color:#15803D}
+  .st-cancelled{background:#FEE2E2;color:#B91C1C}
+  .st-pill{padding:2px 8px;border-radius:99px;font-size:11px;font-weight:700}
+  .item-row{display:grid;grid-template-columns:2fr 70px 90px 110px 28px;gap:6px;margin-bottom:5px;align-items:center}
+  .item-row input,.item-row select{border:1px solid var(--line);border-radius:5px;padding:5px 7px;font-size:12px;width:100%}
 </style>
 </head>
 <body>
@@ -37,41 +51,80 @@
   </header>
 
   <main class="main">
-    <div style="display:flex;align-items:center;gap:12px;margin-bottom:14px">
-      <div>
-        <h1 style="margin:0;font-size:22px;color:var(--navy);font-weight:800">🏭 Nhà cung cấp <span id="hbTitle"></span></h1>
-        <div style="font-size:13px;color:var(--muted);margin-top:2px">Danh bạ NCC đầu vào — công nợ phải trả — lịch sử nhập hàng</div>
+    <div style="margin-bottom:12px">
+      <h1 style="margin:0;font-size:22px;color:var(--navy);font-weight:800">🏭 Nhà cung cấp &amp; Phiếu nhập <span id="hbTitle"></span></h1>
+      <div style="font-size:13px;color:var(--muted);margin-top:2px">Danh bạ NCC đầu vào · đơn nhập hàng · công nợ phải trả</div>
+    </div>
+
+    <div class="tabs2">
+      <div class="t2 active" data-t2="ncc" onclick="window.supTab('ncc')">🏭 Nhà cung cấp <span id="t2nccCount" class="t2cnt"></span></div>
+      <div class="t2" data-t2="pur" onclick="window.supTab('pur')">📦 Phiếu nhập <span id="t2purCount" class="t2cnt"></span></div>
+    </div>
+
+    <!-- ===== TAB NHÀ CUNG CẤP ===== -->
+    <div id="paneNcc">
+      <div style="display:flex;justify-content:flex-end;gap:8px;margin-bottom:12px;flex-wrap:wrap">
+        <button class="btn btn-ghost" onclick="window.exportSupCsv()">⬇ Xuất CSV</button>
+        <button class="btn btn-ghost" onclick="window.supImportExcel()" title="Import NCC hàng loạt từ Excel">📥 Excel</button>
+        <button class="btn btn-ghost" onclick="window.supImportAI()" title="Đọc ảnh AI: danh thiếp / list NCC">📷 Từ ảnh AI</button>
+        <button class="btn btn-primary" onclick="window.openSupModal()">+ Thêm NCC</button>
       </div>
-      <div style="flex:1"></div>
-      <button class="btn btn-ghost" onclick="window.exportSupCsv()">⬇ Xuất CSV</button>
-      <button class="btn btn-ghost" onclick="window.supImportExcel()" title="Import NCC hàng loạt từ Excel">📥 Excel</button>
-      <button class="btn btn-ghost" onclick="window.supImportAI()" title="Đọc ảnh AI: danh thiếp / list NCC">📷 Từ ảnh AI</button>
-      <button class="btn btn-primary" onclick="window.openSupModal()">+ Thêm NCC</button>
+      <div id="hbHost"></div>
+      <div style="display:grid;grid-template-columns:repeat(4,1fr);gap:10px;margin-bottom:14px" id="supKpis"></div>
+      <div style="display:flex;gap:10px;margin-bottom:10px;flex-wrap:wrap">
+        <input id="supQ" placeholder="🔍 Tìm NCC, liên hệ, SĐT..." style="flex:1;min-width:240px;border:1px solid var(--line);border-radius:7px;padding:7px 11px;font-size:13px">
+        <select id="supCat" style="border:1px solid var(--line);border-radius:7px;padding:7px 11px;font-size:13px">
+          <option value="">Tất cả nhóm hàng</option>
+          <option value="rau-cu">Rau củ</option>
+          <option value="rau-la">Rau lá</option>
+          <option value="rau-dalat">Rau Đà Lạt</option>
+          <option value="nam">Nấm</option>
+          <option value="rau-vung-mien">Rau vùng miền</option>
+          <option value="rau-gia-vi">Rau gia vị</option>
+          <option value="hoa-qua">Hoa quả</option>
+        </select>
+        <select id="supStatus" style="border:1px solid var(--line);border-radius:7px;padding:7px 11px;font-size:13px">
+          <option value="">Tất cả</option>
+          <option value="active">Đang hợp tác</option>
+          <option value="inactive">Ngưng</option>
+        </select>
+      </div>
+      <div id="supList"></div>
     </div>
 
-    <div id="hbHost"></div>
-
-    <div style="display:grid;grid-template-columns:repeat(4,1fr);gap:10px;margin-bottom:14px" id="supKpis"></div>
-
-    <div style="display:flex;gap:10px;margin-bottom:10px;flex-wrap:wrap">
-      <input id="supQ" placeholder="🔍 Tìm NCC, liên hệ, SĐT..." style="flex:1;min-width:240px;border:1px solid var(--line);border-radius:7px;padding:7px 11px;font-size:13px">
-      <select id="supCat" style="border:1px solid var(--line);border-radius:7px;padding:7px 11px;font-size:13px">
-        <option value="">Tất cả nhóm hàng</option>
-        <option value="rau-ta">Rau ta</option>
-        <option value="rau-dalat">Rau Đà Lạt</option>
-        <option value="nam">Nấm</option>
-        <option value="rau-vung-mien">Rau vùng miền</option>
-        <option value="rau-gia-vi">Rau gia vị</option>
-        <option value="hai-san">Hải sản</option>
-      </select>
-      <select id="supStatus" style="border:1px solid var(--line);border-radius:7px;padding:7px 11px;font-size:13px">
-        <option value="">Tất cả</option>
-        <option value="active">Đang hợp tác</option>
-        <option value="inactive">Ngưng</option>
-      </select>
+    <!-- ===== TAB PHIẾU NHẬP ===== -->
+    <div id="panePur" style="display:none">
+      <div style="background:#EFF6FF;color:#1E40AF;padding:9px 12px;border-radius:8px;font-size:12.5px;margin-bottom:12px">
+        💡 Quy trình: có đơn KH → bấm <b>Gom hàng → NCC</b> để gom, hoặc tạo phiếu nhập tay tại đây. Khi hàng về bấm <b>"✓ Nhận"</b> để cộng kho + ghi công nợ NCC. <b>Hạn chế tồn kho</b> — chỉ nhập đủ đơn.
+      </div>
+      <div style="display:flex;justify-content:flex-end;gap:8px;margin-bottom:12px;flex-wrap:wrap">
+        <button class="btn btn-ghost" onclick="window.exportPurCsv()">⬇ Xuất CSV</button>
+        <button class="btn btn-primary" onclick="window.openPurModal()">+ Tạo phiếu nhập</button>
+      </div>
+      <div style="display:grid;grid-template-columns:repeat(4,1fr);gap:10px;margin-bottom:14px" id="purKpis"></div>
+      <div style="display:flex;gap:10px;margin-bottom:10px;flex-wrap:wrap">
+        <input id="purQ" placeholder="🔍 Tìm mã phiếu, NCC..." style="flex:1;min-width:240px;border:1px solid var(--line);border-radius:7px;padding:7px 11px;font-size:13px">
+        <select id="purSt" style="border:1px solid var(--line);border-radius:7px;padding:7px 11px;font-size:13px">
+          <option value="">Tất cả trạng thái</option>
+          <option value="ordered">⏳ Đã đặt</option>
+          <option value="received">✓ Đã nhận</option>
+          <option value="cancelled">✕ Hủy</option>
+        </select>
+        <select id="purSup" style="border:1px solid var(--line);border-radius:7px;padding:7px 11px;font-size:13px"><option value="">Tất cả NCC</option></select>
+      </div>
+      <div style="background:#fff;border:1px solid var(--line);border-radius:10px;overflow:hidden">
+        <div style="overflow-x:auto">
+          <table class="pn-table">
+            <thead><tr>
+              <th>Mã phiếu</th><th>NCC</th><th>Ngày nhập</th><th>Mặt hàng</th>
+              <th class="num">Tổng tiền</th><th class="num">Đã trả</th><th class="num">Còn nợ</th>
+              <th>Trạng thái</th><th>Hành động</th>
+            </tr></thead>
+            <tbody id="purBody"></tbody>
+          </table>
+        </div>
+      </div>
     </div>
-
-    <div id="supList"></div>
 
   </main>
 </div>
@@ -93,16 +146,47 @@
 <script src="../scripts/onboarding.js"></script>
 <script src="../scripts/pdf-export.js"></script>
 <script>if(window.AUTH) window.AUTH.requireAuth();</script>
+<script>window.SUP_MERGED = true;</script>
+<script src="../data/products.js"></script>
 <script src="../data/suppliers.js"></script>
 <script src="../data/purchases.js"></script>
-<script src="../scripts/suppliers.js"></script>
-<script src="../scripts/ai-fill.js"></script>
-<script src="../scripts/cust-search-box.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
 <script src="../scripts/bulk-import.js"></script>
+<script src="../scripts/ai-fill.js"></script>
+<script src="../scripts/suppliers.js"></script>
+<script src="../scripts/purchases.js"></script>
+<script src="../scripts/cust-search-box.js"></script>
 <script src="../data/demo-seed.js"></script>
 <script src="../scripts/data-linkage.js"></script>
 <script src="../scripts/system-core.js"></script>
 <script src="../scripts/ai-chat.js"></script>
+<script>
+  /* Chuyển tab NCC ↔ Phiếu nhập */
+  window.supTab = function (which) {
+    document.querySelectorAll('.t2').forEach(t => t.classList.toggle('active', t.dataset.t2 === which));
+    document.getElementById('paneNcc').style.display = which === 'ncc' ? '' : 'none';
+    document.getElementById('panePur').style.display = which === 'pur' ? '' : 'none';
+  };
+  /* Cập nhật số đếm trên tab */
+  function _supTabCounts() {
+    try {
+      const nc = (window.STORE.get('suppliers', []) || []).length;
+      const pu = (window.STORE.get('purchases', []) || []).filter(p => p.status !== 'cancelled').length;
+      const a = document.getElementById('t2nccCount'); if (a) a.textContent = nc || '';
+      const b = document.getElementById('t2purCount'); if (b) b.textContent = pu || '';
+    } catch (e) {}
+  }
+  if (window.STORE) {
+    _supTabCounts();
+    window.STORE.subscribe('suppliers', _supTabCounts);
+    window.STORE.subscribe('purchases', _supTabCounts);
+  }
+  /* Mở tab Phiếu nhập + form tạo phiếu cho 1 NCC (gọi từ drawer NCC) */
+  window.openPurForSup = function (supId) {
+    window.supTab('pur');
+    if (typeof closeDrawer === 'function') closeDrawer();
+    setTimeout(() => window.openPurModal && window.openPurModal(supId), 60);
+  };
+</script>
 </body>
 </html>

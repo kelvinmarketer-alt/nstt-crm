@@ -217,7 +217,7 @@
       </div>
       <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:10px">
         <div><label style="font-size:12px;color:var(--muted)">Mã phiếu</label><input id="pn_id" value="${nextId}" style="width:100%;border:1px solid var(--line);border-radius:6px;padding:7px;font-size:13px;font-family:monospace"></div>
-        <div><label style="font-size:12px;color:var(--muted)">Ngày nhập</label><input id="pn_date" type="date" value="2026-05-18" style="width:100%;border:1px solid var(--line);border-radius:6px;padding:7px;font-size:13px"></div>
+        <div><label style="font-size:12px;color:var(--muted)">Ngày nhập</label><input id="pn_date" type="date" value="${(window.todayISO ? window.todayISO() : new Date().toISOString().slice(0,10))}" style="width:100%;border:1px solid var(--line);border-radius:6px;padding:7px;font-size:13px"></div>
         <div style="grid-column:span 2"><label style="font-size:12px;color:var(--muted)">NCC *</label><select id="pn_sup" style="width:100%;border:1px solid var(--line);border-radius:6px;padding:7px;font-size:13px">${sups.map(s => `<option value="${s.id}" ${forSup===s.id?'selected':''}>${s.name} · ${s.paymentTerm}</option>`).join('')}</select></div>
       </div>
       <div style="display:flex;align-items:center;gap:8px">
@@ -225,6 +225,7 @@
         <button type="button" class="btn btn-ghost btn-sm" onclick="window.pnBulkExcel()" title="Import items từ Excel hàng loạt" style="font-size:11px;padding:3px 8px">📥 Excel</button>
         <button type="button" class="btn btn-ghost btn-sm" onclick="window.pnBulkAI()" title="Đọc ảnh AI: phiếu nhập / list NCC viết tay" style="font-size:11px;padding:3px 8px">📷 Ảnh AI</button>
       </div>
+      <datalist id="pnProdList">${prods.map(p => `<option value="${(p.name||'').replace(/"/g,'&quot;')}">`).join('')}</datalist>
       <div id="pn_items"></div>
       <button class="btn btn-ghost btn-sm" style="margin-top:6px" onclick="window._pnAddRow()">+ Thêm dòng</button>
       <div style="display:flex;justify-content:flex-end;gap:14px;margin-top:12px;padding-top:10px;border-top:1px solid var(--line);font-size:13px">
@@ -242,23 +243,34 @@
     window._pnAddRow();
   };
 
-  window._pnAddRow = function () {
+  window._pnAddRow = function (preset) {
     const host = document.getElementById('pn_items');
-    const prods = window._pnPRODS || getProds();
-    const opts = prods.map(p => `<option value="${p.id}" data-name="${p.name}">${p.id} · ${p.name}</option>`).join('');
+    if (!host) return;
+    const esc = v => String(v == null ? '' : v).replace(/"/g, '&quot;');
     const row = document.createElement('div');
     row.className = 'item-row';
     row.innerHTML = `
-      <select class="pn_pid">${opts}</select>
-      <input type="number" placeholder="SL" class="pn_qty" min="0" step="0.1">
-      <input type="number" placeholder="Đơn giá" class="pn_price" min="0">
+      <input type="text" class="pn_name" list="pnProdList" placeholder="Tên SP (gõ hoặc chọn)" value="${preset ? esc(preset.name) : ''}">
+      <input type="number" placeholder="SL" class="pn_qty" min="0" step="0.1" value="${preset && preset.qty ? preset.qty : ''}">
+      <input type="number" placeholder="Đơn giá" class="pn_price" min="0" value="${preset && preset.price ? preset.price : ''}">
       <input type="text" placeholder="Thành tiền" class="pn_total" readonly style="background:#FAFBFC">
       <button onclick="this.parentElement.remove();window._pnRecalc()" style="background:none;border:none;cursor:pointer;color:var(--danger);font-size:16px">✕</button>
     `;
     host.appendChild(row);
     row.querySelectorAll('input').forEach(inp => inp.oninput = window._pnRecalc);
-    row.querySelector('select').onchange = () => row.querySelector('.pn_qty').focus();
+    window._pnRecalc();
   };
+
+  /* Khớp tên SP với danh mục (để lưu productId nếu có) */
+  function _pnMatchProd(name) {
+    const prods = window._pnPRODS || getProds();
+    const norm = s => (s || '').toLowerCase().normalize('NFD').replace(/[̀-ͯ]/g, '').replace(/đ/g, 'd').trim();
+    const n = norm(name);
+    if (!n) return null;
+    return prods.find(x => norm(x.name) === n)
+      || prods.find(x => { const xn = norm(x.name); return xn && (xn.includes(n) || n.includes(xn)); })
+      || null;
+  }
 
   window._pnRecalc = function () {
     let total = 0;
@@ -275,14 +287,15 @@
   window._pnSave = function () {
     const items = [];
     document.querySelectorAll('#pn_items .item-row').forEach(r => {
-      const sel = r.querySelector('select');
-      const pid = sel.value;
-      const name = sel.options[sel.selectedIndex].dataset.name;
+      const name = (r.querySelector('.pn_name').value || '').trim();
       const q = parseFloat(r.querySelector('.pn_qty').value) || 0;
       const pr = parseFloat(r.querySelector('.pn_price').value) || 0;
-      if (q > 0 && pr > 0) items.push({ productId: pid, name, qty: q, price: pr, total: q * pr });
+      if (name && q > 0 && pr > 0) {
+        const prod = _pnMatchProd(name);
+        items.push({ productId: prod ? prod.id : null, name, qty: q, price: pr, total: q * pr });
+      }
     });
-    if (!items.length) { window.toast('Thêm ít nhất 1 mặt hàng', 'warn'); return; }
+    if (!items.length) { window.toast('Thêm ít nhất 1 mặt hàng (tên + SL + giá)', 'warn'); return; }
     const dt = document.getElementById('pn_date').value;
     const m = dt.match(/(\d+)-(\d+)-(\d+)/);
     const obj = {
@@ -312,48 +325,39 @@
     a.href = URL.createObjectURL(blob); a.download = `phieu-nhap-${new Date().toISOString().slice(0,10)}.csv`; a.click();
   };
 
-  /* Init */
-  window.renderAppShell('purchases', 'Phiếu nhập');
-  document.getElementById('hbHost').innerHTML = window.helpBanner(
-    '📦 Phiếu nhập làm gì?',
-    'Ghi nhận từng đợt lấy hàng từ NCC. Khi bấm <b>"✓ Đã nhận"</b>, hệ thống tự: <b>(1)</b> cộng vào tồn kho, <b>(2)</b> cập nhật giá nhập mới nhất của SP, <b>(3)</b> tạo công nợ phải trả NCC (nếu NET) hoặc ghi phiếu chi ngay (nếu COD).',
-    {id:'hb-pur', icon:'📦'}
-  );
-  document.getElementById('hbT').innerHTML = window.helpTip('Đây là chu trình "mua hàng" — đối nghịch với module Đơn hàng (bán cho KH). Liên kết với Kho + NCC + Kế toán.', {size:'lg'});
-
-  ['purQ','purSt','purSup'].forEach(id => document.getElementById(id).oninput = render);
-  ['purchases','suppliers'].forEach(k => window.STORE.subscribe(k, render));
-  render();
-
-  /* === Bulk items helper === */
-  function _pnApplyBulkItems(items) {
-    const products = window._pnPRODS || getProds();
-    function norm(s) { return (s||'').toLowerCase().normalize('NFD').replace(/[̀-ͯ]/g,'').replace(/đ/g,'d'); }
-    function matchProd(name) {
-      const n = norm(name);
-      let p = products.find(x => norm(x.name) === n);
-      if (p) return p;
-      p = products.find(x => { const xn = norm(x.name); return xn.includes(n) || n.includes(xn); });
-      return p;
+  /* Init — KHÔNG có #purBody (vd đang ở tab khác) thì bỏ qua */
+  if (document.getElementById('purBody')) {
+    /* Trang gộp (Nhà cung cấp 2 tab) → suppliers.js đã dựng shell, KHÔNG gọi lại renderAppShell */
+    if (!window.SUP_MERGED) {
+      window.renderAppShell('purchases', 'Phiếu nhập');
+      const hb = document.getElementById('hbHost');
+      if (hb) hb.innerHTML = window.helpBanner(
+        '📦 Phiếu nhập làm gì?',
+        'Ghi nhận từng đợt lấy hàng từ NCC. Khi bấm <b>"✓ Đã nhận"</b>, hệ thống tự: <b>(1)</b> cộng vào tồn kho, <b>(2)</b> cập nhật giá nhập mới nhất của SP, <b>(3)</b> tạo công nợ phải trả NCC (nếu NET) hoặc ghi phiếu chi ngay (nếu COD).',
+        {id:'hb-pur', icon:'📦'}
+      );
+      const ht = document.getElementById('hbT');
+      if (ht) ht.innerHTML = window.helpTip('Đây là chu trình "mua hàng" — đối nghịch với module Đơn hàng (bán cho KH). Liên kết với Kho + NCC + Kế toán.', {size:'lg'});
     }
-    let added = 0, unmatched = [];
-    items.forEach(it => {
+    ['purQ','purSt','purSup'].forEach(id => { const el = document.getElementById(id); if (el) el.oninput = render; });
+    ['purchases','suppliers'].forEach(k => window.STORE.subscribe(k, render));
+    render();
+  }
+
+  /* === Bulk items helper — nhận MỌI món (kể cả SP ngoài danh mục) === */
+  function _pnApplyBulkItems(items) {
+    let added = 0, noMatch = 0;
+    (items || []).forEach(it => {
+      const name = (it.name || '').toString().trim();
       const qty = parseFloat(it.qty) || 0;
       const price = parseFloat(it.price) || 0;
-      if (!qty || !price) return;
-      const p = matchProd(it.name);
-      if (!p) { unmatched.push(it.name); return; }
-      /* Tạo row mới + điền */
-      window._pnAddRow();
-      const rows = document.querySelectorAll('#pn_items .item-row');
-      const lastRow = rows[rows.length - 1];
-      lastRow.querySelector('.pn_pid').value = p.id;
-      lastRow.querySelector('.pn_qty').value = qty;
-      lastRow.querySelector('.pn_price').value = price;
+      if (!name || !qty) return;           /* giá có thể nhập sau, chỉ cần tên + SL */
+      window._pnAddRow({ name, qty, price });
+      if (!_pnMatchProd(name)) noMatch++;
       added++;
     });
     window._pnRecalc();
-    window.toast(`✓ Thêm ${added} mặt hàng${unmatched.length ? ' · ' + unmatched.length + ' không khớp: ' + unmatched.slice(0,3).join(', ') : ''}`, added ? 'success' : 'warn');
+    window.toast(`✓ Đã thêm ${added} mặt hàng${noMatch ? ' · ' + noMatch + ' SP ngoài danh mục (vẫn nhập được)' : ''}`, added ? 'success' : 'warn');
   }
 
   window.pnBulkExcel = function() {
