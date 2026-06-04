@@ -871,10 +871,13 @@
     render();
   };
 
-  /* === init === */
-  window.STORE.subscribe('timesheet', render);
-  window.STORE.subscribe('payrollExtra', () => { if (tab === 'payroll') renderPayroll(); });
-  window.renderAppShell('payroll', 'Chấm công & Lương');
-  render();
-  window.applyPayrollHeaderPerms?.();
+  /* === init === (chỉ chạy nếu có #payView — trang Nhân sự gộp hoặc payroll.html) */
+  if (document.getElementById('payView')) {
+    window.STORE.subscribe('timesheet', render);
+    window.STORE.subscribe('payrollExtra', () => { if (tab === 'payroll') renderPayroll(); });
+    /* Trang Nhân sự gộp (HR_MERGED) → staff.js đã dựng shell, KHÔNG gọi lại renderAppShell */
+    if (!window.HR_MERGED) window.renderAppShell('payroll', 'Chấm công & Lương');
+    render();
+    window.applyPayrollHeaderPerms?.();
+  }
 })();

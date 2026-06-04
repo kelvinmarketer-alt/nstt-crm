@@ -576,8 +576,7 @@ window.NAV = [
     */
   ]},
   { section: 'Quản trị', items: [
-    { id: 'staff',      label: 'Nhân viên',   icon: '🧑‍💼', href: 'staff.html' },
-    { id: 'payroll',    label: 'Chấm công & Lương', icon: '📅', href: 'payroll.html' },
+    { id: 'staff',      label: 'Nhân sự',     icon: '🧑‍💼', href: 'staff.html' },
     { id: 'reports',    label: 'Báo cáo',     icon: '📈', href: 'reports.html' },
     { id: 'marketing',  label: 'Email/Zalo blast', icon: '📨', href: 'marketing.html' },
     { id: 'audit',      label: 'Nhật ký',     icon: '📋', href: 'audit.html' },

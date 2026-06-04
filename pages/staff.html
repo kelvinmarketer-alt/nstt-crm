@@ -16,6 +16,11 @@
   .perm-group .check-item{font-size:12.5px}
   .perm-group .check-item.perm-sensitive{background:#FEF3C7;border-left:3px solid #DC2626;padding-left:8px;border-radius:4px}
   .perm-group .check-item input[disabled]{opacity:0.5;cursor:not-allowed}
+  .tabs2{display:flex;gap:6px;border-bottom:1px solid var(--line);margin-bottom:16px}
+  .t2{padding:9px 18px;font-size:14px;font-weight:600;color:var(--muted);cursor:pointer;border-bottom:2px solid transparent;margin-bottom:-1px;display:flex;align-items:center;gap:7px}
+  .t2.active{color:var(--navy);border-bottom-color:var(--navy)}
+  .t2cnt{background:#E2E8F0;color:#475569;border-radius:99px;font-size:11px;font-weight:700;padding:1px 7px}
+  .t2.active .t2cnt{background:var(--navy);color:#fff}
 </style>
 </head>
 <body>
@@ -31,48 +36,61 @@
   <main class="main">
     <div class="page-head">
       <div>
-        <h1>Quản lý nhân viên</h1>
-        <div class="sub" id="staffSubHead">Quản lý nhân viên · phân quyền truy cập module</div>
+        <h1>🧑‍💼 Nhân sự</h1>
+        <div class="sub" id="staffSubHead">Quản lý nhân viên · phân quyền · chấm công · bảng lương</div>
       </div>
-      <div class="head-actions">
-        <button class="btn btn-ghost" onclick="window.location.href='payroll.html'">📅 Chấm công</button>
-        <button class="btn btn-ghost" onclick="window.location.href='payroll.html'">💰 Bảng lương</button>
+    </div>
+
+    <div class="tabs2">
+      <div class="t2 active" data-t2="staff" onclick="window.hrTab('staff')">🧑‍💼 Nhân viên <span id="t2stCount" class="t2cnt"></span></div>
+      <div class="t2" data-t2="pay" onclick="window.hrTab('pay')">📅 Chấm công &amp; Lương</div>
+    </div>
+
+    <!-- ===== TAB NHÂN VIÊN ===== -->
+    <div id="paneStaff">
+      <div style="display:flex;justify-content:flex-end;gap:8px;margin-bottom:12px;flex-wrap:wrap">
         <button class="btn btn-ghost" onclick="window.openImportStaffExcel()">📥 Nhập Excel</button>
         <button class="btn btn-ghost" onclick="window.aiAddStaff()">📷 Thêm NV từ ảnh</button>
         <button class="btn btn-primary" onclick="window.openModal('+ Thêm nhân viên',formNv(),{footer:footNv(),width:'560px'})">+ Thêm NV</button>
       </div>
+      <section class="kpis">
+        <div class="kpi k-1"><div class="kpi-label">Tổng NV</div><div class="kpi-value" id="kpiStaffTotal">0</div><div class="kpi-trend" id="kpiStaffDept">— phòng ban</div><div class="kpi-icon">🧑‍💼</div></div>
+        <div class="kpi k-2"><div class="kpi-label">Đang đi làm</div><div class="kpi-value" id="kpiStaffActive">0</div><div class="kpi-trend up" id="kpiStaffOff">0 nghỉ</div><div class="kpi-icon">✓</div></div>
+        <div class="kpi k-4"><div class="kpi-label">Shipper / Giao hàng</div><div class="kpi-value" id="kpiStaffShipper">0</div><div class="kpi-trend">đội giao hàng</div><div class="kpi-icon">🛵</div></div>
+        <div class="kpi k-3"><div class="kpi-label">Tổng lương cơ bản</div><div class="kpi-value" id="kpiStaffSalary">0</div><div class="kpi-trend">LCB/tháng</div><div class="kpi-icon">💰</div></div>
+      </section>
+      <div class="quick-chips" id="staffChips"></div>
+      <div class="filter-bar">
+        <div class="search-in" style="flex:1.5">
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="7"/><path d="m21 21-4.3-4.3"/></svg>
+          <input id="qSearch" placeholder="Tìm tên / SĐT / mã NV...">
+        </div>
+        <select id="fStatus"><option value="">Trạng thái</option><option value="active">Đang làm</option><option value="off">Nghỉ</option></select>
+      </div>
+      <div class="table-card">
+        <div class="table-head"><div class="count" id="rowCount">9 nhân viên</div></div>
+        <div class="table-wrap">
+          <table>
+            <thead><tr>
+              <th>Mã</th><th>Nhân viên</th><th class="hide-sm">Phòng ban</th>
+              <th class="hide-md">SĐT</th><th>Phân quyền</th>
+              <th class="hide-sm">KPI T5</th><th class="num hide-md">Lương cơ bản</th>
+              <th>Trạng thái</th><th class="num">Hành động</th>
+            </tr></thead>
+            <tbody id="stTbody"></tbody>
+          </table>
+        </div>
+      </div>
     </div>
 
-    <section class="kpis">
-      <div class="kpi k-1"><div class="kpi-label">Tổng NV</div><div class="kpi-value" id="kpiStaffTotal">0</div><div class="kpi-trend" id="kpiStaffDept">— phòng ban</div><div class="kpi-icon">🧑‍💼</div></div>
-      <div class="kpi k-2"><div class="kpi-label">Đang đi làm</div><div class="kpi-value" id="kpiStaffActive">0</div><div class="kpi-trend up" id="kpiStaffOff">0 nghỉ</div><div class="kpi-icon">✓</div></div>
-      <div class="kpi k-4"><div class="kpi-label">Shipper / Giao hàng</div><div class="kpi-value" id="kpiStaffShipper">0</div><div class="kpi-trend">đội giao hàng</div><div class="kpi-icon">🛵</div></div>
-      <div class="kpi k-3"><div class="kpi-label">Tổng lương cơ bản</div><div class="kpi-value" id="kpiStaffSalary">0</div><div class="kpi-trend">LCB/tháng</div><div class="kpi-icon">💰</div></div>
-    </section>
-
-    <div class="quick-chips" id="staffChips"></div>
-
-    <div class="filter-bar">
-      <div class="search-in" style="flex:1.5">
-        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="7"/><path d="m21 21-4.3-4.3"/></svg>
-        <input id="qSearch" placeholder="Tìm tên / SĐT / mã NV...">
+    <!-- ===== TAB CHẤM CÔNG & LƯƠNG ===== -->
+    <div id="panePay" style="display:none">
+      <div style="display:flex;align-items:center;gap:10px;margin-bottom:12px">
+        <label style="font-size:13px;color:var(--muted)">Tháng:</label>
+        <input type="month" id="payMonth" value="2026-05" onchange="window.setPayMonth(this.value)" style="padding:7px 10px;border:1px solid var(--line);border-radius:7px">
       </div>
-      <select id="fStatus"><option value="">Trạng thái</option><option value="active">Đang làm</option><option value="off">Nghỉ</option></select>
-    </div>
-
-    <div class="table-card">
-      <div class="table-head"><div class="count" id="rowCount">9 nhân viên</div></div>
-      <div class="table-wrap">
-        <table>
-          <thead><tr>
-            <th>Mã</th><th>Nhân viên</th><th class="hide-sm">Phòng ban</th>
-            <th class="hide-md">SĐT</th><th>Phân quyền</th>
-            <th class="hide-sm">KPI T5</th><th class="num hide-md">Lương cơ bản</th>
-            <th>Trạng thái</th><th class="num">Hành động</th>
-          </tr></thead>
-          <tbody id="stTbody"></tbody>
-        </table>
-      </div>
+      <div class="rpt-tabs" id="payTabs"></div>
+      <div id="payView"></div>
     </div>
   </main>
 </div>
@@ -90,12 +108,28 @@
 <script src="../scripts/pdf-export.js"></script>
 <script src="../scripts/ai-fill.js"></script>
 <script>if(window.AUTH) window.AUTH.requireAuth();</script>
+<script>window.HR_MERGED = true;</script>
 <script src="../data/staff.js"></script>
+<script src="../data/timesheet.js"></script>
 <script src="../scripts/staff.js"></script>
+<script src="../scripts/payroll-formula.js"></script>
+<script src="../scripts/payroll-approval.js"></script>
+<script src="../scripts/payroll.js"></script>
 <script src="../scripts/cust-search-box.js"></script>
 <script src="../data/demo-seed.js"></script>
 <script src="../scripts/data-linkage.js"></script>
 <script src="../scripts/system-core.js"></script>
 <script src="../scripts/ai-chat.js"></script>
+<script>
+  window.hrTab = function (which) {
+    document.querySelectorAll('.t2').forEach(t => t.classList.toggle('active', t.dataset.t2 === which));
+    document.getElementById('paneStaff').style.display = which === 'staff' ? '' : 'none';
+    document.getElementById('panePay').style.display = which === 'pay' ? '' : 'none';
+  };
+  (function () {
+    function cnt() { try { const n = (window.STORE.get('staff', []) || []).length; const e = document.getElementById('t2stCount'); if (e) e.textContent = n || ''; } catch (e) {} }
+    if (window.STORE) { cnt(); window.STORE.subscribe('staff', cnt); }
+  })();
+</script>
 </body>
 </html>
