@@ -223,6 +223,11 @@
       if (df[k] !== undefined) v = vnToIso(v, df[k]);
       result[newKey] = v;
     }
+    /* cash_entries.entry_date NOT NULL — phiếu quỹ tự tạo (hook đơn/ads/lương) thiếu ngày
+       → mặc định HÔM NAY để không bị chặn khi sync. Phiếu có ngày hợp lệ KHÔNG bị đụng. */
+    if (table === 'cashEntries' && !result.entry_date) {
+      result.entry_date = new Date().toISOString().slice(0, 10);
+    }
     return result;
   }
   function mapFrom(table, obj) {
