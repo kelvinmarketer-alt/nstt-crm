@@ -451,7 +451,15 @@
       CATS.map(c => `<button class="chip ${currentCat === c.id ? 'active' : ''}" onclick="window.filterCat('${c.id}')" style="${currentCat === c.id ? 'background:' + c.color + ';color:#fff;border-color:' + c.color : ''}">${c.icon} ${c.label} <span class="cnt">${counts[c.id] || 0}</span></button>`).join('') +
       `<button class="chip" onclick="window.openCategoryManager && window.openCategoryManager()" style="border-style:dashed;color:var(--navy)" title="Đổi biểu tượng / tên danh mục">🏷️ Quản lý danh mục</button>`;
 
-    const list = ps.filter(p => !currentCat || p.cat === currentCat);
+    /* Sắp xếp theo NHÓM (đúng thứ tự danh mục), trong nhóm theo tên A→Z */
+    const catOrder = {};
+    CATS.forEach((c, i) => catOrder[c.id] = i);
+    const list = ps.filter(p => !currentCat || p.cat === currentCat)
+      .sort((a, b) => {
+        const ca = catOrder[a.cat] ?? 999, cb = catOrder[b.cat] ?? 999;
+        if (ca !== cb) return ca - cb;
+        return (a.name || '').localeCompare(b.name || '', 'vi');
+      });
     const rows = list.map(p => {
       const cat = catMeta(p.cat);
       const e = window.priceEntryOn(p, window.todayISO());
