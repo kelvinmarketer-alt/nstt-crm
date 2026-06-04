@@ -541,7 +541,7 @@
             name: { type: 'text',
                     format: (v, row) => `<b>${v}</b><div style="color:var(--muted);font-size:11px">${row?.en || row?.note || ''}</div>` },
             cat:  { type: 'select',
-                    options: () => window.MD.get('services').map(s => ({ value: s.id, label: (s.icon||'') + ' ' + s.label })),
+                    options: () => CATS.map(c => ({ value: c.id, label: (c.icon||'') + ' ' + c.label })),
                     format: v => { const m = catMeta(v); return `<span class="tag" style="background:${m.color}20;color:${m.color}">${m.icon} ${m.label}</span>`; } },
             unit: { type: 'select',
                     options: () => window.MD.get('units').map(u => u.id),
