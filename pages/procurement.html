@@ -11,6 +11,13 @@
   .pc-step-hd{display:flex;align-items:center;gap:10px;font-size:16px;font-weight:800;color:var(--navy);padding-bottom:10px;margin-bottom:12px;border-bottom:2px solid #E2E8F0;flex-wrap:wrap}
   .pc-step-n{display:inline-grid;place-items:center;width:26px;height:26px;border-radius:50%;background:#1B5E20;color:#fff;font-size:14px;flex-shrink:0}
   .pc-step-sub{font-size:12px;font-weight:400;color:var(--muted)}
+  /* Master-detail cho phiên gom */
+  .pc-runs-wrap{display:grid;grid-template-columns:288px minmax(0,1fr);gap:14px;align-items:start}
+  .pc-run-list{display:flex;flex-direction:column;gap:8px;max-height:72vh;overflow:auto;padding-right:2px}
+  .pc-run-detail{background:#fff;border:1px solid var(--line);border-radius:12px;overflow:hidden;min-height:220px}
+  .pc-detail-empty{padding:60px 24px;text-align:center;color:var(--muted);font-size:13px;line-height:1.6}
+  .run-card.pc-sel{border-color:var(--navy);box-shadow:0 0 0 2px rgba(27,94,32,.16);background:#F0FDF4}
+  @media(max-width:860px){.pc-runs-wrap{grid-template-columns:1fr}.pc-run-list{max-height:none}}
   .ord-pick{display:flex;align-items:center;gap:12px;padding:11px 14px;border:1px solid var(--line);border-radius:10px;margin-bottom:8px;background:#fff;cursor:pointer;transition:border-color .15s}
   .ord-pick:hover{border-color:var(--navy)}
   .ord-pick.sel{border-color:#15803D;background:#F0FDF4}
@@ -56,8 +63,11 @@
 
     <section class="pc-step" id="stepRuns">
       <div class="pc-step-hd"><span class="pc-step-n">2</span> Phiên gom &amp; Đặt NCC
-        <span class="pc-step-sub">Mở phiên → <b>gán NCC cho từng mặt hàng</b> → xác nhận đủ/thiếu</span></div>
-      <div id="pcRuns"></div>
+        <span class="pc-step-sub">Chọn phiên bên trái → <b>gán NCC cho từng mặt hàng</b> → xác nhận đủ/thiếu</span></div>
+      <div class="pc-runs-wrap">
+        <div id="pcRunList" class="pc-run-list"></div>
+        <div id="pcRunDetail" class="pc-run-detail"><div class="pc-detail-empty">← Chọn một phiên gom bên trái để gán NCC &amp; xác nhận hàng.</div></div>
+      </div>
     </section>
 
     <section class="pc-step" id="stepRelease">
