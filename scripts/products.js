@@ -457,23 +457,30 @@
       const e = window.priceEntryOn(p, window.todayISO());
       const buy = e ? e.buy : 0, sell = e ? e.sell : 0;
       const margin = sell - buy;
-      return `<tr data-id="${p.id}">
-        <td onclick="event.stopPropagation()"><div class="checkbox" onclick="this.classList.toggle('on')"></div></td>
-        <td><div onclick="event.stopPropagation();window.quickEditProductImage('${p.id}')" title="Bấm để đổi ảnh trực tiếp" style="position:relative;width:42px;height:42px;cursor:pointer">
+      return `<div class="cat-card" data-id="${p.id}" style="display:flex;align-items:center;gap:10px;padding:9px 11px;border:1px solid var(--line);border-radius:10px;background:#fff">
+        <div class="checkbox" onclick="event.stopPropagation();this.classList.toggle('on')" style="flex:none"></div>
+        <div onclick="event.stopPropagation();window.quickEditProductImage('${p.id}')" title="Bấm để đổi ảnh trực tiếp" style="position:relative;width:42px;height:42px;cursor:pointer;flex:none">
           ${p.img ? `<img src="${p.img}" alt="" loading="lazy" style="width:42px;height:42px;object-fit:cover;border-radius:7px;background:#eef3ee" onerror="this.parentElement.querySelector('.ph')?(this.style.display='none'):null">` : ''}
           ${p.img ? '' : `<div class="ph" style="width:42px;height:42px;border-radius:7px;background:#eef3ee;display:grid;place-items:center;color:#9CA3AF;font-size:15px">📷</div>`}
           <span style="position:absolute;right:-4px;bottom:-4px;background:var(--navy);color:#fff;border-radius:50%;width:17px;height:17px;display:grid;place-items:center;font-size:9px;box-shadow:0 1px 3px rgba(0,0,0,.3)">✎</span>
-        </div></td>
-        <td data-field="name" title="Click để sửa tên SP"><b>${p.name}</b><div style="color:var(--muted);font-size:11px">${p.en || p.note || ''}</div></td>
-        <td data-field="cat" title="Click để đổi nhóm"><span class="tag" style="background:${cat.color}20;color:${cat.color}">${cat.icon} ${cat.label}</span></td>
-        <td data-field="unit" title="Click để sửa đơn vị tính" style="color:var(--muted)">/${p.unit}</td>
-        <td class="num"><input class="cat-price" data-id="${p.id}" data-field="buy" type="number" value="${buy}" style="width:100px;text-align:right;padding:5px 7px;border:1px solid var(--line);border-radius:6px;font-weight:700"></td>
-        <td class="num">
-          <button class="icon-btn" title="Sửa chi tiết SP (tên/nhóm/đvt)" onclick="window.editProduct('${p.id}')">✏️</button>
-          <button class="icon-btn" title="Xóa sản phẩm" style="color:var(--danger)" onclick="window.deleteProduct('${p.id}')">🗑</button>
-        </td>
-      </tr>`;
-    }).join('') || `<tr><td colspan="7" style="padding:30px;text-align:center;color:var(--muted)">Chưa có sản phẩm.</td></tr>`;
+        </div>
+        <div style="flex:1;min-width:0">
+          <div data-field="name" title="Click để sửa tên SP" style="line-height:1.3"><b>${p.name}</b><div style="color:var(--muted);font-size:11px">${p.en || p.note || ''}</div></div>
+          <div style="display:flex;align-items:center;gap:7px;margin-top:4px;flex-wrap:wrap">
+            <span data-field="cat" title="Click để đổi nhóm"><span class="tag" style="background:${cat.color}20;color:${cat.color}">${cat.icon} ${cat.label}</span></span>
+            <span data-field="unit" title="Click để sửa đơn vị tính" style="color:var(--muted);font-size:11.5px">/${p.unit}</span>
+          </div>
+        </div>
+        <div style="display:flex;flex-direction:column;align-items:flex-end;gap:5px;flex:none">
+          <div style="font-size:10px;color:var(--muted);text-transform:uppercase;letter-spacing:.3px">Giá nhập</div>
+          <input class="cat-price" data-id="${p.id}" data-field="buy" type="number" value="${buy}" style="width:110px;text-align:right;padding:5px 8px;border:1px solid var(--line);border-radius:6px;font-weight:700">
+          <div style="display:flex;gap:2px">
+            <button class="icon-btn" title="Sửa chi tiết SP (tên/nhóm/đvt)" onclick="event.stopPropagation();window.editProduct('${p.id}')">✏️</button>
+            <button class="icon-btn" title="Xóa sản phẩm" style="color:var(--danger)" onclick="event.stopPropagation();window.deleteProduct('${p.id}')">🗑</button>
+          </div>
+        </div>
+      </div>`;
+    }).join('') || `<div style="grid-column:1/-1;padding:30px;text-align:center;color:var(--muted)">Chưa có sản phẩm.</div>`;
 
     document.getElementById('catalogView').innerHTML = `
       <div class="chart-card" style="margin-bottom:14px">
@@ -484,15 +491,7 @@
         </div>
       </div>
       <div class="quick-chips" style="margin-bottom:14px">${chips}</div>
-      <div class="chart-card">
-        <table class="mini-table">
-          <thead><tr>
-            <th style="width:32px"><div class="checkbox" onclick="this.classList.toggle('on')" title="Chọn tất cả"></div></th>
-            <th style="width:50px">Ảnh</th><th>Tên sản phẩm</th><th>Nhóm</th><th>ĐVT</th><th class="num">Giá nhập</th><th></th>
-          </tr></thead>
-          <tbody>${rows}</tbody>
-        </table>
-      </div>`;
+      <div id="catalogGrid" style="display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:10px">${rows}</div>`;
 
     /* Wire inline edit cho giá (input có sẵn) */
     document.querySelectorAll('#catalogView .cat-price').forEach(inp => {
@@ -501,9 +500,9 @@
 
     /* Bulk operations cho sản phẩm */
     if (window.attachBulkOps) {
-      const tbl = document.querySelector('#catalogView .mini-table');
+      const tbl = document.getElementById('catalogGrid');
       if (tbl) {
-        if (!tbl.id) tbl.id = 'tblProducts';
+        
         window.attachBulkOps({
           tableSelector: '#' + tbl.id,
           store: 'products',
@@ -530,9 +529,9 @@
 
     /* Inline edit cho name/cat/unit (click cell = sửa) */
     if (window.attachInlineEdit) {
-      const tbl = document.querySelector('#catalogView .mini-table');
+      const tbl = document.getElementById('catalogGrid');
       if (tbl) {
-        if (!tbl.id) tbl.id = 'tblProducts';
+        
         window.attachInlineEdit('#' + tbl.id, {
           store: 'products',
           fields: {
