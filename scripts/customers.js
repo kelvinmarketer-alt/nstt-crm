@@ -552,7 +552,8 @@
   /* Options nhóm giá (đọc priceTiers; fallback 3 nhóm mặc định) */
   window.priceTierOptions = function (sel) {
     let tiers = window.STORE.get('priceTiers', null);
-    if (!Array.isArray(tiers) || !tiers.length) tiers = [{ id: 1, name: 'Giá lẻ' }, { id: 2, name: 'Giá sỉ' }, { id: 3, name: 'Giá VIP' }];
+    const _old = Array.isArray(tiers) && tiers.length === 3 && tiers[0]?.name === 'Giá lẻ';
+    if (!Array.isArray(tiers) || !tiers.length || _old) tiers = Array.from({ length: 8 }, (_, i) => ({ id: i + 1, name: 'Nhóm ' + (i + 1) }));
     const ic = ['①', '②', '③', '④', '⑤', '⑥', '⑦', '⑧'];
     return `<option value="">— Mặc định (Giá gốc) —</option>` + tiers.map(t => `<option value="${t.id}" ${String(sel) === String(t.id) ? 'selected' : ''}>${ic[(t.id - 1) % 8] || ''} ${t.name}</option>`).join('');
   };

@@ -11,16 +11,21 @@
      Mỗi nhóm: markup % so với giá gốc + override giá riêng từng SP.
      boardTier = 0 → bảng giá GỐC; >0 → id nhóm. */
   const TIER_ICONS = ['①','②','③','④','⑤','⑥','⑦','⑧'];
-  const DEFAULT_TIERS = [
-    { id: 1, name: 'Giá lẻ', markup: 0, overrides: {} },
-    { id: 2, name: 'Giá sỉ', markup: -5, overrides: {} },
-    { id: 3, name: 'Giá VIP', markup: -10, overrides: {} },
-  ];
+  /* 8 nhóm mặc định: Nhóm 1 … Nhóm 8 (markup % so với GỐC) */
+  const DEFAULT_TIERS = Array.from({ length: 8 }, (_, i) => ({ id: i + 1, name: 'Nhóm ' + (i + 1), markup: 0, overrides: {} }));
+  const _OLD_DEFAULT_NAMES = ['Giá lẻ', 'Giá sỉ', 'Giá VIP'];
   let boardTier = 0;
   function getTiers() {
-    const t = window.STORE.get('priceTiers', null);
+    let t = window.STORE.get('priceTiers', null);
+    /* Migrate bộ mặc định CŨ (Giá lẻ/sỉ/VIP) chưa chỉnh → thay bằng Nhóm 1-8 */
+    if (Array.isArray(t) && t.length === 3 &&
+        t.every((x, i) => x.name === _OLD_DEFAULT_NAMES[i] && (!x.overrides || !Object.keys(x.overrides).length))) {
+      t = null;
+    }
     return (Array.isArray(t) && t.length) ? t : DEFAULT_TIERS.map(x => ({ ...x, overrides: {} }));
   }
+  /* % giá GỐC so với giá nhập (link toàn hệ thống) */
+  function getBaseMarkup() { const v = window.STORE.get('priceBaseMarkup', null); return v == null ? 30 : v; }
   function saveTiers(tiers) { window.STORE.set('priceTiers', tiers); }
   function tierById(id) { return getTiers().find(t => t.id === +id); }
   function tierIcon(t) { return TIER_ICONS[(t.id - 1) % 8] || '#'; }
@@ -42,6 +47,16 @@
     if (tiers.length < 8) s += `<button class="btn btn-sm btn-ghost" style="border-style:dashed" onclick="window.tierAdd()">＋ Thêm nhóm</button>`;
     s += `<button class="btn btn-sm btn-ghost" onclick="window.tierManage()" title="Đổi tên / % / xóa nhóm">⚙ Quản lý nhóm</button></div>`;
     const tier = boardTier ? tierById(boardTier) : null;
+    if (!tier) {
+      /* Gốc: link toàn hệ thống — đặt giá = giá nhập + % */
+      s += `<div style="margin-top:10px;display:flex;align-items:center;gap:10px;flex-wrap:wrap;background:#EFF6FF;border:1px solid #BFDBFE;border-radius:8px;padding:9px 12px">
+        <span style="font-size:13px;font-weight:700;color:var(--navy)">📋 Bảng giá GỐC — dùng cho toàn hệ thống (đơn hàng, website)</span>
+        <label style="font-size:12px;color:var(--muted)">Giá gốc = Giá nhập + <input id="baseMarkup" type="number" value="${getBaseMarkup()}" style="width:64px;text-align:right;padding:4px 6px;border:1px solid var(--line);border-radius:5px"> %</label>
+        <button class="btn btn-sm btn-primary" onclick="window.baseApplyMarkup()">⚙ Áp dụng cho tất cả SP</button>
+        <span style="flex:1"></span>
+        <span style="font-size:11.5px;color:var(--muted)">💡 Áp dụng sẽ tính lại giá bán = giá nhập × (1+%). Vẫn sửa tay từng ô được. Nhớ bấm 💾 Lưu.</span>
+      </div>`;
+    }
     if (tier) {
       s += `<div style="margin-top:10px;display:flex;align-items:center;gap:10px;flex-wrap:wrap;background:#F0FDF4;border:1px solid #BBF7D0;border-radius:8px;padding:9px 12px">
         <span style="font-size:13px;font-weight:700;color:var(--navy)">${tierIcon(tier)} ${tier.name}</span>
@@ -56,6 +71,28 @@
   }
 
   window.boardSwitchTier = function (id) { boardTier = +id; renderBoard(); };
+  /* GỐC: đặt giá bán = giá nhập × (1+%) cho tất cả SP (link toàn hệ thống) */
+  window.baseApplyMarkup = function () {
+    const x = parseFloat(document.getElementById('baseMarkup').value);
+    if (isNaN(x)) { window.toast('Nhập % hợp lệ', 'warn'); return; }
+    if (!confirm(`Đặt GIÁ BÁN GỐC = giá nhập + ${x}% cho TẤT CẢ sản phẩm (ngày ${fmtD(boardDate)})?\nSP chưa có giá nhập sẽ bỏ qua. Vẫn sửa tay lại được.`)) return;
+    window.STORE.set('priceBaseMarkup', x);
+    const ps = products();
+    let n = 0;
+    ps.forEach(p => {
+      const last = window.priceEntryOn(p, boardDate) || { buy: 0, sell: 0 };
+      const buy = last.buy || 0;
+      if (!buy) return;
+      const sell = Math.round(buy * (1 + x / 100));
+      const hist = [...(p.priceHistory || [])];
+      const ex = hist.find(h => h.date === boardDate);
+      if (ex) ex.sell = sell; else hist.push({ date: boardDate, buy, sell });
+      p.priceHistory = hist; n++;
+    });
+    window.STORE.set('products', ps);
+    renderBoard();
+    window.toast(`✓ Đã đặt giá gốc = giá nhập +${x}% cho ${n} SP`, 'success');
+  };
   window.tierApplyMarkup = function () {
     if (!boardTier) return;
     const v = parseFloat(document.getElementById('tierMarkup').value);
