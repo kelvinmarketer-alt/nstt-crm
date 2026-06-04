@@ -101,6 +101,7 @@
     'latePolicy',      /* Khung phạt đi muộn — CRITICAL (admin cấu hình) */
     'mktPrices',       /* Bảng giá Marketing (chào hàng/ads) — KHÔNG ảnh hưởng đơn */
     'procurementRuns', /* Phiên gom hàng → đặt NCC (Kho) — CRITICAL */
+    'supplierClaims',  /* Khoản đòi lại NCC khi hàng NCC giao hỏng (Trả hàng) */
     'audit_log',       /* Truy vết NV — HIGH */
     'inv_movements',   /* Sổ xuất nhập kho — HIGH */
     'snapshots',       /* Auto-backup — HIGH */

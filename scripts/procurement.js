@@ -77,16 +77,13 @@
     });
   }
 
-  /* ============ TAB SWITCH ============ */
+  /* ============ SCROLL TO SECTION (trang cuộn dọc, không còn tab) ============ */
   window.pcSwitch = function (tab) {
-    document.querySelectorAll('.pc-tab').forEach(t => t.classList.toggle('active', t.dataset.pctab === tab));
-    document.getElementById('pcGather').style.display = tab === 'gather' ? '' : 'none';
-    document.getElementById('pcRuns').style.display = tab === 'runs' ? '' : 'none';
-    document.getElementById('pcRelease').style.display = tab === 'release' ? '' : 'none';
-    if (tab === 'gather') renderGather();
-    if (tab === 'runs') renderRuns();
-    if (tab === 'release') renderRelease();
+    const map = { gather: 'stepGather', runs: 'stepRuns', release: 'stepRelease' };
+    const el = document.getElementById(map[tab] || 'stepGather');
+    if (el) el.scrollIntoView({ behavior: 'smooth', block: 'start' });
   };
+  function renderAll() { renderGather(); renderRuns(); renderRelease(); }
 
   /* ============ ① CHỌN ĐƠN → GOM ============ */
   let picked = new Set();
@@ -164,6 +161,7 @@
     S().set('orders', orders);
     picked.clear();
     window.toast?.(`✓ Tạo ${run.id} · ${codes.length} đơn · ${lines.length} mặt hàng` + (noSup.length ? ` · ⚠ ${noSup.length} SP chưa gán NCC` : ''), noSup.length ? 'warn' : 'success');
+    renderGather(); renderRuns();
     window.pcSwitch('runs');
     setTimeout(() => window.pcOpenRun(run.id), 100);
   };
@@ -543,10 +541,10 @@ ${o.shortages && o.shortages.length ? `<div style="margin-top:10px;font-size:11.
   /* ===== Init ===== */
   function init() {
     if (window.renderAppShell) window.renderAppShell('procurement', 'Gom hàng → NCC');
-    renderGather();
+    renderAll();
     /* refresh khi STORE đổi (realtime) */
-    S().subscribe?.('orders', () => { const t = document.querySelector('.pc-tab.active')?.dataset.pctab; if (t) window.pcSwitch(t); });
-    S().subscribe?.('procurementRuns', () => { const t = document.querySelector('.pc-tab.active')?.dataset.pctab; if (t === 'runs') renderRuns(); });
+    S().subscribe?.('orders', () => { renderGather(); renderRelease(); });
+    S().subscribe?.('procurementRuns', () => { renderRuns(); renderRelease(); });
   }
   if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', init);
   else init();

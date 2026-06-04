@@ -35,7 +35,7 @@
           <th style="text-align:left;padding:10px;font-size:11px;color:var(--muted);text-transform:uppercase">Đơn gốc</th>
           <th style="text-align:left;padding:10px;font-size:11px;color:var(--muted);text-transform:uppercase">KH</th>
           <th style="text-align:left;padding:10px;font-size:11px;color:var(--muted);text-transform:uppercase">Ngày</th>
-          <th style="text-align:left;padding:10px;font-size:11px;color:var(--muted);text-transform:uppercase">Lý do</th>
+          <th style="text-align:left;padding:10px;font-size:11px;color:var(--muted);text-transform:uppercase">Mặt hàng / Lý do</th>
           <th style="text-align:right;padding:10px;font-size:11px;color:var(--muted);text-transform:uppercase">Hoàn</th>
           <th style="text-align:left;padding:10px;font-size:11px;color:var(--muted);text-transform:uppercase">Trạng thái</th>
           <th style="text-align:left;padding:10px;font-size:11px;color:var(--muted);text-transform:uppercase">Hành động</th>
@@ -75,7 +75,7 @@
   window.renderAppShell('returns','Trả hàng & POD');
   document.getElementById('hbHost').innerHTML = window.helpBanner(
     '↩️ Quy trình Trả hàng',
-    'Khi KH nhận hàng nhưng có vấn đề (hỏng, sai, thiếu): ghi nhận đơn trả → bù tiền/hàng → đóng. <b>Hoàn tiền</b> sẽ tự tạo phiếu chi trong Kế toán. <b>POD</b> ảnh giúp bảo vệ shipper/DN khi KH khiếu nại oan.',
+    'Khi KH nhận hàng nhưng có vấn đề (hỏng, sai, thiếu): ghi nhận đơn trả (mặt hàng + số kg) → chọn <b>nhập lại kho</b> hay <b>bỏ hao hụt</b>, <b>lỗi do ai</b>, hoàn tiền bằng <b>giảm công nợ</b> hay chi tiền mặt → bấm "✓ Xử lý" để chốt. Lỗi NCC sẽ tạo khoản đòi lại NCC. <b>POD</b> ảnh bảo vệ DN khi KH khiếu nại oan.',
     {id:'hb-ret', icon:'↩️'}
   );
   document.getElementById('hbT').innerHTML = window.helpTip('Tỷ lệ trả hàng > 2% là bất thường — cần kiểm tra quy trình đóng gói/vận chuyển.', {size:'lg'});
@@ -97,8 +97,15 @@
       <td style="padding:10px"><a href="orders.html" style="color:var(--navy)">${r.orderCode}</a></td>
       <td style="padding:10px">${r.custName}</td>
       <td style="padding:10px">${r.date}</td>
-      <td style="padding:10px;font-size:12px">${r.reason}</td>
-      <td style="padding:10px;text-align:right;font-weight:700;color:#DC2626">${window.fmt(r.refundTotal)} ₫</td>
+      <td style="padding:10px;font-size:12px">
+        ${r.item ? `<b>${r.item.name}</b> · ${r.qtyReturn||0}${r.item.unit||'kg'}<br>` : ''}
+        <span style="color:var(--muted)">${r.reason}</span>
+        <div style="margin-top:3px;display:flex;gap:4px;flex-wrap:wrap">
+          ${r.disposition==='restock' ? '<span style="background:#DCFCE7;color:#15803D;font-size:10px;font-weight:700;padding:1px 6px;border-radius:99px">🏬 Nhập lại kho</span>' : r.disposition==='discard' ? '<span style="background:#FEE2E2;color:#B91C1C;font-size:10px;font-weight:700;padding:1px 6px;border-radius:99px">🗑 Hao hụt</span>' : ''}
+          ${r.fault==='supplier' ? `<span style="background:#FEF3C7;color:#B45309;font-size:10px;font-weight:700;padding:1px 6px;border-radius:99px">🏭 Đòi NCC${r.supplierName?': '+r.supplierName:''}</span>` : r.fault==='shipping' ? '<span style="background:#E0E7FF;color:#3730A3;font-size:10px;font-weight:700;padding:1px 6px;border-radius:99px">🚚 Lỗi vận chuyển</span>' : r.fault==='customer' ? '<span style="background:#F1F5F9;color:#475569;font-size:10px;font-weight:700;padding:1px 6px;border-radius:99px">👤 Lỗi KH</span>' : ''}
+        </div>
+      </td>
+      <td style="padding:10px;text-align:right;font-weight:700;color:#DC2626">${window.fmt(r.refundTotal)} ₫<div style="font-size:9px;color:var(--muted);font-weight:400">${r.refundMode==='cash'?'chi tiền mặt':'giảm công nợ'}</div></td>
       <td style="padding:10px"><span style="background:${stClr[r.status]}1f;color:${stClr[r.status]};padding:2px 8px;border-radius:99px;font-size:11px;font-weight:700">${stLab[r.status]}</span></td>
       <td style="padding:10px">${r.status==='pending' ? `<button class="btn btn-ghost btn-sm" onclick="window.processReturn('${r.id}')">✓ Xử lý</button>` : ''}</td>
     </tr>`).join('');
@@ -148,54 +155,161 @@
     const list = getR();
     const i = list.findIndex(x => x.id === id);
     if (i < 0) return;
-    if (!confirm(`Đánh dấu đã hoàn ${window.fmt(list[i].refundTotal)} ₫ cho ${list[i].custName}?`)) return;
-    list[i].status = 'refunded';
+    const r = list[i];
+    const summary = [
+      r.item ? `Mặt hàng: ${r.item.name} ${r.qtyReturn||0}${r.item.unit||'kg'}` : '',
+      `Hàng trả: ${r.disposition==='restock' ? 'NHẬP LẠI KHO' : 'BỎ (hao hụt)'}`,
+      r.refundTotal>0 ? `Hoàn ${window.fmt(r.refundTotal)}₫ — ${r.refundMode==='cash'?'chi tiền mặt':'giảm công nợ KH'}` : 'Không hoàn tiền',
+      r.fault==='supplier' && r.supplierId ? `Đòi lại NCC: ${r.supplierName}` : ''
+    ].filter(Boolean).join('\n');
+    if (!confirm(`Xử lý đơn trả ${r.id}?\n\n${summary}`)) return;
+
+    const msgs = [];
+    r.status = 'refunded';
+
+    /* 1) Nhập lại kho nếu hàng còn dùng được */
+    if (r.disposition === 'restock' && r.item && r.item.id && r.qtyReturn > 0) {
+      const inv = window.STORE.get('inventory', []) || [];
+      let item = inv.find(x => x.productId === r.item.id);
+      if (!item) {
+        item = { id:'INV'+Date.now().toString(36), productId:r.item.id, stock:0, minStock:10, maxStock:100, avgDaily:5, lastIn:'', lastOut:'', location:'Kho A1' };
+        inv.push(item);
+      }
+      item.stock = Math.max(0, (item.stock||0) + r.qtyReturn);
+      item.lastIn = r.date;
+      window.STORE.set('inventory', inv);
+      msgs.push(`+${r.qtyReturn}${r.item.unit||'kg'} vào kho`);
+    }
+
+    /* 2) Hoàn tiền: giảm công nợ KH hoặc chi tiền mặt */
+    if (r.refundTotal > 0) {
+      if (r.refundMode === 'cash') {
+        const cash = window.STORE.get('cashEntries', []) || [];
+        cash.unshift({no:'PC'+String(cash.length+1).padStart(4,'0'), date:r.date, type:'expense',
+          amount:r.refundTotal, account:'Tiền mặt', counterparty:r.custName,
+          description:'Hoàn tiền trả hàng ' + r.orderCode});
+        window.STORE.set('cashEntries', cash);
+        msgs.push('tạo phiếu chi');
+      } else {
+        const custs = window.STORE.get('customers', []) || [];
+        const c = custs.find(x => x.id === r.custId) || custs.find(x => x.name === r.custName);
+        if (c) {
+          c.debt = Math.max(0, (+c.debt||0) - r.refundTotal);
+          window.STORE.set('customers', custs);
+          msgs.push(`giảm công nợ ${r.custName}`);
+        } else { msgs.push('không tìm thấy KH để giảm nợ'); }
+      }
+    }
+
+    /* 3) Lỗi NCC → tạo khoản đòi lại NCC */
+    if (r.fault === 'supplier' && r.supplierId) {
+      const claims = window.STORE.get('supplierClaims', []) || [];
+      claims.unshift({
+        id:'CL'+Date.now().toString(36), supplierId:r.supplierId, supplierName:r.supplierName,
+        orderCode:r.orderCode, returnId:r.id, item:r.item?r.item.name:'', qty:r.qtyReturn||0,
+        amount:r.refundTotal, reason:r.reason, date:r.date, status:'open'
+      });
+      window.STORE.set('supplierClaims', claims);
+      msgs.push(`tạo khoản đòi NCC ${r.supplierName}`);
+    }
+
     window.STORE.set('returns', list);
-    /* Tạo phiếu chi */
-    const cash = window.STORE.get('cashEntries', []) || [];
-    cash.unshift({no:'PC'+String(cash.length+1).padStart(4,'0'), date:'18/05/2026', type:'expense',
-      amount:list[i].refundTotal, account:'Tiền mặt', counterparty:list[i].custName,
-      description:'Hoàn tiền trả hàng ' + list[i].orderCode});
-    window.STORE.set('cashEntries', cash);
-    window.audit && window.audit.log('return.refund', `${id} · ${window.fmt(list[i].refundTotal)} ₫`);
-    window.toast('✓ Đã ghi hoàn tiền + phiếu chi','success');
+    window.audit && window.audit.log('return.process', `${id} · ${msgs.join(', ')}`);
+    window.toast('✓ Đã xử lý: ' + (msgs.join(' · ') || 'đóng đơn trả'), 'success');
     renderRet();
   };
 
+  function viToday() {
+    const d = (window.todayDate && window.todayDate()) || new Date();
+    return `${String(d.getDate()).padStart(2,'0')}/${String(d.getMonth()+1).padStart(2,'0')}/${d.getFullYear()}`;
+  }
+  const _lbl = 'font-size:12px;color:var(--muted)';
+  const _inp = 'width:100%;border:1px solid var(--line);border-radius:6px;padding:7px;font-size:13px;margin-bottom:8px';
+
   window.openReturnModal = function() {
     const orders = getOrd().filter(o => o.status === 'delivered' || o.status === 'reconciled');
+    const sups = window.STORE.get('suppliers', []) || [];
     window.openModal('+ Ghi nhận trả hàng', `
       <div style="background:#FEF3C7;color:#92400E;padding:9px 12px;border-radius:7px;font-size:12px;margin-bottom:12px">
-        💡 Ghi nhận khi KH trả hàng vì lý do hỏng/sai/thiếu. Sau khi lưu, bấm "✓ Xử lý" để hoàn tiền — phiếu chi sẽ tự tạo trong Kế toán.
+        💡 Ghi rõ <b>mặt hàng + số kg trả</b>. Chọn cách xử lý tồn kho, lỗi do ai, và cách hoàn tiền. Bấm "✓ Xử lý" để chốt.
       </div>
-      <label style="font-size:12px;color:var(--muted)">Đơn gốc *</label>
-      <select id="rt_ord" style="width:100%;border:1px solid var(--line);border-radius:6px;padding:7px;font-size:13px;margin-bottom:8px"><option value="">— Chọn đơn —</option>${orders.slice(0,50).map(o => `<option value="${o.code}" data-cust="${o.custName}">${o.code} · ${o.custName} · ${o.date}</option>`).join('')}</select>
-      <label style="font-size:12px;color:var(--muted)">Lý do *</label>
-      <select id="rt_reason" style="width:100%;border:1px solid var(--line);border-radius:6px;padding:7px;font-size:13px;margin-bottom:8px">
+      <label style="${_lbl}">Đơn gốc *</label>
+      <select id="rt_ord" onchange="window._rtOnOrder()" style="${_inp}"><option value="">— Chọn đơn —</option>${orders.slice(0,80).map(o => `<option value="${o.code}" data-cust="${o.custName}">${o.code} · ${o.custName} · ${o.date}</option>`).join('')}</select>
+      <label style="${_lbl}">Mặt hàng trả *</label>
+      <select id="rt_item" style="${_inp}"><option value="">— Chọn đơn trước —</option></select>
+      <div style="display:flex;gap:8px">
+        <div style="flex:1"><label style="${_lbl}">Số lượng trả</label><input id="rt_qty" type="number" min="0" step="0.1" placeholder="VD: 2" style="${_inp}"></div>
+        <div style="flex:1"><label style="${_lbl}">Số tiền hoàn (₫)</label><input id="rt_refund" type="number" placeholder="VD: 80000" style="${_inp}"></div>
+      </div>
+      <label style="${_lbl}">Lý do *</label>
+      <select id="rt_reason" style="${_inp}">
         <option>Rau hỏng/thối</option><option>Sai mặt hàng</option><option>Thiếu số lượng</option>
         <option>Không đúng chất lượng</option><option>KH đổi ý</option><option>Khác</option>
       </select>
-      <label style="font-size:12px;color:var(--muted)">Số tiền hoàn (₫)</label>
-      <input id="rt_refund" type="number" placeholder="VD: 80000" style="width:100%;border:1px solid var(--line);border-radius:6px;padding:7px;font-size:13px;margin-bottom:8px">
-      <label style="font-size:12px;color:var(--muted)">Ghi chú</label>
+      <label style="${_lbl}">Hàng trả về xử lý thế nào?</label>
+      <select id="rt_disp" style="${_inp}">
+        <option value="discard">🗑 Bỏ — hao hụt (hỏng, không dùng được)</option>
+        <option value="restock">🏬 Nhập lại kho (còn dùng được) → +tồn</option>
+      </select>
+      <label style="${_lbl}">Lỗi do ai?</label>
+      <select id="rt_fault" onchange="window._rtOnFault()" style="${_inp}">
+        <option value="shipping">🚚 Vận chuyển — công ty chịu</option>
+        <option value="supplier">🏭 NCC giao hàng đã hỏng — đòi lại NCC</option>
+        <option value="customer">👤 Khách đổi ý / lỗi KH</option>
+      </select>
+      <div id="rt_supWrap" style="display:none">
+        <label style="${_lbl}">NCC chịu trách nhiệm</label>
+        <select id="rt_sup" style="${_inp}"><option value="">— Chọn NCC —</option>${sups.map(s => `<option value="${s.id}">${s.name}</option>`).join('')}</select>
+      </div>
+      <label style="${_lbl}">Hoàn tiền bằng cách</label>
+      <select id="rt_mode" style="${_inp}">
+        <option value="debt">Giảm công nợ KH (B2B — khuyên dùng)</option>
+        <option value="cash">Chi tiền mặt (tạo phiếu chi)</option>
+      </select>
+      <label style="${_lbl}">Ghi chú</label>
       <textarea id="rt_note" rows="2" style="width:100%;border:1px solid var(--line);border-radius:6px;padding:7px;font-size:13px"></textarea>
     `, {
       footer:`<button class="btn btn-ghost" onclick="window.closeModal()">Hủy</button>
               <button class="btn btn-primary" onclick="window._rtSave()">Lưu (Chờ xử lý)</button>`,
-      width:'480px'
+      width:'540px'
     });
+  };
+
+  window._rtOnOrder = function() {
+    const code = document.getElementById('rt_ord').value;
+    const o = getOrd().find(x => x.code === code);
+    const items = (o && Array.isArray(o.items)) ? o.items : [];
+    const itemSel = document.getElementById('rt_item');
+    itemSel.innerHTML = items.length
+      ? items.map((it,idx) => `<option value="${idx}">${it.name} (đã giao ${it.qty||0}${it.unit||'kg'})</option>`).join('')
+      : '<option value="">(đơn này không có chi tiết mặt hàng)</option>';
+  };
+  window._rtOnFault = function() {
+    document.getElementById('rt_supWrap').style.display = document.getElementById('rt_fault').value === 'supplier' ? '' : 'none';
   };
 
   window._rtSave = function() {
     const sel = document.getElementById('rt_ord');
     if (!sel.value) { window.toast('Chọn đơn','warn'); return; }
+    const o = getOrd().find(x => x.code === sel.value);
+    const items = (o && Array.isArray(o.items)) ? o.items : [];
+    const it = items[+document.getElementById('rt_item').value] || null;
+    const supSel = document.getElementById('rt_sup');
     const list = getR();
     list.push({
       id: 'RT' + String(list.length+1).padStart(3,'0'),
       orderCode: sel.value,
-      custName: sel.options[sel.selectedIndex].dataset.cust,
-      date: '18/05/2026',
+      custId: o ? o.cust : '',
+      custName: o ? o.custName : sel.options[sel.selectedIndex].dataset.cust,
+      date: viToday(),
+      item: it ? { id: it.id, name: it.name, unit: it.unit || 'kg' } : null,
+      qtyReturn: parseFloat(document.getElementById('rt_qty').value) || 0,
       reason: document.getElementById('rt_reason').value,
+      disposition: document.getElementById('rt_disp').value,
+      fault: document.getElementById('rt_fault').value,
+      refundMode: document.getElementById('rt_mode').value,
+      supplierId: supSel ? supSel.value : '',
+      supplierName: (supSel && supSel.value) ? supSel.options[supSel.selectedIndex].text : '',
       refundTotal: parseInt(document.getElementById('rt_refund').value) || 0,
       note: document.getElementById('rt_note').value,
       status: 'pending',

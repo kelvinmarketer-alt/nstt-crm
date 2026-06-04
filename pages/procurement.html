@@ -7,9 +7,10 @@
 <link rel="stylesheet" href="../styles/tokens.css">
 <link rel="stylesheet" href="../styles/app.css">
 <style>
-  .pc-tabs{display:flex;gap:6px;margin-bottom:14px;border-bottom:1px solid var(--line)}
-  .pc-tab{padding:9px 16px;font-size:13.5px;font-weight:600;color:var(--muted);cursor:pointer;border-bottom:2px solid transparent;margin-bottom:-1px}
-  .pc-tab.active{color:var(--navy);border-bottom-color:var(--navy)}
+  .pc-step{margin-bottom:24px}
+  .pc-step-hd{display:flex;align-items:center;gap:10px;font-size:16px;font-weight:800;color:var(--navy);padding-bottom:10px;margin-bottom:12px;border-bottom:2px solid #E2E8F0;flex-wrap:wrap}
+  .pc-step-n{display:inline-grid;place-items:center;width:26px;height:26px;border-radius:50%;background:#1B5E20;color:#fff;font-size:14px;flex-shrink:0}
+  .pc-step-sub{font-size:12px;font-weight:400;color:var(--muted)}
   .ord-pick{display:flex;align-items:center;gap:12px;padding:11px 14px;border:1px solid var(--line);border-radius:10px;margin-bottom:8px;background:#fff;cursor:pointer;transition:border-color .15s}
   .ord-pick:hover{border-color:var(--navy)}
   .ord-pick.sel{border-color:#15803D;background:#F0FDF4}
@@ -47,15 +48,23 @@
       <div style="flex:1"></div>
     </div>
 
-    <div class="pc-tabs">
-      <div class="pc-tab active" data-pctab="gather" onclick="window.pcSwitch('gather')">① Chọn đơn → Gom</div>
-      <div class="pc-tab" data-pctab="runs" onclick="window.pcSwitch('runs')">② Phiên gom &amp; Đặt NCC</div>
-      <div class="pc-tab" data-pctab="release" onclick="window.pcSwitch('release')">③ Xuất kho → Ship</div>
-    </div>
+    <section class="pc-step" id="stepGather">
+      <div class="pc-step-hd"><span class="pc-step-n">1</span> Chọn đơn → Gom
+        <span class="pc-step-sub">Tick các đơn cùng đợt giao rồi bấm <b>Tạo phiên gom</b></span></div>
+      <div id="pcGather"></div>
+    </section>
 
-    <div id="pcGather"></div>
-    <div id="pcRuns" style="display:none"></div>
-    <div id="pcRelease" style="display:none"></div>
+    <section class="pc-step" id="stepRuns">
+      <div class="pc-step-hd"><span class="pc-step-n">2</span> Phiên gom &amp; Đặt NCC
+        <span class="pc-step-sub">Mở phiên → <b>gán NCC cho từng mặt hàng</b> → xác nhận đủ/thiếu</span></div>
+      <div id="pcRuns"></div>
+    </section>
+
+    <section class="pc-step" id="stepRelease">
+      <div class="pc-step-hd"><span class="pc-step-n">3</span> Xuất kho → Ship
+        <span class="pc-step-sub">Phiên đã xác nhận → xuất kho, bàn giao cho shipper</span></div>
+      <div id="pcRelease"></div>
+    </section>
   </main>
 </div>
 
