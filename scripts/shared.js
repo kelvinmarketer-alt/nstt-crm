@@ -436,6 +436,10 @@ window.attachBulkOps = function (opts) {
         <option value="">${customActions.changeStatus.label || 'Đổi TT'}</option>${opts2}
       </select>`;
     }
+    /* Nút tùy biến: opts.actions.buttons = [{label, handler(ids)}] */
+    (customActions.buttons || []).forEach((b, i) => {
+      actionsHtml += `<button onclick="window._bulkBtn_${store}_${i}()" style="background:#fff;color:var(--navy);border:none;padding:5px 11px;border-radius:6px;font-weight:600;font-size:12.5px;cursor:pointer">${b.label}</button>`;
+    });
     toolbar.innerHTML = `
       <span style="font-weight:700">✓ Đã chọn ${ids.length} ${label}</span>
       <button onclick="window._bulkClear_${store}()" style="background:transparent;color:#fff;border:1px solid rgba(255,255,255,0.3);padding:5px 11px;border-radius:6px;font-size:12.5px;cursor:pointer">Bỏ chọn</button>
@@ -498,6 +502,14 @@ window.attachBulkOps = function (opts) {
     URL.revokeObjectURL(url);
     window.toast?.(`⬇ Đã xuất ${selected.length} ${label}`, 'success');
   };
+  /* Nút tùy biến → gọi handler với danh sách id đang chọn */
+  ((opts.actions && opts.actions.buttons) || []).forEach((b, i) => {
+    window[`_bulkBtn_${store}_${i}`] = function () {
+      const ids = getSelectedIds();
+      if (!ids.length) return;
+      b.handler(ids);
+    };
+  });
 
   /* Bind checkbox clicks (delegate) */
   tbl.addEventListener('click', (e) => {

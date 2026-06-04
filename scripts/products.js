@@ -608,6 +608,29 @@
     catch (e) { window.openModal('📋 Bảng giá (text)', `<textarea rows="14" style="width:100%;font-family:ui-monospace,monospace;font-size:12px;padding:10px;border:1px solid var(--line);border-radius:8px">${msg}</textarea>`, { footer: `<button class="btn btn-primary" onclick="closeModal()">Đóng</button>`, width: '560px' }); }
   };
 
+  /* Đặt GIÁ NHẬP hàng loạt cho các SP đã chọn (ngày hôm nay) */
+  window.bulkSetBuyPrice = function (ids) {
+    const val = prompt(`Đặt GIÁ NHẬP cho ${ids.length} SP đã chọn (đ/đvt):`, '');
+    if (val == null) return;
+    const v = parseInt(String(val).replace(/[^\d]/g, ''), 10);
+    if (isNaN(v) || v < 0) { window.toast('Nhập số hợp lệ', 'warn'); return; }
+    const today = window.todayISO();
+    const ps = products();
+    let n = 0;
+    ids.forEach(id => {
+      const p = ps.find(x => x.id === id); if (!p) return;
+      const last = window.priceEntryOn(p, today) || { buy: 0, sell: 0 };
+      const hist = [...(p.priceHistory || [])];
+      const ex = hist.find(h => h.date === today);
+      if (ex) ex.buy = v; else hist.push({ date: today, buy: v, sell: last.sell || 0 });
+      p.priceHistory = hist; n++;
+    });
+    window.STORE.set('products', ps);
+    if (window._bulkClear_products) window._bulkClear_products();
+    renderCatalog();
+    window.toast(`✓ Đã đặt giá nhập ${window.fmt(v)} cho ${n} SP`, 'success');
+  };
+
   /* ============ DANH MỤC SẢN PHẨM ============ */
   function renderCatalog() {
     const ps = products();
@@ -691,7 +714,10 @@
               label: '🔄 Đổi nhóm',
               field: 'cat',
               options: CATS.map(c => ({ id: c.id, label: (c.icon || '') + ' ' + c.label }))
-            }
+            },
+            buttons: [
+              { label: '💲 Đặt giá nhập', handler: (ids) => window.bulkSetBuyPrice(ids) },
+            ]
           }
         });
       }
