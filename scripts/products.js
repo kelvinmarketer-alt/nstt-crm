@@ -458,7 +458,11 @@
       const margin = sell - buy;
       return `<tr data-id="${p.id}">
         <td onclick="event.stopPropagation()"><div class="checkbox" onclick="this.classList.toggle('on')"></div></td>
-        <td>${p.img ? `<img src="${p.img}" alt="" loading="lazy" style="width:42px;height:42px;object-fit:cover;border-radius:7px;background:#eef3ee" onerror="this.style.visibility='hidden'">` : ''}</td>
+        <td><div onclick="event.stopPropagation();window.quickEditProductImage('${p.id}')" title="Bấm để đổi ảnh trực tiếp" style="position:relative;width:42px;height:42px;cursor:pointer">
+          ${p.img ? `<img src="${p.img}" alt="" loading="lazy" style="width:42px;height:42px;object-fit:cover;border-radius:7px;background:#eef3ee" onerror="this.parentElement.querySelector('.ph')?(this.style.display='none'):null">` : ''}
+          ${p.img ? '' : `<div class="ph" style="width:42px;height:42px;border-radius:7px;background:#eef3ee;display:grid;place-items:center;color:#9CA3AF;font-size:15px">📷</div>`}
+          <span style="position:absolute;right:-4px;bottom:-4px;background:var(--navy);color:#fff;border-radius:50%;width:17px;height:17px;display:grid;place-items:center;font-size:9px;box-shadow:0 1px 3px rgba(0,0,0,.3)">✎</span>
+        </div></td>
         <td data-field="name" title="Click để sửa tên SP"><b>${p.name}</b><div style="color:var(--muted);font-size:11px">${p.en || p.note || ''}</div></td>
         <td data-field="cat" title="Click để đổi nhóm"><span class="tag" style="background:${cat.color}20;color:${cat.color}">${cat.icon} ${cat.label}</span></td>
         <td data-field="unit" title="Click để sửa đơn vị tính" style="color:var(--muted)">/${p.unit}</td>
@@ -705,6 +709,42 @@
     const pv = document.getElementById('pImgPreview'); if (pv) { pv.src = ''; pv.style.visibility = 'hidden'; }
     const file = document.getElementById('pImgFile'); if (file) file.value = '';
     window.toast('Đã xóa ảnh sản phẩm', 'info');
+  };
+
+  /* Nén ảnh file → base64 (~400px) rồi callback */
+  function _resizeToBase64(file, cb) {
+    if (!file) return;
+    if (file.size > 12 * 1024 * 1024) { window.toast('Ảnh quá lớn (>12MB)', 'warn'); return; }
+    const reader = new FileReader();
+    reader.onload = ev => {
+      const im = new Image();
+      im.onload = () => {
+        const MAX = 400; let w = im.width, h = im.height;
+        if (w > h && w > MAX) { h = Math.round(h * MAX / w); w = MAX; }
+        else if (h > MAX) { w = Math.round(w * MAX / h); h = MAX; }
+        const cv = document.createElement('canvas'); cv.width = w; cv.height = h;
+        cv.getContext('2d').drawImage(im, 0, 0, w, h);
+        try { cb(cv.toDataURL('image/jpeg', 0.82)); } catch (e) { window.toast('Không đọc được ảnh', 'warn'); }
+      };
+      im.onerror = () => window.toast('File không phải ảnh hợp lệ', 'warn');
+      im.src = ev.target.result;
+    };
+    reader.readAsDataURL(file);
+  }
+
+  /* Đổi ảnh SP TRỰC TIẾP từ danh mục (không cần mở form sửa) */
+  window.quickEditProductImage = function (id) {
+    const inp = document.createElement('input');
+    inp.type = 'file'; inp.accept = 'image/*';
+    inp.onchange = () => {
+      const f = inp.files && inp.files[0]; if (!f) return;
+      _resizeToBase64(f, data => {
+        window.STORE.update('products', id, { img: data });
+        window.toast('✓ Đã đổi ảnh · ' + Math.round(data.length / 1024) + 'KB', 'success');
+        renderCatalog();
+      });
+    };
+    inp.click();
   };
 
   window.openAddProduct = function () {
