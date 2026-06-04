@@ -158,7 +158,7 @@
   };
 
   /* ---- Boot ---- */
-  window.renderAppShell('web-orders', 'Đơn từ web');
+  window.renderAppShell('orders', 'Đơn từ web');
 
   document.getElementById('woFilter').addEventListener('click', e => {
     const b = e.target.closest('button[data-st]');

@@ -1790,4 +1790,20 @@ ${o.note ? `\n📝 Ghi chú: ${o.note}` : ''}
   render();
   setTimeout(applyOrdColPrefs, 100);
   if (prefillCust) setTimeout(() => window.openCreateOrder(prefillCust), 200);
+
+  /* Đếm số đơn web đang chờ duyệt → badge trên nút "🛒 Đơn web chờ duyệt" */
+  window.refreshWebPendBadge = async function () {
+    const badge = document.getElementById('webPendBadge');
+    if (!badge || !window.SB) return;
+    try {
+      const { count, error } = await window.SB
+        .from('web_orders')
+        .select('id', { count: 'exact', head: true })
+        .eq('status', 'pending');
+      if (error) return;
+      if (count && count > 0) { badge.textContent = count; badge.style.display = ''; }
+      else { badge.style.display = 'none'; }
+    } catch (e) {}
+  };
+  setTimeout(() => window.refreshWebPendBadge(), 400);
 })();
