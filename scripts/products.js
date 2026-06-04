@@ -467,15 +467,13 @@
         <td data-field="name" title="Click để sửa tên SP"><b>${p.name}</b><div style="color:var(--muted);font-size:11px">${p.en || p.note || ''}</div></td>
         <td data-field="cat" title="Click để đổi nhóm"><span class="tag" style="background:${cat.color}20;color:${cat.color}">${cat.icon} ${cat.label}</span></td>
         <td data-field="unit" title="Click để sửa đơn vị tính" style="color:var(--muted)">/${p.unit}</td>
-        <td class="num"><input class="cat-price" data-id="${p.id}" data-field="buy" type="number" value="${buy}" style="width:96px;text-align:right;padding:5px 7px;border:1px solid var(--line);border-radius:6px;color:var(--muted)"></td>
-        <td class="num"><input class="cat-price" data-id="${p.id}" data-field="sell" type="number" value="${sell}" style="width:100px;text-align:right;padding:5px 7px;border:1px solid var(--line);border-radius:6px;font-weight:700"></td>
-        <td class="num cat-margin" data-id="${p.id}" style="color:${margin > 0 ? 'var(--ok)' : 'var(--muted)'}">${window.fmt(margin)}</td>
+        <td class="num"><input class="cat-price" data-id="${p.id}" data-field="buy" type="number" value="${buy}" style="width:100px;text-align:right;padding:5px 7px;border:1px solid var(--line);border-radius:6px;font-weight:700"></td>
         <td class="num">
           <button class="icon-btn" title="Sửa chi tiết SP (tên/nhóm/đvt)" onclick="window.editProduct('${p.id}')">✏️</button>
           <button class="icon-btn" title="Xóa sản phẩm" style="color:var(--danger)" onclick="window.deleteProduct('${p.id}')">🗑</button>
         </td>
       </tr>`;
-    }).join('') || `<tr><td colspan="9" style="padding:30px;text-align:center;color:var(--muted)">Chưa có sản phẩm.</td></tr>`;
+    }).join('') || `<tr><td colspan="7" style="padding:30px;text-align:center;color:var(--muted)">Chưa có sản phẩm.</td></tr>`;
 
     document.getElementById('catalogView').innerHTML = `
       <div class="chart-card" style="margin-bottom:14px">
@@ -490,7 +488,7 @@
         <table class="mini-table">
           <thead><tr>
             <th style="width:32px"><div class="checkbox" onclick="this.classList.toggle('on')" title="Chọn tất cả"></div></th>
-            <th style="width:50px">Ảnh</th><th>Tên sản phẩm</th><th>Nhóm</th><th>ĐVT</th><th class="num">Giá nhập</th><th class="num">Giá bán</th><th class="num">Lãi/ĐV</th><th></th>
+            <th style="width:50px">Ảnh</th><th>Tên sản phẩm</th><th>Nhóm</th><th>ĐVT</th><th class="num">Giá nhập</th><th></th>
           </tr></thead>
           <tbody>${rows}</tbody>
         </table>
