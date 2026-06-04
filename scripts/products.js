@@ -448,7 +448,8 @@
     const counts = { all: ps.length };
     ps.forEach(p => counts[p.cat] = (counts[p.cat] || 0) + 1);
     const chips = `<button class="chip ${!currentCat ? 'active' : ''}" onclick="window.filterCat(null)">Tất cả <span class="cnt">${counts.all}</span></button>` +
-      CATS.map(c => `<button class="chip ${currentCat === c.id ? 'active' : ''}" onclick="window.filterCat('${c.id}')" style="${currentCat === c.id ? 'background:' + c.color + ';color:#fff;border-color:' + c.color : ''}">${c.icon} ${c.label} <span class="cnt">${counts[c.id] || 0}</span></button>`).join('');
+      CATS.map(c => `<button class="chip ${currentCat === c.id ? 'active' : ''}" onclick="window.filterCat('${c.id}')" style="${currentCat === c.id ? 'background:' + c.color + ';color:#fff;border-color:' + c.color : ''}">${c.icon} ${c.label} <span class="cnt">${counts[c.id] || 0}</span></button>`).join('') +
+      `<button class="chip" onclick="window.openCategoryManager && window.openCategoryManager()" style="border-style:dashed;color:var(--navy)" title="Đổi biểu tượng / tên danh mục">🏷️ Quản lý danh mục</button>`;
 
     const list = ps.filter(p => !currentCat || p.cat === currentCat);
     const rows = list.map(p => {
