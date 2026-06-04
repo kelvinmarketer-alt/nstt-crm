@@ -632,7 +632,7 @@
       const buy = e ? e.buy : 0, sell = e ? e.sell : 0;
       const margin = sell - buy;
       return `<div class="cat-card" data-id="${p.id}" style="display:flex;align-items:center;gap:10px;padding:9px 11px;border:1px solid var(--line);border-radius:10px;background:#fff">
-        <div class="checkbox" onclick="event.stopPropagation();this.classList.toggle('on')" style="flex:none"></div>
+        <div class="checkbox" onclick="this.classList.toggle('on')" style="flex:none"></div>
         <div onclick="event.stopPropagation();window.quickEditProductImage('${p.id}')" title="Bấm để đổi ảnh trực tiếp" style="position:relative;width:42px;height:42px;cursor:pointer;flex:none">
           ${p.img ? `<img src="${p.img}" alt="" loading="lazy" style="width:42px;height:42px;object-fit:cover;border-radius:7px;background:#eef3ee" onerror="this.parentElement.querySelector('.ph')?(this.style.display='none'):null">` : ''}
           ${p.img ? '' : `<div class="ph" style="width:42px;height:42px;border-radius:7px;background:#eef3ee;display:grid;place-items:center;color:#9CA3AF;font-size:15px">📷</div>`}
@@ -665,6 +665,10 @@
         </div>
       </div>
       <div class="quick-chips" style="margin-bottom:14px">${chips}</div>
+      <div style="display:flex;align-items:center;gap:9px;margin-bottom:10px;padding:8px 12px;background:#fff;border:1px solid var(--line);border-radius:9px">
+        <div id="catSelectAll" class="checkbox" onclick="this.classList.toggle('on')" title="Chọn / bỏ tất cả"></div>
+        <span style="font-size:12.5px;color:var(--muted)">Chọn tất cả · tick từng SP để <b>sửa nhóm / xóa hàng loạt</b> (thanh thao tác hiện ở dưới)</span>
+      </div>
       <div id="catalogGrid" style="display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:10px">${rows}</div>`;
 
     /* Wire inline edit cho giá (input có sẵn) */
@@ -679,22 +683,14 @@
         
         window.attachBulkOps({
           tableSelector: '#' + tbl.id,
+          selectAllSelector: '#catSelectAll',
           store: 'products',
           label: 'SP',
           actions: {
             changeStatus: {
               label: '🔄 Đổi nhóm',
               field: 'cat',
-              options: [
-                {id:'rau-ta', label:'🥬 Rau ta'},
-                {id:'rau-dalat', label:'🥗 Rau Đà Lạt'},
-                {id:'nam', label:'🍄 Nấm'},
-                {id:'rau-gia-vi', label:'🌶 Rau gia vị'},
-                {id:'thit-lon', label:'🐖 Thịt lợn'},
-                {id:'thit-ga', label:'🐓 Thịt gà'},
-                {id:'thit-bo', label:'🥩 Thịt bò'},
-                {id:'hang-khac', label:'🧺 Hàng khác'},
-              ]
+              options: CATS.map(c => ({ id: c.id, label: (c.icon || '') + ' ' + c.label }))
             }
           }
         });
