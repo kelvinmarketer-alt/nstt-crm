@@ -657,8 +657,55 @@
       <div class="form-row">
         <div><label>Giá nhập hôm nay (₫)</label><input id="pBuy" type="number" value="${e ? e.buy : ''}" placeholder="0"></div>
         <div><label>Giá bán hôm nay (₫) *</label><input id="pSell" type="number" value="${e ? e.sell : ''}" placeholder="0"></div>
+      </div>
+      <div class="form-row wide">
+        <label>🖼 Ảnh sản phẩm</label>
+        <div style="display:flex;align-items:center;gap:12px">
+          <img id="pImgPreview" src="${p && p.img ? p.img : ''}" alt="" style="width:74px;height:74px;object-fit:cover;border-radius:10px;border:1px solid var(--line);background:#f3f7f3;${p && p.img ? '' : 'visibility:hidden'}" onerror="this.style.visibility='hidden'">
+          <div style="display:flex;flex-direction:column;gap:6px">
+            <input type="file" id="pImgFile" accept="image/*" style="display:none" onchange="window._prodPickImage(this)">
+            <button type="button" class="btn btn-ghost btn-sm" onclick="document.getElementById('pImgFile').click()">📷 Chọn / Đổi ảnh</button>
+            <button type="button" class="btn btn-ghost btn-sm" style="color:var(--danger)" onclick="window._prodClearImage()">🗑 Xóa ảnh</button>
+          </div>
+          <input type="hidden" id="pImg" value="${p && p.img ? String(p.img).replace(/"/g, '&quot;') : ''}">
+        </div>
+        <div style="font-size:11px;color:var(--muted);margin-top:4px">Ảnh tự nén nhỏ (~400px) lưu kèm SP → đồng bộ mọi máy. Để trống = không có ảnh.</div>
       </div>`;
   }
+
+  /* Chọn ảnh từ máy → nén canvas → base64 vào #pImg */
+  window._prodPickImage = function (input) {
+    const f = input.files && input.files[0];
+    if (!f) return;
+    if (f.size > 12 * 1024 * 1024) { window.toast('Ảnh quá lớn (>12MB)', 'warn'); return; }
+    const reader = new FileReader();
+    reader.onload = ev => {
+      const img = new Image();
+      img.onload = () => {
+        const MAX = 400;
+        let w = img.width, h = img.height;
+        if (w > h && w > MAX) { h = Math.round(h * MAX / w); w = MAX; }
+        else if (h > MAX) { w = Math.round(w * MAX / h); h = MAX; }
+        const cv = document.createElement('canvas'); cv.width = w; cv.height = h;
+        cv.getContext('2d').drawImage(img, 0, 0, w, h);
+        let data;
+        try { data = cv.toDataURL('image/jpeg', 0.82); }
+        catch (e) { window.toast('Không đọc được ảnh', 'warn'); return; }
+        const fld = document.getElementById('pImg'); if (fld) fld.value = data;
+        const pv = document.getElementById('pImgPreview'); if (pv) { pv.src = data; pv.style.visibility = 'visible'; }
+        window.toast('✓ Đã chọn ảnh · ' + Math.round(data.length / 1024) + 'KB', 'success');
+      };
+      img.onerror = () => window.toast('File không phải ảnh hợp lệ', 'warn');
+      img.src = ev.target.result;
+    };
+    reader.readAsDataURL(f);
+  };
+  window._prodClearImage = function () {
+    const fld = document.getElementById('pImg'); if (fld) fld.value = '';
+    const pv = document.getElementById('pImgPreview'); if (pv) { pv.src = ''; pv.style.visibility = 'hidden'; }
+    const file = document.getElementById('pImgFile'); if (file) file.value = '';
+    window.toast('Đã xóa ảnh sản phẩm', 'info');
+  };
 
   window.openAddProduct = function () {
     window.openModal('+ Thêm sản phẩm', productForm(null), {
@@ -685,6 +732,8 @@
     const unit = (window.formVal('#pUnit') || 'kg').toLowerCase();
     const note = window.formVal('#pNote');
     const buy = parseInt(window.formVal('#pBuy'), 10) || 0;
+    const imgEl = document.getElementById('pImg');
+    const img = imgEl ? imgEl.value : '';
     const today = window.todayISO();
 
     if (id) {
@@ -692,12 +741,12 @@
       const hist = [...(p.priceHistory || [])];
       const ex = hist.find(h => h.date === today);
       if (ex) { ex.buy = buy; ex.sell = sell; } else { hist.push({ date: today, buy, sell }); }
-      window.STORE.update('products', id, { name, cat, unit, note, priceHistory: hist });
+      window.STORE.update('products', id, { name, cat, unit, note, priceHistory: hist, img });
       window.toast('✓ Đã cập nhật ' + name, 'success');
     } else {
       window.STORE.add('products', {
         id: window.STORE.nextId('products', 'SP', 3),
-        name, cat, unit, note,
+        name, cat, unit, note, img,
         priceHistory: [{ date: today, buy, sell }],
       });
       window.toast('✓ Đã thêm ' + name, 'success');
