@@ -98,7 +98,7 @@
     orders.forEach(o => { const d = o.deliverDate || '(chưa đặt ngày giao)'; (byDate[d] = byDate[d] || []).push(o); });
     const dates = Object.keys(byDate).sort();
     let html = `<div style="display:flex;align-items:center;gap:10px;margin-bottom:10px;flex-wrap:wrap">
-        <span style="font-size:12.5px;color:var(--muted)">Tick các đơn cùng đợt giao → bấm <b>Tạo phiên gom</b>. Hệ thống cộng sản lượng theo từng NCC.</span>
+        <span style="font-size:12.5px;color:var(--muted)">Tick các đơn cùng đợt giao → bấm <b>Tạo phiên gom</b>. Phiên gom mở ra → <b>gán NCC cho từng mặt hàng</b> + xác nhận đủ/thiếu.</span>
         <div style="flex:1"></div>
         <button class="btn btn-primary btn-sm" id="pcMakeRun" onclick="window.pcMakeRun()" disabled>🧺 Tạo phiên gom (<span id="pcSelN">0</span>)</button>
       </div>`;
@@ -176,16 +176,19 @@
     const stLabel = { draft: ['Nháp', '#64748B'], sent: ['Đã gửi NCC', '#0EA5E9'], confirmed: ['Đã xác nhận', '#15803D'], closed: ['Đã xuất kho', '#1B5E20'] };
     host.innerHTML = runs.map(r => {
       const [lb, clr] = stLabel[r.status] || stLabel.draft;
-      const sups = [...new Set(r.lines.map(l => l.supplierName || '(chưa gán)'))];
+      const sups = [...new Set(r.lines.filter(l => l.supplierId).map(l => l.supplierName))];
+      const nNone = r.lines.filter(l => !l.supplierId).length;
       const totalKg = r.lines.reduce((s, l) => s + l.totalQty, 0);
       return `<div class="run-card" onclick="window.pcOpenRun('${r.id}')">
-        <div style="display:flex;align-items:center;gap:10px">
+        <div style="display:flex;align-items:center;gap:10px;flex-wrap:wrap">
           <div style="font-weight:800;font-size:15px;color:var(--navy)">${r.id}</div>
           <span class="tag" style="background:${clr}1f;color:${clr};font-weight:700">${lb}</span>
+          ${nNone > 0 ? `<span class="tag" style="background:#FEF3C7;color:#B45309;font-weight:700">⚠ ${nNone} SP chưa gán NCC</span>` : ''}
           <div style="flex:1"></div>
           <div style="font-size:11.5px;color:var(--muted)">${new Date(r.createdAt).toLocaleString('vi-VN')} · ${r.createdBy}</div>
         </div>
-        <div style="font-size:12.5px;color:var(--muted);margin-top:6px">${r.orderCodes.length} đơn · ${r.lines.length} mã · ${fmtQty(totalKg)} kg · NCC: ${sups.map(esc).join(', ')}</div>
+        <div style="font-size:12.5px;color:var(--muted);margin-top:6px">${r.orderCodes.length} đơn · ${r.lines.length} mã · ${fmtQty(totalKg)} kg${sups.length ? ' · NCC: ' + sups.map(esc).join(', ') : ''}</div>
+        <div style="margin-top:9px"><button class="btn btn-primary btn-sm" onclick="event.stopPropagation();window.pcOpenRun('${r.id}')">🏭 ${nNone > 0 ? 'Gán NCC & xác nhận' : 'Mở · xác nhận hàng'} →</button></div>
       </div>`;
     }).join('');
   }

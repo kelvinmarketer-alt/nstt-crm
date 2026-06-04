@@ -26,6 +26,9 @@
    ========================================================= */
 (function () {
 
+  /* Không nạp AI chat khi trang đang nằm trong iframe (embed) → tránh 2 bong bóng */
+  if (window.self !== window.top || document.documentElement.classList.contains('embed')) return;
+
   const WORKING_TURNS = 10;        /* Số turn nguyên văn gửi lên */
   const SUMMARIZE_AT = 20;         /* Khi hist > X turn → summarize */
 
