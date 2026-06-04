@@ -60,6 +60,7 @@
         <td><span class="st-pill st-${p.status}">${p.status==='ordered'?'⏳ Đã đặt':p.status==='received'?'✓ Đã nhận':'✕ Hủy'}</span></td>
         <td>
           <button class="btn btn-ghost btn-sm" onclick="window.openPurDrawer('${p.id}')" title="Xem chi tiết">👁</button>
+          <button class="btn btn-ghost btn-sm" onclick="window.printPur('${p.id}')" title="In phiếu nhập">🖨</button>
           ${p.status==='ordered' ? `<button class="btn btn-ghost btn-sm" style="color:var(--ok)" onclick="window.markReceived('${p.id}')" title="Đánh dấu đã nhận → cộng kho">✓ Nhận</button>` : ''}
           ${due>0 && p.status==='received' ? `<button class="btn btn-ghost btn-sm" style="color:var(--ok)" onclick="window.payPur('${p.id}')" title="Ghi thanh toán">💰</button>` : ''}
         </td>
@@ -100,7 +101,8 @@
 
         <div><b>Ghi chú:</b> ${p.note || '—'}</div>
 
-        <div style="display:flex;gap:8px;margin-top:18px">
+        <button class="btn btn-navy" style="width:100%;margin-top:14px" onclick="window.printPur('${p.id}')">🖨 In phiếu nhập (PDF/HTML)</button>
+        <div style="display:flex;gap:8px;margin-top:8px">
           ${p.status==='ordered' ? `<button class="btn btn-primary" style="flex:1" onclick="window.markReceived('${p.id}');closeDrawer()">✓ Đã nhận hàng</button>` : ''}
           ${(p.total-(p.paid||0))>0 && p.status==='received' ? `<button class="btn btn-ghost" style="flex:1;color:var(--ok)" onclick="window.payPur('${p.id}');closeDrawer()">💰 Ghi thanh toán</button>` : ''}
           ${p.status!=='cancelled' ? `<button class="btn btn-ghost" style="color:var(--danger)" onclick="window.cancelPur('${p.id}')">✕ Hủy phiếu</button>` : ''}
@@ -243,6 +245,47 @@
     window._pnAddRow();
   };
 
+  const _pnNorm = s => (s || '').toLowerCase().normalize('NFD').replace(/[̀-ͯ]/g, '').replace(/đ/g, 'd').trim();
+  function _pnLastBuy(p) { const h = p.priceHistory || []; const last = h[h.length - 1]; return last ? (last.buy || 0) : 0; }
+  let _pnAC = null;
+  function _pnCloseAC() { if (_pnAC) { _pnAC.remove(); _pnAC = null; } }
+  /* Autocomplete: gõ tên → dropdown gợi ý SP từ danh mục + giá nhập gần nhất */
+  function _pnWireAC(input) {
+    input.setAttribute('autocomplete', 'off');
+    const esc = v => String(v == null ? '' : v).replace(/"/g, '&quot;');
+    function show() {
+      const q = _pnNorm(input.value);
+      const prods = window._pnPRODS || getProds();
+      let list = q ? prods.filter(p => _pnNorm(p.name).includes(q)) : prods.slice();
+      list = list.slice(0, 12);
+      _pnCloseAC();
+      if (!list.length) return;
+      const dd = document.createElement('div');
+      const r = input.getBoundingClientRect();
+      dd.style.cssText = `position:fixed;z-index:99999;left:${r.left}px;top:${r.bottom + 2}px;width:${Math.max(r.width, 240)}px;max-height:260px;overflow:auto;background:#fff;border:1px solid var(--line);border-radius:8px;box-shadow:0 8px 24px rgba(0,0,0,.16)`;
+      dd.innerHTML = list.map(p => {
+        const buy = _pnLastBuy(p);
+        return `<div class="pn-ac-item" data-name="${esc(p.name)}" data-buy="${buy}" style="padding:8px 11px;font-size:12.5px;cursor:pointer;border-bottom:1px solid #F1F5F9;display:flex;justify-content:space-between;gap:10px;align-items:center"><span>${p.name} <span style="color:#94A3B8;font-size:11px">/${p.unit || 'kg'}</span></span>${buy ? `<span style="color:#15803D;font-size:11px;white-space:nowrap">~${window.fmt(buy)}đ</span>` : ''}</div>`;
+      }).join('');
+      document.body.appendChild(dd); _pnAC = dd;
+      dd.querySelectorAll('.pn-ac-item').forEach(it => {
+        it.onmouseover = () => { dd.querySelectorAll('.pn-ac-item').forEach(x => x.style.background = ''); it.style.background = '#F0FDF4'; };
+        it.onmousedown = (e) => {
+          e.preventDefault();
+          input.value = it.dataset.name;
+          const row = input.closest('.item-row');
+          const priceInp = row && row.querySelector('.pn_price');
+          if (priceInp && !priceInp.value && +it.dataset.buy) priceInp.value = it.dataset.buy;
+          _pnCloseAC(); window._pnRecalc();
+          const qtyInp = row && row.querySelector('.pn_qty'); (qtyInp || input).focus();
+        };
+      });
+    }
+    input.addEventListener('focus', show);
+    input.addEventListener('input', show);
+    input.addEventListener('blur', () => setTimeout(_pnCloseAC, 160));
+  }
+
   window._pnAddRow = function (preset) {
     const host = document.getElementById('pn_items');
     if (!host) return;
@@ -250,7 +293,7 @@
     const row = document.createElement('div');
     row.className = 'item-row';
     row.innerHTML = `
-      <input type="text" class="pn_name" list="pnProdList" placeholder="Tên SP (gõ hoặc chọn)" value="${preset ? esc(preset.name) : ''}">
+      <input type="text" class="pn_name" placeholder="Gõ tên SP — gợi ý từ danh mục" value="${preset ? esc(preset.name) : ''}">
       <input type="number" placeholder="SL" class="pn_qty" min="0" step="0.1" value="${preset && preset.qty ? preset.qty : ''}">
       <input type="number" placeholder="Đơn giá" class="pn_price" min="0" value="${preset && preset.price ? preset.price : ''}">
       <input type="text" placeholder="Thành tiền" class="pn_total" readonly style="background:#FAFBFC">
@@ -258,6 +301,7 @@
     `;
     host.appendChild(row);
     row.querySelectorAll('input').forEach(inp => inp.oninput = window._pnRecalc);
+    _pnWireAC(row.querySelector('.pn_name'));
     window._pnRecalc();
   };
 
@@ -314,6 +358,52 @@
     if (window.audit) window.audit.log('purchase.create', `${obj.id} cho ${findSup(obj.supplierId)?.name || obj.supplierId} (${window.fmt(obj.total)} ₫)`);
     window.toast('✓ Đã tạo phiếu nhập (chưa nhận hàng — vào danh sách bấm "✓ Nhận" khi hàng về)', 'success');
     window.closeModal();
+  };
+
+  /* ====== IN PHIẾU NHẬP (branded, qua iframe) ====== */
+  window.printPur = function (id) {
+    const p = getPur().find(x => x.id === id); if (!p) return;
+    const s = findSup(p.supplierId) || {};
+    const ci = window.STORE.get('companyInfo', {}) || {};
+    const origin = (typeof location !== 'undefined' && location.origin && location.origin !== 'null') ? location.origin : 'https://app.nongsantuantuhanoi.vn';
+    const comp = { name: 'NÔNG SẢN TUẤN TÚ HÀ NỘI', addr: ci.address || '36/147A Tân Mai, Hoàng Mai, Hà Nội', phone: ci.hotline || '0836 676 086', logo: ci.logo || (origin + '/assets/logo.png') };
+    const esc = v => String(v == null ? '' : v).replace(/[&<>"]/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]));
+    const items = p.items || [];
+    const rows = items.map((it, i) => `<tr><td class="stt">${i + 1}</td><td><b>${esc(it.name)}</b></td><td class="num">${it.qty} ${it.unit || 'kg'}</td><td class="num">${(it.price || 0).toLocaleString('vi-VN')}</td><td class="num">${(it.total || 0).toLocaleString('vi-VN')}</td></tr>`).join('');
+    const html = `<!doctype html><html lang="vi"><head><meta charset="utf-8"><title>PHIẾU NHẬP ${esc(p.id)}</title>
+<style>@page{size:A4;margin:14mm 12mm}*{box-sizing:border-box;margin:0;padding:0;font-family:'Segoe UI',Arial,sans-serif}
+body{color:#1a1a1a;font-size:13px}.wrap{max-width:780px;margin:0 auto}
+.top{display:flex;align-items:center;gap:14px;border-bottom:3px solid #1B5E20;padding-bottom:10px}
+.top img{width:64px;height:64px;object-fit:contain}.brand h1{font-size:19px;color:#1B5E20;font-weight:800}.brand .sub{font-size:11px;color:#555;margin-top:4px}
+.title{text-align:center;font-size:21px;font-weight:800;color:#1B5E20;letter-spacing:1px;margin:14px 0 2px}
+.metabox{border:1px solid #CBD9C4;border-radius:8px;padding:10px 14px;margin:8px 0;background:#F7FBF5}
+.meta{display:flex;justify-content:space-between;gap:18px;font-size:12.5px;line-height:1.9}.meta b{color:#1B5E20}
+table{width:100%;border-collapse:collapse;font-size:12.5px;margin-top:6px}th,td{border:1px solid #B6C9B0;padding:7px 9px}
+th{background:#1B5E20;color:#fff;font-size:11.5px;text-transform:uppercase}td.stt{text-align:center;width:40px;color:#777}td.num{text-align:right}
+tbody tr:nth-child(even){background:#F4FAF2}tfoot td{background:#E8F5E9;font-weight:800;color:#1B5E20}
+.sig{display:grid;grid-template-columns:1fr 1fr 1fr;gap:24px;margin-top:34px;text-align:center;font-size:11.5px}.sig .role{font-weight:700;color:#1B5E20}.sig .l{margin-top:46px;border-top:1px dotted #aaa}</style></head><body><div class="wrap">
+<div class="top"><img src="${comp.logo}" onerror="this.style.display='none'"><div class="brand"><h1>${comp.name}</h1><div class="sub">${esc(comp.addr)} · ☎ ${esc(comp.phone)}</div></div></div>
+<div class="title">PHIẾU NHẬP HÀNG</div>
+<div class="metabox"><div class="meta"><div><b>Nhà cung cấp:</b> ${esc(s.name || p.supplierId || '')}</div><div><b>Mã phiếu:</b> ${esc(p.id)}</div></div>
+<div class="meta"><div><b>SĐT NCC:</b> ${esc(s.phone || '')}</div><div><b>Ngày nhập:</b> ${esc(p.date || '')}</div></div>
+<div class="meta"><div><b>Điều khoản TT:</b> ${esc(s.paymentTerm || '')}</div><div><b>Trạng thái:</b> ${p.status === 'received' ? 'Đã nhận' : p.status === 'cancelled' ? 'Đã hủy' : 'Đã đặt'}</div></div></div>
+<table><thead><tr><th style="width:40px">STT</th><th>Mặt hàng</th><th class="num">Số lượng</th><th class="num">Đơn giá</th><th class="num">Thành tiền</th></tr></thead>
+<tbody>${rows || '<tr><td colspan="5" style="text-align:center;color:#999;padding:16px">Chưa có mặt hàng</td></tr>'}</tbody>
+<tfoot><tr><td colspan="4" style="text-align:right">TỔNG TIỀN HÀNG</td><td class="num">${(p.total || 0).toLocaleString('vi-VN')} ₫</td></tr>
+<tr><td colspan="4" style="text-align:right">Đã thanh toán</td><td class="num">${(p.paid || 0).toLocaleString('vi-VN')} ₫</td></tr>
+<tr><td colspan="4" style="text-align:right">Còn nợ NCC</td><td class="num" style="color:#B91C1C">${Math.max(0, (p.total || 0) - (p.paid || 0)).toLocaleString('vi-VN')} ₫</td></tr></tfoot></table>
+${p.note ? `<div style="margin-top:10px;font-size:12px"><b>Ghi chú:</b> ${esc(p.note)}</div>` : ''}
+<div class="sig"><div><div class="role">Người lập phiếu</div><div class="l"></div></div><div><div class="role">Thủ kho nhận</div><div class="l"></div></div><div><div class="role">NCC giao</div><div class="l"></div></div></div>
+</div></body></html>`;
+    const old = document.getElementById('purPrintFrame'); if (old) old.remove();
+    const f = document.createElement('iframe'); f.id = 'purPrintFrame';
+    f.style.cssText = 'position:fixed;right:0;bottom:0;width:0;height:0;border:0;visibility:hidden';
+    document.body.appendChild(f);
+    const doc = f.contentWindow.document; doc.open(); doc.write(html); doc.close();
+    const fire = () => { try { f.contentWindow.focus(); f.contentWindow.print(); } catch (e) {} };
+    const img = doc.querySelector('img');
+    if (img && !img.complete) { img.onload = () => setTimeout(fire, 120); img.onerror = () => setTimeout(fire, 120); } else setTimeout(fire, 250);
+    window.toast && window.toast('🖨 Mở hộp in — bỏ tick "Headers and footers" để ẩn ngày/URL', 'info');
   };
 
   window.exportPurCsv = function () {

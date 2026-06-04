@@ -211,3 +211,13 @@ window.PRODUCTS = [
   {"id":"SP119","name":"Mầm cải tím","en":"Purple Mustard Sprouts","cat":"khac","unit":"kg","img":"../assets/products/SP119.jpg","priceHistory":[{"date":"2026-05-17","buy":7000,"sell":11000}]},
   {"id":"SP120","name":"Lá nhíp","en":"Wild Betel Leaves","cat":"khac","unit":"kg","img":"../assets/products/SP120.jpg","priceHistory":[{"date":"2026-05-17","buy":65000,"sell":100000}]}
 ];
+
+/* Override danh mục từ bản đã lưu (icon/tên do user sửa qua "Quản lý danh mục").
+   Đọc localStorage đồng bộ (vty_md_product_categories) → giữ chỉnh sửa qua reload.
+   STORE.set('md_product_categories', ...) cũng đẩy bản này lên Supabase. */
+try {
+  var _pcOverride = JSON.parse(localStorage.getItem('vty_md_product_categories') || 'null');
+  if (Array.isArray(_pcOverride) && _pcOverride.length) {
+    window.PRODUCT_CATEGORIES = _pcOverride;
+  }
+} catch (e) { /* ignore */ }
