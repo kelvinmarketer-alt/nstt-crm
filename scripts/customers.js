@@ -526,6 +526,11 @@
           <select id="addFreq">${window.MD.options('orderFreq')}</select></div>
       </div>
       <div class="form-row">
+        <div><label>Nhóm giá (bảng giá KH nhận)</label>
+          <select id="addPriceTier">${window.priceTierOptions ? window.priceTierOptions('') : '<option value="">Mặc định</option>'}</select></div>
+        <div></div>
+      </div>
+      <div class="form-row">
         <div><label>NV phụ trách</label>
           <select id="addStaff">${
             (window.STORE.get('staff', []) || [])
@@ -544,6 +549,14 @@
     });
   };
 
+  /* Options nhóm giá (đọc priceTiers; fallback 3 nhóm mặc định) */
+  window.priceTierOptions = function (sel) {
+    let tiers = window.STORE.get('priceTiers', null);
+    if (!Array.isArray(tiers) || !tiers.length) tiers = [{ id: 1, name: 'Giá lẻ' }, { id: 2, name: 'Giá sỉ' }, { id: 3, name: 'Giá VIP' }];
+    const ic = ['①', '②', '③', '④', '⑤', '⑥', '⑦', '⑧'];
+    return `<option value="">— Mặc định (Giá gốc) —</option>` + tiers.map(t => `<option value="${t.id}" ${String(sel) === String(t.id) ? 'selected' : ''}>${ic[(t.id - 1) % 8] || ''} ${t.name}</option>`).join('');
+  };
+
   window.submitAddCustomer = function(thenCreateOrder) {
     const name = window.formVal('#addName');
     const phone = window.formVal('#addPhone');
@@ -555,6 +568,7 @@
       id: code, code,
       type: window.formVal('#addType'),
       group: window.formVal('#addGroup'),
+      priceTier: window.formVal('#addPriceTier'),
       name, contact: name,
       phone, email: window.formVal('#addEmail'),
       address: window.formVal('#addAddress'),
@@ -608,6 +622,11 @@
             ).map(s=>`<option ${c.staffOwner===s?'selected':''}>${s}</option>`).join('')
           }</select></div>
       </div>
+      <div class="form-row">
+        <div><label>Nhóm giá (bảng giá KH nhận)</label>
+          <select id="ePriceTier">${window.priceTierOptions ? window.priceTierOptions(c.priceTier || '') : '<option value="">Mặc định</option>'}</select></div>
+        <div></div>
+      </div>
       <div class="form-row wide"><label>Địa chỉ</label><input id="eAddress" value="${c.address}"></div>
     `, {
       footer: `<button class="btn btn-ghost" onclick="closeModal()">Hủy</button>
@@ -618,6 +637,7 @@
     const patch = {
       type: window.formVal('#eType'),
       group: window.formVal('#eGroup'),
+      priceTier: window.formVal('#ePriceTier'),
       name: window.formVal('#eName'),
       contact: window.formVal('#eName'),
       phone: window.formVal('#ePhone'),

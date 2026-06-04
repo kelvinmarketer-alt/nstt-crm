@@ -100,6 +100,7 @@
     'payrollExtra',    /* Bảng lương chi tiết — CRITICAL */
     'latePolicy',      /* Khung phạt đi muộn — CRITICAL (admin cấu hình) */
     'mktPrices',       /* Bảng giá Marketing (chào hàng/ads) — KHÔNG ảnh hưởng đơn */
+    'priceTiers',      /* Nhóm bảng giá theo nhóm KH (±% + override) — gửi báo giá riêng */
     'procurementRuns', /* Phiên gom hàng → đặt NCC (Kho) — CRITICAL */
     'supplierClaims',  /* Khoản đòi lại NCC khi hàng NCC giao hỏng (Trả hàng) */
     'audit_log',       /* Truy vết NV — HIGH */

@@ -7,6 +7,111 @@
   const CATS = window.PRODUCT_CATEGORIES || [];
   const catMeta = id => CATS.find(c => c.id === id) || { label: id, icon: '📦', color: '#666' };
 
+  /* ============ NHÓM BẢNG GIÁ (price tiers theo nhóm KH) ============
+     Mỗi nhóm: markup % so với giá gốc + override giá riêng từng SP.
+     boardTier = 0 → bảng giá GỐC; >0 → id nhóm. */
+  const TIER_ICONS = ['①','②','③','④','⑤','⑥','⑦','⑧'];
+  const DEFAULT_TIERS = [
+    { id: 1, name: 'Giá lẻ', markup: 0, overrides: {} },
+    { id: 2, name: 'Giá sỉ', markup: -5, overrides: {} },
+    { id: 3, name: 'Giá VIP', markup: -10, overrides: {} },
+  ];
+  let boardTier = 0;
+  function getTiers() {
+    const t = window.STORE.get('priceTiers', null);
+    return (Array.isArray(t) && t.length) ? t : DEFAULT_TIERS.map(x => ({ ...x, overrides: {} }));
+  }
+  function saveTiers(tiers) { window.STORE.set('priceTiers', tiers); }
+  function tierById(id) { return getTiers().find(t => t.id === +id); }
+  function tierIcon(t) { return TIER_ICONS[(t.id - 1) % 8] || '#'; }
+  /* Giá hiệu lực của SP trong 1 nhóm: override riêng → dùng; không thì giá gốc ±% */
+  function tierPriceOf(tier, productId, baseSell) {
+    if (tier.overrides && tier.overrides[productId] != null) return tier.overrides[productId];
+    return Math.round((baseSell || 0) * (1 + (tier.markup || 0) / 100));
+  }
+  window.PriceTiers = { getTiers, tierById, tierPriceOf, tierIcon };
+
+  function tierBarHTML() {
+    const tiers = getTiers();
+    let s = `<div class="chart-card" style="margin-bottom:14px"><div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap">
+      <span style="font-size:12.5px;color:var(--muted);font-weight:700">📊 Nhóm bảng giá:</span>
+      <button class="btn btn-sm ${boardTier === 0 ? 'btn-primary' : 'btn-ghost'}" onclick="window.boardSwitchTier(0)">📋 Gốc</button>`;
+    tiers.forEach(t => {
+      s += `<button class="btn btn-sm ${boardTier === t.id ? 'btn-primary' : 'btn-ghost'}" onclick="window.boardSwitchTier(${t.id})">${tierIcon(t)} ${t.name} <span style="opacity:.7">(${t.markup >= 0 ? '+' : ''}${t.markup}%)</span></button>`;
+    });
+    if (tiers.length < 8) s += `<button class="btn btn-sm btn-ghost" style="border-style:dashed" onclick="window.tierAdd()">＋ Thêm nhóm</button>`;
+    s += `<button class="btn btn-sm btn-ghost" onclick="window.tierManage()" title="Đổi tên / % / xóa nhóm">⚙ Quản lý nhóm</button></div>`;
+    const tier = boardTier ? tierById(boardTier) : null;
+    if (tier) {
+      s += `<div style="margin-top:10px;display:flex;align-items:center;gap:10px;flex-wrap:wrap;background:#F0FDF4;border:1px solid #BBF7D0;border-radius:8px;padding:9px 12px">
+        <span style="font-size:13px;font-weight:700;color:var(--navy)">${tierIcon(tier)} ${tier.name}</span>
+        <label style="font-size:12px;color:var(--muted)">% so giá gốc: <input id="tierMarkup" type="number" value="${tier.markup}" style="width:64px;text-align:right;padding:4px 6px;border:1px solid var(--line);border-radius:5px"> %</label>
+        <button class="btn btn-sm btn-primary" onclick="window.tierApplyMarkup()">Áp dụng %</button>
+        <span style="flex:1"></span>
+        <span style="font-size:11.5px;color:var(--muted)">💡 Giá = giá gốc ±%. Sửa tay 1 ô = ghi đè riêng SP đó (nền vàng), ↺ để bỏ ghi đè.</span>
+      </div>`;
+    }
+    s += `</div>`;
+    return s;
+  }
+
+  window.boardSwitchTier = function (id) { boardTier = +id; renderBoard(); };
+  window.tierApplyMarkup = function () {
+    if (!boardTier) return;
+    const v = parseFloat(document.getElementById('tierMarkup').value);
+    if (isNaN(v)) { window.toast('Nhập % hợp lệ', 'warn'); return; }
+    const tiers = getTiers(); const t = tiers.find(x => x.id === boardTier); if (!t) return;
+    t.markup = v; saveTiers(tiers);
+    window.toast(`✓ ${t.name}: giá gốc ${v >= 0 ? '+' : ''}${v}%`, 'success');
+    renderBoard();
+  };
+  window.tierResetOverride = function (pid) {
+    if (!boardTier) return;
+    const tiers = getTiers(); const t = tiers.find(x => x.id === boardTier); if (!t) return;
+    if (t.overrides) delete t.overrides[pid];
+    saveTiers(tiers); renderBoard();
+  };
+  window.tierAdd = function () {
+    const tiers = getTiers();
+    if (tiers.length >= 8) { window.toast('Tối đa 8 nhóm', 'warn'); return; }
+    const id = (tiers.reduce((m, t) => Math.max(m, t.id), 0) || 0) + 1;
+    const name = prompt('Tên nhóm bảng giá mới:', 'Nhóm ' + id);
+    if (name == null) return;
+    tiers.push({ id, name: name.trim() || ('Nhóm ' + id), markup: 0, overrides: {} });
+    saveTiers(tiers); boardTier = id; renderBoard();
+    window.toast('✓ Đã thêm nhóm ' + (name.trim() || id), 'success');
+  };
+  window.tierManage = function () {
+    const tiers = getTiers();
+    const rows = tiers.map(t => `<div style="display:flex;align-items:center;gap:8px;margin-bottom:8px">
+        <span style="font-size:16px">${tierIcon(t)}</span>
+        <input value="${(t.name || '').replace(/"/g, '&quot;')}" data-tid="${t.id}" class="tm-name" style="flex:1;border:1px solid var(--line);border-radius:6px;padding:6px 8px;font-size:13px">
+        <input type="number" value="${t.markup}" data-tid="${t.id}" class="tm-mk" style="width:70px;text-align:right;border:1px solid var(--line);border-radius:6px;padding:6px" title="% so giá gốc"> %
+        <button class="btn btn-ghost btn-sm" style="color:var(--danger)" onclick="window.tierDelete(${t.id})" title="Xóa nhóm">🗑</button>
+      </div>`).join('');
+    window.openModal('⚙ Quản lý nhóm bảng giá', `
+      <div style="font-size:12.5px;color:var(--muted);margin-bottom:10px">Mỗi nhóm = 1 mức giá riêng cho 1 nhóm khách. Khách gán nhóm nào sẽ nhận bảng giá đó. % là điều chỉnh so với giá gốc.</div>
+      ${rows || '<div style="color:var(--muted)">Chưa có nhóm.</div>'}
+      ${tiers.length < 8 ? `<button class="btn btn-ghost btn-sm" onclick="window.closeModal();window.tierAdd()">＋ Thêm nhóm</button>` : ''}
+    `, {
+      footer: `<button class="btn btn-ghost" onclick="window.closeModal()">Đóng</button><button class="btn btn-primary" onclick="window.tierSaveManage()">💾 Lưu</button>`,
+      width: '480px'
+    });
+  };
+  window.tierSaveManage = function () {
+    const tiers = getTiers();
+    document.querySelectorAll('.tm-name').forEach(inp => { const t = tiers.find(x => x.id === +inp.dataset.tid); if (t) t.name = inp.value.trim() || t.name; });
+    document.querySelectorAll('.tm-mk').forEach(inp => { const t = tiers.find(x => x.id === +inp.dataset.tid); if (t) { const v = parseFloat(inp.value); if (!isNaN(v)) t.markup = v; } });
+    saveTiers(tiers); window.closeModal(); renderBoard();
+    window.toast('✓ Đã lưu nhóm bảng giá', 'success');
+  };
+  window.tierDelete = function (id) {
+    if (!confirm('Xóa nhóm bảng giá này? (giá gốc + nhóm khác không ảnh hưởng)')) return;
+    let tiers = getTiers().filter(t => t.id !== +id);
+    saveTiers(tiers); if (boardTier === +id) boardTier = 0;
+    window.closeModal(); renderBoard();
+  };
+
   let currentCat = null;          // lọc danh mục
   let boardDate = maxDate();      // ngày đang xem ở bảng giá
 
@@ -81,6 +186,7 @@
   /* ============ BẢNG GIÁ HÔM NAY ============ */
   function renderBoard() {
     const ps = products();
+    const tier = boardTier ? tierById(boardTier) : null;
     const rows = applyBoardFilter(ps).map(p => {
       const cat = catMeta(p.cat);
       const cur = entryExactlyOn(p, boardDate);
@@ -96,15 +202,26 @@
       } else {
         delta = `<span style="color:var(--muted)">mới</span>`;
       }
+      /* Cột giá: GỐC = input bprice; NHÓM = giá nhóm (override hoặc gốc±%) */
+      let priceCell, lastCell;
+      if (!tier) {
+        priceCell = `<input class="bprice" data-id="${p.id}" type="number" value="${todaySell}" style="width:110px;text-align:right;padding:6px 8px;border:1px solid var(--line);border-radius:6px">`;
+        lastCell = `<td class="num">${delta}</td>`;
+      } else {
+        const hasOv = tier.overrides && tier.overrides[p.id] != null;
+        const tp = tierPriceOf(tier, p.id, todaySell);
+        priceCell = `<input class="tprice" data-id="${p.id}" type="number" value="${tp}" title="${hasOv ? 'Giá ghi đè riêng' : 'Giá gốc ' + (tier.markup >= 0 ? '+' : '') + tier.markup + '%'}" style="width:110px;text-align:right;padding:6px 8px;border:1px solid ${hasOv ? '#F59E0B' : 'var(--line)'};border-radius:6px;${hasOv ? 'background:#FEF9C3;font-weight:700' : ''}">`;
+        lastCell = `<td class="num">${hasOv ? `<button class="btn btn-ghost btn-sm" title="Bỏ ghi đè, về giá gốc ±%" onclick="window.tierResetOverride('${p.id}')">↺</button>` : `<span style="color:var(--muted);font-size:11px">theo %</span>`}</td>`;
+      }
       return `<tr>
         <td><div style="display:flex;align-items:center;gap:8px">
           ${p.img ? `<img src="${p.img}" alt="" loading="lazy" style="width:34px;height:34px;object-fit:cover;border-radius:6px;background:#eef3ee;flex:none" onerror="this.style.visibility='hidden'">` : ''}
           <b>${p.name}</b></div></td>
         <td><span class="tag" style="background:${cat.color}20;color:${cat.color}">${cat.icon} ${cat.label}</span></td>
         <td style="color:var(--muted)">/${p.unit}</td>
-        <td class="num" style="color:var(--muted)">${prevSell != null ? window.fmt(prevSell) : '—'}</td>
-        <td class="num"><input class="bprice" data-id="${p.id}" type="number" value="${todaySell}" style="width:110px;text-align:right;padding:6px 8px;border:1px solid var(--line);border-radius:6px"></td>
-        <td class="num">${delta}</td>
+        <td class="num" style="color:var(--muted)">${tier ? window.fmt(todaySell) : (prevSell != null ? window.fmt(prevSell) : '—')}</td>
+        <td class="num">${priceCell}</td>
+        ${lastCell}
       </tr>`;
     }).join('');
 
@@ -148,13 +265,14 @@
           <button class="btn btn-primary btn-sm" onclick="window.savePriceBoard()">💾 Lưu bảng giá ${fmtD(boardDate)}</button>
         </div>
       </div>
+      ${tierBarHTML()}
       <div class="chart-card">
         ${boardToolbarHTML()}
         <table class="mini-table">
           <thead><tr>
             <th onclick="window.boardSortBy('name')" style="cursor:pointer;user-select:none" title="Bấm để sắp xếp theo tên">Sản phẩm${_sortArrow('name')}</th>
             <th onclick="window.boardSortBy('cat')" style="cursor:pointer;user-select:none" title="Bấm để sắp xếp theo nhóm">Nhóm${_sortArrow('cat')}</th><th>ĐVT</th>
-            <th class="num">Giá bán hôm qua</th><th class="num">Giá bán ${fmtD(boardDate)}</th><th class="num">Thay đổi</th>
+            <th class="num">${tier ? 'Giá gốc' : 'Giá bán hôm qua'}</th><th class="num">${tier ? (tierIcon(tier) + ' ' + tier.name) : ('Giá bán ' + fmtD(boardDate))}</th><th class="num">${tier ? '' : 'Thay đổi'}</th>
           </tr></thead>
           <tbody>${rows || '<tr><td colspan="6" style="text-align:center;color:var(--muted);padding:24px">Không có SP nào khớp bộ lọc</td></tr>'}</tbody>
         </table>
@@ -164,6 +282,17 @@
     document.getElementById('boardDateInp').addEventListener('change', e => {
       boardDate = e.target.value || window.todayISO();
       renderBoard();
+    });
+    /* Sửa tay giá nhóm → ghi đè riêng SP đó (auto-lưu) */
+    document.querySelectorAll('.tprice').forEach(inp => {
+      inp.addEventListener('change', () => {
+        if (!boardTier) return;
+        const tiers = getTiers(); const t = tiers.find(x => x.id === boardTier); if (!t) return;
+        t.overrides = t.overrides || {};
+        t.overrides[inp.dataset.id] = parseInt(inp.value, 10) || 0;
+        saveTiers(tiers); renderBoard();
+        window.toast('✓ Đã ghi đè giá nhóm cho SP', 'success');
+      });
     });
     wireBoardToolbar(renderBoard);
   }
