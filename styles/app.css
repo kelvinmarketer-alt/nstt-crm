@@ -40,6 +40,11 @@ a{color:inherit; text-decoration:none}
   padding:18px 22px 60px;
 }
 
+/* ===== Chế độ nhúng (iframe trong trang gộp) — ẩn sidebar + topbar ===== */
+html.embed .app{grid-template-columns:1fr;grid-template-rows:1fr;grid-template-areas:"main"}
+html.embed .sidebar,html.embed .topbar{display:none!important}
+html.embed .main{padding:14px 16px 40px}
+
 /* ===== Sidebar ===== */
 .brand{
   padding:16px 18px;

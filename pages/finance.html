@@ -1,0 +1,66 @@
+<!doctype html>
+<html lang="vi">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Tài chính · Nông Sản Tuấn Tú</title>
+<link rel="stylesheet" href="../styles/tokens.css">
+<link rel="stylesheet" href="../styles/app.css">
+<style>
+  .main.fin{display:flex;flex-direction:column;padding:0;overflow:hidden}
+  .fin-head{padding:16px 22px 0}
+  .tabs2{display:flex;gap:6px;border-bottom:1px solid var(--line);margin-top:10px}
+  .t2{padding:9px 18px;font-size:14px;font-weight:600;color:var(--muted);cursor:pointer;border-bottom:2px solid transparent;margin-bottom:-1px;display:flex;align-items:center;gap:7px}
+  .t2.active{color:var(--navy);border-bottom-color:var(--navy)}
+  .fin-body{flex:1;position:relative;min-height:0}
+  #finFrame{width:100%;height:100%;border:0;display:block}
+</style>
+</head>
+<body>
+<div class="app">
+  <aside class="sidebar"></aside>
+  <header class="topbar">
+    <div class="breadcrumb"></div>
+    <div class="top-spacer"></div>
+    <div class="search-global"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="7"/><path d="m21 21-4.3-4.3"/></svg><input placeholder="Tìm... (Ctrl+K)"></div>
+    <button class="icon-btn" title="Thông báo"><span style="font-size:18px">🔔</span><span class="dot"></span></button>
+    <button class="icon-btn" title="Hướng dẫn" onclick="window.location.href='docs.html'"><span style="font-size:18px">❓</span></button>
+  </header>
+
+  <main class="main fin">
+    <div class="fin-head">
+      <h1 style="margin:0;font-size:22px;color:var(--navy);font-weight:800">💰 Tài chính</h1>
+      <div style="font-size:13px;color:var(--muted);margin-top:2px">Kế toán thu chi · công nợ phải thu · hóa đơn VAT</div>
+      <div class="tabs2">
+        <div class="t2 active" data-fin="accounting" onclick="window.finTab('accounting')">💰 Kế toán</div>
+        <div class="t2" data-fin="debt" onclick="window.finTab('debt')">📉 Công nợ</div>
+        <div class="t2" data-fin="invoices" onclick="window.finTab('invoices')">🧾 Hóa đơn</div>
+      </div>
+    </div>
+    <div class="fin-body">
+      <iframe id="finFrame" title="Tài chính"></iframe>
+    </div>
+  </main>
+</div>
+
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<script src="../scripts/supabase-config.js"></script>
+<script src="../scripts/supabase-client.js"></script>
+<script src="../scripts/shared.js"></script>
+<script src="../scripts/store.js"></script>
+<script src="../scripts/auth.js"></script>
+<script>if(window.AUTH) window.AUTH.requireAuth();</script>
+<script>
+  if (window.renderAppShell) window.renderAppShell('finance', 'Tài chính');
+  window.finTab = function (which) {
+    document.querySelectorAll('.t2').forEach(t => t.classList.toggle('active', t.dataset.fin === which));
+    document.getElementById('finFrame').src = which + '.html?embed=1';
+  };
+  /* tab mặc định (đọc ?tab= nếu có) */
+  (function () {
+    var t = new URLSearchParams(location.search).get('tab') || 'accounting';
+    window.finTab(['accounting', 'debt', 'invoices'].includes(t) ? t : 'accounting');
+  })();
+</script>
+</body>
+</html>

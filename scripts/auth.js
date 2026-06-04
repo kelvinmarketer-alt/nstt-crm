@@ -477,6 +477,9 @@
         window.location.replace(loginPath);
         return false;
       }
+      /* Trang nhúng iframe (?embed=1) — trang gộp cha đã kiểm soát quyền, bỏ qua check ở đây
+         để tránh iframe tự redirect khi user thiếu perm con. */
+      try { if (new URLSearchParams(location.search).get('embed') === '1') return true; } catch (e) {}
       const pageName = (location.pathname.split('/').pop() || 'dashboard.html').toLowerCase();
       const requiredPerm = PAGE_PERMS[pageName];
       if (requiredPerm && !this.hasPermission(requiredPerm)) {

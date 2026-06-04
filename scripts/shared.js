@@ -37,6 +37,12 @@
      có thể tái sử dụng cùng 1 favicon */
   window.NSTT_FAVICON_DATAURL = faviconDataUrl;
 
+  /* Chế độ nhúng iframe (trang gộp): ?embed=1 → ẩn sidebar + topbar */
+  try {
+    if (new URLSearchParams(location.search).get('embed') === '1') {
+      document.documentElement.classList.add('embed');
+    }
+  } catch (e) {}
   /* Inject manifest link nếu chưa có */
   if (!document.querySelector('link[rel="manifest"]')) {
     const link = document.createElement('link');
@@ -567,9 +573,7 @@ window.NAV = [
     { id: 'returns',    label: 'Trả hàng',    icon: '↩️', href: 'returns.html' },
   ]},
   { section: 'Tài chính', items: [
-    { id: 'accounting', label: 'Kế toán',     icon: '💰', href: 'accounting.html' },
-    { id: 'debt',       label: 'Công nợ',     icon: '📉', href: 'debt.html', badgeKey: 'debt' },
-    { id: 'invoices',   label: 'Hóa đơn',     icon: '🧾', href: 'invoices.html' },
+    { id: 'finance',    label: 'Tài chính',   icon: '💰', href: 'finance.html', badgeKey: 'debt' },
     { id: 'adspend',    label: 'Chi phí Ads', icon: '📣', href: 'adspend.html' },
     /* Ẩn theo yêu cầu: Loyalty (chiết khấu/tích điểm)
     { id: 'loyalty',    label: 'Loyalty (tích điểm)', icon: '⭐', href: 'loyalty.html' },
