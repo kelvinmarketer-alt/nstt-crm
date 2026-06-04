@@ -711,7 +711,8 @@
       <div class="form-row" style="align-items:flex-end">
         <div style="flex:2"><label>Chọn sản phẩm</label><select id="oProd">${prodOpts}</select></div>
         <div><label>Số lượng</label><input id="oProdQty" type="number" value="1" min="0" step="0.1"></div>
-        <div style="flex:0 0 auto"><label>&nbsp;</label><button type="button" class="btn btn-primary btn-sm" style="width:100%" onclick="window.addOrderItem()">+ Thêm 1 món</button></div>
+        <div style="flex:0 0 auto"><label>&nbsp;</label><button type="button" class="btn btn-primary btn-sm" style="width:100%;white-space:nowrap" onclick="window.addOrderItem()">+ Thêm 1 món</button></div>
+        <div style="flex:0 0 auto"><label>&nbsp;</label><button type="button" class="btn btn-ghost btn-sm" style="width:100%;white-space:nowrap" onclick="window.addCustomOrderItem()" title="Thêm SP khách đặt NGOÀI danh mục công ty — gõ tên + giá tự do">✏️ SP ngoài DM</button></div>
       </div>
       <div id="orderItemsBox" style="margin:6px 0 12px"></div>
       <div class="form-row">
@@ -803,7 +804,9 @@
         </tr></thead>
         <tbody>${orderItems.map((it, i) => `<tr>
           <td class="num" style="color:var(--muted);font-weight:600">${i + 1}</td>
-          <td><div style="display:flex;align-items:center;gap:8px">${it.img ? `<img src="${it.img}" alt="" style="width:30px;height:30px;object-fit:cover;border-radius:5px;flex:none" onerror="this.style.display='none'">` : ''}<div><b>${it.name}</b>${it.priceConfirmed===false?'<div style="font-size:10px;color:#A16207">⚠ chưa xác nhận giá</div>':''}</div></div></td>
+          <td><div style="display:flex;align-items:center;gap:8px">${it.img ? `<img src="${it.img}" alt="" style="width:30px;height:30px;object-fit:cover;border-radius:5px;flex:none" onerror="this.style.display='none'">` : ''}<div style="flex:1;min-width:0">${it.custom
+              ? `<input value="${(it.name||'').replace(/"/g,'&quot;')}" data-idx="${i}" class="oi-name" placeholder="Gõ tên SP khách đặt..." style="width:100%;min-width:150px;padding:4px 7px;border:1px solid #C4B5FD;border-radius:5px;font-size:12.5px;font-weight:600;background:#F5F3FF"><div style="font-size:9px;color:#7C3AED;font-weight:700;margin-top:1px">✏️ NGOÀI DANH MỤC</div>`
+              : `<b>${it.name}</b>`}${it.priceConfirmed===false?'<div style="font-size:10px;color:#A16207">⚠ chưa xác nhận giá</div>':''}</div></div></td>
           <td class="num"><div style="display:flex;align-items:center;gap:4px;justify-content:flex-end"><input type="number" min="0" step="0.5" value="${it.qty}" data-idx="${i}" class="oi-qty" style="width:64px;padding:4px 6px;text-align:right;border:1px solid var(--line);border-radius:5px;font-size:12.5px;font-weight:600" title="Sửa số lượng"><span style="font-size:11px;color:var(--muted)">${it.unit}</span></div></td>
           <td class="num">
             <input type="number" min="0" step="100" value="${it.price||0}" data-idx="${i}" class="oi-price" style="width:100px;padding:4px 6px;text-align:right;border:1px solid ${it.priceConfirmed===false?'#FCD34D':'var(--line)'};border-radius:5px;font-size:12.5px;font-weight:600;background:${it.priceConfirmed===false?'#FEF9C3':'#fff'}" title="Sale có quyền sửa giá theo đối tác">
@@ -827,6 +830,13 @@
           </tr>
         </tfoot>
       </table>`;
+      /* Wire input tên SP thủ công (cập nhật live, không re-render để giữ focus) */
+      box.querySelectorAll('.oi-name').forEach(inp => {
+        inp.addEventListener('input', (e) => {
+          const it = orderItems[+e.target.dataset.idx];
+          if (it) it.name = e.target.value;
+        });
+      });
       /* Wire input số lượng */
       box.querySelectorAll('.oi-qty').forEach(inp => {
         inp.addEventListener('change', (e) => {
@@ -898,6 +908,24 @@
     }
     document.getElementById('oProdQty').value = 1;
     renderOrderItems();
+  };
+
+  /* Thêm SP THỦ CÔNG (khách đặt ngoài danh mục công ty) — gõ tên + giá tự do */
+  window.addCustomOrderItem = function () {
+    const qty = parseFloat(document.getElementById('oProdQty')?.value) || 1;
+    orderItems.push({
+      id: null, custom: true,
+      name: '', unit: 'kg', img: '',
+      qty: qty > 0 ? qty : 1, price: 0, basePrice: 0,
+      priceConfirmed: false,   /* Sale nhập giá rồi xác nhận */
+      total: 0
+    });
+    renderOrderItems();
+    /* focus ngay ô tên dòng vừa thêm */
+    setTimeout(() => {
+      const names = document.querySelectorAll('#orderItemsBox .oi-name');
+      if (names.length) names[names.length - 1].focus();
+    }, 30);
   };
 
   window.removeOrderItem = function (i) {
@@ -1420,6 +1448,13 @@ CHỈ TRẢ JSON, không giải thích gì thêm.`;
     if (!custId) { window.toast('Chọn khách hàng', 'warn'); return; }
     if (!goods) { window.toast('Nhập tên hàng hóa', 'warn'); return; }
     if (!freight) { window.toast('Nhập cước', 'warn'); return; }
+
+    /* SP thủ công bỏ trống tên → loại bỏ hoặc cảnh báo */
+    const blankCustom = orderItems.filter(x => x.custom && !(x.name || '').trim());
+    if (blankCustom.length) {
+      window.toast?.(`⚠ Còn ${blankCustom.length} dòng SP thủ công chưa gõ tên — nhập tên hoặc xóa dòng đó`, 'warn');
+      return;
+    }
 
     /* ===== Bắt sale xác nhận giá thủ công TRƯỚC khi tạo đơn ===== */
     const unconfirmed = orderItems.filter(x => x.priceConfirmed === false);
