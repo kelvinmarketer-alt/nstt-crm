@@ -734,18 +734,37 @@
   }
 
   /* Đổi ảnh SP TRỰC TIẾP từ danh mục (không cần mở form sửa) */
+  let _pendingImg = null;
   window.quickEditProductImage = function (id) {
     const inp = document.createElement('input');
     inp.type = 'file'; inp.accept = 'image/*';
     inp.onchange = () => {
       const f = inp.files && inp.files[0]; if (!f) return;
       _resizeToBase64(f, data => {
-        window.STORE.update('products', id, { img: data });
-        window.toast('✓ Đã đổi ảnh · ' + Math.round(data.length / 1024) + 'KB', 'success');
-        renderCatalog();
+        _pendingImg = { id, data };   // chưa lưu — chờ bấm "Lưu ảnh"
+        const p = (products() || []).find(x => x.id === id) || {};
+        window.openModal('🖼️ Đổi ảnh sản phẩm',
+          `<div style="text-align:center">
+             <div style="font-size:13px;color:var(--muted);margin-bottom:8px"><b>${p.name || ''}</b> — xem trước ảnh mới:</div>
+             <img src="${data}" alt="" style="max-width:100%;max-height:320px;border-radius:10px;border:1px solid var(--line);object-fit:contain">
+             <div style="font-size:12px;color:var(--muted);margin-top:8px">${Math.round(data.length / 1024)}KB · Bấm <b>Lưu ảnh</b> để áp dụng</div>
+           </div>`,
+          { width: '440px',
+            footer: `<button class="btn btn-ghost" onclick="window.cancelProductImage()">Hủy</button>
+                     <button class="btn btn-primary" onclick="window.saveProductImage()">💾 Lưu ảnh</button>` });
       });
     };
     inp.click();
+  };
+  window.cancelProductImage = function () { _pendingImg = null; window.closeModal(); };
+  window.saveProductImage = function () {
+    if (!_pendingImg) return;
+    window.STORE.update('products', _pendingImg.id, { img: _pendingImg.data });
+    const kb = Math.round(_pendingImg.data.length / 1024);
+    _pendingImg = null;
+    window.closeModal();
+    window.toast('✓ Đã lưu ảnh · ' + kb + 'KB', 'success');
+    renderCatalog();
   };
 
   window.openAddProduct = function () {
