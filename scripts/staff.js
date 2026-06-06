@@ -5,12 +5,29 @@
   let staffs = window.STORE.get('staff', window.STAFFS || []);
   let curDept = 'all';
 
+  /* Chuẩn hoá tên phòng ban để gộp các giá trị lưu lộn xộn (slug vs nhãn) — CHỈ để hiển thị/lọc, KHÔNG sửa data gốc */
+  function _normDept(d) {
+    const x = (d || '').toString().trim().toLowerCase().replace(/[-_]+/g, ' ').replace(/\s+/g, ' ');
+    if (!x) return 'Khác';
+    const M = {
+      'ban gd': 'Ban GĐ', 'ban giam doc': 'Ban GĐ', 'ban giám đốc': 'Ban GĐ', 'bgd': 'Ban GĐ', 'giam doc': 'Ban GĐ',
+      'sale': 'Sale', 'sales': 'Sale', 'kinh doanh': 'Sale', 'cskh': 'Sale', 'cham soc khach hang': 'Sale', 'chăm sóc khách hàng': 'Sale',
+      'ke toan': 'Kế toán', 'kế toán': 'Kế toán', 'ketoan': 'Kế toán', 'ke-toan': 'Kế toán',
+      'kho': 'Kho', 'kho van': 'Kho',
+      'hcns': 'Nhân sự', 'nhan su': 'Nhân sự', 'nhân sự': 'Nhân sự', 'tuyen dung': 'Nhân sự', 'tuyển dụng': 'Nhân sự', 'hanh chinh': 'Nhân sự', 'hr': 'Nhân sự',
+      'mkt': 'Marketing', 'marketing': 'Marketing', 'digital marketing': 'Marketing', 'truyen thong': 'Marketing',
+      'van hanh': 'Vận hành', 'vận hành': 'Vận hành', 'van phong': 'Văn phòng', 'văn phòng': 'Văn phòng',
+      'giao hang': 'Giao hàng', 'giao hàng': 'Giao hàng', 'shipper': 'Giao hàng',
+    };
+    return M[x] || ((d || '').toString().trim());
+  }
+
   function render() {
     staffs = window.STORE.get('staff', window.STAFFS || []);
     const q = document.getElementById('qSearch').value.trim().toLowerCase();
     const st = document.getElementById('fStatus').value;
     const rows = staffs.filter(s =>
-      (curDept === 'all' || s.dept === curDept) &&
+      (curDept === 'all' || _normDept(s.dept) === curDept) &&
       (!q || [s.name, s.phone, s.code, s.id].some(x => (x||'').toLowerCase().includes(q))) &&
       (!st || s.status === st)
     );
@@ -19,7 +36,7 @@
     (function updateStaffKpis() {
       const active = staffs.filter(s => s.status === 'active');
       const off = staffs.filter(s => s.status !== 'active');
-      const depts = new Set(staffs.map(s => s.dept).filter(Boolean));
+      const depts = new Set(staffs.map(s => _normDept(s.dept)).filter(Boolean));
       const shippers = staffs.filter(s => /giao hàng|shipper|vận hành/i.test((s.dept||'') + ' ' + (s.role||'')));
       const salarySum = staffs.reduce((sum, s) => sum + (+s.salary || 0), 0);
       const f = window.fmtShort || (n => n);
@@ -391,10 +408,14 @@
   function buildDeptChips(staffs) {
     const box = document.getElementById('staffChips');
     if (!box) return;
-    const depts = [...new Set(staffs.map(s => s.dept).filter(Boolean))];
+    /* đảm bảo bố cục đúng: bọc dòng, có khoảng cách, không chồng */
+    box.style.cssText = 'display:flex;flex-wrap:wrap;gap:6px;margin:6px 0 14px';
+    const counts = {};
+    staffs.forEach(s => { const d = _normDept(s.dept); counts[d] = (counts[d] || 0) + 1; });
+    const depts = Object.keys(counts).sort((a, b) => counts[b] - counts[a]);
     box.innerHTML =
       `<button class="chip ${curDept==='all'?'active':''}" data-q="all">Tất cả <span class="cnt">${staffs.length}</span></button>` +
-      depts.map(d => `<button class="chip ${curDept===d?'active':''}" data-q="${d}">${d} <span class="cnt">${staffs.filter(s=>s.dept===d).length}</span></button>`).join('');
+      depts.map(d => `<button class="chip ${curDept===d?'active':''}" data-q="${(d||'').replace(/"/g,'&quot;')}">${d} <span class="cnt">${counts[d]}</span></button>`).join('');
     box.querySelectorAll('.chip').forEach(c => {
       c.addEventListener('click', () => {
         curDept = c.dataset.q;
