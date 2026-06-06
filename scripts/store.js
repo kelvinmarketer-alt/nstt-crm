@@ -411,7 +411,9 @@
         _save(key);
         /* Push to Supabase */
         if (isSupabaseMode() && TABLE_MAP[key]) {
-          const idCol = ID_COLUMN[key] || (arr[i].code ? 'code' : 'id');
+          /* Mặc định khóa = 'id' (KH/NCC/NV... cloud dùng id, KHÔNG có cột code).
+             Bảng dùng code/no đã khai báo rõ trong ID_COLUMN (orders=code, invoices/cashEntries=no). */
+          const idCol = ID_COLUMN[key] || 'id';
           window.SB_DATA.update(TABLE_MAP[key], identifier, patch, idCol)
             .catch(e => console.warn(`[STORE update ${key} → SB]`, e));
         }
@@ -429,7 +431,7 @@
       _save(key);
       /* Push to Supabase */
       if (isSupabaseMode() && TABLE_MAP[key] && item) {
-        const idCol = ID_COLUMN[key] || (item.code ? 'code' : 'id');
+        const idCol = ID_COLUMN[key] || 'id';   /* mặc định 'id'; code/no khai báo trong ID_COLUMN */
         window.SB_DATA.remove(TABLE_MAP[key], identifier, idCol)
           .catch(e => console.warn(`[STORE remove ${key} → SB]`, e));
       }
@@ -456,19 +458,26 @@
       setTimeout(() => location.reload(), 800);
     },
 
-    /* Chỉ xóa cache business data demo — an toàn, không động settings/staff/products */
-    clearDemoCache() {
+    /* Xóa data demo — XÓA CẢ CLOUD + local (trước đây chỉ xóa local → reload bị cloud kéo về). */
+    async clearDemoCache() {
       const DEMO_KEYS = [
         'customers', 'orders', 'invoices', 'returns', 'purchases',
         'quotes', 'leads', 'suppliers', 'recurring_orders', 'cashEntries',
       ];
+      if (isSupabaseMode() && window.SB_DATA && window.SB_DATA.clearTable) {
+        for (const k of DEMO_KEYS) {
+          const table = TABLE_MAP[k]; if (!table) continue;
+          await window.SB_DATA.clearTable(table, ID_COLUMN[k] || 'id').catch(() => {});
+        }
+      }
       DEMO_KEYS.forEach(k => {
         localStorage.removeItem(PREFIX + k);
         delete _data[k];
         _preloaded.delete(k);
+        _synced[k] = JSON.stringify([]);
       });
-      window.toast?.('🧹 Đã xóa cache ' + DEMO_KEYS.length + ' bảng demo · đang reload…', 'success');
-      setTimeout(() => location.reload(), 600);
+      window.toast?.('🧹 Đã xóa ' + DEMO_KEYS.length + ' bảng (cả cloud) · đang reload…', 'success');
+      setTimeout(() => location.reload(), 700);
     },
 
     /* === Xóa TOÀN BỘ data kinh doanh (đơn/HĐ/KH/kho/quỹ...) ===
