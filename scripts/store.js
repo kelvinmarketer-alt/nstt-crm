@@ -93,6 +93,7 @@
     orders:       'code',
     cashEntries:  'no',
     invoices:     'no',
+    staff:        'id',   /* bảng staff chỉ có cột id (KHÔNG có 'code') → update/remove theo id */
   };
 
   /* === Generic kv_store keys — sync qua bảng kv_store(key, value JSONB) ===

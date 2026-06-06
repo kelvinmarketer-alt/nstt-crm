@@ -115,7 +115,7 @@
               converted_to:'convertedTo', lost_reason:'lostReason' },
     },
     staff: {
-      to:   { hireDate:'hire_date', userId:'user_id' },
+      to:   { hireDate:'hire_date', userId:'user_id', code:null },  /* DB staff không có cột 'code' → bỏ khi sync */
       from: { hire_date:'hireDate', user_id:'userId' },
     },
     paymentAccounts: {
