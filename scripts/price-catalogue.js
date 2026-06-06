@@ -232,6 +232,7 @@ footer b{color:#1f7a3d}
 <span class="badge">Mã số thuế / Tax Code: 0110302211</span>
 <span class="badge">Bảng giá áp dụng / Valid: ${range}</span>
 <span class="badge">${products.length} sản phẩm / items</span>
+${opts.tierName ? `<span class="badge" style="background:#1B5E20;color:#fff">Bảng giá: ${opts.tierName}</span>` : ''}
 <a class="badge" href="https://nongsantuantuhanoi.com" target="_blank" rel="noopener">🌐 nongsantuantuhanoi.com</a>
 </div>
 <div class="note">📌 Tất cả các mã hàng đều được tính đơn vị là KG. &nbsp;|&nbsp; All items are priced per KILOGRAM (KG).</div>
@@ -283,7 +284,7 @@ ${sections}
           if (finalCall) setTimeout(() => progEl && progEl.remove(), 800);
         }
       };
-      const html = await buildHTML(dateISO, { onProgress, forPrint: true, priceFn: opts.priceFn });
+      const html = await buildHTML(dateISO, { onProgress, forPrint: true, priceFn: opts.priceFn, tierName: opts.tierName });
       /* Inject print CSS — ÉP GIỮ MÀU NỀN + bố cục đẹp khi in PDF */
       const printCss = `<style>
         @page { size: A4; margin: 8mm 6mm; }
@@ -570,7 +571,7 @@ ${sections}
           if (finalCall) setTimeout(() => progEl && progEl.remove(), 800);
         }
       };
-      const html = await buildHTML(dateISO, { onProgress, priceFn: opts.priceFn });
+      const html = await buildHTML(dateISO, { onProgress, priceFn: opts.priceFn, tierName: opts.tierName });
       const filename = `BangGia-TuanTu-${ddmmyy(dateISO)}.html`;
       const blob = new Blob([html], { type: 'text/html;charset=utf-8' });
       /* tải về máy (trừ khi sendOnly) */

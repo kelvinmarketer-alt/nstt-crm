@@ -278,12 +278,12 @@
           ${tgOn ? `
           <button class="btn btn-sm btn-ghost" onclick="window.PriceAutoSend && window.PriceAutoSend.openConfig()" title="Bật/tắt tự động gửi mỗi sáng + cấu hình giờ. Chỉ gửi khi giá đổi so hôm qua.">🤖 Auto hằng ngày</button>
           <button class="btn btn-sm btn-ghost" onclick="window.PriceAutoSend && window.PriceAutoSend.sendNowIfChanged()" title="Kiểm tra giá đổi và gửi ngay (skip nếu không đổi để tránh spam)">📤 Gửi ngay (nếu đổi)</button>
-          <button class="btn btn-sm btn-ghost" onclick="window.exportPriceBoardPDF()" title="Mở cửa sổ in → chọn Save as PDF để lưu file PDF">🖨 Xuất PDF</button>
-          <button class="btn btn-sm btn-primary" onclick="window.sendPriceBoard()" title="Tải file HTML (có ảnh embed) + tự gửi Telegram">📥 Tải HTML + gửi TG</button>
+          <button class="btn btn-sm btn-ghost" onclick="window.openExportTierPicker('pdf')" title="Mở cửa sổ in → chọn Save as PDF để lưu file PDF">🖨 Xuất PDF</button>
+          <button class="btn btn-sm btn-primary" onclick="window.openExportTierPicker('html')" title="Tải file HTML (có ảnh embed) + tự gửi Telegram">📥 Tải HTML + gửi TG</button>
           ` : `
           <button class="btn btn-sm btn-ghost" onclick="window.location.href='settings.html'">⚙️ Cấu hình Telegram</button>
-          <button class="btn btn-sm btn-ghost" onclick="window.exportPriceBoardPDF()" title="Mở cửa sổ in → Save as PDF">🖨 Xuất PDF</button>
-          <button class="btn btn-sm btn-primary" onclick="window.sendPriceBoard()" title="Tải file HTML có ảnh embed — gửi Zalo / mở offline">📥 Tải HTML</button>
+          <button class="btn btn-sm btn-ghost" onclick="window.openExportTierPicker('pdf')" title="Mở cửa sổ in → Save as PDF">🖨 Xuất PDF</button>
+          <button class="btn btn-sm btn-primary" onclick="window.openExportTierPicker('html')" title="Tải file HTML có ảnh embed — gửi Zalo / mở offline">📥 Tải HTML</button>
           `}
         </div>
       </div>`;
@@ -297,8 +297,8 @@
           <button class="btn btn-ghost btn-sm" onclick="window.copyYesterday()">📋 Sao chép giá hôm qua</button>
           <button class="btn btn-ghost btn-sm" onclick="window.copyPriceText()" title="Copy text gọn dán Zalo">📋 Copy text</button>
           <button class="btn btn-ghost btn-sm" onclick="window.PriceAutoSend && window.PriceAutoSend.previewDiff()" title="Xem nhanh SP nào đổi giá so hôm qua">🔍 So sánh giá</button>
-          <button class="btn btn-ghost btn-sm" onclick="window.exportPriceBoardPDF()" title="Mở popup print → Save as PDF">🖨 Xuất PDF</button>
-          <button class="btn btn-ghost btn-sm" onclick="window.sendPriceBoard()" title="Tải HTML có ảnh embed + auto gửi Telegram">📥 Xuất HTML</button>
+          <button class="btn btn-ghost btn-sm" onclick="window.openExportTierPicker('pdf')" title="Mở popup print → Save as PDF">🖨 Xuất PDF</button>
+          <button class="btn btn-ghost btn-sm" onclick="window.openExportTierPicker('html')" title="Tải HTML có ảnh embed + auto gửi Telegram">📥 Xuất HTML</button>
           <button class="btn btn-primary btn-sm" onclick="window.savePriceBoard()">💾 Lưu bảng giá ${fmtD(boardDate)}</button>
         </div>
       </div>
@@ -573,21 +573,46 @@
   }
 
   /* === Xuất HTML — file gửi Zalo / mở offline (self-contained có ảnh base64) === */
-  window.sendPriceBoard = async function () {
+  /* priceFn + tên cho 1 nhóm (0 = Gốc) → dùng khi xuất/gửi báo giá */
+  function tierExportOpts(tierId) {
+    const tier = tierId ? tierById(tierId) : null;
+    if (!tier) return {};
+    return {
+      priceFn: (p) => { const e = window.priceEntryOn(p, boardDate); return tierPriceOf(tier, p.id, e ? e.sell : 0); },
+      tierName: tierIcon(tier) + ' ' + tier.name,
+    };
+  }
+  /* Bộ chọn nhóm giá trước khi xuất PDF / HTML */
+  window.openExportTierPicker = function (mode) {
+    const tiers = getTiers();
+    let btns = `<button class="btn btn-ghost" style="justify-content:flex-start" onclick="window._doExport('${mode}',0)">📋 Gốc — giá hệ thống</button>`;
+    tiers.forEach(t => btns += `<button class="btn btn-ghost" style="justify-content:flex-start" onclick="window._doExport('${mode}',${t.id})">${tierIcon(t)} ${t.name} <span style="opacity:.7">(${t.markup >= 0 ? '+' : ''}${t.markup}%)</span></button>`);
+    window.openModal(mode === 'pdf' ? '🖨 Xuất PDF — chọn nhóm giá' : '📥 Xuất / Gửi HTML — chọn nhóm giá', `
+      <div style="font-size:12.5px;color:var(--muted);margin-bottom:10px">Chọn bảng giá theo nhóm khách để xuất file (giá đã tính theo % / ghi đè của nhóm):</div>
+      <div style="display:flex;flex-direction:column;gap:8px">${btns}</div>
+    `, { footer: `<button class="btn btn-ghost" onclick="window.closeModal()">Hủy</button>`, width: '440px' });
+  };
+  window._doExport = function (mode, tierId) {
+    window.closeModal();
+    if (mode === 'pdf') window.exportPriceBoardPDF(+tierId);
+    else window.sendPriceBoard(+tierId);
+  };
+
+  window.sendPriceBoard = async function (tierId) {
     if (!window.PriceCatalogue) { window.toast('Chưa tải module báo giá', 'warn'); return; }
     window.toast('Đang tạo file HTML báo giá (kèm ảnh sản phẩm)…', 'info');
     try {
-      await window.PriceCatalogue.export(boardDate);
+      await window.PriceCatalogue.export(boardDate, tierExportOpts(tierId));
       window.STORE.set('priceBoardLastSent', new Date().toLocaleString('vi-VN'));
       renderBoard();
     } catch (e) { window.toast('Lỗi tạo file: ' + e.message, 'warn'); }
   };
 
   /* === Xuất PDF — mở popup window có nút In / Save as PDF === */
-  window.exportPriceBoardPDF = async function () {
+  window.exportPriceBoardPDF = async function (tierId) {
     if (!window.PriceCatalogue) { window.toast('Chưa tải module báo giá', 'warn'); return; }
     try {
-      await window.PriceCatalogue.exportPDF(boardDate);
+      await window.PriceCatalogue.exportPDF(boardDate, tierExportOpts(tierId));
     } catch (e) { window.toast('Lỗi tạo PDF: ' + e.message, 'warn'); }
   };
 
