@@ -1,0 +1,183 @@
+<!doctype html>
+<html lang="vi">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Luồng vận hành · Nông Sản Tuấn Tú Hà Nội</title>
+<style>
+  :root{--green:#1B5E20;--lime:#339B21;--gold:#E8A33D;--ink:#1F2937;--mut:#6B7280;--line:#E5E7EB;--bg:#F7FAF7}
+  *{box-sizing:border-box;margin:0;padding:0;font-family:'Segoe UI',system-ui,-apple-system,Roboto,Arial,sans-serif}
+  body{background:var(--bg);color:var(--ink);line-height:1.55;padding:0 0 60px}
+  header{background:linear-gradient(135deg,var(--green),var(--lime));color:#fff;padding:30px 24px}
+  .wrap{max-width:1080px;margin:0 auto;padding:0 20px}
+  header h1{font-size:26px;font-weight:800}
+  header p{opacity:.92;margin-top:6px;font-size:14px}
+  h2{font-size:20px;color:var(--green);margin:34px 0 4px;display:flex;align-items:center;gap:10px}
+  h2 .n{background:var(--green);color:#fff;width:30px;height:30px;border-radius:50%;display:grid;place-items:center;font-size:15px;flex:none}
+  .sub{color:var(--mut);font-size:13.5px;margin-bottom:14px}
+  .card{background:#fff;border:1px solid var(--line);border-radius:12px;padding:16px 18px;margin-bottom:14px;box-shadow:0 1px 2px rgba(0,0,0,.03)}
+  /* flow steps */
+  .flow{display:flex;flex-wrap:wrap;align-items:stretch;gap:0}
+  .step{flex:1;min-width:150px;background:#fff;border:1px solid var(--line);border-top:4px solid var(--lime);border-radius:10px;padding:12px 14px;margin:6px}
+  .step .s-h{font-weight:700;color:var(--green);font-size:14px;display:flex;align-items:center;gap:7px}
+  .step .s-b{font-size:12.5px;color:var(--mut);margin-top:5px}
+  .step .who{display:inline-block;margin-top:8px;font-size:11px;font-weight:700;background:#EFF6FF;color:#1D4ED8;padding:2px 8px;border-radius:99px}
+  .arrow{align-self:center;color:var(--gold);font-size:22px;font-weight:800;padding:0 2px}
+  .grid2{display:grid;grid-template-columns:repeat(auto-fit,minmax(300px,1fr));gap:14px}
+  .dept{background:#fff;border:1px solid var(--line);border-radius:12px;padding:16px 18px;border-left:5px solid var(--c,var(--green))}
+  .dept h3{font-size:16px;display:flex;align-items:center;gap:9px;color:var(--ink)}
+  .dept .role{font-size:12px;color:var(--mut);margin:3px 0 10px}
+  .dept ul{list-style:none;font-size:13px}
+  .dept li{padding:4px 0 4px 20px;position:relative}
+  .dept li:before{content:'→';position:absolute;left:0;color:var(--lime);font-weight:800}
+  .perm{font-size:11px;color:var(--mut);margin-top:10px;padding-top:9px;border-top:1px dashed var(--line)}
+  .perm b{color:var(--green)}
+  .note{background:#FEF9E7;border:1px solid #F6E2A6;border-radius:10px;padding:12px 14px;font-size:13px;color:#7a5b00;margin:8px 0}
+  .tag{display:inline-block;font-size:11px;font-weight:700;padding:2px 9px;border-radius:99px;margin:2px}
+  table{width:100%;border-collapse:collapse;font-size:13px;background:#fff;border-radius:10px;overflow:hidden}
+  th,td{border:1px solid var(--line);padding:8px 11px;text-align:left;vertical-align:top}
+  th{background:var(--green);color:#fff;font-size:12px}
+  tr:nth-child(even) td{background:#FAFBFA}
+  .legend{font-size:12px;color:var(--mut);margin-top:6px}
+  @media print{.step{break-inside:avoid}header{-webkit-print-color-adjust:exact;print-color-adjust:exact}}
+</style>
+</head>
+<body>
+<header><div class="wrap">
+  <h1>🌱 Luồng vận hành — Nông Sản Tuấn Tú Hà Nội</h1>
+  <p>Bản đồ tổng quát: lộ trình khách hàng → đơn hàng → các phòng ban → công nợ &amp; báo cáo. Dùng để soát quy trình, tìm chỗ lủng củng và phân quyền.</p>
+</div></header>
+
+<div class="wrap">
+
+  <!-- 1. CUSTOMER JOURNEY -->
+  <h2><span class="n">1</span> Lộ trình khách hàng</h2>
+  <div class="sub">Từ người lạ → khách mua định kỳ. Hai nguồn vào: <b>tự khai thác (Sale)</b> và <b>website</b>.</div>
+  <div class="flow">
+    <div class="step"><div class="s-h">🎯 Lead / Tiềm năng</div><div class="s-b">Nhà hàng/bếp ăn quan tâm — thu thập qua MKT, giới thiệu, form web.</div><span class="who">Marketing · Sale</span></div>
+    <div class="arrow">›</div>
+    <div class="step"><div class="s-h">🤝 Tư vấn &amp; báo giá</div><div class="s-b">Sale gửi <b>bảng giá theo nhóm KH</b> (Gốc/Nhóm 1–8) qua Zalo/Telegram/PDF.</div><span class="who">Sale</span></div>
+    <div class="arrow">›</div>
+    <div class="step"><div class="s-h">👤 Tạo khách hàng</div><div class="s-b">Lập hồ sơ KH: SĐT, địa chỉ, <b>nhóm giá</b>, NV phụ trách.</div><span class="who">Sale</span></div>
+    <div class="arrow">›</div>
+    <div class="step"><div class="s-h">📦 Đặt hàng định kỳ</div><div class="s-b">KH đặt qua Sale hoặc tự đặt trên website → vào hệ thống.</div><span class="who">KH · Sale</span></div>
+    <div class="arrow">›</div>
+    <div class="step"><div class="s-h">💚 Chăm sóc &amp; giữ chân</div><div class="s-b">Theo dõi tần suất, nhắc đơn, xử lý công nợ, chăm KH ngừng đặt.</div><span class="who">Sale · Kế toán</span></div>
+  </div>
+
+  <!-- 2. ORDER FLOW -->
+  <h2><span class="n">2</span> Luồng đơn hàng (xương sống vận hành)</h2>
+  <div class="sub">Mô hình <b>demand-driven</b>: có đơn mới gom &amp; đặt NCC, hạn chế tồn kho.</div>
+  <div class="flow">
+    <div class="step"><div class="s-h">📝 Tạo đơn</div><div class="s-b">Sale tạo đơn (hoặc đơn web đổ về <b>chờ duyệt</b> → Sale duyệt thành đơn chính thức).</div><span class="who">Sale</span></div>
+    <div class="arrow">›</div>
+    <div class="step"><div class="s-h">🧺 Gom hàng</div><div class="s-b">Kho gom nhiều đơn cùng đợt giao → tổng sản lượng theo từng mặt hàng.</div><span class="who">Kho</span></div>
+    <div class="arrow">›</div>
+    <div class="step"><div class="s-h">🏭 Đặt NCC</div><div class="s-b">Gán NCC cho từng mặt hàng → gửi phiếu yêu cầu (PDF/Zalo).</div><span class="who">Kho · Mua hàng</span></div>
+    <div class="arrow">›</div>
+    <div class="step"><div class="s-h">✅ Xác nhận / báo thiếu</div><div class="s-b">NCC giao → nhập kho. Thiếu hàng → cắt theo <b>ưu tiên đơn đặt trước</b> + báo Sale.</div><span class="who">Kho</span></div>
+    <div class="arrow">›</div>
+    <div class="step"><div class="s-h">📤 Xuất kho → Shipper</div><div class="s-b">In phiếu xuất kho (ca/giờ giao) → bàn giao shipper.</div><span class="who">Kho · Shipper</span></div>
+    <div class="arrow">›</div>
+    <div class="step"><div class="s-h">🛵 Xác nhận giao</div><div class="s-b">Giao xong KHÔNG tự "thành công" — phải xác nhận: <b>Giao đủ / Trả hàng / Thiếu</b>.</div><span class="who">Shipper · Sale</span></div>
+    <div class="arrow">›</div>
+    <div class="step"><div class="s-h">💰 Đối soát &amp; công nợ</div><div class="s-b">Ghi nhận COD/đã thu, cập nhật công nợ KH, đối soát sổ quỹ.</div><span class="who">Kế toán</span></div>
+  </div>
+  <div class="note">↩️ <b>Nhánh trả hàng:</b> khi xác nhận "Trả hàng / Thiếu" → mở phiếu <b>Trả hàng</b>: ghi mặt hàng + số kg → chọn <b>Bỏ (hao hụt)</b> hay <b>Nhập lại kho</b> → lỗi do <b>Vận chuyển / NCC / KH</b> → hoàn tiền bằng <b>giảm công nợ</b> hoặc chi tiền mặt. Lỗi NCC → tạo khoản <b>đòi lại NCC</b>.</div>
+
+  <!-- 3. DEPARTMENTS -->
+  <h2><span class="n">3</span> Các phòng ban &amp; nhiệm vụ</h2>
+  <div class="sub">Mỗi phòng ban có phạm vi quyền riêng (đăng nhập bằng SĐT, phân quyền theo vị trí).</div>
+  <div class="grid2">
+
+    <div class="dept" style="--c:#1B5E20">
+      <h3>💼 Sale / Kinh doanh</h3>
+      <div class="role">Đầu mối khách hàng &amp; doanh thu</div>
+      <ul>
+        <li>Khai thác lead, tư vấn, gửi báo giá theo nhóm</li>
+        <li>Tạo &amp; quản lý khách hàng, gán nhóm giá</li>
+        <li>Tạo đơn, duyệt đơn web, theo dõi giao hàng</li>
+        <li>Đơn định kỳ, báo giá (quotes), chăm sóc KH</li>
+      </ul>
+      <div class="perm"><b>Quyền:</b> Đơn hàng · Khách hàng · Báo giá · Lead · SP (xem) · Báo cáo doanh số</div>
+    </div>
+
+    <div class="dept" style="--c:#E8A33D">
+      <h3>🏭 Kho &amp; Mua hàng</h3>
+      <div class="role">Cung ứng — gom hàng, NCC, tồn kho</div>
+      <ul>
+        <li>Gom đơn → đặt NCC → xác nhận/báo thiếu</li>
+        <li>Phiếu nhập, cập nhật giá nhập, cộng kho</li>
+        <li>Quản lý tồn kho, kiểm kê, cảnh báo hết hàng</li>
+        <li>Xuất kho cho shipper, xử lý trả hàng</li>
+      </ul>
+      <div class="perm"><b>Quyền:</b> Kho/Tồn · NCC · Phiếu nhập · Gom hàng · Trả hàng · SP (xem) · Đơn (xem)</div>
+    </div>
+
+    <div class="dept" style="--c:#15803D">
+      <h3>🧮 Kế toán / Tài chính</h3>
+      <div class="role">Dòng tiền, công nợ, lợi nhuận</div>
+      <ul>
+        <li>Sổ quỹ thu/chi, đối soát ngân hàng</li>
+        <li>Công nợ phải thu (KH) &amp; phải trả (NCC)</li>
+        <li>Hóa đơn VAT, chi phí Ads</li>
+        <li>Báo cáo lợi nhuận, giá vốn, COGS</li>
+      </ul>
+      <div class="perm"><b>Quyền:</b> Sổ quỹ · Công nợ · Hóa đơn · Chi phí Ads · Báo cáo lợi nhuận · Lương (xem chi)</div>
+    </div>
+
+    <div class="dept" style="--c:#7C3AED">
+      <h3>🧑‍💼 Nhân sự (HR)</h3>
+      <div class="role">Con người &amp; lương</div>
+      <ul>
+        <li>Hồ sơ nhân viên, chấm công</li>
+        <li>Tính lương theo công thức → gửi CFO/Sếp duyệt</li>
+        <li>Upload chấm công từ máy, khung phạt đi muộn</li>
+      </ul>
+      <div class="perm"><b>Quyền:</b> Nhân sự · Chấm công · Tính + gửi duyệt lương · Báo cáo</div>
+    </div>
+
+    <div class="dept" style="--c:#DC2626">
+      <h3>📣 Marketing</h3>
+      <div class="role">Thương hiệu &amp; lead</div>
+      <ul>
+        <li>Chạy ads (FB/Google), nội dung, thương hiệu</li>
+        <li>Thu hút lead → chuyển Sale</li>
+        <li>Email/Zalo blast, theo dõi chi phí Ads</li>
+      </ul>
+      <div class="perm"><b>Quyền:</b> Email/Zalo blast · Chi phí Ads · KH (xem) · SP (xem) · Báo cáo</div>
+    </div>
+
+    <div class="dept" style="--c:#339B21">
+      <h3>👑 Ban giám đốc (Sếp / CEO / CFO)</h3>
+      <div class="role">Điều hành &amp; phê duyệt</div>
+      <ul>
+        <li>Sếp/CEO: toàn quyền, xem mọi báo cáo</li>
+        <li>CFO: duyệt lương, kiểm soát tài chính</li>
+        <li>Quyết định giá gốc, nhóm giá, chính sách</li>
+      </ul>
+      <div class="perm"><b>Quyền:</b> Sếp/CEO = <b>tất cả</b> · CFO = tài chính + duyệt lương + báo cáo</div>
+    </div>
+  </div>
+
+  <!-- 4. CROSS LINKS -->
+  <h2><span class="n">4</span> Dữ liệu liên thông giữa các phòng</h2>
+  <div class="sub">Một thao tác ở phòng này tự động ảnh hưởng phòng khác — đây là chỗ dễ "lủng củng" nhất, cần soát kỹ.</div>
+  <table>
+    <thead><tr><th>Khi…</th><th>Tự động xảy ra</th><th>Phòng liên quan</th></tr></thead>
+    <tbody>
+      <tr><td>Sale chốt đơn</td><td>Gửi phiếu báo hàng + đơn vào hàng đợi gom</td><td>Sale → Kho</td></tr>
+      <tr><td>Kho "Đã nhận" phiếu nhập</td><td>Cộng tồn kho + cập nhật giá nhập + công nợ NCC</td><td>Kho → Kế toán</td></tr>
+      <tr><td>Xác nhận "Đã giao"</td><td>Tính doanh thu + công nợ KH + trừ tồn</td><td>Shipper → Kế toán</td></tr>
+      <tr><td>Trả hàng (nhập lại kho)</td><td>Cộng lại tồn + giảm công nợ/chi tiền + đòi NCC</td><td>Kho → Kế toán</td></tr>
+      <tr><td>Đổi giá Gốc (= giá nhập +%)</td><td>Áp cho toàn hệ thống: đơn, website, các nhóm giá</td><td>Sếp → tất cả</td></tr>
+      <tr><td>HR tính lương</td><td>Gửi CFO/Sếp duyệt → chi lương vào sổ quỹ</td><td>HR → CFO → Kế toán</td></tr>
+    </tbody>
+  </table>
+
+  <div class="note" style="margin-top:22px">📌 <b>Cách dùng tài liệu này:</b> đọc từng mũi tên ở mục 1–2 và bảng liên thông mục 4. Chỗ nào quy trình thực tế của bạn khác với mô tả → đánh dấu, gửi lại để chỉnh app cho khớp.</div>
+
+  <p class="legend">© 2026 Nông Sản Tuấn Tú Hà Nội — tài liệu nội bộ mô tả luồng vận hành. In: Ctrl/Cmd + P.</p>
+</div>
+</body>
+</html>
