@@ -59,6 +59,10 @@
   const _data = {};
   const _subs = {};
   const _preloaded = new Set();
+  /* Snapshot (JSON) bản đã đồng bộ cloud gần nhất, per table key.
+     set() diff value vs snapshot này (KHÔNG vs cache live) → bắt được cả
+     trường hợp caller mutate mảng TẠI CHỖ rồi set cùng reference. */
+  const _synced = {};
 
   /* Mapping STORE key → Supabase table name (NSTT 17 bảng — 11 core + 6 extra) */
   const TABLE_MAP = {
@@ -285,6 +289,7 @@
     const keep = localOnly.length <= 200 ? localOnly : [];
     const merged = cloudMerged.concat(keep);
     const newJson = JSON.stringify(merged);
+    _synced[key] = newJson;   /* baseline = trạng thái cloud sau merge/self-heal */
     if (newJson !== JSON.stringify(_data[key] || [])) {
       _data[key] = merged;
       try { localStorage.setItem(PREFIX + key, newJson); } catch (e) {}
@@ -309,7 +314,15 @@
     /* Set toàn bộ — DIFF-SYNC: nếu là array và TABLE_MAP có key,
        sẽ so sánh cache cũ với value mới rồi push delta (insert/update/delete) lên Supabase. */
     set(key, value) {
-      const oldArr = Array.isArray(_data[key]) ? _data[key].slice() : [];
+      /* Baseline để diff = SNAPSHOT cloud gần nhất (nếu có) — KHÔNG dùng cache live,
+         vì caller có thể đã mutate cache TẠI CHỖ (cùng reference) → slice() sẽ giống
+         hệt value → diff bỏ sót → không push lên cloud (bug mất dữ liệu sau refresh). */
+      let baseArr;
+      if (Array.isArray(value) && _synced[key] != null) {
+        try { baseArr = JSON.parse(_synced[key]); } catch (e) { baseArr = null; }
+      }
+      if (!Array.isArray(baseArr)) baseArr = Array.isArray(_data[key]) ? _data[key].slice() : [];
+      const oldArr = baseArr;
       _data[key] = value;
       _save(key);
 
@@ -370,6 +383,8 @@
             .catch(e => console.warn(`[STORE set→remove ${key}]`, e));
         }
       });
+      /* Cập nhật baseline = trạng thái vừa đẩy lên cloud */
+      _synced[key] = JSON.stringify(value);
     },
 
     /* Thêm item vào mảng */
@@ -382,6 +397,7 @@
         window.SB_DATA.insert(TABLE_MAP[key], item)
           .catch(e => console.warn(`[STORE add ${key} → SB]`, e));
       }
+      if (TABLE_MAP[key] && Array.isArray(_data[key])) _synced[key] = JSON.stringify(_data[key]);
       return item;
     },
 
@@ -398,6 +414,7 @@
           window.SB_DATA.update(TABLE_MAP[key], identifier, patch, idCol)
             .catch(e => console.warn(`[STORE update ${key} → SB]`, e));
         }
+        if (TABLE_MAP[key] && Array.isArray(_data[key])) _synced[key] = JSON.stringify(_data[key]);
         return arr[i];
       }
       return null;
@@ -415,6 +432,7 @@
         window.SB_DATA.remove(TABLE_MAP[key], identifier, idCol)
           .catch(e => console.warn(`[STORE remove ${key} → SB]`, e));
       }
+      if (TABLE_MAP[key] && Array.isArray(_data[key])) _synced[key] = JSON.stringify(_data[key]);
     },
 
     subscribe(key, fn) {
