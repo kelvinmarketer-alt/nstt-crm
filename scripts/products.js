@@ -79,17 +79,18 @@
     window.STORE.set('priceBaseMarkup', x);
     const ps = products();
     let n = 0;
-    ps.forEach(p => {
+    const newPs = ps.map(p => {
       const last = window.priceEntryOn(p, boardDate) || { buy: 0, sell: 0 };
       const buy = last.buy || 0;
-      if (!buy) return;
+      if (!buy) return p;
       const sell = Math.round(buy * (1 + x / 100));
-      const hist = [...(p.priceHistory || [])];
+      const hist = (p.priceHistory || []).map(h => ({ ...h }));
       const ex = hist.find(h => h.date === boardDate);
-      if (ex) ex.sell = sell; else hist.push({ date: boardDate, buy, sell });
-      p.priceHistory = hist; n++;
+      if (ex) { if (ex.sell === sell) return p; ex.sell = sell; } else hist.push({ date: boardDate, buy, sell });
+      n++;
+      return { ...p, priceHistory: hist };
     });
-    window.STORE.set('products', ps);
+    window.STORE.set('products', newPs);
     renderBoard();
     window.toast(`✓ Đã đặt giá gốc = giá nhập +${x}% cho ${n} SP`, 'success');
   };
@@ -665,16 +666,14 @@
       ids.forEach(id => { t.overrides[id] = v; });
       saveTiers(tiers);
     } else {
-      const ps = products();
       ids.forEach(id => {
-        const p = ps.find(x => x.id === id); if (!p) return;
+        const p = window.productById(id); if (!p) return;
         const last = window.priceEntryOn(p, boardDate) || { buy: 0, sell: 0 };
-        const hist = [...(p.priceHistory || [])];
+        const hist = (p.priceHistory || []).map(h => ({ ...h }));
         const ex = hist.find(h => h.date === boardDate);
         if (ex) ex.sell = v; else hist.push({ date: boardDate, buy: last.buy || 0, sell: v });
-        p.priceHistory = hist;
+        window.STORE.update('products', id, { priceHistory: hist });
       });
-      window.STORE.set('products', ps);
     }
     if (window._bulkClear_products) window._bulkClear_products();
     renderBoard();
@@ -688,17 +687,15 @@
     const v = parseInt(String(val).replace(/[^\d]/g, ''), 10);
     if (isNaN(v) || v < 0) { window.toast('Nhập số hợp lệ', 'warn'); return; }
     const today = window.todayISO();
-    const ps = products();
     let n = 0;
     ids.forEach(id => {
-      const p = ps.find(x => x.id === id); if (!p) return;
+      const p = window.productById(id); if (!p) return;
       const last = window.priceEntryOn(p, today) || { buy: 0, sell: 0 };
-      const hist = [...(p.priceHistory || [])];
+      const hist = (p.priceHistory || []).map(h => ({ ...h }));
       const ex = hist.find(h => h.date === today);
       if (ex) ex.buy = v; else hist.push({ date: today, buy: v, sell: last.sell || 0 });
-      p.priceHistory = hist; n++;
+      window.STORE.update('products', id, { priceHistory: hist }); n++;
     });
-    window.STORE.set('products', ps);
     if (window._bulkClear_products) window._bulkClear_products();
     renderCatalog();
     window.toast(`✓ Đã đặt giá nhập ${window.fmt(v)} cho ${n} SP`, 'success');
@@ -854,7 +851,7 @@
     const txt = document.getElementById('bulkText').value || '';
     const lines = txt.split(/\r?\n/).map(s => s.trim()).filter(Boolean);
     if (!lines.length) { window.toast('Chưa có dữ liệu', 'warn'); return; }
-    const ps = products(); let n = 0; const miss = [];
+    const ps = products(); let n = 0, created = 0; const today = window.todayISO();
     lines.forEach(ln => {
       const parts = ln.split(/\t|,|;|\|/).map(s => s.trim());
       if (parts.length < 2) return;
@@ -864,8 +861,12 @@
       const nm = window.AI ? window.AI.norm(name) : name.toLowerCase();
       const p = ps.find(x => (window.AI ? window.AI.norm(x.name) : x.name.toLowerCase()) === nm)
         || ps.find(x => { const xn = window.AI ? window.AI.norm(x.name) : x.name.toLowerCase(); return xn.includes(nm) || nm.includes(xn); });
-      if (!p) { miss.push(name); return; }
-      const today = window.todayISO();
+      if (!p) {
+        /* Chưa khớp → TẠO SP MỚI (nhóm Khác, chưa ảnh) → hiện trong Danh mục để thêm ảnh */
+        window.STORE.add('products', { id: window.STORE.nextId('products', 'SP', 3), name, cat: 'khac', unit: 'kg', img: '', priceHistory: [{ date: today, buy, sell: sell || buy }] });
+        created++;
+        return;
+      }
       const hist = [...(p.priceHistory || [])];
       const ex = hist.find(h => h.date === today);
       if (ex) { if (buy) ex.buy = buy; if (sell) ex.sell = sell; }
@@ -874,7 +875,7 @@
       n++;
     });
     window.closeModal();
-    window.toast(`✓ Cập nhật ${n} SP${miss.length ? ' · chưa khớp: ' + miss.slice(0, 4).join(', ') : ''}`, n ? 'success' : 'warn');
+    window.toast(`✓ Cập nhật ${n} SP${created ? ` · ➕ tạo mới ${created} SP (nhóm Khác — vào Danh mục thêm ảnh)` : ''}`, 'success');
     renderCatalog();
   };
 
@@ -889,14 +890,19 @@
       onResult: (data) => {
         const list = Array.isArray(data) ? data : (data.products || data.items || []);
         if (!list.length) { window.toast('Không đọc được SP từ ảnh', 'warn'); return; }
-        const ps = products(); let n = 0; const miss = [];
+        const ps = products(); let n = 0, created = 0; const today = window.todayISO();
         list.forEach(it => {
           const nm = window.AI.norm(it.name);
           const buy = parseInt(String(it.buy == null ? '' : it.buy).replace(/[^0-9]/g, ''), 10) || 0;
           const sell = parseInt(String(it.sell == null ? '' : it.sell).replace(/[^0-9]/g, ''), 10) || 0;
           const p = ps.find(x => window.AI.norm(x.name) === nm) || ps.find(x => { const xn = window.AI.norm(x.name); return xn.includes(nm) || nm.includes(xn); });
-          if (!p || (!buy && !sell)) { if (!p) miss.push(it.name); return; }
-          const today = window.todayISO();
+          if (!p) {
+            if (!it.name || !String(it.name).trim()) return;
+            window.STORE.add('products', { id: window.STORE.nextId('products', 'SP', 3), name: String(it.name).trim(), cat: 'khac', unit: 'kg', img: '', priceHistory: (buy || sell) ? [{ date: today, buy, sell: sell || buy }] : [] });
+            created++;
+            return;
+          }
+          if (!buy && !sell) return;
           const hist = [...(p.priceHistory || [])];
           const ex = hist.find(h => h.date === today);
           if (ex) { if (buy) ex.buy = buy; if (sell) ex.sell = sell; }
@@ -904,7 +910,7 @@
           window.STORE.update('products', p.id, { priceHistory: hist });
           n++;
         });
-        window.toast(`🤖 AI đã cập nhật ${n} SP${miss.length ? ' · chưa khớp: ' + miss.slice(0, 4).join(', ') : ''}`, n ? 'success' : 'warn');
+        window.toast(`🤖 AI cập nhật ${n} SP${created ? ` · ➕ tạo mới ${created} SP (nhóm Khác — vào Danh mục thêm ảnh)` : ''}`, 'success');
         renderCatalog();
       },
     });
@@ -1092,28 +1098,27 @@
 
   /* ============ BULK IMPORT SP ============ */
   function _prodSaveImported(records, src) {
-    const list = window.STORE.get('products', window.PRODUCTS || []) || [];
-    const today = (new Date()).toISOString().slice(0,10);
+    const today = window.todayISO();
     let added = 0;
-    records.forEach((r, i) => {
+    records.forEach((r) => {
       if (!r.name || !String(r.name).trim()) return;
-      const nextNo = String(list.length + 1 + i).padStart(3, '0');
       const buy = parseInt(r.buyPrice) || 0;
       const sell = parseInt(r.sellPrice) || Math.round(buy * 1.55);
-      list.push({
-        id: 'SP' + nextNo,
-        name: r.name,
+      /* STORE.add → insert thẳng lên cloud (không dính bug same-reference của set) */
+      window.STORE.add('products', {
+        id: window.STORE.nextId('products', 'SP', 3),
+        name: String(r.name).trim(),
         en: r.en || '',
-        cat: r.cat || 'rau-ta',
+        cat: r.cat || 'khac',
         unit: r.unit || 'kg',
         img: '',
         priceHistory: buy ? [{ date: today, buy, sell }] : [],
       });
       added++;
     });
-    window.STORE.set('products', list);
     window.audit && window.audit.log('product.bulkImport', `+${added} SP từ ${src}`);
-    window.toast(`✓ Đã thêm ${added} SP từ ${src}`, 'success');
+    window.toast(`✓ Đã thêm ${added} SP từ ${src} — vào Danh mục để thêm ảnh`, 'success');
+    renderCatalog();
   }
 
   window.prodImportExcel = function() {
