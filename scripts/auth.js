@@ -31,9 +31,11 @@
   function presetPerms(role, dept) {
     const r = ((role || '') + ' ' + (dept || '')).toLowerCase();
     const has = (...kw) => kw.some(k => r.includes(k));
-    if (has('sếp', 'ceo', 'chủ doanh', 'giám đốc', 'tổng giám', 'admin', 'ban giám đốc')) return ['all'];
-    if (has('cfo', 'kế toán trưởng', 'tài chính'))
+    /* CFO / Giám đốc tài chính / Kế toán trưởng → tài chính (KIỂM TRA TRƯỚC 'giám đốc' chung) */
+    if (has('cfo', 'kế toán trưởng') || (has('giám đốc') && has('tài chính')) || (has('tài chính') && !has('giám đốc') && !has('ceo')))
       return ['dashboard.view', 'accounting.view', 'accounting.edit', 'debt.view', 'debt.collect', 'invoices.view', 'invoices.create', 'adspend.view', 'adspend.edit', 'suppliers.view', 'products.view', 'orders.view', 'reports.view', 'reports.profit', 'reports.daily', 'reports.export', 'payroll.viewSelf', 'payroll.viewAll'];
+    /* Sếp / CEO / Tổng giám đốc / Giám đốc điều hành → toàn quyền */
+    if (has('sếp', 'ceo', 'chủ doanh', 'giám đốc', 'tổng giám', 'admin', 'ban giám đốc')) return ['all'];
     if (has('kế toán'))
       return ['dashboard.view', 'accounting.view', 'accounting.edit', 'debt.view', 'debt.collect', 'invoices.view', 'invoices.create', 'adspend.view', 'products.view', 'orders.view', 'reports.view', 'reports.daily', 'payroll.viewSelf'];
     if (has('nhân sự', 'tuyển dụng', 'hr', 'hcns', 'hành chính'))
