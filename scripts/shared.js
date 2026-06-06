@@ -459,13 +459,15 @@ window.attachBulkOps = function (opts) {
       let count = 0;
       ids.forEach(id => {
         const item = list.find(x => x.id === id || x.code === id || x.no === id);
-        if (item) { item[fieldName] = statusSel.value; count++; }
+        if (item) { window.STORE.update(store, (item.id || item.code || item.no), { [fieldName]: statusSel.value }); count++; }
       });
-      window.STORE.set(store, list);
       window.toast?.(`✓ Đã đổi ${count} ${label}`, 'success');
       window[`_bulkClear_${store}`]();
     };
   }
+
+  /* Cho phép cập nhật toolbar thủ công (vd card có onclick riêng phải stopPropagation) */
+  window[`_bulkRefresh_${store}`] = function () { setTimeout(updateToolbar, 0); };
 
   /* Expose bulk actions vào window */
   window[`_bulkClear_${store}`] = function () {

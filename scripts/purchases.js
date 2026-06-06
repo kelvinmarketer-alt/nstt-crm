@@ -44,12 +44,13 @@
     if (sup) rows = rows.filter(p => p.supplierId === sup);
 
     const tb = document.getElementById('purBody');
-    if (!rows.length) { tb.innerHTML = `<tr><td colspan="9" style="padding:36px;text-align:center;color:var(--muted)">Không có phiếu nhập nào.</td></tr>`; return; }
+    if (!rows.length) { tb.innerHTML = `<tr><td colspan="10" style="padding:36px;text-align:center;color:var(--muted)">Không có phiếu nhập nào.</td></tr>`; return; }
 
     tb.innerHTML = rows.map(p => {
       const s = findSup(p.supplierId);
       const due = (p.total||0) - (p.paid||0);
-      return `<tr>
+      return `<tr data-id="${p.id}">
+        <td onclick="event.stopPropagation()"><div class="checkbox" onclick="this.classList.toggle('on')"></div></td>
         <td><b style="font-family:monospace">${p.id}</b></td>
         <td>${s ? s.name : p.supplierId}<div style="font-size:11px;color:var(--muted)">${s?.paymentTerm || ''}</div></td>
         <td>${p.date}</td>
@@ -66,6 +67,25 @@
         </td>
       </tr>`;
     }).join('');
+
+    /* Bulk ops: chọn / đổi trạng thái / xóa hàng loạt */
+    if (window.attachBulkOps) {
+      const tbl = tb.closest('table');
+      if (tbl) {
+        if (!tbl.id) tbl.id = 'tblPur';
+        window.attachBulkOps({
+          tableSelector: '#tblPur',
+          selectAllSelector: '#purSelectAll',
+          store: 'purchases',
+          label: 'phiếu',
+          actions: {
+            changeStatus: { label: '🔄 Đổi trạng thái', field: 'status', options: [
+              { id: 'ordered', label: '⏳ Đã đặt' }, { id: 'received', label: '✓ Đã nhận' }, { id: 'cancelled', label: '✕ Hủy' },
+            ] },
+          }
+        });
+      }
+    }
   }
 
   window.openPurDrawer = function (id) {

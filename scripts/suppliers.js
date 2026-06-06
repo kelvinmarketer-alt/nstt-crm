@@ -61,7 +61,7 @@
       const empty = '<span style="color:var(--muted);opacity:.55;font-style:italic">chưa có</span>';
       const has = v => v && String(v).trim() && String(v).trim().toLowerCase() !== 'null';
       return `<div class="sup-card" data-id="${s.id}" onclick="window.openSupDrawer('${s.id}')" style="cursor:pointer">
-        <div class="checkbox" onclick="event.stopPropagation();this.classList.toggle('on')" style="position:absolute;top:16px;left:14px;z-index:2"></div>
+        <div class="checkbox" onclick="event.stopPropagation();this.classList.toggle('on');window._bulkRefresh_suppliers&&window._bulkRefresh_suppliers()" style="position:absolute;top:16px;left:14px;z-index:2"></div>
         <div class="sup-head">
           <div class="sup-av" style="background:${window.avatarColor(s.id)}">${window.initials(s.name)}</div>
           <div class="sup-info">
