@@ -16,12 +16,15 @@
     const today = window.todayVN();
     const todayList = list.filter(p => p.date === today);
     const ordered = list.filter(p => p.status === 'ordered');
-    const monthSpend = list.filter(p => p.status === 'received' && (p.date||'').endsWith('/2026') && (p.date||'').startsWith('1') === false || (p.date||'').includes('/05/2026')).reduce((s,p) => s + (p.total||0), 0);
+    const _now = window.todayDate ? window.todayDate() : new Date();
+    const _mmyyyy = `/${String(_now.getMonth()+1).padStart(2,'0')}/${_now.getFullYear()}`;
+    const _monthLabel = `T${_now.getMonth()+1}/${_now.getFullYear()}`;
+    const monthSpend = list.filter(p => p.status === 'received' && (p.date||'').endsWith(_mmyyyy)).reduce((s,p) => s + (p.total||0), 0);
     const unpaid = list.filter(p => p.status === 'received').reduce((s,p) => s + Math.max(0, (p.total||0) - (p.paid||0)), 0);
     document.getElementById('purKpis').innerHTML = `
       <div style="background:#fff;border:1px solid var(--line);border-radius:10px;padding:14px"><div style="font-size:11px;color:var(--muted);text-transform:uppercase;font-weight:700">Nhập hôm nay ${window.helpTip('Số phiếu + giá trị nhập hàng trong ngày hiện tại.')}</div><div style="font-size:22px;font-weight:800;color:var(--navy);margin-top:4px">${todayList.length} <span style="font-size:13px;color:var(--muted);font-weight:500">phiếu</span></div><div style="font-size:11.5px;color:var(--muted)">${window.fmtShort(todayList.reduce((s,p)=>s+(p.total||0),0))} ₫</div></div>
       <div style="background:#fff;border:1px solid var(--line);border-radius:10px;padding:14px"><div style="font-size:11px;color:var(--muted);text-transform:uppercase;font-weight:700">⏳ Chờ nhận ${window.helpTip('Phiếu đã đặt nhưng NCC chưa giao. Khi nhận hàng → bấm "✓ Đã nhận" để cộng vào kho.')}</div><div style="font-size:22px;font-weight:800;color:#92400E;margin-top:4px">${ordered.length}</div><div style="font-size:11.5px;color:var(--muted)">${window.fmtShort(ordered.reduce((s,p)=>s+(p.total||0),0))} ₫</div></div>
-      <div style="background:#fff;border:1px solid var(--line);border-radius:10px;padding:14px"><div style="font-size:11px;color:var(--muted);text-transform:uppercase;font-weight:700">💸 Chi nhập T5/2026 ${window.helpTip('Tổng chi nhập hàng trong tháng — = COGS (giá vốn).')}</div><div style="font-size:22px;font-weight:800;color:var(--ok);margin-top:4px">${window.fmtShort(monthSpend)}</div></div>
+      <div style="background:#fff;border:1px solid var(--line);border-radius:10px;padding:14px"><div style="font-size:11px;color:var(--muted);text-transform:uppercase;font-weight:700">💸 Chi nhập ${_monthLabel} ${window.helpTip('Tổng chi nhập hàng trong tháng — = COGS (giá vốn).')}</div><div style="font-size:22px;font-weight:800;color:var(--ok);margin-top:4px">${window.fmtShort(monthSpend)}</div></div>
       <div style="background:#fff;border:1px solid var(--line);border-radius:10px;padding:14px"><div style="font-size:11px;color:var(--muted);text-transform:uppercase;font-weight:700">🔴 Chưa thanh toán ${window.helpTip('Tổng tiền hàng đã nhận nhưng chưa trả NCC. Bằng Σ công nợ NCC.')}</div><div style="font-size:22px;font-weight:800;color:#DC2626;margin-top:4px">${window.fmtShort(unpaid)}</div></div>
     `;
   }
@@ -73,16 +76,14 @@
       const tbl = tb.closest('table');
       if (tbl) {
         if (!tbl.id) tbl.id = 'tblPur';
+        /* KHÔNG cho đổi trạng thái hàng loạt: 'Đã nhận'/'Hủy' có side-effect (cộng kho,
+           công nợ, priceHistory) — phải qua nút ✓ Nhận / ✕ Hủy để chạy đúng luồng.
+           Bulk chỉ Xóa + Export. */
         window.attachBulkOps({
           tableSelector: '#tblPur',
           selectAllSelector: '#purSelectAll',
           store: 'purchases',
           label: 'phiếu',
-          actions: {
-            changeStatus: { label: '🔄 Đổi trạng thái', field: 'status', options: [
-              { id: 'ordered', label: '⏳ Đã đặt' }, { id: 'received', label: '✓ Đã nhận' }, { id: 'cancelled', label: '✕ Hủy' },
-            ] },
-          }
         });
       }
     }
@@ -148,17 +149,13 @@
     /* Cộng công nợ NCC nếu chưa COD */
     const sup = findSup(list[i].supplierId);
     if (sup && sup.paymentTerm !== 'COD') {
-      const sups = getSup();
-      const si = sups.findIndex(s => s.id === sup.id);
-      sups[si].debt = (sups[si].debt || 0) + list[i].total;
-      sups[si].totalSpend = (sups[si].totalSpend || 0) + list[i].total;
-      window.STORE.set('suppliers', sups);
+      window.STORE.update('suppliers', sup.id, {
+        debt: (sup.debt || 0) + list[i].total,
+        totalSpend: (sup.totalSpend || 0) + list[i].total,
+      });
     } else if (sup) {
       list[i].paid = list[i].total;
-      const sups = getSup();
-      const si = sups.findIndex(s => s.id === sup.id);
-      sups[si].totalSpend = (sups[si].totalSpend || 0) + list[i].total;
-      window.STORE.set('suppliers', sups);
+      window.STORE.update('suppliers', sup.id, { totalSpend: (sup.totalSpend || 0) + list[i].total });
     }
     /* Cập nhật priceHistory cho từng SP */
     const prods = getProds();

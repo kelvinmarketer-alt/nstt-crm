@@ -184,18 +184,27 @@
     /* 2) Hoàn tiền: giảm công nợ KH hoặc chi tiền mặt */
     if (r.refundTotal > 0) {
       if (r.refundMode === 'cash') {
-        const cash = window.STORE.get('cashEntries', []) || [];
-        cash.unshift({no:'PC'+String(cash.length+1).padStart(4,'0'), date:r.date, type:'expense',
-          amount:r.refundTotal, account:'Tiền mặt', counterparty:r.custName,
-          description:'Hoàn tiền trả hàng ' + r.orderCode});
-        window.STORE.set('cashEntries', cash);
+        /* Phiếu chi đúng schema sổ quỹ (type:'out', party, desc) — số phiếu riêng tránh trùng dải PC- của Kế toán */
+        window.STORE.add('cashEntries', {
+          no: 'PCTH-' + Date.now().toString(36).toUpperCase(),
+          date: r.date, type: 'out', party: r.custName,
+          desc: 'Hoàn tiền trả hàng ' + r.orderCode + (r.item ? ' · ' + r.item.name : ''),
+          account: 'Tiền mặt', amount: r.refundTotal,
+          staff: window.CURRENT_USER?.name || '',
+        });
+        /* Trừ số dư tài khoản Tiền mặt nếu có */
+        const accs = window.STORE.get('paymentAccounts', []) || [];
+        const acc = accs.find(a => (a.name || '').toLowerCase().includes('tiền mặt'));
+        if (acc) window.STORE.update('paymentAccounts', acc.id, { balance: (+acc.balance || 0) - r.refundTotal });
         msgs.push('tạo phiếu chi');
       } else {
         const custs = window.STORE.get('customers', []) || [];
         const c = custs.find(x => x.id === r.custId) || custs.find(x => x.name === r.custName);
         if (c) {
-          c.debt = Math.max(0, (+c.debt||0) - r.refundTotal);
-          window.STORE.set('customers', custs);
+          window.STORE.update('customers', c.id, {
+            debt: Math.max(0, (+c.debt || 0) - r.refundTotal),
+            debtOverdue: Math.max(0, (+c.debtOverdue || 0) - r.refundTotal),
+          });
           msgs.push(`giảm công nợ ${r.custName}`);
         } else { msgs.push('không tìm thấy KH để giảm nợ'); }
       }

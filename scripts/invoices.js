@@ -369,7 +369,7 @@
 
       <div class="total-section">
         <div class="total-row"><div>Cộng tiền hàng:</div><div><b>${window.fmt(i.net)} ₫</b></div></div>
-        <div class="total-row"><div>Thuế suất GTGT (${Math.round(i.vat/i.net*100)}%):</div><div><b>${window.fmt(i.vat)} ₫</b></div></div>
+        <div class="total-row"><div>Thuế suất GTGT (${i.net ? Math.round(i.vat/i.net*100) : 0}%):</div><div><b>${window.fmt(i.vat)} ₫</b></div></div>
         <div class="total-row big"><div>TỔNG CỘNG TIỀN THANH TOÁN:</div><div>${window.fmt(total)} ₫</div></div>
       </div>
 
