@@ -10,73 +10,73 @@
      Đăng nhập qua MOCK_USERS fallback (Supabase Auth chưa tạo user).
      ⚠ Mật khẩu mặc định — đổi sau khi đăng nhập lần đầu.
      ========================================================= */
+  /* TÀI KHOẢN ADMIN dự phòng (luôn đăng nhập được — tránh bị khoá ngoài).
+     Nhân viên thật đăng nhập bằng SĐT + mật khẩu mặc định (xem staffLogin bên dưới). */
   const MOCK_USERS = [
-    /* 1) SẾP — Tuấn Tú (NV001) — toàn quyền */
-    { email:'sep@nstt.vn', password:'sep@2026', staffId:'NV001',
+    { email:'sep@nstt.vn', password:'Nstt@2026', staffId:'NV001',
       name:'Tuấn Tú', role:'Sếp (Chủ doanh nghiệp)', dept:'Ban giám đốc',
       avatar:'TT', avatarColor:'#339B21',
       permissions:['all'], status:'active' },
-
-    /* 2) SALE — Chu Thị Tố Loan (NV016) */
-    { email:'sale@nstt.vn', password:'sale@2026', staffId:'NV016',
-      name:'Chu Thị Tố Loan', role:'Nhân viên Sale', dept:'Sale',
-      avatar:'CL', avatarColor:'#1B5E20',
-      permissions:[
-        'dashboard.view',
-        'orders.view','orders.create','orders.edit','orders.print',
-        'customers.view','customers.create','customers.edit','customers.debt',
-        'products.view',
-        'quotes.view','quotes.create',
-        'recurring.view','recurring.edit',
-        'leads.view','leads.edit',
-        'reports.view','reports.sales',
-        'payroll.viewSelf',
-      ], status:'active' },
-
-    /* 3) NHÂN SỰ (HR) — Nguyễn Phương Trang (NV010) — tính + gửi lương (KHÔNG duyệt) */
-    { email:'nhansu@nstt.vn', password:'nhansu@2026', staffId:'NV010',
-      name:'Nguyễn Phương Trang', role:'Nhân sự (HR)', dept:'HCNS',
-      avatar:'PT', avatarColor:'#7C3AED',
-      permissions:[
-        'dashboard.view',
-        'staff.view','staff.edit',
-        'payroll.viewSelf','payroll.viewAll','payroll.edit','payroll.upload',
-        'payroll.calc','payroll.submit',   /* HR tính lương + gửi Sếp duyệt */
-        'reports.view',
-      ], status:'active' },
-
-    /* 4) KẾ TOÁN — Nguyễn Thị Thủy (NV015) — tài chính + xem lợi nhuận/giá vốn/lương */
-    { email:'ketoan@nstt.vn', password:'ketoan@2026', staffId:'NV015',
-      name:'Nguyễn Thị Thủy', role:'Kế toán', dept:'Kế toán',
-      avatar:'NT', avatarColor:'#15803D',
-      permissions:[
-        'dashboard.view',
-        'accounting.view','accounting.edit',
-        'debt.view','debt.collect',
-        'invoices.view','invoices.create',
-        'adspend.view','adspend.edit',
-        'suppliers.view',
-        'products.view','products.editCost',
-        'orders.view',
-        'reports.view','reports.profit','reports.daily','reports.export',
-        'payroll.viewSelf','payroll.viewAll',   /* xem lương để chi trả */
-      ], status:'active' },
-
-    /* 5) KHO — Dương Phương Trang (NV023) — kho + nhập hàng + NCC + trả hàng */
-    { email:'kho@nstt.vn', password:'kho@2026', staffId:'NV023',
-      name:'Dương Phương Trang', role:'Quản lý Kho', dept:'Kho',
-      avatar:'DT', avatarColor:'#E8A33D',
-      permissions:[
-        'dashboard.view',
-        'inventory.view','inventory.adjust',
-        'suppliers.view','suppliers.edit',
-        'purchases.view','purchases.create',
-        'returns.view','returns.process',
-        'products.view',
-        'orders.view',   /* xem đơn để soạn hàng */
-        'payroll.viewSelf',
-      ], status:'active' },
   ];
+
+  /* ===== Mật khẩu mặc định + phân quyền theo VỊ TRÍ (cho login bằng bản ghi staff) ===== */
+  const PWD_LEADER = 'Nstt@2026';   /* admin / CEO / CFO */
+  const PWD_STAFF  = 'Tuantu@2026'; /* tất cả nhân viên còn lại */
+
+  function _isLeaderRole(role, dept) {
+    const r = ((role || '') + ' ' + (dept || '')).toLowerCase();
+    return ['sếp', 'ceo', 'cfo', 'chủ doanh', 'giám đốc', 'tổng giám', 'admin', 'ban giám đốc'].some(k => r.includes(k));
+  }
+  /* Quyền chi tiết theo vị trí (role) / phòng ban (dept) */
+  function presetPerms(role, dept) {
+    const r = ((role || '') + ' ' + (dept || '')).toLowerCase();
+    const has = (...kw) => kw.some(k => r.includes(k));
+    if (has('sếp', 'ceo', 'chủ doanh', 'giám đốc', 'tổng giám', 'admin', 'ban giám đốc')) return ['all'];
+    if (has('cfo', 'kế toán trưởng', 'tài chính'))
+      return ['dashboard.view', 'accounting.view', 'accounting.edit', 'debt.view', 'debt.collect', 'invoices.view', 'invoices.create', 'adspend.view', 'adspend.edit', 'suppliers.view', 'products.view', 'orders.view', 'reports.view', 'reports.profit', 'reports.daily', 'reports.export', 'payroll.viewSelf', 'payroll.viewAll'];
+    if (has('kế toán'))
+      return ['dashboard.view', 'accounting.view', 'accounting.edit', 'debt.view', 'debt.collect', 'invoices.view', 'invoices.create', 'adspend.view', 'products.view', 'orders.view', 'reports.view', 'reports.daily', 'payroll.viewSelf'];
+    if (has('nhân sự', 'tuyển dụng', 'hr', 'hcns', 'hành chính'))
+      return ['dashboard.view', 'staff.view', 'staff.edit', 'payroll.viewSelf', 'payroll.viewAll', 'payroll.edit', 'payroll.upload', 'payroll.calc', 'payroll.submit', 'reports.view'];
+    if (has('marketing', 'mkt', 'digital', 'ads', 'content', 'truyền thông'))
+      return ['dashboard.view', 'marketing.send', 'adspend.view', 'adspend.edit', 'customers.view', 'products.view', 'reports.view', 'reports.sales', 'payroll.viewSelf'];
+    if (has('kho'))
+      return ['dashboard.view', 'inventory.view', 'inventory.adjust', 'suppliers.view', 'suppliers.edit', 'purchases.view', 'purchases.create', 'returns.view', 'returns.process', 'products.view', 'orders.view', 'payroll.viewSelf'];
+    if (has('shipper', 'giao hàng', 'tài xế'))
+      return ['dashboard.view', 'orders.view', 'shippers.view', 'payroll.viewSelf'];
+    if (has('sale', 'kinh doanh', 'cskh', 'bán hàng', 'chăm sóc'))
+      return ['dashboard.view', 'orders.view', 'orders.create', 'orders.edit', 'orders.print', 'customers.view', 'customers.create', 'customers.edit', 'customers.debt', 'products.view', 'quotes.view', 'quotes.create', 'recurring.view', 'recurring.edit', 'leads.view', 'leads.edit', 'reports.view', 'reports.sales', 'payroll.viewSelf'];
+    return ['dashboard.view', 'payroll.viewSelf'];
+  }
+  /* Đăng nhập bằng bản ghi nhân viên: SĐT (hoặc email/mã NV) + mật khẩu mặc định.
+     async vì trên máy mới (login page chưa cache staff) phải fetch từ Supabase. */
+  async function staffLogin(username, password) {
+    let list = (window.STORE && window.STORE.get('staff', window.STAFFS || [])) || [];
+    if ((!list || !list.length) && window.SB_DATA && window.SB_DATA.getAll) {
+      try { const cloud = await window.SB_DATA.getAll('staff'); if (Array.isArray(cloud) && cloud.length) list = cloud; } catch (e) { console.warn('[AUTH staffLogin fetch]', e && e.message); }
+    }
+    const norm = s => (s || '').toString().replace(/\s+/g, '').toLowerCase();
+    const dig = s => (s || '').toString().replace(/\D/g, '');
+    const uin = norm(username), ud = dig(username);
+    const st = list.find(s =>
+      (ud && dig(s.phone) === ud) ||
+      (uin && norm(s.email) === uin) ||
+      (uin && (norm(s.code) === uin || norm(s.id) === uin)));
+    if (!st) return null;
+    if (st.status === 'inactive' || st.status === 'off' || st.status === 'nghỉ') return { _locked: true };
+    const expect = st.pwd || (_isLeaderRole(st.role, st.dept) ? PWD_LEADER : PWD_STAFF);
+    if (password !== expect) return null;
+    return {
+      staffId: st.id || st.code,
+      email: st.email || dig(st.phone),
+      name: st.name,
+      role: st.role,
+      dept: st.dept,
+      permissions: presetPerms(st.role, st.dept),
+      avatar: st.avatar || (st.name || '?').trim().split(/\s+/).slice(-2).map(x => x[0]).join('').toUpperCase(),
+      avatarColor: st.avatarColor || '#1B5E20',
+    };
+  }
 
   /* ============================================================
      PERM_GROUPS — phân quyền chi tiết theo từng tính năng
@@ -333,27 +333,38 @@
         }
       }
 
-      /* Fallback mock — cho phép demo accounts hoạt động khi Supabase chưa có user */
-      const u = MOCK_USERS.find(x => x.email.toLowerCase() === email.toLowerCase() && x.password === password);
-      if (!u) {
-        const msg = supabaseError?.message || '';
-        if (msg && !msg.toLowerCase().includes('invalid')) {
-          return { success: false, error: msg };
-        }
-        return { success: false, error: 'Email hoặc mật khẩu không đúng.' };
+      const _exp = () => remember
+        ? new Date(Date.now() + 7*24*60*60*1000).toISOString()
+        : new Date(Date.now() + 4*60*60*1000).toISOString();
+
+      /* 1) Admin dự phòng (MOCK_USERS) */
+      const u = MOCK_USERS.find(x => x.email.toLowerCase() === (email||'').toLowerCase() && x.password === password);
+      if (u) {
+        if (u.status === 'off') return { success: false, error: 'Tài khoản đã bị khóa.' };
+        const session = {
+          staffId: u.staffId, email: u.email, name: u.name, role: u.role, dept: u.dept,
+          permissions: u.permissions || [], avatar: u.avatar, avatarColor: u.avatarColor,
+          loginAt: new Date().toISOString(), expiresAt: _exp(),
+        };
+        window.STORE.set('currentUser', session);
+        this.logActivity(u.staffId, 'login', 'Đăng nhập (admin)');
+        return { success: true, user: session };
       }
-      if (u.status === 'off') return { success: false, error: 'Tài khoản đã bị khóa.' };
-      const session = {
-        staffId: u.staffId, email: u.email, name: u.name, role: u.role, dept: u.dept,
-        permissions: u.permissions || [], avatar: u.avatar, avatarColor: u.avatarColor,
-        loginAt: new Date().toISOString(),
-        expiresAt: remember
-          ? new Date(Date.now() + 7*24*60*60*1000).toISOString()
-          : new Date(Date.now() + 4*60*60*1000).toISOString(),
-      };
-      window.STORE.set('currentUser', session);
-      this.logActivity(u.staffId, 'login', 'Đăng nhập (mock fallback)');
-      return { success: true, user: session };
+
+      /* 2) Nhân viên: SĐT (hoặc email/mã NV) + mật khẩu mặc định, quyền theo vị trí */
+      const sres = await staffLogin(email, password);
+      if (sres && sres._locked) return { success: false, error: 'Tài khoản nhân viên đã bị khóa / nghỉ việc.' };
+      if (sres) {
+        const session = { ...sres, loginAt: new Date().toISOString(), expiresAt: _exp() };
+        window.STORE.set('currentUser', session);
+        this.logActivity(sres.staffId, 'login', 'Đăng nhập (NV · ' + (sres.role || '') + ')');
+        return { success: true, user: session };
+      }
+
+      /* 3) Sai thông tin */
+      const msg = supabaseError?.message || '';
+      if (msg && !msg.toLowerCase().includes('invalid')) return { success: false, error: msg };
+      return { success: false, error: 'SĐT/email hoặc mật khẩu không đúng.' };
     },
 
     /* === Đăng ký user mới (admin only) === */
