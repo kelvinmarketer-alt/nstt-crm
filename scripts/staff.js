@@ -830,6 +830,52 @@
     window.toast(`✓ Đã thêm ${added} NV từ ảnh AI`, 'success');
   };
 
+  /* ===== Xuất danh sách TẤT CẢ tài khoản đăng nhập (admin + sếp + CEO/CFO + NV) ===== */
+  window.exportAllUsers = function () {
+    const staff = window.STORE.get('staff', window.STAFFS || []) || [];
+    const A = window.AUTH || {};
+    const fixed = A.fixedAccounts ? A.fixedAccounts() : [];
+    const esc = v => String(v == null ? '' : v).replace(/[<>&]/g, c => ({ '<': '&lt;', '>': '&gt;', '&': '&amp;' }[c]));
+    const pwOf = s => s.pwd || (A.staffDefaultPassword ? A.staffDefaultPassword(s.role, s.dept) : 'Tuantu@2026');
+    const permsOf = s => { const p = A.presetPerms ? A.presetPerms(s.role, s.dept) : []; return p.includes('all') ? 'Toàn quyền' : p.join(', '); };
+    const today = (window.todayDate ? window.todayDate() : new Date());
+    const dstr = `${String(today.getDate()).padStart(2,'0')}/${String(today.getMonth()+1).padStart(2,'0')}/${today.getFullYear()}`;
+
+    const fixedRows = fixed.map(u => `<tr class="lead"><td>—</td><td><b>${esc(u.name)}</b></td><td>${esc(u.role)}</td><td>${esc(u.dept)}</td><td><code>${esc(u.email)}</code></td><td><code>${esc(u.password)}</code></td><td>${(u.permissions || []).includes('all') ? 'Toàn quyền' : esc((u.permissions || []).join(', '))}</td></tr>`).join('');
+    const staffRows = staff.map(s => `<tr><td>${esc(s.code || s.id || '')}</td><td><b>${esc(s.name)}</b></td><td>${esc(s.role || '')}</td><td>${esc(s.dept || '')}</td><td><code>${esc((s.phone || '').replace(/\s/g, ''))}</code></td><td><code>${esc(pwOf(s))}</code></td><td class="pm">${esc(permsOf(s))}</td></tr>`).join('') || `<tr><td colspan="7" style="text-align:center;color:#888;padding:20px">Chưa có nhân viên trong hệ thống.</td></tr>`;
+
+    const html = `<!doctype html><html lang="vi"><head><meta charset="utf-8"><title>Danh sách tài khoản đăng nhập — Nông Sản Tuấn Tú Hà Nội</title>
+<style>*{box-sizing:border-box;margin:0;padding:0;font-family:'Segoe UI',system-ui,Arial,sans-serif}body{background:#F7FAF7;color:#1F2937;padding:24px}
+h1{color:#1B5E20;font-size:22px}.sub{color:#6B7280;font-size:13px;margin:4px 0 16px}
+h2{color:#1B5E20;font-size:16px;margin:22px 0 8px}
+table{width:100%;border-collapse:collapse;font-size:12.5px;background:#fff;border-radius:8px;overflow:hidden;box-shadow:0 1px 3px rgba(0,0,0,.06)}
+th,td{border:1px solid #E5E7EB;padding:7px 9px;text-align:left;vertical-align:top}
+th{background:#1B5E20;color:#fff;font-size:11px;text-transform:uppercase}
+tr:nth-child(even) td{background:#FAFBFA}
+tr.lead td{background:#FEF9E7}
+code{background:#EEF2EE;padding:1px 6px;border-radius:4px;font-family:ui-monospace,monospace;font-weight:700;color:#15803D}
+.pm{font-size:10.5px;color:#6B7280;max-width:340px}
+.note{background:#FEF3C7;border:1px solid #FCD34D;border-radius:8px;padding:11px 14px;font-size:12.5px;color:#854D0E;margin:16px 0;line-height:1.6}
+@media print{th{-webkit-print-color-adjust:exact;print-color-adjust:exact}}</style></head><body>
+<h1>🔑 Danh sách tài khoản đăng nhập</h1>
+<div class="sub">Nông Sản Tuấn Tú Hà Nội · xuất ngày ${dstr} · ${fixed.length} tài khoản quản trị + ${staff.length} nhân viên</div>
+<div class="note">🔒 <b>TÀI LIỆU MẬT</b> — chỉ chia sẻ nội bộ. Admin/CEO/CFO đăng nhập bằng <b>email</b>; nhân viên đăng nhập bằng <b>số điện thoại</b>. Mỗi người nên đổi mật khẩu sau lần đăng nhập đầu (Cài đặt → Tài khoản).</div>
+<h2>① Quản trị (Admin · CEO · CFO) — đăng nhập bằng email</h2>
+<table><thead><tr><th>Mã</th><th>Họ tên</th><th>Vị trí</th><th>Phòng ban</th><th>Tài khoản</th><th>Mật khẩu</th><th>Quyền</th></tr></thead><tbody>${fixedRows}</tbody></table>
+<h2>② Nhân viên — đăng nhập bằng số điện thoại</h2>
+<table><thead><tr><th>Mã NV</th><th>Họ tên</th><th>Vị trí</th><th>Phòng ban</th><th>Tài khoản (SĐT)</th><th>Mật khẩu</th><th>Quyền (theo vị trí)</th></tr></thead><tbody>${staffRows}</tbody></table>
+<div class="note" style="margin-top:18px">💡 Quyền được gán <b>tự động theo vị trí</b>. Nếu một nhân viên cần quyền khác, chỉnh trong module Nhân sự hoặc báo IT cập nhật. In: Ctrl/Cmd + P.</div>
+</body></html>`;
+
+    const blob = new Blob([html], { type: 'text/html;charset=utf-8' });
+    const a = document.createElement('a');
+    a.href = URL.createObjectURL(blob);
+    a.download = 'tai-khoan-dang-nhap-NSTT.html';
+    document.body.appendChild(a); a.click(); a.remove();
+    setTimeout(() => URL.revokeObjectURL(a.href), 1000);
+    window.toast(`✓ Đã xuất ${fixed.length} TK quản trị + ${staff.length} NV`, 'success');
+  };
+
   window.STORE.subscribe('staff', render);
   window.renderAppShell('staff', 'Nhân viên');
   ['qSearch','fStatus'].forEach(id => document.getElementById(id)?.addEventListener('input', render));

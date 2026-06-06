@@ -12,11 +12,23 @@
      ========================================================= */
   /* TÀI KHOẢN ADMIN dự phòng (luôn đăng nhập được — tránh bị khoá ngoài).
      Nhân viên thật đăng nhập bằng SĐT + mật khẩu mặc định (xem staffLogin bên dưới). */
+  const _FINANCE_PERMS = ['dashboard.view','accounting.view','accounting.edit','debt.view','debt.collect','invoices.view','invoices.create','adspend.view','adspend.edit','suppliers.view','products.view','orders.view','reports.view','reports.profit','reports.daily','reports.export','payroll.viewSelf','payroll.viewAll'];
   const MOCK_USERS = [
+    /* ADMIN / SẾP — luôn đăng nhập được (chống khoá ngoài) */
     { email:'sep@nstt.vn', password:'Nstt@2026', staffId:'NV001',
       name:'Tuấn Tú', role:'Sếp (Chủ doanh nghiệp)', dept:'Ban giám đốc',
       avatar:'TT', avatarColor:'#339B21',
       permissions:['all'], status:'active' },
+    /* CEO — đăng nhập bằng email (KHÔNG dùng SĐT) */
+    { email:'ceo@nstt.vn', password:'Nstt@2026', staffId:'CEO',
+      name:'CEO — Giám đốc điều hành', role:'CEO', dept:'Ban giám đốc',
+      avatar:'CE', avatarColor:'#1B5E20',
+      permissions:['all'], status:'active' },
+    /* CFO — đăng nhập bằng email (KHÔNG dùng SĐT) */
+    { email:'cfo@nstt.vn', password:'Nstt@2026', staffId:'CFO',
+      name:'CFO — Giám đốc tài chính', role:'CFO', dept:'Ban giám đốc',
+      avatar:'CF', avatarColor:'#15803D',
+      permissions:_FINANCE_PERMS, status:'active' },
   ];
 
   /* ===== Mật khẩu mặc định + phân quyền theo VỊ TRÍ (cho login bằng bản ghi staff) ===== */
@@ -295,6 +307,12 @@
   }
 
   window.AUTH = {
+    /* Helper cho màn "Xuất danh sách tài khoản" */
+    presetPerms,
+    isLeaderRole: _isLeaderRole,
+    staffDefaultPassword(role, dept) { return _isLeaderRole(role, dept) ? PWD_LEADER : PWD_STAFF; },
+    fixedAccounts() { return MOCK_USERS.map(u => ({ email: u.email, password: u.password, name: u.name, role: u.role, dept: u.dept, permissions: u.permissions })); },
+
     /* === Login === */
     async login(email, password, remember) {
       /* Supabase Auth */

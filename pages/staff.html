@@ -49,6 +49,7 @@
     <!-- ===== TAB NHÂN VIÊN ===== -->
     <div id="paneStaff">
       <div style="display:flex;justify-content:flex-end;gap:8px;margin-bottom:12px;flex-wrap:wrap">
+        <button class="btn btn-ghost" onclick="window.exportAllUsers()" title="Tải file HTML đầy đủ tài khoản đăng nhập của admin + sếp + toàn bộ NV">🔑 Xuất danh sách tài khoản</button>
         <button class="btn btn-ghost" onclick="window.openImportStaffExcel()">📥 Nhập Excel</button>
         <button class="btn btn-ghost" onclick="window.aiAddStaff()">📷 Thêm NV từ ảnh</button>
         <button class="btn btn-primary" onclick="window.openModal('+ Thêm nhân viên',formNv(),{footer:footNv(),width:'560px'})">+ Thêm NV</button>
