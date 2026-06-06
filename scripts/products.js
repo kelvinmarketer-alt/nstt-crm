@@ -250,7 +250,8 @@
         priceCell = `<input class="tprice" data-id="${p.id}" type="number" value="${tp}" title="${hasOv ? 'Giá ghi đè riêng' : 'Giá gốc ' + (tier.markup >= 0 ? '+' : '') + tier.markup + '%'}" style="width:110px;text-align:right;padding:6px 8px;border:1px solid ${hasOv ? '#F59E0B' : 'var(--line)'};border-radius:6px;${hasOv ? 'background:#FEF9C3;font-weight:700' : ''}">`;
         lastCell = `<td class="num">${hasOv ? `<button class="btn btn-ghost btn-sm" title="Bỏ ghi đè, về giá gốc ±%" onclick="window.tierResetOverride('${p.id}')">↺</button>` : `<span style="color:var(--muted);font-size:11px">theo %</span>`}</td>`;
       }
-      return `<tr>
+      return `<tr data-id="${p.id}">
+        <td onclick="event.stopPropagation()"><div class="checkbox" onclick="this.classList.toggle('on')"></div></td>
         <td><div style="display:flex;align-items:center;gap:8px">
           ${p.img ? `<img src="${p.img}" alt="" loading="lazy" style="width:34px;height:34px;object-fit:cover;border-radius:6px;background:#eef3ee;flex:none" onerror="this.style.visibility='hidden'">` : ''}
           <b>${p.name}</b></div></td>
@@ -307,19 +308,37 @@
         ${boardToolbarHTML()}
         <table class="mini-table">
           <thead><tr>
+            <th style="width:32px"><div id="boardSelectAll" class="checkbox" onclick="this.classList.toggle('on')" title="Chọn tất cả"></div></th>
             <th onclick="window.boardSortBy('name')" style="cursor:pointer;user-select:none" title="Bấm để sắp xếp theo tên">Sản phẩm${_sortArrow('name')}</th>
             <th onclick="window.boardSortBy('cat')" style="cursor:pointer;user-select:none" title="Bấm để sắp xếp theo nhóm">Nhóm${_sortArrow('cat')}</th><th>ĐVT</th>
             <th class="num">${tier ? 'Giá gốc' : 'Giá bán hôm qua'}</th><th class="num">${tier ? (tierIcon(tier) + ' ' + tier.name) : ('Giá bán ' + fmtD(boardDate))}</th><th class="num">${tier ? '' : 'Thay đổi'}</th>
           </tr></thead>
-          <tbody>${rows || '<tr><td colspan="6" style="text-align:center;color:var(--muted);padding:24px">Không có SP nào khớp bộ lọc</td></tr>'}</tbody>
+          <tbody>${rows || '<tr><td colspan="7" style="text-align:center;color:var(--muted);padding:24px">Không có SP nào khớp bộ lọc</td></tr>'}</tbody>
         </table>
-        <div style="font-size:11.5px;color:var(--muted);margin-top:6px">Hiển thị ${applyBoardFilter(ps).length}/${ps.length} sản phẩm</div>
+        <div style="font-size:11.5px;color:var(--muted);margin-top:6px">Hiển thị ${applyBoardFilter(ps).length}/${ps.length} sản phẩm · tick để xóa / đổi nhóm / đặt giá hàng loạt</div>
       </div>`;
 
     document.getElementById('boardDateInp').addEventListener('change', e => {
       boardDate = e.target.value || window.todayISO();
       renderBoard();
     });
+    /* Bulk ops cho bảng giá: chọn / đổi nhóm / đặt giá / xóa hàng loạt */
+    if (window.attachBulkOps) {
+      const tbl = document.querySelector('#boardView .mini-table');
+      if (tbl) {
+        if (!tbl.id) tbl.id = 'tblBoard';
+        window.attachBulkOps({
+          tableSelector: '#tblBoard',
+          selectAllSelector: '#boardSelectAll',
+          store: 'products',
+          label: 'SP',
+          actions: {
+            changeStatus: { label: '🔄 Đổi nhóm', field: 'cat', options: CATS.map(c => ({ id: c.id, label: (c.icon || '') + ' ' + c.label })) },
+            buttons: [{ label: boardTier ? '💲 Đặt giá nhóm' : '💲 Đặt giá bán', handler: (ids) => window.bulkSetBoardPrice(ids) }],
+          }
+        });
+      }
+    }
     /* Sửa tay giá nhóm → ghi đè riêng SP đó (auto-lưu) */
     document.querySelectorAll('.tprice').forEach(inp => {
       inp.addEventListener('change', () => {
@@ -631,6 +650,35 @@
     const msg = buildPriceMessage();
     try { await navigator.clipboard.writeText(msg); window.toast('✓ Đã copy bảng giá (text) — dán vào Zalo', 'success'); }
     catch (e) { window.openModal('📋 Bảng giá (text)', `<textarea rows="14" style="width:100%;font-family:ui-monospace,monospace;font-size:12px;padding:10px;border:1px solid var(--line);border-radius:8px">${msg}</textarea>`, { footer: `<button class="btn btn-primary" onclick="closeModal()">Đóng</button>`, width: '560px' }); }
+  };
+
+  /* Đặt GIÁ BÁN hàng loạt trong Bảng giá — Gốc: set giá bán; Nhóm: ghi đè giá nhóm */
+  window.bulkSetBoardPrice = function (ids) {
+    const tier = boardTier ? tierById(boardTier) : null;
+    const val = prompt(`Đặt ${tier ? 'GIÁ NHÓM "' + tier.name + '"' : 'GIÁ BÁN'} cho ${ids.length} SP đã chọn (đ):`, '');
+    if (val == null) return;
+    const v = parseInt(String(val).replace(/[^\d]/g, ''), 10);
+    if (isNaN(v) || v < 0) { window.toast('Nhập số hợp lệ', 'warn'); return; }
+    if (tier) {
+      const tiers = getTiers(); const t = tiers.find(x => x.id === boardTier); if (!t) return;
+      t.overrides = t.overrides || {};
+      ids.forEach(id => { t.overrides[id] = v; });
+      saveTiers(tiers);
+    } else {
+      const ps = products();
+      ids.forEach(id => {
+        const p = ps.find(x => x.id === id); if (!p) return;
+        const last = window.priceEntryOn(p, boardDate) || { buy: 0, sell: 0 };
+        const hist = [...(p.priceHistory || [])];
+        const ex = hist.find(h => h.date === boardDate);
+        if (ex) ex.sell = v; else hist.push({ date: boardDate, buy: last.buy || 0, sell: v });
+        p.priceHistory = hist;
+      });
+      window.STORE.set('products', ps);
+    }
+    if (window._bulkClear_products) window._bulkClear_products();
+    renderBoard();
+    window.toast(`✓ Đã đặt giá ${window.fmt(v)} cho ${ids.length} SP`, 'success');
   };
 
   /* Đặt GIÁ NHẬP hàng loạt cho các SP đã chọn (ngày hôm nay) */
