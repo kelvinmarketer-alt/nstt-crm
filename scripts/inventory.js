@@ -46,21 +46,21 @@
 
   /* Apply 1 movement vào stock (không ghi log — log ở chỗ gọi) */
   window.invApply = function (productId, deltaQty) {
-    const inv = getInv();
-    let item = inv.find(i => i.productId === productId);
-    if (!item) {
-      const p = findProd(productId);
-      item = { id: 'INV' + Date.now().toString(36), productId,
-        stock: 0, minStock: 10, maxStock: 100, avgDaily: 5,
-        lastIn: '', lastOut: '', location: 'Kho A1' };
-      inv.push(item);
-    }
-    item.stock = Math.max(0, (item.stock || 0) + deltaQty);
+    const item = getInv().find(i => i.productId === productId);
     const today = window.todayDate();
     const vi = `${String(today.getDate()).padStart(2,'0')}/${String(today.getMonth()+1).padStart(2,'0')}/${today.getFullYear()}`;
-    if (deltaQty > 0) item.lastIn = vi;
-    else item.lastOut = vi;
-    window.STORE.set('inventory', inv);
+    if (!item) {
+      /* STORE.add → insert thẳng lên cloud (tránh bug same-reference của STORE.set) */
+      window.STORE.add('inventory', {
+        id: 'INV' + Date.now().toString(36), productId,
+        stock: Math.max(0, deltaQty), minStock: 10, maxStock: 100, avgDaily: 5,
+        lastIn: deltaQty > 0 ? vi : '', lastOut: deltaQty < 0 ? vi : '', location: 'Kho A1',
+      });
+      return;
+    }
+    const patch = { stock: Math.max(0, (item.stock || 0) + deltaQty) };
+    if (deltaQty > 0) patch.lastIn = vi; else patch.lastOut = vi;
+    window.STORE.update('inventory', item.id, patch);
   };
 
   /* Auto sub khi đơn chuyển sang delivered */
@@ -154,7 +154,7 @@
     rows.sort((a, b) => order[a.level] - order[b.level] || (a.prod?.name||'').localeCompare(b.prod?.name||''));
 
     if (!rows.length) {
-      tb.innerHTML = `<tr><td colspan="9" style="padding:36px;text-align:center;color:var(--muted)">Không có SP nào khớp bộ lọc.</td></tr>`;
+      tb.innerHTML = `<tr><td colspan="10" style="padding:36px;text-align:center;color:var(--muted)">Không có SP nào khớp bộ lọc.</td></tr>`;
       return;
     }
 
@@ -163,7 +163,8 @@
       const colors = { out:'#7F1D1D', low:'#DC2626', warn:'#D97706', ok:'#16A34A' };
       const lvlLabels = { out:'⛔ Hết hàng', low:'🔴 Dưới ngưỡng', warn:'🟠 Sắp hết', ok:'🟢 Đủ' };
       const cls = 'lvl-' + r.level;
-      return `<tr>
+      return `<tr data-id="${r.id}">
+        <td onclick="event.stopPropagation()"><div class="checkbox" onclick="this.classList.toggle('on')"></div></td>
         <td><b>${r.prod?.name || r.productId}</b><div style="font-size:11px;color:var(--muted)">${r.prod?.cat || ''}</div></td>
         <td><code style="font-size:11.5px;color:var(--muted)">${r.productId}</code></td>
         <td><span class="tag" style="background:#F1F5F9;color:#475569">${r.location}</span></td>
@@ -184,7 +185,47 @@
         </td>
       </tr>`;
     }).join('');
+
+    /* Bulk ops: chọn / đổi kho / đặt tồn / xóa hàng loạt */
+    if (window.attachBulkOps) {
+      const tbl = tb.closest('table');
+      if (tbl) {
+        if (!tbl.id) tbl.id = 'tblInv';
+        const locOpts = [...new Set(getInv().map(i => i.location).filter(Boolean))];
+        ['Kho A1', 'Kho A2', 'Kho B1', 'Kho lạnh'].forEach(l => { if (!locOpts.includes(l)) locOpts.push(l); });
+        window.attachBulkOps({
+          tableSelector: '#tblInv',
+          selectAllSelector: '#invSelectAll',
+          store: 'inventory',
+          label: 'SP',
+          actions: {
+            changeStatus: { label: '🏬 Đổi kho', field: 'location', options: locOpts.map(l => ({ id: l, label: l })) },
+            buttons: [{ label: '📦 Đặt tồn (kiểm kê)', handler: (ids) => window.bulkSetInvStock(ids) }],
+          }
+        });
+      }
+    }
   }
+
+  /* Đặt tồn thực tế hàng loạt (kiểm kê) cho các SP đã chọn — có ghi log biến động */
+  window.bulkSetInvStock = function (ids) {
+    const val = prompt(`Đặt TỒN THỰC TẾ cho ${ids.length} SP đã chọn (kiểm kê):`, '');
+    if (val == null) return;
+    const v = parseFloat(String(val).replace(/[^\d.]/g, ''));
+    if (isNaN(v) || v < 0) { window.toast('Nhập số hợp lệ', 'warn'); return; }
+    let n = 0;
+    ids.forEach(id => {
+      const it = getInv().find(x => x.id === id); if (!it) return;
+      const delta = v - (it.stock || 0);
+      if (!delta) return;
+      window.invApply(it.productId, delta);
+      window.invRecordMovement(it.productId, delta, 'adjust', 'Kiểm kê hàng loạt');
+      n++;
+    });
+    if (window._bulkClear_inventory) window._bulkClear_inventory();
+    render(); renderMoves();
+    window.toast(`✓ Đã đặt tồn = ${v} cho ${n} SP`, 'success');
+  };
 
   function renderMoves() {
     const moves = getMoves();
@@ -218,13 +259,15 @@
   window.openInvAdjust = function (productId) {
     const inv = getInv();
     const item = productId ? inv.find(i => i.productId === productId) : null;
-    const opts = getProds().map(p => `<option value="${p.id}" ${productId===p.id?'selected':''}>${p.id} · ${p.name}</option>`).join('');
+    const dl = getProds().map(p => `<option value="${p.id} · ${(p.name || '').replace(/"/g, '&quot;')}">`).join('');
+    const initVal = item ? (item.productId + ' · ' + (findProd(item.productId)?.name || '')) : (productId ? (productId + ' · ' + (findProd(productId)?.name || '')) : '');
     window.openModal('⚖️ Kiểm kê / Điều chỉnh tồn', `
       ${window.helpBanner ? `<div style="background:#FEF3C7;border:1px solid #FCD34D;color:#92400E;padding:10px 12px;border-radius:8px;font-size:12.5px;margin-bottom:10px">
         💡 <b>Khi nào dùng?</b> Khi kiểm kê thực tế ≠ số trên hệ thống (hao hụt, hỏng, mất). Điều chỉnh sẽ ghi vào lịch sử biến động — KHÔNG xoá log.
       </div>` : ''}
-      <label style="display:block;font-size:12px;color:var(--muted);margin-bottom:4px">Sản phẩm</label>
-      <select id="adProd" style="width:100%;border:1px solid var(--line);border-radius:7px;padding:8px;font-size:13px;margin-bottom:10px">${opts}</select>
+      <label style="display:block;font-size:12px;color:var(--muted);margin-bottom:4px">Sản phẩm (gõ tên/mã rồi chọn)</label>
+      <input id="adProd" list="adProdDL" value="${initVal.replace(/"/g, '&quot;')}" placeholder="Gõ tên hoặc mã SP…" autocomplete="off" style="width:100%;border:1px solid var(--line);border-radius:7px;padding:8px;font-size:13px;margin-bottom:10px">
+      <datalist id="adProdDL">${dl}</datalist>
 
       <label style="display:block;font-size:12px;color:var(--muted);margin-bottom:4px">Tồn hiện tại trên hệ thống</label>
       <input id="adCur" disabled value="${item ? item.stock : 0}" style="width:100%;border:1px solid var(--line);border-radius:7px;padding:8px;font-size:13px;margin-bottom:10px;background:#F9FAFB">
@@ -249,15 +292,30 @@
                <button class="btn btn-primary" onclick="window._invAdjustSave()">Lưu kiểm kê</button>`,
       width: '460px',
     });
-    document.getElementById('adProd').onchange = e => {
-      const it = inv.find(i => i.productId === e.target.value);
+    const _fillStock = () => {
+      const pid = _adResolvePid();
+      const it = getInv().find(i => i.productId === pid);
       document.getElementById('adCur').value = it ? it.stock : 0;
       document.getElementById('adNew').value = it ? it.stock : 0;
     };
+    document.getElementById('adProd').oninput = _fillStock;
+    document.getElementById('adProd').onchange = _fillStock;
   };
 
+  /* Lấy productId từ ô nhập "SPxxx · Tên" (hoặc gõ tên/mã trực tiếp) */
+  function _adResolvePid() {
+    const v = (document.getElementById('adProd').value || '').trim();
+    if (!v) return '';
+    const idPart = v.split('·')[0].trim();
+    let p = getProds().find(x => x.id === idPart);
+    if (!p) p = getProds().find(x => (x.id + ' · ' + x.name) === v);
+    if (!p) p = getProds().find(x => (x.name || '').toLowerCase() === v.toLowerCase());
+    return p ? p.id : '';
+  }
+
   window._invAdjustSave = function () {
-    const pid = document.getElementById('adProd').value;
+    const pid = _adResolvePid();
+    if (!pid) { window.toast('Chọn sản phẩm hợp lệ từ gợi ý', 'warn'); return; }
     const cur = parseFloat(document.getElementById('adCur').value) || 0;
     const neu = parseFloat(document.getElementById('adNew').value) || 0;
     const reason = document.getElementById('adReason').value;
