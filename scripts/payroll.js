@@ -305,12 +305,12 @@
           v === 'P' ? 'att-cell s-p' :
           v === 'V' ? 'att-cell s-v' : 'att-cell';
         const lateMin = (meta[dayN] && meta[dayN].lateMin) || 0;
-        const chip = isOff ? '<span class="chip-off">—</span>' :
-          v === 'X' ? '<span class="chip s-x">X</span>' :
-          v === 'L' ? `<span class="chip s-l" title="Muộn ${lateMin}p">L</span>${lateMin>15?'<sup class="late-min">'+lateMin+'</sup>':''}` :
-          v === 'H' ? '<span class="chip s-h">½</span>' :
-          v === 'P' ? '<span class="chip s-p">P</span>' :
-          v === 'V' ? '<span class="chip s-v">V</span>' : '';
+        const chip = isOff ? '<span class="achip-off">—</span>' :
+          v === 'X' ? '<span class="achip s-x">X</span>' :
+          v === 'L' ? `<span class="achip s-l" title="Muộn ${lateMin}p">L</span>${lateMin>15?'<sup class="late-min">'+lateMin+'</sup>':''}` :
+          v === 'H' ? '<span class="achip s-h">½</span>' :
+          v === 'P' ? '<span class="achip s-p">P</span>' :
+          v === 'V' ? '<span class="achip s-v">V</span>' : '';
         const tip = isOff ? 'Chủ nhật — nghỉ' : isSat ? `T7 — chỉ ca sáng 08:00-12:00 (0.5 công). Click để chọn trạng thái.` : 'Click để chọn trạng thái';
         const satMark = isSat && !isOff ? '<span class="sat-mark" title="½ công">½</span>' : '';
         return `<td class="${cellClass}${isSat?' is-sat':''}" data-sid="${s.id}" data-day="${dayN}" title="${tip}">${chip}${satMark}</td>`;
@@ -360,14 +360,14 @@
 
         .att-legend{display:flex;align-items:center;gap:10px;font-size:11.5px;color:var(--muted);margin-bottom:8px;flex-wrap:wrap;padding:10px 12px;background:#FAFAFB;border:1px dashed var(--line);border-radius:7px}
         .att-legend b{color:var(--navy)}
-        .att-legend .chip{margin:0 2px}
-        .chip{display:inline-flex;align-items:center;justify-content:center;width:24px;height:24px;line-height:1;text-align:center;border-radius:6px;font-weight:800;font-size:12.5px;vertical-align:middle}
-        .chip.s-x{background:#16A34A;color:#fff}
-        .chip.s-l{background:#EA580C;color:#fff}
-        .chip.s-h{background:linear-gradient(90deg,#F59E0B 50%,#16A34A 50%);color:#fff;font-size:13px}
-        .chip.s-p{background:#F59E0B;color:#fff}
-        .chip.s-v{background:#EF4444;color:#fff}
-        .chip-off{color:var(--muted-2);font-weight:600;font-size:13px}
+        .att-legend .achip{margin:0 2px}
+        .achip{display:inline-flex;align-items:center;justify-content:center;width:24px;height:24px;line-height:1;text-align:center;border-radius:6px;font-weight:800;font-size:12.5px;vertical-align:middle}
+        .achip.s-x{background:#16A34A;color:#fff}
+        .achip.s-l{background:#EA580C;color:#fff}
+        .achip.s-h{background:linear-gradient(90deg,#F59E0B 50%,#16A34A 50%);color:#fff;font-size:13px}
+        .achip.s-p{background:#F59E0B;color:#fff}
+        .achip.s-v{background:#EF4444;color:#fff}
+        .achip-off{color:var(--muted-2);font-weight:600;font-size:13px}
         .late-min{position:relative;top:-8px;font-size:9px;color:#C2410C;font-weight:700;background:#fff;padding:0 3px;border-radius:3px;border:1px solid #FED7AA}
 
         .att-wrap{background:#fff;border:1px solid var(--line);border-radius:10px;overflow:auto;max-height:calc(100vh - 320px)}
@@ -417,7 +417,7 @@
         .att-pop .opt{padding:8px 4px;border:1px solid var(--line);border-radius:7px;cursor:pointer;text-align:center;background:#fff;transition:all 0.15s}
         .att-pop .opt:hover{transform:translateY(-1px)}
         .att-pop .opt.on{box-shadow:0 0 0 2px var(--red)}
-        .att-pop .opt .chip{margin-bottom:4px}
+        .att-pop .opt .achip{margin-bottom:4px}
         .att-pop .opt .lb{font-size:10px;color:var(--muted);font-weight:600}
         .att-pop .late-row{display:flex;align-items:center;gap:8px;padding:8px;background:#FFF7ED;border:1px dashed #FED7AA;border-radius:7px;margin-bottom:8px}
         .att-pop .late-row label{font-size:11.5px;color:#C2410C;font-weight:700;margin:0}
@@ -442,11 +442,11 @@
         </div>
         <div style="display:flex;align-items:center;gap:14px;flex-wrap:wrap">
           <span>📌 <b>Click ô</b> để chọn:</span>
-          <span><span class="chip s-x">X</span> Có mặt</span>
-          <span><span class="chip s-l">L</span> Đi muộn (≤${LATE_GRACE_MIN}p miễn phạt)</span>
-          <span><span class="chip s-h">½</span> Nửa ca phép</span>
-          <span><span class="chip s-p">P</span> Cả ca phép</span>
-          <span><span class="chip s-v">V</span> Vắng</span>
+          <span><span class="achip s-x">X</span> Có mặt</span>
+          <span><span class="achip s-l">L</span> Đi muộn (≤${LATE_GRACE_MIN}p miễn phạt)</span>
+          <span><span class="achip s-h">½</span> Nửa ca phép</span>
+          <span><span class="achip s-p">P</span> Cả ca phép</span>
+          <span><span class="achip s-v">V</span> Vắng</span>
           <span style="color:#A16207"><b>Ô viền vàng ½</b> = T7 nửa ngày</span>
           <span>Ô gạch chéo = CN nghỉ</span>
         </div>
@@ -502,7 +502,7 @@
       <div style="font-size:11px;color:var(--muted);padding:6px 10px;background:${isSat?'#FEF3C7':'#F0FDF4'};border-radius:6px;margin-bottom:8px;line-height:1.5">${shiftInfo}</div>
       <div class="opts" id="popOpts">
         ${['X','L','H','P','V'].map(s => `<div class="opt ${cur===s?'on':''}" data-s="${s}">
-          <div class="chip s-${s.toLowerCase()}">${s==='H'?'½':s}</div>
+          <div class="achip s-${s.toLowerCase()}">${s==='H'?'½':s}</div>
           <div class="lb">${s==='X'?'Có mặt':s==='L'?'Muộn':s==='H'?'½ phép':s==='P'?'Phép':'Vắng'}</div>
         </div>`).join('')}
       </div>

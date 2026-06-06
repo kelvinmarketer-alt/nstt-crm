@@ -181,6 +181,11 @@ html.embed .main{padding:14px 16px 40px}
 .kpi.k-4 .kpi-icon{background:var(--gold-soft); color:var(--gold)}
 .kpi.k-5 .kpi-icon{background:#F3F4F6; color:var(--muted)}
 
+/* ===== Tab phụ (rpt-tabs) — dùng ở Báo cáo + trang Nhân sự gộp (Chấm công/Lương) ===== */
+.rpt-tabs{display:flex;gap:0;background:#fff;border:1px solid var(--line);border-radius:10px;padding:4px;margin-bottom:14px;width:fit-content;flex-wrap:wrap}
+.rpt-tab{padding:8px 14px;font-size:13px;font-weight:600;color:var(--muted);cursor:pointer;border-radius:7px;white-space:nowrap}
+.rpt-tab.active{background:var(--red);color:#fff}
+
 /* ===== Quick chips ===== */
 .quick-chips{display:flex; gap:6px; flex-wrap:wrap; margin-bottom:12px}
 .chip{
