@@ -53,7 +53,7 @@
       const s = findSup(p.supplierId);
       const due = (p.total||0) - (p.paid||0);
       return `<tr data-id="${p.id}">
-        <td onclick="event.stopPropagation()"><div class="checkbox" onclick="this.classList.toggle('on')"></div></td>
+        <td><div class="checkbox" onclick="this.classList.toggle('on')"></div></td>
         <td><b style="font-family:monospace">${p.id}</b></td>
         <td>${s ? s.name : p.supplierId}<div style="font-size:11px;color:var(--muted)">${s?.paymentTerm || ''}</div></td>
         <td>${p.date}</td>

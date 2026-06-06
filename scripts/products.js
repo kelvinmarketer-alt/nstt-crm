@@ -252,7 +252,7 @@
         lastCell = `<td class="num">${hasOv ? `<button class="btn btn-ghost btn-sm" title="Bỏ ghi đè, về giá gốc ±%" onclick="window.tierResetOverride('${p.id}')">↺</button>` : `<span style="color:var(--muted);font-size:11px">theo %</span>`}</td>`;
       }
       return `<tr data-id="${p.id}">
-        <td onclick="event.stopPropagation()"><div class="checkbox" onclick="this.classList.toggle('on')"></div></td>
+        <td><div class="checkbox" onclick="this.classList.toggle('on')"></div></td>
         <td><div style="display:flex;align-items:center;gap:8px">
           ${p.img ? `<img src="${p.img}" alt="" loading="lazy" style="width:34px;height:34px;object-fit:cover;border-radius:6px;background:#eef3ee;flex:none" onerror="this.style.visibility='hidden'">` : ''}
           <b>${p.name}</b></div></td>

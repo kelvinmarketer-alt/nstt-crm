@@ -164,7 +164,7 @@
       const lvlLabels = { out:'⛔ Hết hàng', low:'🔴 Dưới ngưỡng', warn:'🟠 Sắp hết', ok:'🟢 Đủ' };
       const cls = 'lvl-' + r.level;
       return `<tr data-id="${r.id}">
-        <td onclick="event.stopPropagation()"><div class="checkbox" onclick="this.classList.toggle('on')"></div></td>
+        <td><div class="checkbox" onclick="this.classList.toggle('on')"></div></td>
         <td><b>${r.prod?.name || r.productId}</b><div style="font-size:11px;color:var(--muted)">${r.prod?.cat || ''}</div></td>
         <td><code style="font-size:11.5px;color:var(--muted)">${r.productId}</code></td>
         <td><span class="tag" style="background:#F1F5F9;color:#475569">${r.location}</span></td>
