@@ -208,6 +208,13 @@
     staff: { kpi: true, salary: true },
   };
 
+  /* Cột UNIQUE: chuỗi rỗng '' → NULL trước khi gửi.
+     Postgres cho phép NHIỀU NULL nhưng KHÔNG cho nhiều '' (vd nhiều NV chưa có email
+     → lỗi 'duplicate key value violates unique constraint staff_email_key'). */
+  const NULL_IF_EMPTY = {
+    staff: { email: true },
+  };
+
   /* Parse tên cột lạ từ lỗi PostgREST:
      "Could not find the 'X' column of 'table' in the schema cache" */
   function parseUnknownColumn(msg) {
@@ -230,6 +237,7 @@
     const m = FIELD_MAP[key]?.to || {};
     const df = DATE_FIELDS[key] || {};
     const nf = NUM_FIELDS[key] || {};
+    const ne = NULL_IF_EMPTY[key] || {};
     const result = {};
     for (const k of Object.keys(obj)) {
       /* Bỏ field nội bộ/transient (bắt đầu '_') — KHÔNG phải cột DB.
@@ -245,6 +253,8 @@
         if (v === '' || v == null) v = null;
         else { const n = parseInt(String(v).replace(/[^\d-]/g, ''), 10); v = Number.isNaN(n) ? null : n; }
       }
+      /* Cột UNIQUE: '' → NULL (tránh đụng ràng buộc unique khi để trống) */
+      if (ne[k] && (v === '' || (typeof v === 'string' && v.trim() === ''))) v = null;
       result[newKey] = v;
     }
     /* cash_entries.entry_date NOT NULL — phiếu quỹ tự tạo (hook đơn/ads/lương) thiếu ngày
