@@ -119,7 +119,7 @@
          Map đầy đủ để THÊM/SỬA NV lưu trọn quyền + ngày vào lên cloud (không chỉ local). */
       to:   { hireDate:'hire_date', joinDate:'hire_date', userId:'user_id',
               permissions:'perms', code:null, avatar:null, address:null, salaryConfig:null },
-      from: { hire_date:'hireDate', user_id:'userId', perms:'permissions' },
+      from: { hire_date:'joinDate', user_id:'userId', perms:'permissions' },
     },
     paymentAccounts: {
       to:   {},
@@ -199,7 +199,13 @@
     customers: { created: false, lastOrder: false, lastContact: false },
     cashEntries: { date: false },
     leads:     { lastTouch: false, createdAt: false, lastContact: false },
-    staff:     { hireDate: false },
+    staff:     { hireDate: false, joinDate: false },
+  };
+
+  /* Fields PHẢI là số nguyên ở cloud — strip ký tự lạ (vd kpi "94%" → 94, salary "12.000.000" → 12000000).
+     Tránh lỗi "invalid input syntax for type integer". '' / null → null. */
+  const NUM_FIELDS = {
+    staff: { kpi: true, salary: true },
   };
 
   /* Parse tên cột lạ từ lỗi PostgREST:
@@ -223,6 +229,7 @@
     const key = fmKey(table);
     const m = FIELD_MAP[key]?.to || {};
     const df = DATE_FIELDS[key] || {};
+    const nf = NUM_FIELDS[key] || {};
     const result = {};
     for (const k of Object.keys(obj)) {
       /* Bỏ field nội bộ/transient (bắt đầu '_') — KHÔNG phải cột DB.
@@ -233,6 +240,11 @@
       let v = obj[k];
       /* Convert VN date → ISO before insert if this JS field is a date */
       if (df[k] !== undefined) v = vnToIso(v, df[k]);
+      /* Ép số nguyên cho cột số (kpi/salary) — bỏ %, dấu chấm phân cách... */
+      if (nf[k]) {
+        if (v === '' || v == null) v = null;
+        else { const n = parseInt(String(v).replace(/[^\d-]/g, ''), 10); v = Number.isNaN(n) ? null : n; }
+      }
       result[newKey] = v;
     }
     /* cash_entries.entry_date NOT NULL — phiếu quỹ tự tạo (hook đơn/ads/lương) thiếu ngày
