@@ -13,7 +13,7 @@
   /* === Seed version === : khi đổi dữ liệu mẫu (data/*.js) thì tăng version này.
      App sẽ tự xoá các key dữ liệu cũ trong localStorage để nạp lại bản mới
      (giữ nguyên đăng nhập + cấu hình tích hợp). Tránh tình trạng "kẹt data cũ". */
-  const SEED_VERSION = 'nstt-2026-06-01-blank-start-v3';
+  const SEED_VERSION = 'nstt-2026-06-07-real-roster-v4';
   try {
     if (localStorage.getItem(PREFIX + 'seedVersion') !== SEED_VERSION) {
       /* Migration: chuyển dữ liệu 'drivers' cũ → 'shippers' nếu user đã có */
@@ -39,9 +39,12 @@
       ].forEach(k => {
         /* Giữ shippers nếu vừa migrate từ drivers */
         if (k === 'shippers') return;
-        /* GIỮ staff + products: đã có data thật synced từ cloud — tránh nhấp nháy demo */
-        if (k === 'staff' || k === 'products') return;
+        /* GIỮ products: data thật (SP đã import) synced từ cloud — tránh nhấp nháy.
+           XOÁ staff: ép mọi máy bỏ cache NV demo cũ → kéo lại roster thật 13 NV từ cloud
+           (đồng thời xoá baseline id-set staff để merge sạch). */
+        if (k === 'products') return;
         localStorage.removeItem(PREFIX + k);
+        localStorage.removeItem(PREFIX + '__sids__' + k);
       });
       /* Xoá luôn drivers cũ sau khi migrate */
       localStorage.removeItem(PREFIX + 'drivers');
