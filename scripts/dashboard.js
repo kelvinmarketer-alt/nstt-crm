@@ -33,10 +33,23 @@
     return (best || p.priceHistory[0]).buy;
   }
 
+  /* Row-level scope: Sale chỉ thấy KH (công nợ/top KH) của mình phụ trách */
+  function _scopeCusts(arr) {
+    try {
+      const A = window.AUTH;
+      if (A && typeof A.seesAllCustomers === 'function' && !A.seesAllCustomers()) {
+        const u = A.currentUser && A.currentUser();
+        const mine = ((u && u.name) || '').toString().trim().toLowerCase();
+        return (arr || []).filter(c => (c.staffOwner || '').toString().trim().toLowerCase() === mine);
+      }
+    } catch (e) {}
+    return arr || [];
+  }
+
   /* ========== COMPUTE ALL KPIs ========== */
   function calcAll() {
     const orders    = window.STORE.get('orders', window.ORDERS || []) || [];
-    const customers = window.STORE.get('customers', window.CUSTOMERS || []) || [];
+    const customers = _scopeCusts(window.STORE.get('customers', window.CUSTOMERS || []) || []);
     const products  = window.STORE.get('products', window.PRODUCTS || []) || [];
     const staff     = window.STORE.get('staff', window.STAFFS || []) || [];
     const drivers   = window.STORE.get('shippers', window.DRIVERS || []) || [];
@@ -223,7 +236,7 @@
     }
 
     /* === Cảnh báo === */
-    const customers = window.STORE.get('customers', []) || [];
+    const customers = _scopeCusts(window.STORE.get('customers', []) || []);
     const overdueKH = customers.filter(c => (c.debtOverdue || 0) > 0).sort((a, b) => b.debtOverdue - a.debtOverdue);
     const alerts = [];
     overdueKH.slice(0, 2).forEach(c => alerts.push({ type: 'danger', icon: '🚨', title: c.name + ' — công nợ quá hạn', desc: window.fmt(c.debtOverdue) + ' ₫ quá hạn', href: 'debt.html' }));

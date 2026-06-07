@@ -50,9 +50,9 @@
     /* Sếp / CEO / Tổng giám đốc / Giám đốc điều hành → toàn quyền */
     if (has('sếp', 'ceo', 'chủ doanh', 'giám đốc', 'tổng giám', 'admin', 'ban giám đốc')) return ['all'];
     if (has('kế toán'))
-      return ['dashboard.view', 'accounting.view', 'accounting.edit', 'debt.view', 'debt.collect', 'invoices.view', 'invoices.create', 'adspend.view', 'products.view', 'orders.view', 'reports.view', 'reports.daily', 'payroll.viewSelf'];
+      return ['dashboard.view', 'customers.view', 'accounting.view', 'accounting.edit', 'debt.view', 'debt.collect', 'invoices.view', 'invoices.create', 'adspend.view', 'products.view', 'orders.view', 'reports.view', 'reports.daily', 'payroll.viewSelf'];
     if (has('nhân sự', 'tuyển dụng', 'hr', 'hcns', 'hành chính'))
-      return ['dashboard.view', 'staff.view', 'staff.edit', 'payroll.viewSelf', 'payroll.viewAll', 'payroll.edit', 'payroll.upload', 'payroll.calc', 'payroll.submit', 'reports.view'];
+      return ['dashboard.view', 'customers.view', 'staff.view', 'staff.edit', 'payroll.viewSelf', 'payroll.viewAll', 'payroll.edit', 'payroll.upload', 'payroll.calc', 'payroll.submit', 'reports.view'];
     if (has('marketing', 'mkt', 'digital', 'ads', 'content', 'truyền thông'))
       return ['dashboard.view', 'marketing.send', 'adspend.view', 'adspend.edit', 'customers.view', 'products.view', 'reports.view', 'reports.sales', 'payroll.viewSelf'];
     if (has('kho'))
@@ -313,6 +313,20 @@
     isLeaderRole: _isLeaderRole,
     staffDefaultPassword(role, dept) { return _isLeaderRole(role, dept) ? PWD_LEADER : PWD_STAFF; },
     fixedAccounts() { return MOCK_USERS.map(u => ({ email: u.email, password: u.password, name: u.name, role: u.role, dept: u.dept, permissions: u.permissions })); },
+
+    /* === Row-level scope KHÁCH HÀNG ===
+       TRUE  = thấy TẤT CẢ KH của mọi sale (admin/sếp/CEO, kế toán, nhân sự, marketing)
+       FALSE = chỉ thấy KH mình phụ trách (Sale, CSKH, và vai trò khác)
+       Dùng cho customers list + chi tiết + dropdown chọn KH khi tạo đơn. */
+    seesAllCustomers() {
+      const u = this.currentUser(); if (!u) return false;
+      const perms = u.permissions || [];
+      if (perms.includes('all') || perms.includes('Tất cả')) return true;   /* admin / CEO / sếp */
+      const r = ((u.role || '') + ' ' + (u.dept || '')).toLowerCase();
+      return ['kế toán', 'ke toan', 'nhân sự', 'nhan su', 'tuyển dụng', 'tuyen dung',
+              'hành chính', 'hanh chinh', 'marketing', 'mkt', 'digital', 'truyền thông', 'truyen thong']
+        .some(k => r.includes(k));
+    },
 
     /* === Login === */
     async login(email, password, remember) {

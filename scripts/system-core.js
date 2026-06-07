@@ -160,8 +160,17 @@
       });
     });
 
-    /* Khách hàng */
-    (window.STORE.get('customers', window.CUSTOMERS || []) || []).forEach(c => {
+    /* Khách hàng — Sale chỉ tìm được KH mình phụ trách (row-level scope) */
+    let _gsCusts = window.STORE.get('customers', window.CUSTOMERS || []) || [];
+    try {
+      const A = window.AUTH;
+      if (A && typeof A.seesAllCustomers === 'function' && !A.seesAllCustomers()) {
+        const u = A.currentUser && A.currentUser();
+        const mine = ((u && u.name) || '').toString().trim().toLowerCase();
+        _gsCusts = _gsCusts.filter(c => (c.staffOwner || '').toString().trim().toLowerCase() === mine);
+      }
+    } catch (e) {}
+    _gsCusts.forEach(c => {
       const hay = gsNorm(c.code + ' ' + c.name + ' ' + (c.phone||'') + ' ' + (c.address||''));
       if (hay.includes(Q)) out.push({
         type: 'customer', icon: '👥', label: c.name,

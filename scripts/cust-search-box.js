@@ -108,8 +108,22 @@
   /* ============ State per widget ============ */
   const instances = {};
 
+  /* Row-level scope: Sale chỉ tìm/gợi ý được KH mình phụ trách (không lộ KH của sale khác).
+     CHỈ áp cho GỢI Ý search — KHÔNG áp cho tra cứu id→tên của đơn đã có. */
+  function _scopeCusts(arr) {
+    try {
+      const A = window.AUTH;
+      if (A && typeof A.seesAllCustomers === 'function' && !A.seesAllCustomers()) {
+        const u = A.currentUser && A.currentUser();
+        const mine = ((u && u.name) || '').toString().trim().toLowerCase();
+        return (arr || []).filter(c => (c.staffOwner || '').toString().trim().toLowerCase() === mine);
+      }
+    } catch (e) {}
+    return arr || [];
+  }
+
   function search(query, limit) {
-    const customers = window.STORE.get('customers', window.CUSTOMERS || []) || [];
+    const customers = _scopeCusts(window.STORE.get('customers', window.CUSTOMERS || []) || []);
     if (!query || query.length === 0) {
       /* Empty query → top 10 most recent / VIP */
       return customers

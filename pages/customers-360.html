@@ -75,7 +75,13 @@
   document.getElementById('hb1').innerHTML = window.helpTip('9 segment dựa trên ma trận R×F×M. Click vào card để xem danh sách KH thuộc segment đó.');
   document.getElementById('hb2').innerHTML = window.helpTip('Mỗi ô = 1 cặp (R, F). Đậm = nhiều KH. Góc trên phải = KH ngon. Góc dưới trái = KH cần winback.');
 
-  const custs = window.STORE.get('customers', window.CUSTOMERS || []) || [];
+  let custs = window.STORE.get('customers', window.CUSTOMERS || []) || [];
+  /* Row-level scope: Sale chỉ phân tích KH mình phụ trách (không thấy KH của sale khác) */
+  if (window.AUTH && typeof window.AUTH.seesAllCustomers === 'function' && !window.AUTH.seesAllCustomers()) {
+    const u = window.AUTH.currentUser && window.AUTH.currentUser();
+    const mine = ((u && u.name) || '').toString().trim().toLowerCase();
+    custs = custs.filter(c => (c.staffOwner || '').toString().trim().toLowerCase() === mine);
+  }
   const segs = {};
   custs.forEach(c => {
     const r = window.RFM.calc(c.id);

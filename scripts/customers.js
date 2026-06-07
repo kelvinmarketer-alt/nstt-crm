@@ -52,6 +52,34 @@
   /* Nếu đã từng load thì decorate lại đề phòng schema thay đổi */
   customers.forEach((c, i) => customers[i] = decorate(c));
 
+  /* ============ ROW-LEVEL SCOPE: Sale chỉ thấy KH mình phụ trách ============
+     Vai trò "xem tất cả" (admin/kế toán/nhân sự/marketing) → giữ nguyên cả danh sách.
+     Vai trò bị giới hạn (Sale, CSKH...) → chỉ KH có staffOwner = chính mình. */
+  function scopeCustomers(arr) {
+    try {
+      const A = window.AUTH;
+      if (A && typeof A.seesAllCustomers === 'function' && !A.seesAllCustomers()) {
+        const u = A.currentUser ? A.currentUser() : null;
+        const myName = ((u && u.name) || (window.CURRENT_USER && window.CURRENT_USER.name) || '').toString().trim().toLowerCase();
+        const myId = u && u.staffId;
+        return (arr || []).filter(c => {
+          const owner = (c.staffOwner || '').toString().trim().toLowerCase();
+          return (myName && owner === myName) || (myId && ((c.staffOwnerId === myId) || ((c.staffOwner || '') === myId)));
+        });
+      }
+    } catch (e) { console.warn('[customers scope]', e); }
+    return arr || [];
+  }
+  /* Có đang bị giới hạn không (để khoá ô "NV phụ trách" + ép chủ sở hữu khi tạo) */
+  function isScoped() {
+    const A = window.AUTH;
+    return !!(A && typeof A.seesAllCustomers === 'function' && !A.seesAllCustomers());
+  }
+  function myName() {
+    const A = window.AUTH; const u = A && A.currentUser && A.currentUser();
+    return (u && u.name) || (window.CURRENT_USER && window.CURRENT_USER.name) || '';
+  }
+
   let currentQuick = 'all';
   let curPage = 1;
   let pageSize = 25;
@@ -62,7 +90,7 @@
 
   /* ============ Helper: cập nhật số đếm chip ============ */
   function updateChipCounts() {
-    customers = window.STORE.get('customers', initialData);
+    customers = scopeCustomers(window.STORE.get('customers', initialData));
     const counts = {
       all:   customers.length,
       b2b:   customers.filter(c => c.type !== 'ca-nhan').length,
@@ -112,7 +140,7 @@
 
   /* ============ RENDER ============ */
   function render() {
-    customers = window.STORE.get('customers', initialData);
+    customers = scopeCustomers(window.STORE.get('customers', initialData));
     updateChipCounts();
     const rows = customers.filter(c => quickMatch(c) && filterMatch(c) && searchMatch(c));
     rowCount.textContent = `Đang hiển thị ${rows.length} / ${customers.length} khách hàng`;
@@ -531,12 +559,14 @@
         <div></div>
       </div>
       <div class="form-row">
-        <div><label>NV phụ trách</label>
-          <select id="addStaff">${
-            (window.STORE.get('staff', []) || [])
-              .filter(s => s.status !== 'inactive')
-              .map(s => `<option>${s.name}</option>`)
-              .join('') || '<option>Tuấn Tú</option>'
+        <div><label>NV phụ trách${isScoped() ? ' <span style="color:var(--muted);font-weight:400">(chính bạn)</span>' : ''}</label>
+          <select id="addStaff" ${isScoped() ? 'disabled' : ''}>${
+            (isScoped()
+              ? [`<option selected>${myName()}</option>`]
+              : (window.STORE.get('staff', []) || [])
+                  .filter(s => s.status !== 'inactive')
+                  .map(s => `<option ${s.name === myName() ? 'selected' : ''}>${s.name}</option>`)
+            ).join('') || '<option>Tuấn Tú</option>'
           }</select></div>
         <div><label>Nguồn</label>
           <select id="addSource">${window.MD.options('sources')}</select></div>
@@ -576,7 +606,8 @@
       province: window.formVal('#addProvince'),
       orderFreq: window.formVal('#addFreq'),
       mainCats: [],
-      staffOwner: window.formVal('#addStaff'),
+      /* Sale tạo KH → BẮT BUỘC chủ sở hữu = chính mình (nếu không sẽ không thấy lại KH vừa tạo) */
+      staffOwner: isScoped() ? myName() : window.formVal('#addStaff'),
       source: window.formVal('#addSource'),
       created: new Date().toLocaleDateString('vi-VN'),
       lastContact: new Date().toLocaleDateString('vi-VN'),
