@@ -239,11 +239,11 @@
     _realtimeSubs.add(key);
     try {
       window.SB_DATA.subscribe(table, () => {
-        /* Debounce 400ms — gộp nhiều change liên tiếp thành 1 lần pull */
+        /* Debounce 120ms — gộp change liên tiếp thành 1 pull, vẫn cảm giác tức thì (<1s) */
         clearTimeout(_rtTimers[key]);
         _rtTimers[key] = setTimeout(() => {
           _mergeTableFromCloud(key, table).catch(() => {});
-        }, 400);
+        }, 120);
       });
       console.log(`[STORE] 🔴 Realtime ON: ${key}`);
     } catch (e) {
@@ -598,7 +598,10 @@
 
      Skip poll khi tab nền (document.hidden) → 0 cost khi user không xem. */
 
-  const DEFAULT_POLL_SEC = 300;     /* 5 phút */
+  /* Real-time CHÍNH = websocket (đã bật mọi bảng, ~0 egress, <1s).
+     Poll chỉ là LƯỚI AN TOÀN khi websocket rớt mạng → để 60s là đủ nhanh + nhẹ egress
+     (skip khi tab nền). Khi quay lại tab → đồng bộ NGAY (visibilitychange bên dưới). */
+  const DEFAULT_POLL_SEC = 60;
   let _pollIntervalId = null;
   let _pollSec = DEFAULT_POLL_SEC;
 
@@ -607,7 +610,7 @@
     /* Load user-configured interval từ localStorage nếu có */
     try {
       const saved = parseInt(localStorage.getItem(PREFIX + 'pollSec') || '0', 10);
-      if (saved >= 60) _pollSec = saved;
+      if (saved >= 20) _pollSec = saved;
     } catch (e) {}
     _pollIntervalId = setInterval(() => {
       if (!isSupabaseMode()) return;
@@ -624,7 +627,7 @@
 
   /* Public API: user/dev có thể chỉnh poll interval */
   window.STORE.setPollInterval = function (sec) {
-    if (sec < 60) { console.warn('Min 60s'); return; }
+    if (sec < 20) { console.warn('Min 20s'); return; }
     if (sec > 3600) { console.warn('Max 1h'); return; }
     _pollSec = sec;
     try { localStorage.setItem(PREFIX + 'pollSec', String(sec)); } catch (e) {}
@@ -649,4 +652,24 @@
   window.clearBusinessData = () => window.STORE.clearBusinessData();
 
   if (typeof window !== 'undefined') _startPoll();
+
+  /* === QUAY LẠI TAB → ĐỒNG BỘ NGAY (real-time feel) ===
+     Khi user chuyển sang app khác rồi quay lại, hoặc tab được focus,
+     pull cloud ngay lập tức thay vì đợi vòng poll kế tiếp.
+     Throttle 3s để tránh spam khi focus/blur liên tục. */
+  if (typeof window !== 'undefined') {
+    let _lastForeSync = 0;
+    const _foreSync = () => {
+      if (!isSupabaseMode() || document.hidden) return;
+      const now = Date.now();
+      if (now - _lastForeSync < 3000) return;
+      _lastForeSync = now;
+      _preloaded.forEach(key => {
+        if (TABLE_MAP[key]) _mergeTableFromCloud(key, TABLE_MAP[key]).catch(() => {});
+      });
+    };
+    document.addEventListener('visibilitychange', _foreSync);
+    window.addEventListener('focus', _foreSync);
+    window.addEventListener('online', _foreSync);
+  }
 })();
