@@ -115,8 +115,11 @@
               converted_to:'convertedTo', lost_reason:'lostReason' },
     },
     staff: {
-      to:   { hireDate:'hire_date', userId:'user_id', code:null },  /* DB staff không có cột 'code' → bỏ khi sync */
-      from: { hire_date:'hireDate', user_id:'userId' },
+      /* DB staff: cột là `perms`, `hire_date`; KHÔNG có code/avatar/address/salaryConfig.
+         Map đầy đủ để THÊM/SỬA NV lưu trọn quyền + ngày vào lên cloud (không chỉ local). */
+      to:   { hireDate:'hire_date', joinDate:'hire_date', userId:'user_id',
+              permissions:'perms', code:null, avatar:null, address:null, salaryConfig:null },
+      from: { hire_date:'hireDate', user_id:'userId', perms:'permissions' },
     },
     paymentAccounts: {
       to:   {},

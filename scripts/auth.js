@@ -14,10 +14,11 @@
      Nhân viên thật đăng nhập bằng SĐT + mật khẩu mặc định (xem staffLogin bên dưới). */
   const _FINANCE_PERMS = ['dashboard.view','accounting.view','accounting.edit','debt.view','debt.collect','invoices.view','invoices.create','adspend.view','adspend.edit','suppliers.view','products.view','orders.view','reports.view','reports.profit','reports.daily','reports.export','payroll.viewSelf','payroll.viewAll'];
   const MOCK_USERS = [
-    /* ADMIN / SẾP — luôn đăng nhập được (chống khoá ngoài) */
+    /* ADMIN / SẾP — luôn đăng nhập được (chống khoá ngoài).
+       Tên đăng nhập (sep@nstt.vn) + mật khẩu (Nstt@2026) GIỮ NGUYÊN. */
     { email:'sep@nstt.vn', password:'Nstt@2026', staffId:'NV001',
-      name:'Tuấn Tú', role:'Sếp (Chủ doanh nghiệp)', dept:'Ban giám đốc',
-      avatar:'TT', avatarColor:'#339B21',
+      name:'Trịnh Xuân Quang', role:'Leader Marketing', dept:'Ban giám đốc',
+      avatar:'XQ', avatarColor:'#339B21',
       permissions:['all'], status:'active' },
     /* CEO — đăng nhập bằng email (KHÔNG dùng SĐT) */
     { email:'ceo@nstt.vn', password:'Nstt@2026', staffId:'CEO',

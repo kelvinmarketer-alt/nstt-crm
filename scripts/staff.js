@@ -540,7 +540,7 @@
     /* Step 3: Link user_id nếu có Supabase */
     if (authUserId && window.SB) {
       try {
-        await window.SB.from('staff').update({ user_id: authUserId }).eq('code', code);
+        await window.SB.from('staff').update({ user_id: authUserId }).eq('id', code);
       } catch (e) { console.warn('[Staff] link user_id', e); }
     }
 
