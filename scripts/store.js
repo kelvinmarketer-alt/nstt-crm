@@ -64,6 +64,35 @@
      trường hợp caller mutate mảng TẠI CHỖ rồi set cùng reference. */
   const _synced = {};
 
+  /* === Baseline ID-set (BỀN qua reload) — để phân biệt record bị XOÁ ở máy khác
+     với record mới tạo offline. Chỉ lưu danh sách id (nhẹ), per table key.
+     - record có ở local, KHÔNG có trên cloud, NHƯNG có trong baseline cũ → đã bị xoá → BỎ
+     - record có ở local, KHÔNG có trên cloud, KHÔNG có trong baseline → mới offline → ĐẨY LÊN */
+  function _idOf(key, it) {
+    const idCol = (typeof ID_COLUMN !== 'undefined' && ID_COLUMN[key]) || 'id';
+    return it && (it[idCol] || it.id || it.code || it.no);
+  }
+  function _persistSyncedIds(key, arr) {
+    try {
+      const ids = (arr || []).map(x => _idOf(key, x)).filter(v => v != null);
+      localStorage.setItem(PREFIX + '__sids__' + key, JSON.stringify(ids));
+    } catch (e) {}
+  }
+  function _loadSyncedIds(key) {
+    /* Ưu tiên snapshot trong RAM (_synced) nếu có; fallback id-set đã lưu localStorage */
+    try {
+      if (_synced[key] != null) {
+        const a = JSON.parse(_synced[key]);
+        if (Array.isArray(a)) return new Set(a.map(x => _idOf(key, x)).filter(v => v != null));
+      }
+    } catch (e) {}
+    try {
+      const v = localStorage.getItem(PREFIX + '__sids__' + key);
+      if (v != null) return new Set(JSON.parse(v));
+    } catch (e) {}
+    return null;
+  }
+
   /* Mapping STORE key → Supabase table name (NSTT 17 bảng — 11 core + 6 extra) */
   const TABLE_MAP = {
     customers:        'customers',
@@ -266,14 +295,23 @@
     const localOnly = local.filter(it => keyOf(it) && !cloudIds.has(keyOf(it)));
     const localById = new Map(local.map(it => [keyOf(it), it]));
 
-    /* Self-heal: đẩy record local-only lên cloud (guard ≤200 tránh mass-push nhầm) */
-    if (localOnly.length > 0 && localOnly.length <= 200) {
-      console.log(`[STORE] ${key}: tự đẩy ${localOnly.length} record local-only lên cloud`);
-      for (const it of localOnly) {
+    /* Phân biệt: record local-only TỪNG có trên cloud (baseline) = đã bị XOÁ ở nơi khác → bỏ;
+       record CHƯA từng lên cloud = mới tạo offline / sync lỗi → tự đẩy lên. */
+    const prevIds = _loadSyncedIds(key);
+    const deletedOnCloud = prevIds ? localOnly.filter(it => prevIds.has(keyOf(it))) : [];
+    const neverSynced    = prevIds ? localOnly.filter(it => !prevIds.has(keyOf(it))) : localOnly;
+
+    /* Self-heal: CHỈ đẩy record chưa từng lên cloud (guard ≤200 tránh mass-push nhầm) */
+    if (neverSynced.length > 0 && neverSynced.length <= 200) {
+      console.log(`[STORE] ${key}: tự đẩy ${neverSynced.length} record mới (chưa sync) lên cloud`);
+      for (const it of neverSynced) {
         await window.SB_DATA.insert(table, it).catch(() => {});
       }
-    } else if (localOnly.length > 200) {
-      console.warn(`[STORE] ${key}: ${localOnly.length} record local-only — BỎ QUA auto-push (quá nhiều)`);
+    } else if (neverSynced.length > 200) {
+      console.warn(`[STORE] ${key}: ${neverSynced.length} record chưa sync — BỎ QUA auto-push (quá nhiều)`);
+    }
+    if (deletedOnCloud.length) {
+      console.log(`[STORE] ${key}: bỏ ${deletedOnCloud.length} record đã bị xoá trên cloud (KHÔNG hồi sinh)`);
     }
 
     /* Merge: cloud (nguồn chính) — GIỮ LẠI flag '_' từ bản local.
@@ -287,10 +325,12 @@
       for (const k of Object.keys(lr)) if (k.charAt(0) === '_') flags[k] = lr[k];
       return Object.keys(flags).length ? { ...c, ...flags } : c;
     });
-    const keep = localOnly.length <= 200 ? localOnly : [];
+    /* GIỮ lại record mới chưa sync (neverSynced) — KHÔNG giữ record đã bị xoá trên cloud */
+    const keep = neverSynced.length <= 200 ? neverSynced : [];
     const merged = cloudMerged.concat(keep);
     const newJson = JSON.stringify(merged);
     _synced[key] = newJson;   /* baseline = trạng thái cloud sau merge/self-heal */
+    _persistSyncedIds(key, merged);  /* lưu id-set bền qua reload để lần sau biết record nào bị xoá */
     if (newJson !== JSON.stringify(_data[key] || [])) {
       _data[key] = merged;
       try { localStorage.setItem(PREFIX + key, newJson); } catch (e) {}
@@ -386,6 +426,7 @@
       });
       /* Cập nhật baseline = trạng thái vừa đẩy lên cloud */
       _synced[key] = JSON.stringify(value);
+      _persistSyncedIds(key, value);
     },
 
     /* Thêm item vào mảng */
@@ -398,7 +439,7 @@
         window.SB_DATA.insert(TABLE_MAP[key], item)
           .catch(e => console.warn(`[STORE add ${key} → SB]`, e));
       }
-      if (TABLE_MAP[key] && Array.isArray(_data[key])) _synced[key] = JSON.stringify(_data[key]);
+      if (TABLE_MAP[key] && Array.isArray(_data[key])) _synced[key] = JSON.stringify(_data[key]); if (TABLE_MAP[key] && Array.isArray(_data[key])) _persistSyncedIds(key, _data[key]);
       return item;
     },
 
@@ -417,7 +458,7 @@
           window.SB_DATA.update(TABLE_MAP[key], identifier, patch, idCol)
             .catch(e => console.warn(`[STORE update ${key} → SB]`, e));
         }
-        if (TABLE_MAP[key] && Array.isArray(_data[key])) _synced[key] = JSON.stringify(_data[key]);
+        if (TABLE_MAP[key] && Array.isArray(_data[key])) _synced[key] = JSON.stringify(_data[key]); if (TABLE_MAP[key] && Array.isArray(_data[key])) _persistSyncedIds(key, _data[key]);
         return arr[i];
       }
       return null;
@@ -435,7 +476,7 @@
         window.SB_DATA.remove(TABLE_MAP[key], identifier, idCol)
           .catch(e => console.warn(`[STORE remove ${key} → SB]`, e));
       }
-      if (TABLE_MAP[key] && Array.isArray(_data[key])) _synced[key] = JSON.stringify(_data[key]);
+      if (TABLE_MAP[key] && Array.isArray(_data[key])) _synced[key] = JSON.stringify(_data[key]); if (TABLE_MAP[key] && Array.isArray(_data[key])) _persistSyncedIds(key, _data[key]);
     },
 
     subscribe(key, fn) {
