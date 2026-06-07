@@ -308,64 +308,40 @@
   };
 
   /* === Reset mật khẩu === */
+  /* === Admin: đặt / reset mật khẩu cho NV (dùng mật khẩu cá nhân hash, KHÔNG cần Supabase Auth) === */
   window.resetStaffPassword = async function(staffId, email, name) {
-    if (!email) {
-      window.toast('NV chưa có email — sửa thêm email rồi reset', 'warn');
-      return;
-    }
-    const choice = confirm(
-      `Reset mật khẩu cho ${name}?\n\n` +
-      `OK = Gửi email reset (NV tự đổi pass qua link email)\n` +
-      `Hủy = Cấp pass mới thủ công (admin chọn pass)`
-    );
-    if (choice) {
-      /* Send reset email */
-      if (window.AUTH?.resetPassword) {
-        window.toast('⏳ Đang gửi email reset...', 'info');
-        const result = await window.AUTH.resetPassword(email);
-        if (result.success) {
-          window.toast('✓ Đã gửi email reset password đến ' + email, 'success');
-        } else {
-          window.toast('❌ ' + result.error, 'danger');
-        }
-      } else {
-        window.toast('Cần Supabase Auth — fallback: cấp pass thủ công', 'warn');
-      }
-    } else {
-      /* Cấp pass mới thủ công — admin nhập pass cho NV */
-      const newPass = prompt('Nhập mật khẩu mới cho ' + name + ' (tối thiểu 6 ký tự):',
-        'NSTT' + Math.random().toString(36).slice(2, 8));
-      if (!newPass || newPass.length < 6) {
-        window.toast('Mật khẩu tối thiểu 6 ký tự', 'warn');
-        return;
-      }
-      if (!window.SB) {
-        window.toast('Cần Supabase để đổi mật khẩu', 'warn');
-        return;
-      }
-      /* Note: anon key không có quyền admin updateUserById.
-         Phương án: dùng adminAPI nếu có service_role, hoặc hướng dẫn user vào Supabase */
-      window.openModal('🔑 Đổi mật khẩu cho ' + name, `
-        <div style="padding:14px;background:#FEF3C7;border:1px solid #FCD34D;border-radius:8px;font-size:13px;color:var(--warn);margin-bottom:14px">
-          ⚠️ Để bảo mật, đổi mật khẩu user khác cần làm qua <b>Supabase Dashboard</b> (anon key không có quyền).
-        </div>
-        <div style="background:#FAFAFB;padding:14px;border-radius:8px;font-family:ui-monospace,monospace;font-size:13px;line-height:1.8">
-          <b>Hướng dẫn 30 giây:</b><br><br>
-          1. Vào <a href="https://supabase.com/dashboard" target="_blank" style="color:var(--red)">Supabase Dashboard</a> → chọn project NSTT → <b>Auth → Users</b><br>
-          2. Tìm user: <b style="color:var(--navy)">${email}</b><br>
-          3. Click ⋮ → <b>"Send password recovery"</b> (NV nhận email reset)<br>
-          4. <b>Hoặc</b> click vào user → <b>"Reset password"</b> → nhập pass mới: <b style="color:var(--red);background:#FEF3C7;padding:2px 8px;border-radius:4px">${newPass}</b><br>
-          5. Save → báo lại NV pass mới
-        </div>
-        <div style="margin-top:14px">
-          <button class="btn btn-ghost btn-sm" onclick="navigator.clipboard.writeText('${newPass}');window.toast('✓ Đã copy pass','success')">📋 Copy pass</button>
-          <button class="btn btn-ghost btn-sm" onclick="navigator.clipboard.writeText('${email}');window.toast('✓ Đã copy email','success')">📋 Copy email</button>
-        </div>
-      `, {
-        footer: `<button class="btn btn-primary" onclick="closeModal()">Đã hiểu</button>`,
-        width: '560px'
-      });
-    }
+    const has = window.AUTH && window.AUTH.hasCustomPassword && window.AUTH.hasCustomPassword(staffId);
+    const safeName = (name || staffId || '').replace(/['"\\]/g, '');
+    window.openModal('🔑 Mật khẩu — ' + (name || staffId), `
+      <div style="font-size:13px;margin-bottom:12px">
+        Trạng thái: ${has
+          ? '<b style="color:var(--navy)">NV đã đặt mật khẩu riêng</b>'
+          : '<b style="color:var(--warn)">Đang dùng mật khẩu mặc định <code>Tuantu@2026</code></b>'}
+      </div>
+      <label style="font-size:12px;font-weight:600;color:var(--navy)">Đặt mật khẩu mới cho NV (tối thiểu 6 ký tự)</label>
+      <input id="admNewPw" type="text" placeholder="VD: NSTT2026abc" autocomplete="off"
+             style="width:100%;padding:9px 11px;border:1px solid var(--line);border-radius:7px;font-size:13px;margin-top:6px;box-sizing:border-box">
+      <div style="font-size:11.5px;color:var(--muted);margin-top:8px">NV sẽ dùng SĐT/Gmail + mật khẩu này để đăng nhập. Báo lại mật khẩu cho NV.</div>
+    `, {
+      footer: `
+        <button class="btn btn-ghost" onclick="closeModal()">Hủy</button>
+        ${has ? `<button class="btn btn-ghost" onclick="window._resetStaffToDefault('${staffId}','${safeName}')">↩ Về mặc định</button>` : ''}
+        <button class="btn btn-primary" onclick="window._adminSetStaffPw('${staffId}','${safeName}')">💾 Đặt mật khẩu</button>`,
+      width: '460px'
+    });
+  };
+  window._adminSetStaffPw = async function(staffId, name) {
+    const pw = (document.getElementById('admNewPw') || {}).value || '';
+    if (!pw || pw.length < 6) { window.toast('Mật khẩu tối thiểu 6 ký tự', 'warn'); return; }
+    const r = await window.AUTH.setStaffPassword(staffId, pw);
+    if (r.success) { window.closeModal(); window.toast('✓ Đã đặt mật khẩu cho ' + (name || staffId) + '. Báo NV đăng nhập bằng: ' + pw, 'success'); }
+    else window.toast('❌ ' + (r.error || 'Lỗi'), 'danger');
+  };
+  window._resetStaffToDefault = function(staffId, name) {
+    if (!confirm('Reset mật khẩu của ' + (name || staffId) + ' về mặc định Tuantu@2026?')) return;
+    window.AUTH.resetStaffAuth(staffId);
+    window.closeModal();
+    window.toast('✓ Đã reset về mặc định. NV đăng nhập bằng Tuantu@2026', 'success');
   };
 
   /* === Toggle khóa/mở tài khoản === */

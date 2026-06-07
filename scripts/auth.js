@@ -63,6 +63,27 @@
       return ['dashboard.view', 'orders.view', 'orders.create', 'orders.edit', 'orders.print', 'customers.view', 'customers.create', 'customers.edit', 'customers.debt', 'products.view', 'quotes.view', 'quotes.create', 'recurring.view', 'recurring.edit', 'leads.view', 'leads.edit', 'reports.view', 'reports.sales', 'payroll.viewSelf'];
     return ['dashboard.view', 'payroll.viewSelf'];
   }
+  /* === MẬT KHẨU CÁ NHÂN (NV tự đổi) ===
+     Lưu HASH SHA-256 (salt theo staffId) trong kv 'staffAuth' — KHÔNG bao giờ lưu mật khẩu thô.
+     Đăng nhập: nếu NV đã đặt mật khẩu riêng → so hash; chưa đặt → dùng mặc định Tuantu@2026. */
+  async function _hashPwd(staffId, pwd) {
+    const salt = 'nstt::' + (staffId || '') + '::';
+    const bytes = new TextEncoder().encode(salt + (pwd || ''));
+    try {
+      if (window.crypto && window.crypto.subtle) {
+        const buf = await window.crypto.subtle.digest('SHA-256', bytes);
+        return Array.from(new Uint8Array(buf)).map(b => b.toString(16).padStart(2, '0')).join('');
+      }
+    } catch (e) { /* fallthrough */ }
+    /* Fallback khi không có crypto.subtle (http/file) — hash đơn giản, vẫn không lưu thô */
+    let h = 0; const s = salt + (pwd || '');
+    for (let i = 0; i < s.length; i++) h = ((h << 5) - h + s.charCodeAt(i)) | 0;
+    return 'x' + (h >>> 0).toString(16);
+  }
+  function _getStaffAuth() {
+    try { return (window.STORE && window.STORE.get('staffAuth', {})) || {}; } catch (e) { return {}; }
+  }
+
   /* Đăng nhập bằng bản ghi nhân viên: SĐT (hoặc email/mã NV) + mật khẩu mặc định.
      async vì trên máy mới (login page chưa cache staff) phải fetch từ Supabase. */
   async function staffLogin(username, password) {
@@ -79,8 +100,16 @@
       (uin && (norm(s.code) === uin || norm(s.id) === uin)));
     if (!st) return null;
     if (st.status === 'inactive' || st.status === 'off' || st.status === 'nghỉ') return { _locked: true };
-    const expect = st.pwd || (_isLeaderRole(st.role, st.dept) ? PWD_LEADER : PWD_STAFF);
-    if (password !== expect) return null;
+    const sid = st.id || st.code;
+    const custom = _getStaffAuth()[sid];
+    if (custom && custom.hash) {
+      /* NV đã đặt mật khẩu riêng → so hash (mặc định KHÔNG còn dùng được) */
+      if ((await _hashPwd(sid, password)) !== custom.hash) return null;
+    } else {
+      /* Chưa đặt → mật khẩu mặc định theo vị trí */
+      const expect = st.pwd || (_isLeaderRole(st.role, st.dept) ? PWD_LEADER : PWD_STAFF);
+      if (password !== expect) return null;
+    }
     return {
       staffId: st.id || st.code,
       email: st.email || dig(st.phone),
@@ -328,6 +357,57 @@
         .some(k => r.includes(k));
     },
 
+    /* === MẬT KHẨU CÁ NHÂN === */
+    /* NV tự đổi mật khẩu: nhập mật khẩu hiện tại + mật khẩu mới */
+    async changeMyPassword(currentPwd, newPwd, confirmPwd) {
+      const u = this.currentUser();
+      if (!u || !u.staffId) return { success: false, error: 'Chưa đăng nhập.' };
+      if (!newPwd || newPwd.length < 6) return { success: false, error: 'Mật khẩu mới tối thiểu 6 ký tự.' };
+      if (confirmPwd != null && newPwd !== confirmPwd) return { success: false, error: 'Xác nhận mật khẩu không khớp.' };
+      const sid = u.staffId;
+      const map = _getStaffAuth();
+      /* Xác minh mật khẩu hiện tại */
+      let curOk = false;
+      const cur = map[sid];
+      if (cur && cur.hash) {
+        curOk = (await _hashPwd(sid, currentPwd)) === cur.hash;
+      } else {
+        const mock = MOCK_USERS.find(x => x.staffId === sid);
+        const def = mock ? mock.password : (_isLeaderRole(u.role, u.dept) ? PWD_LEADER : PWD_STAFF);
+        curOk = (currentPwd === def);
+      }
+      if (!curOk) return { success: false, error: 'Mật khẩu hiện tại không đúng.' };
+      if (newPwd === currentPwd) return { success: false, error: 'Mật khẩu mới phải khác mật khẩu cũ.' };
+      map[sid] = { hash: await _hashPwd(sid, newPwd), updatedAt: new Date().toISOString() };
+      window.STORE.set('staffAuth', map);
+      this.logActivity(sid, 'password.change', 'Đổi mật khẩu cá nhân');
+      return { success: true };
+    },
+    /* Admin đặt mật khẩu mới cho 1 NV */
+    async setStaffPassword(staffId, newPwd) {
+      if (!staffId) return { success: false, error: 'Thiếu mã NV.' };
+      if (!newPwd || newPwd.length < 6) return { success: false, error: 'Mật khẩu tối thiểu 6 ký tự.' };
+      const map = _getStaffAuth();
+      map[staffId] = { hash: await _hashPwd(staffId, newPwd), updatedAt: new Date().toISOString() };
+      window.STORE.set('staffAuth', map);
+      const me = this.currentUser();
+      this.logActivity(me && me.staffId, 'password.adminset', 'Admin đặt mật khẩu cho ' + staffId);
+      return { success: true };
+    },
+    /* Admin reset 1 NV về mật khẩu mặc định (Tuantu@2026) — xoá mật khẩu cá nhân */
+    resetStaffAuth(staffId) {
+      const map = _getStaffAuth();
+      if (map[staffId]) { delete map[staffId]; window.STORE.set('staffAuth', map); }
+      const me = this.currentUser();
+      this.logActivity(me && me.staffId, 'password.reset', 'Reset mật khẩu NV ' + staffId + ' về mặc định');
+      return { success: true };
+    },
+    /* NV này đã đặt mật khẩu riêng chưa? (để hiển thị trạng thái) */
+    hasCustomPassword(staffId) {
+      const c = _getStaffAuth()[staffId];
+      return !!(c && c.hash);
+    },
+
     /* === Login === */
     async login(email, password, remember) {
       /* Supabase Auth */
@@ -372,8 +452,18 @@
         ? new Date(Date.now() + 7*24*60*60*1000).toISOString()
         : new Date(Date.now() + 4*60*60*1000).toISOString();
 
-      /* 1) Admin dự phòng (MOCK_USERS) */
-      const u = MOCK_USERS.find(x => x.email.toLowerCase() === (email||'').toLowerCase() && x.password === password);
+      /* 1) Admin dự phòng (MOCK_USERS) — chấp nhận mật khẩu CỨNG (cứu hộ, chống khoá ngoài)
+            HOẶC mật khẩu cá nhân đã đặt (staffAuth). */
+      const mu = MOCK_USERS.find(x => x.email.toLowerCase() === (email||'').toLowerCase());
+      let u = null;
+      if (mu) {
+        let ok = (mu.password === password);
+        if (!ok) {
+          const custom = _getStaffAuth()[mu.staffId];
+          if (custom && custom.hash && (await _hashPwd(mu.staffId, password)) === custom.hash) ok = true;
+        }
+        if (ok) u = mu;
+      }
       if (u) {
         if (u.status === 'off') return { success: false, error: 'Tài khoản đã bị khóa.' };
         const session = {

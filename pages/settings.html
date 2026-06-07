@@ -437,12 +437,17 @@
           <h2>🔒 Bảo mật</h2>
           <div class="desc">Mật khẩu, xác thực 2 lớp, lịch sử đăng nhập, phiên hoạt động.</div>
 
-          <div style="background:#FAFAFB;border:1px solid var(--line);border-radius:10px;padding:14px 16px;margin-bottom:14px">
-            <div style="font-weight:700;font-size:13px;color:var(--navy);margin-bottom:4px">Đổi mật khẩu của bạn</div>
-            <div style="font-size:12px;color:var(--muted);margin-bottom:10px">
-              App dùng Supabase Auth quản lý mật khẩu. Bấm bên dưới để app gửi email reset đến email đăng nhập — bạn click link trong email để đổi mật khẩu mới.
+          <div style="background:#FAFAFB;border:1px solid var(--line);border-radius:10px;padding:14px 16px;margin-bottom:14px;max-width:420px">
+            <div style="font-weight:700;font-size:13px;color:var(--navy);margin-bottom:4px">🔑 Đổi mật khẩu của bạn</div>
+            <div style="font-size:12px;color:var(--muted);margin-bottom:12px">
+              Lần đầu dùng mật khẩu mặc định được cấp. Đổi sang mật khẩu riêng để bảo mật — áp dụng ngay trên mọi thiết bị.
             </div>
-            <button class="btn btn-primary" onclick="window.changeMyPassword()">🔑 Gửi email reset mật khẩu</button>
+            <div style="display:flex;flex-direction:column;gap:9px">
+              <input id="pwCur"  type="password" placeholder="Mật khẩu hiện tại" autocomplete="current-password" style="padding:9px 11px;border:1px solid var(--line);border-radius:7px;font-size:13px">
+              <input id="pwNew"  type="password" placeholder="Mật khẩu mới (≥ 6 ký tự)" autocomplete="new-password" style="padding:9px 11px;border:1px solid var(--line);border-radius:7px;font-size:13px">
+              <input id="pwNew2" type="password" placeholder="Nhập lại mật khẩu mới" autocomplete="new-password" style="padding:9px 11px;border:1px solid var(--line);border-radius:7px;font-size:13px">
+              <button class="btn btn-primary" onclick="window.changeMyPassword()" style="margin-top:2px">💾 Đổi mật khẩu</button>
+            </div>
           </div>
 
           <div class="section-h">Xác thực 2 lớp (2FA)</div>
@@ -1843,18 +1848,21 @@
     });
   };
 
-  /* === Đổi mật khẩu của chính mình === */
+  /* === Đổi mật khẩu của chính mình (mật khẩu cá nhân, hash SHA-256) === */
   window.changeMyPassword = async function () {
-    const u = window.AUTH && window.AUTH.currentUser();
-    if (!u) { window.toast('Chưa đăng nhập', 'warn'); return; }
-    if (!u.email) { window.toast('Tài khoản không có email — không reset được', 'warn'); return; }
-    if (!confirm(`Gửi email reset mật khẩu đến ${u.email}?`)) return;
-    if (window.AUTH.resetPassword) {
-      const r = await window.AUTH.resetPassword(u.email);
-      if (r.success) window.toast('✓ Đã gửi email reset đến ' + u.email, 'success');
-      else window.toast('❌ ' + (r.error || 'Lỗi không xác định'), 'danger');
+    const cur = (document.getElementById('pwCur') || {}).value || '';
+    const nw  = (document.getElementById('pwNew') || {}).value || '';
+    const nw2 = (document.getElementById('pwNew2') || {}).value || '';
+    if (!cur) { window.toast('Nhập mật khẩu hiện tại', 'warn'); return; }
+    if (!nw || nw.length < 6) { window.toast('Mật khẩu mới tối thiểu 6 ký tự', 'warn'); return; }
+    if (nw !== nw2) { window.toast('Nhập lại mật khẩu mới chưa khớp', 'warn'); return; }
+    if (!window.AUTH || !window.AUTH.changeMyPassword) { window.toast('Phiên bản app cũ — tải lại trang', 'warn'); return; }
+    const r = await window.AUTH.changeMyPassword(cur, nw, nw2);
+    if (r.success) {
+      window.toast('✓ Đã đổi mật khẩu. Lần sau đăng nhập bằng mật khẩu mới.', 'success');
+      ['pwCur', 'pwNew', 'pwNew2'].forEach(id => { const e = document.getElementById(id); if (e) e.value = ''; });
     } else {
-      window.toast('Cần Supabase Auth để reset — hiện đang chạy mock', 'warn');
+      window.toast('❌ ' + (r.error || 'Đổi mật khẩu thất bại'), 'danger');
     }
   };
 
