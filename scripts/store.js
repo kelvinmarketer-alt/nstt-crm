@@ -142,7 +142,8 @@
     'supplierClaims',  /* Khoản đòi lại NCC khi hàng NCC giao hỏng (Trả hàng) */
     'audit_log',       /* Truy vết NV — HIGH */
     'inv_movements',   /* Sổ xuất nhập kho — HIGH */
-    'snapshots',       /* Auto-backup — HIGH */
+    /* 'snapshots' KHÔNG sync cloud: mỗi bản backup copy TOÀN BỘ data (gồm 268 SP) →
+       payload JSONB quá lớn → setKv timeout 500 + phình. Backup vốn nên theo MÁY (local). */
     'budget_2026',     /* Kế hoạch năm — HIGH */
     'loyalty_rules',   /* Rules tích điểm — MED */
     'marketing_tpls',  /* Template marketing — MED */

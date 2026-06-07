@@ -78,8 +78,9 @@
       };
       const list = window.STORE.get('snapshots', []) || [];
       list.unshift(snap);
-      /* Giữ 14 cái mới nhất */
-      while (list.length > 14) list.pop();
+      /* Giữ 6 cái mới nhất — mỗi bản copy toàn bộ data nên không giữ quá nhiều
+         (tránh vượt quota localStorage). */
+      while (list.length > 6) list.pop();
       window.STORE.set('snapshots', list);
       window.audit.log('backup.create', `Snapshot "${snap.label}" (${(json.length/1024).toFixed(1)} KB)`);
       return snap;
