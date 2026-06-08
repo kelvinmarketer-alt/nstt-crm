@@ -276,6 +276,7 @@
     'orders.html':     'orders.view',
     'orders-hub.html': 'orders.view',
     'web-orders.html': 'orders.view',
+    'order-samples.html': 'orders.view',
     'customers.html':  'customers.view',
     'customers-360.html':'customers.view',
     'products.html':   'products.view',
