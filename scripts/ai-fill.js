@@ -97,11 +97,22 @@
     });
   }
 
-  /* === Vision API callers — nhận model param === */
-  async function geminiVision(key, model, b64, mime, prompt) {
+  /* === Vision API callers — nhận model param + examples (few-shot nhớ nét chữ) ===
+     examples: [{ b64, mime, resultText }] — ảnh KH từng viết + kết quả đúng. */
+  async function geminiVision(key, model, b64, mime, prompt, examples) {
     const url = `https://generativelanguage.googleapis.com/v1beta/models/${model || 'gemini-2.0-flash'}:generateContent?key=${encodeURIComponent(key)}`;
+    const parts = [];
+    (examples || []).forEach((ex, i) => {
+      if (!ex || !ex.b64) return;
+      parts.push({ text: `VÍ DỤ ${i + 1} — ảnh KH này TỪNG viết tay:` });
+      parts.push({ inline_data: { mime_type: ex.mime || 'image/jpeg', data: ex.b64 } });
+      parts.push({ text: `KẾT QUẢ ĐÚNG (nhân viên đã xác nhận): ${ex.resultText || ''}` });
+    });
+    if ((examples || []).some(e => e && e.b64)) parts.push({ text: '↑ Học cách viết / nét chữ / từ viết tắt của khách qua các ví dụ trên. BÂY GIỜ đọc ảnh MỚI dưới đây của CÙNG khách:' });
+    parts.push({ text: prompt });
+    parts.push({ inline_data: { mime_type: mime, data: b64 } });
     const body = {
-      contents: [{ parts: [{ text: prompt }, { inline_data: { mime_type: mime, data: b64 } }] }],
+      contents: [{ parts }],
       generationConfig: { response_mime_type: 'application/json', temperature: 0, maxOutputTokens: 8192 },
     };
     const r = await fetch(url, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) });
@@ -111,12 +122,21 @@
     return parseJSON(txt);
   }
 
-  async function openaiVision(key, model, b64, mime, prompt) {
+  async function openaiVision(key, model, b64, mime, prompt, examples) {
+    const content = [];
+    (examples || []).forEach((ex, i) => {
+      if (!ex || !ex.b64) return;
+      content.push({ type: 'text', text: `VÍ DỤ ${i + 1} — ảnh KH từng viết:` });
+      content.push({ type: 'image_url', image_url: { url: `data:${ex.mime || 'image/jpeg'};base64,${ex.b64}` } });
+      content.push({ type: 'text', text: `KẾT QUẢ ĐÚNG: ${ex.resultText || ''}` });
+    });
+    content.push({ type: 'text', text: prompt });
+    content.push({ type: 'image_url', image_url: { url: `data:${mime};base64,${b64}` } });
     const r = await fetch('https://api.openai.com/v1/chat/completions', {
       method: 'POST', headers: { 'Content-Type': 'application/json', 'Authorization': 'Bearer ' + key },
       body: JSON.stringify({
         model: model || 'gpt-4o-mini', temperature: 0, response_format: { type: 'json_object' },
-        messages: [{ role: 'user', content: [{ type: 'text', text: prompt }, { type: 'image_url', image_url: { url: `data:${mime};base64,${b64}` } }] }],
+        messages: [{ role: 'user', content }],
       }),
     });
     const j = await r.json();
@@ -124,13 +144,22 @@
     return parseJSON(j.choices && j.choices[0] && j.choices[0].message.content);
   }
 
-  async function claudeVision(key, model, b64, mime, prompt) {
+  async function claudeVision(key, model, b64, mime, prompt, examples) {
+    const content = [];
+    (examples || []).forEach((ex, i) => {
+      if (!ex || !ex.b64) return;
+      content.push({ type: 'text', text: `VÍ DỤ ${i + 1} — ảnh KH từng viết:` });
+      content.push({ type: 'image', source: { type: 'base64', media_type: ex.mime || 'image/jpeg', data: ex.b64 } });
+      content.push({ type: 'text', text: `KẾT QUẢ ĐÚNG: ${ex.resultText || ''}` });
+    });
+    content.push({ type: 'image', source: { type: 'base64', media_type: mime, data: b64 } });
+    content.push({ type: 'text', text: prompt });
     const r = await fetch('https://api.anthropic.com/v1/messages', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json', 'x-api-key': key, 'anthropic-version': '2023-06-01', 'anthropic-dangerous-direct-browser-access': 'true' },
       body: JSON.stringify({
         model: model || 'claude-haiku-4-5', max_tokens: 8192,
-        messages: [{ role: 'user', content: [{ type: 'image', source: { type: 'base64', media_type: mime, data: b64 } }, { type: 'text', text: prompt }] }],
+        messages: [{ role: 'user', content }],
       }),
     });
     const j = await r.json();
@@ -156,13 +185,13 @@
     /* Pick provider theo taskId — public */
     pickFor(taskId) { return pickProvider(taskId); },
 
-    /* taskId: optional, để chọn provider phù hợp */
-    async extract(b64, mime, prompt, taskId) {
+    /* taskId: optional, để chọn provider phù hợp · examples: few-shot ảnh nhớ nét chữ */
+    async extract(b64, mime, prompt, taskId, examples) {
       const p = pickProvider(taskId);
       if (!p) throw new Error('NO_KEY');
-      if (p.provider === 'openai') return openaiVision(p.apiKey, p.model, b64, mime, prompt);
-      if (p.provider === 'claude') return claudeVision(p.apiKey, p.model, b64, mime, prompt);
-      return geminiVision(p.apiKey, p.model, b64, mime, prompt);
+      if (p.provider === 'openai') return openaiVision(p.apiKey, p.model, b64, mime, prompt, examples);
+      if (p.provider === 'claude') return claudeVision(p.apiKey, p.model, b64, mime, prompt, examples);
+      return geminiVision(p.apiKey, p.model, b64, mime, prompt, examples);
     },
 
     /* opts: { title, guideHtml, prompt, onResult(data), task?:'customer'|'order'|'product'|'adspend'|'invoice' }
@@ -241,11 +270,13 @@
     async _run() {
       if (!this._img) { window.toast('Chọn/dán ảnh trước', 'warn'); return; }
       const st = document.getElementById('aiStatus'), btn = document.getElementById('aiRunBtn');
-      st.innerHTML = '⏳ AI đang đọc ảnh & trích xuất dữ liệu...'; btn.disabled = true;
+      const exN = (this._opts.examples || []).filter(e => e && e.b64).length;
+      st.innerHTML = '⏳ AI đang đọc ảnh & trích xuất dữ liệu...' + (exN ? ` <span style="color:var(--ok)">(dùng ${exN} mẫu nét chữ KH)</span>` : ''); btn.disabled = true;
       try {
-        const data = await this.extract(this._img.base64, this._img.mime, this._opts.prompt, this._opts.task);
+        const data = await this.extract(this._img.base64, this._img.mime, this._opts.prompt, this._opts.task, this._opts.examples);
+        const meta = { dataURL: this._img.dataURL, b64: this._img.base64, mime: this._img.mime };
         this._closeOverlay();
-        this._opts.onResult(data);
+        this._opts.onResult(data, meta);
       } catch (e) {
         btn.disabled = false;
         const msg = e.message === 'NO_KEY' ? 'Chưa có API key (Cài đặt → Tích hợp)' : e.message;

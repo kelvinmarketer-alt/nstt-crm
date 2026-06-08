@@ -14,6 +14,7 @@
   let currentService = null;
   let orderItems = [];   // mặt hàng của đơn đang tạo (sản phẩm + giá ngày)
   let orderTier = '';    // nhóm giá áp dụng cho đơn đang tạo ('' = giá gốc; theo nhóm giá của KH)
+  let _pendingSample = null;  // ảnh đơn vừa đọc bằng AI → lưu thành mẫu "nhớ nét chữ" khi lưu đơn
 
   /* Đơn giá 1 SP theo NHÓM GIÁ đang chọn của đơn (fallback giá gốc) */
   function priceForOrder(productId) {
@@ -710,6 +711,7 @@
       prodList.map(p => `<option value="${p.id}">${p.name} · ${window.fmt(priceForOrder(p.id))}đ/${p.unit}</option>`).join('');
     orderItems = [];
     orderTier = '';
+    _pendingSample = null;
     const tierOpts = window.priceTierOptions ? window.priceTierOptions('') : '<option value="">— Mặc định (Giá gốc) —</option>';
     const nextCode = window.STORE.nextOrderCode();
     /* NV phụ trách — lấy từ staff thật, default = user đang đăng nhập */
@@ -1128,12 +1130,24 @@
   };
 
   /* === Thêm hàng loạt từ ẢNH (AI parse) — alias-aware === */
-  window.addOrderItemsFromImage = function () {
+  window.addOrderItemsFromImage = async function () {
     if (!window.AI) { window.toast('Chưa tải module AI', 'warn'); return; }
     /* Lấy custId hiện tại trong form (nếu đã chọn) để chèn từ điển vào prompt */
     const custId = window.formVal && window.formVal('#oCust');
     const c = custId ? window.STORE.get('customers', []).find(x => x.id === custId) : null;
     const aliasCtx = (custId && window.CustPrefs) ? window.CustPrefs.aliasContextForAI(custId) : '';
+
+    /* === FEW-SHOT: nạp 1-2 mẫu đơn cũ của KH (ảnh + kết quả đúng) để AI nhớ nét chữ === */
+    let examples = [];
+    if (custId && window.OrderSamples) {
+      try {
+        const samples = await window.OrderSamples.forCust(custId, 2);
+        examples = samples.map(s => ({
+          b64: s.b64, mime: s.mime,
+          resultText: (s.finalItems || []).map(it => `${it.name} = ${it.qty}`).join('; '),
+        })).filter(e => e.b64 && e.resultText);
+      } catch (e) { /* IndexedDB lỗi → bỏ qua, vẫn đọc bình thường */ }
+    }
 
     /* Build catalog để AI ưu tiên match đúng — đưa TOÀN BỘ danh mục (cắt an toàn 300 SP) */
     const products = window.STORE.get('products', window.PRODUCTS || []);
@@ -1158,16 +1172,22 @@ CHỈ TRẢ JSON, không giải thích gì thêm.`;
 
     window.AI.openFillModal({
       task: 'order',
-      title: '📷 Thêm mặt hàng từ ảnh (AI)' + (c ? ' — ' + c.name : ''),
+      title: '📷 Thêm mặt hàng từ ảnh (AI)' + (c ? ' — ' + c.name : '') + (examples.length ? ' · 🧠 ' + examples.length + ' mẫu nét chữ' : ''),
       guideHtml: `Đính kèm <b>ảnh chụp tin nhắn / list hàng / phiếu đặt</b>. AI đọc tên + số lượng từng món, tự match với danh mục SP và cộng vào đơn.
         ${c ? `<br>👤 <b>KH:</b> ${c.name} ${aliasCtx ? '— AI đã biết <b style="color:#15803D">'+Object.keys(window.CustPrefs.get(custId).aliases).length+' từ riêng</b> của KH này' : '— <span style="color:#92400E">chưa có từ điển riêng</span>'}`
                   : '<br>⚠️ <b>Chưa chọn KH</b> — AI không có context cá nhân hoá. Chọn KH trước khi đọc ảnh để chính xác hơn.'}
+        ${examples.length ? `<br>🧠 <b style="color:#15803D">AI đang nhớ nét chữ:</b> dùng ${examples.length} mẫu đơn cũ của KH này để đọc chính xác hơn.` : (c ? '<br>💡 Sau khi lưu đơn này, hệ thống sẽ <b>nhớ nét chữ</b> KH để lần sau đọc đúng hơn.' : '')}
         <br><b>Cấu trúc gợi ý:</b> mỗi dòng "Tên món — số lượng" (vd: "Cà chua 5kg, Rau muống 3kg").`,
       prompt: basePrompt,
-      onResult: (d) => {
+      examples,
+      onResult: (d, meta) => {
         const items = (d && d.items) || [];
         if (!items.length) { window.toast('AI không đọc được mặt hàng nào', 'warn'); return; }
-        applyBulkItems(items, 'AI' + (aliasCtx ? ' (có từ điển KH)' : ''));
+        applyBulkItems(items, 'AI' + (aliasCtx ? ' (có từ điển KH)' : '') + (examples.length ? ' +mẫu' : ''));
+        /* Ghi nhớ ảnh để lưu thành "mẫu nét chữ" khi đơn được lưu (chỉ khi đã chọn KH) */
+        if (custId && meta && meta.dataURL) {
+          _pendingSample = { custId, custName: (c && c.name) || '', dataURL: meta.dataURL, rawItems: items.slice() };
+        }
       },
     });
   };
@@ -1520,10 +1540,33 @@ CHỈ TRẢ JSON, không giải thích gì thêm.`;
           return prod ? `<span style="background:#F0FDF4;color:#15803D;padding:3px 8px;border-radius:99px">${prod.name} ${p.defaultQty[pid]?'· ~'+p.defaultQty[pid]+prod.unit:''}</span>` : '';
         }).join('') || '<span style="color:var(--muted)">Chưa có đơn — không có dữ liệu</span>'}
       </div>
+
+      <h3 style="font-size:12px;color:var(--navy);text-transform:uppercase;margin:16px 0 6px">🧠 Mẫu nét chữ đã học</h3>
+      <div id="custSampleBox" style="font-size:11.5px;color:var(--muted)">Đang tải…</div>
     `, {
       footer:`<button class="btn btn-ghost" onclick="window.closeModal()">Đóng</button>`,
       width:'620px'
     });
+    if (window._renderAliasSamples) window._renderAliasSamples(custId);
+  };
+
+  /* Hiển thị mẫu nét chữ (ảnh) của KH trong modal Từ điển — async đọc IndexedDB */
+  window._renderAliasSamples = async function (custId) {
+    const box = document.getElementById('custSampleBox');
+    if (!box) return;
+    if (!window.OrderSamples) { box.innerHTML = '<span>Mở từ trang Đơn hàng để xem mẫu nét chữ.</span>'; return; }
+    let samples = [];
+    try { samples = await window.OrderSamples.listCust(custId); } catch (e) {}
+    if (!samples.length) {
+      box.innerHTML = 'Chưa có mẫu. Khi bạn dùng <b>📷 Từ ảnh</b> đọc đơn của KH này rồi lưu đơn → hệ thống tự lưu mẫu để AI nhớ nét chữ.';
+      return;
+    }
+    box.innerHTML = `<div style="display:flex;gap:8px;flex-wrap:wrap;align-items:flex-start">
+      ${samples.slice(0, 6).map(s => `<div style="position:relative">
+        <img src="data:${s.mime};base64,${s.b64}" title="${(s.finalItems||[]).map(it=>it.name+' '+it.qty).join(', ')}" style="width:74px;height:74px;object-fit:cover;border-radius:6px;border:1px solid var(--line);cursor:zoom-in" onclick="window.open('order-samples.html?cust=${encodeURIComponent(custId)}','_blank')">
+      </div>`).join('')}
+    </div>
+    <div style="margin-top:6px"><b style="color:#15803D">${samples.length} mẫu</b> — AI dùng 2 mẫu mới nhất khi đọc đơn KH này. <a href="order-samples.html?cust=${encodeURIComponent(custId)}" style="color:#1B5E20;font-weight:600">Quản lý →</a></div>`;
   };
 
   /* ============ Lưu items hiện tại thành đơn định kỳ ============ */
@@ -1630,6 +1673,23 @@ CHỈ TRẢ JSON, không giải thích gì thêm.`;
       items: orderItems.slice(),
     };
     window.STORE.add('orders', newOrder);
+    /* === LƯU "MẪU NÉT CHỮ": nếu đơn này đọc từ ảnh AI → lưu ảnh + kết quả cuối (đã sửa tay) === */
+    if (_pendingSample && window.OrderSamples && cust && _pendingSample.custId === cust.id) {
+      const ps = _pendingSample;
+      const finalItems = orderItems.map(it => ({ name: it.name, qty: it.qty, productId: it.id || null }));
+      (async () => {
+        try {
+          const small = await window.OrderSamples.downscale(ps.dataURL, 1100, 0.72);
+          await window.OrderSamples.add({
+            custId: ps.custId, custName: ps.custName || (cust && cust.name) || '',
+            b64: small.b64, mime: small.mime,
+            rawItems: ps.rawItems, finalItems,
+          });
+          window.toast && window.toast('🧠 Đã lưu mẫu nét chữ của KH — lần sau AI đọc đơn chính xác hơn', 'success');
+        } catch (e) { console.warn('[order sample save]', e); }
+      })();
+    }
+    _pendingSample = null;
     orderItems = [];
     orderTier = '';
     window.closeModal();

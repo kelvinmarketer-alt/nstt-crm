@@ -1,0 +1,47 @@
+<!doctype html>
+<html lang="vi">
+<head>
+<meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Mẫu đơn AI · Nông Sản Tuấn Tú</title>
+<link rel="stylesheet" href="../styles/tokens.css"><link rel="stylesheet" href="../styles/app.css">
+</head>
+<body>
+<div class="app">
+  <aside class="sidebar"></aside>
+  <header class="topbar">
+    <div class="breadcrumb"></div><div class="top-spacer"></div>
+    <div class="search-global"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="7"/><path d="m21 21-4.3-4.3"/></svg><input placeholder="Tìm... (Ctrl+K)"></div>
+    <button class="icon-btn" title="Hướng dẫn" onclick="window.location.href='docs.html'"><span style="font-size:18px">❓</span></button>
+  </header>
+
+  <main class="main">
+    <div style="display:flex;align-items:center;gap:12px;margin-bottom:14px">
+      <div>
+        <h1 style="margin:0;font-size:22px;color:var(--navy);font-weight:800">🧠 Mẫu đơn AI — nhớ nét chữ KH</h1>
+        <div style="font-size:13px;color:var(--muted);margin-top:2px">Kho ảnh đơn KH từng viết + kết quả đúng → AI học nét chữ để đọc đơn lần sau chính xác hơn</div>
+      </div>
+      <div style="flex:1"></div>
+      <select id="osFilter" style="border:1px solid var(--line);border-radius:7px;padding:7px 10px;font-size:13px"></select>
+    </div>
+
+    <div style="background:#EFF6FF;color:#1E40AF;padding:11px 14px;border-radius:9px;font-size:12.5px;margin-bottom:14px;line-height:1.55">
+      💡 <b>Tự động:</b> mỗi khi anh bấm <b>📷 Từ ảnh</b> trong Tạo đơn (đã chọn KH) rồi <b>lưu đơn</b> → hệ thống tự lưu ảnh + kết quả cuối (đã sửa tay) thành 1 mẫu.
+      Lần sau đọc ảnh của KH đó, AI <b>đính kèm 1–2 mẫu cũ</b> làm ví dụ → suy ra nét chữ / từ viết tắt của khách.
+      <br>🔒 Ảnh lưu <b>ngay trên máy này</b> (IndexedDB), không tải lên cloud — nhẹ & riêng tư.
+    </div>
+
+    <div id="osStats" style="display:flex;gap:14px;flex-wrap:wrap;margin-bottom:14px"></div>
+    <div id="osHost"></div>
+  </main>
+</div>
+
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<script src="../scripts/supabase-config.js"></script>
+<script src="../scripts/supabase-client.js"></script>
+<script src="../scripts/shared.js"></script><script src="../scripts/store.js"></script>
+<script src="../scripts/auth.js"></script><script src="../scripts/help-tips.js"></script>
+<script>if(window.AUTH) window.AUTH.requireAuth();</script>
+<script src="../scripts/order-samples.js"></script>
+<script src="../scripts/order-samples-page.js"></script>
+</body>
+</html>
