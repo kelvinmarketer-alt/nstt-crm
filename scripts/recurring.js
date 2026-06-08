@@ -383,7 +383,9 @@
       promptHint: 'list rau định kỳ KH hay đặt (vd từ tin nhắn, đơn cũ)',
       fields: ['name','qty'],
       aiTask: 'order',
-      customPrompt: `Đọc ảnh chứa list mặt hàng nông sản (tiếng Việt). Trả JSON: {"items":[{"name":"tên SP","qty":<số>}]}. KHÔNG ghi đơn vị "kg" trong qty.
+      customPrompt: `Đọc ảnh chứa list mặt hàng nông sản đặt mua (tiếng Việt, có thể VIẾT TAY). Trả JSON: {"items":[{"name":"tên SP","qty":<số>}]}. KHÔNG ghi đơn vị "kg" trong qty.
+
+⚠️ QUAN TRỌNG — ĐỌC ĐẦY ĐỦ: đọc HẾT MỌI DÒNG từ trên xuống dưới, KHÔNG bỏ sót dòng nào — kể cả chữ viết tay mờ, chữ nhỏ, nhiều cột, gạch đầu dòng, tin nhắn dài. Nếu ảnh có 30 món thì items phải đủ 30 phần tử. Thà đoán còn hơn bỏ sót.
 
 ${aliasHint || ''}
 

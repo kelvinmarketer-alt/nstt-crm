@@ -646,8 +646,8 @@
     window.AI.openFillModal({
       task: 'quote-items',
       title: '📷 Nhập mặt hàng báo giá từ ảnh',
-      guideHtml: 'Đính ảnh chụp <b>danh sách hàng / tin nhắn đặt hàng</b>. AI đọc và thêm vào báo giá.',
-      prompt: 'Đọc ảnh danh sách hàng (tiếng Việt). Trả JSON mảng: [{"name":"tên sản phẩm","qty": số lượng (số), "price": đơn giá VND (số, 0 nếu không có)}]. CHỈ trả JSON.',
+      guideHtml: 'Đính ảnh chụp <b>danh sách hàng / tin nhắn đặt hàng / phiếu viết tay</b>. AI đọc và thêm vào báo giá.',
+      prompt: 'Đọc ảnh danh sách hàng / phiếu / tin nhắn đặt hàng (tiếng Việt, có thể VIẾT TAY). Trả JSON mảng: [{"name":"tên sản phẩm","qty": số lượng (số), "price": đơn giá VND (số, 0 nếu không có)}].\n\n⚠️ ĐỌC ĐẦY ĐỦ: đọc HẾT MỌI DÒNG từ trên xuống dưới, KHÔNG bỏ sót dòng nào — kể cả chữ viết tay mờ, chữ nhỏ, nhiều cột, tin nhắn dài. Nếu ảnh có 30 món thì mảng phải đủ 30 phần tử.\n\nCHỈ trả JSON.',
       onResult: (data) => {
         const list = Array.isArray(data) ? data : (data.items || data.rows || []);
         if (!list.length) { window.toast('Không đọc được mặt hàng nào', 'warn'); return; }
