@@ -31,17 +31,51 @@
     });
   }
 
-  /* ===== Gom SL nhiều đơn → lines theo từng NCC ===== */
+  /* ===== Loại NCC (sỉ / lẻ / cả hai) — lưu kv 'supplierMeta' (cloud suppliers k có cột) ===== */
+  const getSupMeta = () => S().get('supplierMeta', {}) || {};
+  const supplyTypeOf = (supId) => { const m = getSupMeta()[supId]; return (m && m.type) || 'both'; };
+  const TYPE_LABEL = { si: 'Sỉ', le: 'Lẻ', both: 'Sỉ+Lẻ' };
+
+  /* Tất cả NCC cung cấp 1 SP — sắp theo SAO giảm dần (auto ưu tiên), rồi giá tăng dần */
+  function suppliersForProduct(productId, productName) {
+    const out = [];
+    getSuppliers().filter(s => s.active !== false).forEach(s => {
+      const p = (s.products || []).find(pp => (productId && pp.id === productId) || norm(pp.name) === norm(productName));
+      if (p) out.push({ id: s.id, name: s.name, price: +p.price || 0, rating: +s.rating || 0, type: supplyTypeOf(s.id) });
+    });
+    return out.sort((a, b) => (b.rating - a.rating) || (a.price - b.price));
+  }
+
+  /* Auto phân bổ theo SAO: NCC sao cao nhất nhận TOÀN BỘ (người gom tự tách sau nếu NCC k đủ) */
+  function autoStarAllocate(line) {
+    const cands = suppliersForProduct(line.productId, line.name);
+    if (cands.length) {
+      const top = cands[0];
+      line.allocations = [{ supplierId: top.id, supplierName: top.name, qty: line.totalQty, unitCost: top.price, confirmedQty: null }];
+    } else if (!Array.isArray(line.allocations)) {
+      line.allocations = [];
+    }
+  }
+  /* Migrate dòng cũ (supplierId đơn) → allocations[]; đảm bảo luôn có mảng */
+  function normalizeLine(l) {
+    if (!Array.isArray(l.allocations)) l.allocations = [];
+    if (!l.allocations.length && l.supplierId) {
+      l.allocations = [{ supplierId: l.supplierId, supplierName: l.supplierName || '', qty: l.totalQty,
+        unitCost: l.unitCost || 0, confirmedQty: (l.confirmedQty != null ? l.confirmedQty : null) }];
+    }
+    return l;
+  }
+  function normalizeRun(run) { if (run && Array.isArray(run.lines)) run.lines.forEach(normalizeLine); return run; }
+
+  const allocOf = (l) => (l.allocations || []).reduce((s, a) => s + (+a.qty || 0), 0);            /* tổng đã phân bổ NCC */
+  const remainOf = (l) => +((l.totalQty || 0) - allocOf(l)).toFixed(2);                            /* còn chưa phân bổ */
+  const confirmedOf = (l) => (l.allocations || []).reduce((s, a) => s + (a.confirmedQty != null && a.confirmedQty !== '' ? +a.confirmedQty : (+a.qty || 0)), 0); /* tổng NCC giao thực */
+
+  /* ===== Gom SL nhiều đơn → lines (gom theo MÃ HÀNG) ===== */
   function buildLines(orderCodes) {
     const orders = getOrders().filter(o => orderCodes.includes(o.code))
       .sort((a, b) => (a.createdAt || a.date || '') < (b.createdAt || b.date || '') ? -1 : 1);
     const products = getProducts();
-    const suppliers = getSuppliers();
-    /* productId → NCC cung cấp (NCC đầu tiên có gán SP đó) */
-    const supByProd = {};
-    suppliers.forEach(s => (s.products || []).forEach(p => {
-      if (!supByProd[p.id]) supByProd[p.id] = { id: s.id, name: s.name, price: p.price || 0 };
-    }));
     const prodByName = {};
     products.forEach(p => { prodByName[norm(p.name)] = p; });
 
@@ -50,25 +84,26 @@
       const prod = prodByName[norm(it.name)];
       const key = prod ? prod.id : 'x:' + norm(it.name);
       if (!map.has(key)) {
-        const sup = prod ? supByProd[prod.id] : null;
         map.set(key, {
           key, productId: prod ? prod.id : '', name: it.name, unit: it.unit || 'kg',
-          supplierId: sup ? sup.id : '', supplierName: sup ? sup.name : '',
-          unitCost: sup ? sup.price : 0,
-          totalQty: 0, breakdown: [], confirmedQty: null, shortageReason: '', note: ''
+          totalQty: 0, breakdown: [], allocations: [], shortageReason: '', note: ''
         });
       }
       const g = map.get(key);
       g.totalQty = +(g.totalQty + (+it.qty || 0)).toFixed(2);
       g.breakdown.push({ code: o.code, custName: o.custName, qty: +it.qty || 0, createdAt: o.createdAt || o.date || '' });
     }));
-    return [...map.values()];
+    const lines = [...map.values()];
+    lines.forEach(autoStarAllocate);  /* tự gán NCC sao cao nhất */
+    return lines;
   }
 
   /* ===== Phân bổ phần thiếu: ƯU TIÊN ĐƠN ĐẶT TRƯỚC =====
-     Đơn tạo sớm được nhận đủ trước; đơn sau gánh phần thiếu. */
+     Tổng giao thực = Σ(giao thực từng NCC). Đơn tạo sớm nhận đủ trước; đơn sau gánh thiếu. */
   function allocateLine(line) {
-    let avail = line.confirmedQty != null && line.confirmedQty !== '' ? +line.confirmedQty : line.totalQty;
+    const hasAlloc = Array.isArray(line.allocations) && line.allocations.length;
+    let avail = hasAlloc ? confirmedOf(line)
+      : (line.confirmedQty != null && line.confirmedQty !== '' ? +line.confirmedQty : line.totalQty);
     const sorted = [...line.breakdown].sort((a, b) => (a.createdAt || a.code) < (b.createdAt || b.code) ? -1 : 1);
     return sorted.map(b => {
       const give = Math.min(b.qty, Math.max(0, avail));
@@ -142,7 +177,7 @@
     if (!picked.size) return;
     const codes = [...picked];
     const lines = buildLines(codes);
-    const noSup = lines.filter(l => !l.supplierId);
+    const noSup = lines.filter(l => remainOf(l) > 0.001);  /* chưa phân bổ đủ NCC */
     const runs = getRuns();
     const seq = String(runs.length + 1).padStart(3, '0');
     const run = {
@@ -180,7 +215,8 @@
     const stLabel = { draft: ['Nháp', '#64748B'], sent: ['Đã gửi NCC', '#0EA5E9'], confirmed: ['Đã xác nhận', '#15803D'], closed: ['Đã xuất kho', '#1B5E20'] };
     host.innerHTML = runs.map(r => {
       const [lb, clr] = stLabel[r.status] || stLabel.draft;
-      const nNone = r.lines.filter(l => !l.supplierId).length;
+      normalizeRun(r);
+      const nNone = r.lines.filter(l => remainOf(l) > 0.001).length;
       const totalKg = r.lines.reduce((s, l) => s + l.totalQty, 0);
       const sel = window._pcActiveRun === r.id ? ' pc-sel' : '';
       return `<div class="run-card${sel}" data-runid="${r.id}" onclick="window.pcOpenRun('${r.id}')" style="padding:11px 13px">
@@ -189,7 +225,7 @@
           <span class="tag" style="background:${clr}1f;color:${clr};font-weight:700;font-size:10.5px">${lb}</span>
         </div>
         <div style="font-size:11.5px;color:var(--muted);margin-top:5px">${r.orderCodes.length} đơn · ${r.lines.length} mã · ${fmtQty(totalKg)} kg</div>
-        ${nNone > 0 ? `<div style="margin-top:6px"><span class="tag" style="background:#FEF3C7;color:#B45309;font-weight:700;font-size:10.5px">⚠ ${nNone} SP chưa gán NCC</span></div>` : `<div style="margin-top:6px"><span style="font-size:11px;color:#15803D;font-weight:700">✓ đã gán đủ NCC</span></div>`}
+        ${nNone > 0 ? `<div style="margin-top:6px"><span class="tag" style="background:#FEF3C7;color:#B45309;font-weight:700;font-size:10.5px">⚠ ${nNone} mã chưa phân bổ đủ NCC</span></div>` : `<div style="margin-top:6px"><span style="font-size:11px;color:#15803D;font-weight:700">✓ đã phân bổ đủ NCC</span></div>`}
       </div>`;
     }).join('');
     /* nếu phiên đang chọn không còn → mở phiên đầu */
@@ -204,73 +240,142 @@
       sups.map(s => `<option value="${s.id}" ${selId === s.id ? 'selected' : ''}>${esc(s.name)}</option>`).join('');
   }
 
+  /* Tổng hợp theo NCC từ allocations (cho phần "đặt hàng theo NCC" + summary) */
+  function summarizeBySupplier(run) {
+    const bySup = {};            /* supId → { id,name,type,rating, items:[{name,unit,qty,cost}], breakdown per cust } */
+    run.lines.forEach(l => (l.allocations || []).forEach(a => {
+      if (!a.supplierId || !(+a.qty)) return;
+      const b = bySup[a.supplierId] = bySup[a.supplierId] || { id: a.supplierId, name: a.supplierName || a.supplierId, items: [], kg: 0, cost: 0 };
+      b.items.push({ key: l.key, name: l.name, unit: l.unit, qty: +a.qty || 0, unitCost: +a.unitCost || 0, breakdown: l.breakdown });
+      b.kg += +a.qty || 0; b.cost += (+a.qty || 0) * (+a.unitCost || 0);
+    }));
+    return bySup;
+  }
+  /* Mỗi ĐƠN dùng bao nhiêu NCC (distinct suppliers chạm vào mã hàng của đơn) */
+  function suppliersPerOrder(run) {
+    const res = {};   /* code → Set(supId) */
+    run.lines.forEach(l => {
+      const custCodes = new Set((l.breakdown || []).map(b => b.code));
+      (l.allocations || []).forEach(a => { if (a.supplierId) custCodes.forEach(c => { (res[c] = res[c] || new Set()).add(a.supplierId); }); });
+    });
+    return res;
+  }
+
   window.pcOpenRun = function (runId) {
-    const run = getRuns().find(r => r.id === runId);
+    const runs = getRuns();
+    const run = normalizeRun(runs.find(r => r.id === runId));
     if (!run) return;
-    /* group lines by supplier */
-    const bySup = {};
-    run.lines.forEach(l => { const k = l.supplierId || '__none__'; (bySup[k] = bySup[k] || { name: l.supplierName || '⚠ Chưa gán NCC', id: l.supplierId, lines: [] }).lines.push(l); });
-    /* đưa nhóm "chưa gán" lên đầu */
-    const supKeys = Object.keys(bySup).sort((a, b) => (a === '__none__' ? -1 : b === '__none__' ? 1 : 0));
-    const nNone = (bySup['__none__'] || { lines: [] }).lines.length;
-    const supDL = `<datalist id="pcSupDL">${getSuppliers().filter(s => s.active !== false).map(s => `<option value="${esc(s.name)}">`).join('')}</datalist>`;
+    saveRuns(runs);  /* lưu migration allocations nếu có */
+    const sups = getSuppliers().filter(s => s.active !== false);
+    const supDL = `<datalist id="pcSupDL">${sups.map(s => `<option value="${esc(s.name)}">`).join('')}</datalist>`;
+    const totalKg = run.lines.reduce((s, l) => s + l.totalQty, 0);
+    const bySup = summarizeBySupplier(run);
+    const perOrder = suppliersPerOrder(run);
+    const nSup = Object.keys(bySup).length;
+    const nIncomplete = run.lines.filter(l => remainOf(l) > 0.001).length;
+
     let body = supDL + `
       <div style="background:linear-gradient(135deg,#1B5E20,#2E7D32);color:#fff;padding:14px 18px;position:relative">
         <button onclick="window.pcCloseDetail()" title="Đóng" style="position:absolute;top:11px;right:13px;background:rgba(255,255,255,.18);border:none;color:#fff;width:28px;height:28px;border-radius:6px;cursor:pointer">✕</button>
         <h2 style="margin:0;font-size:16px">${run.id} — Phiên gom hàng</h2>
-        <div style="opacity:.9;font-size:12px;margin-top:3px">${run.orderCodes.length} đơn · ${run.lines.length} mặt hàng</div>
+        <div style="opacity:.9;font-size:12px;margin-top:3px">${run.orderCodes.length} đơn · ${run.lines.length} mã hàng · ${fmtQty(totalKg)} kg · ${nSup} NCC</div>
       </div>
       <div style="padding:14px 18px">`;
 
-    if (nNone > 0) {
-      body += `<div style="background:#FEF3C7;border:1px solid #FDE68A;border-radius:9px;padding:10px 12px;margin-bottom:12px;display:flex;align-items:center;gap:10px;flex-wrap:wrap">
-        <span style="font-size:12.5px;color:#92400E;font-weight:600">⚠ ${nNone} SP chưa gán NCC.</span>
-        <span style="font-size:12px;color:#92400E">Gán nhanh tất cả cho:</span>
-        <input id="pcBulkSup" list="pcSupDL" placeholder="Gõ tên NCC (tạo mới nếu chưa có)…" style="font-size:12.5px;border:1px solid #FDE68A;border-radius:6px;padding:5px 8px;min-width:210px">
-        <button class="btn btn-primary btn-sm" onclick="window.pcBulkAssignSup('${run.id}')">⚡ Gán hàng loạt</button>
-      </div>`;
-    }
+    /* ===== TỔNG QUAN SAU GOM ===== */
+    body += `<div style="background:#F0FDF4;border:1px solid #BBF7D0;border-radius:10px;padding:12px 14px;margin-bottom:14px">
+      <div style="font-weight:800;color:#15803D;font-size:12.5px;margin-bottom:8px">📊 TỔNG QUAN SAU GOM</div>
+      <div style="display:flex;gap:18px;flex-wrap:wrap;font-size:12.5px;margin-bottom:8px">
+        <div><b style="font-size:16px;color:var(--navy)">${run.lines.length}</b> mã hàng</div>
+        <div><b style="font-size:16px;color:var(--navy)">${fmtQty(totalKg)}</b> kg tổng</div>
+        <div><b style="font-size:16px;color:var(--navy)">${nSup}</b> nhà cung cấp</div>
+        ${nIncomplete ? `<div style="color:#B45309"><b>${nIncomplete}</b> mã chưa phân bổ đủ</div>` : '<div style="color:#15803D">✓ đã phân bổ đủ</div>'}
+      </div>
+      <div style="font-size:11.5px;color:var(--muted);margin-bottom:4px">Số NCC mỗi đơn:</div>
+      <div style="display:flex;gap:6px;flex-wrap:wrap">${run.orderCodes.map(code => {
+        const o = getOrders().find(x => x.code === code);
+        const n = (perOrder[code] || new Set()).size;
+        return `<span class="bd-chip">${code}${o ? ' · ' + esc(o.custName || '') : ''}: <b>${n} NCC</b></span>`;
+      }).join('')}</div>
+    </div>`;
 
-    supKeys.forEach(sk => {
-      const sup = bySup[sk];
-      const isNone = sk === '__none__';
-      body += `<div class="sup-block" style="margin-bottom:14px">
-        <div class="hd" style="${isNone ? 'background:#B45309' : ''}">🏭 ${esc(sup.name)} <span style="opacity:.8;font-weight:400;font-size:11.5px">(${sup.lines.length} SP)</span>
-          <div style="flex:1"></div>
-          ${isNone ? '' : `<button class="btn btn-ghost btn-sm" style="background:rgba(255,255,255,.2);color:#fff;border:none" onclick="window.pcPrintSupReq('${run.id}','${sk}')">🖨 In phiếu</button>
-          <button class="btn btn-ghost btn-sm" style="background:rgba(255,255,255,.2);color:#fff;border:none" onclick="window.pcCopySupReq('${run.id}','${sk}')">📋 Copy Zalo</button>`}
+    /* ===== PHÂN BỔ NCC THEO TỪNG MÃ (chia nhiều NCC được) ===== */
+    body += `<div style="font-weight:800;color:var(--navy);font-size:12.5px;margin:4px 0 8px">🧮 PHÂN BỔ NCC THEO TỪNG MÃ <span style="font-weight:400;color:var(--muted)">(1 mã có thể chia nhiều NCC)</span></div>`;
+    run.lines.forEach(l => {
+      const cands = suppliersForProduct(l.productId, l.name);
+      const alloc = allocateLine(l);
+      const totalShort = alloc.reduce((s, a) => s + a.short, 0);
+      const done = allocOf(l), remain = remainOf(l);
+      const okAlloc = Math.abs(remain) < 0.001;
+      body += `<div class="pc-line" style="margin-bottom:10px">
+        <div style="display:flex;align-items:center;gap:10px;flex-wrap:wrap;margin-bottom:6px">
+          <div style="flex:1;min-width:130px"><b>${esc(l.name)}</b> <span style="color:var(--muted);font-size:11.5px">· cần <b style="color:var(--navy)">${fmtQty(l.totalQty)} ${l.unit}</b></span></div>
+          <span class="tag" style="background:${okAlloc ? '#DCFCE7' : '#FEF3C7'};color:${okAlloc ? '#15803D' : '#B45309'};font-weight:700;font-size:10.5px">
+            ${okAlloc ? '✓ đã phân bổ đủ' : `đã ${fmtQty(done)}/${fmtQty(l.totalQty)} · còn ${fmtQty(remain)} ${l.unit}`}</span>
+          ${cands.length ? `<button class="btn btn-ghost btn-sm" style="font-size:11px;padding:3px 8px" onclick="window.pcAutoStar('${run.id}','${l.key}')" title="Tự gán NCC sao cao nhất">⭐ Tự chọn theo sao</button>` : `<span style="font-size:11px;color:#B45309">⚠ chưa NCC nào khai cung cấp mã này</span>`}
         </div>`;
-      sup.lines.forEach(l => {
-        const alloc = allocateLine(l);
-        const totalShort = alloc.reduce((s, a) => s + a.short, 0);
-        body += `<div class="pc-line">
-          <div style="display:flex;align-items:center;gap:10px;flex-wrap:wrap;margin-bottom:7px">
-            <div style="flex:1;min-width:130px"><b>${esc(l.name)}</b> <span style="color:var(--muted);font-size:11.5px">· cần <b style="color:var(--navy)">${fmtQty(l.totalQty)} ${l.unit}</b></span></div>
-            <label style="font-size:11px;color:var(--muted);display:flex;align-items:center;gap:4px">NCC:
-              <input class="pc-sup" list="pcSupDL" data-rkey="${l.key}" value="${esc(l.supplierName || '')}" onchange="window.pcSetLineSupByName('${run.id}','${l.key}',this.value)" placeholder="Gõ tên NCC…" style="font-size:11.5px;border:1px solid ${l.supplierId ? 'var(--line)' : '#F59E0B'};border-radius:5px;padding:3px 6px;width:160px;${l.supplierId ? '' : 'background:#FEF9C3'}">
-            </label>
-          </div>
-          <div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap">
-            <label style="font-size:11.5px;color:var(--muted)">Giao thực:
-              <input type="number" min="0" step="0.1" value="${l.confirmedQty != null ? l.confirmedQty : ''}" placeholder="${fmtQty(l.totalQty)}" data-rkey="${l.key}" class="pc-conf" style="width:70px;text-align:right;border:1px solid var(--line);border-radius:5px;padding:3px 6px;margin-left:4px"> ${l.unit}</label>
-            <select data-rkey="${l.key}" class="pc-reason" style="font-size:11.5px;border:1px solid var(--line);border-radius:5px;padding:3px 6px">
-              <option value="">— lý do thiếu —</option>
-              ${['Trái mùa', 'Sai quy cách', 'Hàng thối/hỏng', 'NCC hết hàng', 'Khác'].map(r => `<option ${l.shortageReason === r ? 'selected' : ''}>${r}</option>`).join('')}
-            </select>
-            <input type="text" data-rkey="${l.key}" class="pc-note" value="${esc(l.note || '')}" placeholder="Ghi chú..." style="flex:1;min-width:120px;font-size:11.5px;border:1px solid var(--line);border-radius:5px;padding:3px 8px">
-          </div>
-          <div style="margin-top:6px">${alloc.map(a => `<span class="bd-chip ${a.short > 0 ? 'short' : ''}">${a.code}: ${fmtQty(a.give)}${a.short > 0 ? ' <b>(-' + fmtQty(a.short) + ')</b>' : ''}</span>`).join('')}
-            ${totalShort > 0 ? `<span style="color:#B91C1C;font-size:11.5px;font-weight:700;margin-left:6px">⚠ Thiếu ${fmtQty(totalShort)} ${l.unit}</span>` : ''}</div>
+      /* các dòng allocation (NCC + sl + giao thực) */
+      (l.allocations || []).forEach((a, ai) => {
+        body += `<div class="pc-alloc" style="display:flex;align-items:center;gap:6px;flex-wrap:wrap;margin:3px 0 3px 6px">
+          <span style="color:var(--muted);font-size:11px">↳</span>
+          <input list="pcSupDL" value="${esc(a.supplierName || '')}" placeholder="Gõ tên NCC…"
+            onchange="window.pcSetAllocSup('${run.id}','${l.key}',${ai},this.value)"
+            style="font-size:11.5px;border:1px solid ${a.supplierId ? 'var(--line)' : '#F59E0B'};border-radius:5px;padding:3px 6px;width:150px;${a.supplierId ? '' : 'background:#FEF9C3'}">
+          <input type="number" min="0" step="0.1" value="${a.qty != null ? a.qty : ''}" placeholder="SL"
+            onchange="window.pcSetAllocQty('${run.id}','${l.key}',${ai},this.value)"
+            style="width:64px;text-align:right;font-size:11.5px;border:1px solid var(--line);border-radius:5px;padding:3px 6px"> <span style="font-size:11px;color:var(--muted)">${l.unit}</span>
+          <label style="font-size:11px;color:var(--muted)">giao thực:
+            <input type="number" min="0" step="0.1" value="${a.confirmedQty != null ? a.confirmedQty : ''}" placeholder="${fmtQty(a.qty || 0)}"
+              onchange="window.pcSetAllocConf('${run.id}','${l.key}',${ai},this.value)"
+              style="width:60px;text-align:right;font-size:11.5px;border:1px solid var(--line);border-radius:5px;padding:3px 6px"></label>
+          <button onclick="window.pcDelAlloc('${run.id}','${l.key}',${ai})" title="Xoá NCC này" style="background:none;border:none;color:#B91C1C;cursor:pointer;font-size:13px">✕</button>
         </div>`;
       });
-      body += `</div>`;
+      body += `<div style="margin:2px 0 6px 6px">
+          <button class="btn btn-ghost btn-sm" style="font-size:11px;padding:2px 8px" onclick="window.pcAddAlloc('${run.id}','${l.key}')">➕ Thêm NCC chia phần</button>
+          ${cands.length > 1 ? `<span style="font-size:10.5px;color:var(--muted);margin-left:6px">NCC bán mã này: ${cands.map(c => esc(c.name) + ' ' + '★'.repeat(Math.round(c.rating))).join(' · ')}</span>` : ''}
+        </div>`;
+      /* lý do thiếu + ghi chú + breakdown phân bổ về đơn */
+      body += `<div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap;margin:4px 0 0 6px">
+          <select data-rkey="${l.key}" class="pc-reason" style="font-size:11.5px;border:1px solid var(--line);border-radius:5px;padding:3px 6px">
+            <option value="">— lý do thiếu —</option>
+            ${['Trái mùa', 'Sai quy cách', 'Hàng thối/hỏng', 'NCC hết hàng', 'Khác'].map(r => `<option ${l.shortageReason === r ? 'selected' : ''}>${r}</option>`).join('')}
+          </select>
+          <input type="text" data-rkey="${l.key}" class="pc-note" value="${esc(l.note || '')}" placeholder="Ghi chú..." style="flex:1;min-width:120px;font-size:11.5px;border:1px solid var(--line);border-radius:5px;padding:3px 8px">
+        </div>
+        <div style="margin:6px 0 0 6px">${alloc.map(a => `<span class="bd-chip ${a.short > 0 ? 'short' : ''}">${a.code}: ${fmtQty(a.give)}${a.short > 0 ? ' <b>(-' + fmtQty(a.short) + ')</b>' : ''}</span>`).join('')}
+          ${totalShort > 0 ? `<span style="color:#B91C1C;font-size:11.5px;font-weight:700;margin-left:6px">⚠ Thiếu ${fmtQty(totalShort)} ${l.unit}</span>` : ''}</div>
+      </div>`;
     });
+
+    /* ===== TỔNG HỢP ĐẶT HÀNG THEO NCC ===== */
+    if (nSup > 0) {
+      body += `<div style="font-weight:800;color:var(--navy);font-size:12.5px;margin:14px 0 8px">🏭 ĐẶT HÀNG THEO NHÀ CUNG CẤP</div>`;
+      Object.values(bySup).forEach(b => {
+        const sObj = getSuppliers().find(s => s.id === b.id) || {};
+        const typ = supplyTypeOf(b.id);
+        const rating = +sObj.rating || 0;
+        body += `<div class="sup-block" style="margin-bottom:12px">
+          <div class="hd">🏭 ${esc(b.name)} <span style="opacity:.85;font-weight:400;font-size:11px">${'★'.repeat(Math.round(rating)) || ''} · ${TYPE_LABEL[typ]} · ${b.items.length} mã · ${fmtQty(b.kg)}kg${b.cost ? ' · ' + money(b.cost) + '₫' : ''}</span>
+            <div style="flex:1"></div>
+            <button class="btn btn-ghost btn-sm" style="background:rgba(255,255,255,.2);color:#fff;border:none" onclick="window.pcPrintSupReq('${run.id}','${b.id}')">🖨 In phiếu đặt</button>
+            <button class="btn btn-ghost btn-sm" style="background:rgba(255,255,255,.2);color:#fff;border:none" onclick="window.pcCopySupReq('${run.id}','${b.id}')">📋 Copy Zalo</button>
+          </div>
+          <div style="padding:8px 12px">
+          ${b.items.map(it => `<div style="font-size:12px;padding:3px 0;border-bottom:1px dashed #EEF2F0">
+            <b>${esc(it.name)}</b>: ${fmtQty(it.qty)} ${it.unit}${it.unitCost ? ` <span style="color:var(--muted)">× ${money(it.unitCost)}₫</span>` : ''}
+            ${typ === 'le' || typ === 'both' ? `<div style="font-size:10.5px;color:var(--muted);margin-top:1px">Chia khách: ${it.breakdown.map(bd => esc(bd.custName || bd.code) + ' ' + fmtQty(bd.qty) + it.unit).join(' · ')}</div>` : ''}
+          </div>`).join('')}
+          </div>
+        </div>`;
+      });
+    }
 
     body += `<div style="position:sticky;bottom:0;background:#fff;padding-top:10px;border-top:1px solid var(--line);display:flex;gap:8px;flex-wrap:wrap">
         <button class="btn btn-navy" onclick="window.pcSaveConfirm('${run.id}')">💾 Lưu</button>
         <button class="btn btn-primary" onclick="window.pcApplyAlloc('${run.id}')">✅ Chốt &amp; phân bổ về đơn + báo Sale</button>
       </div>
-      <div style="font-size:11px;color:var(--muted);margin-top:8px">💡 Gán NCC cho từng SP (hoặc gán hàng loạt). Bỏ trống "Giao thực" = giao đủ. Điền nhỏ hơn = thiếu → tự cắt theo ưu tiên đơn đặt trước.</div>
+      <div style="font-size:11px;color:var(--muted);margin-top:8px">💡 Mỗi mã tự gán NCC sao cao nhất. Nếu 1 NCC không đủ → bấm <b>➕ Thêm NCC chia phần</b> rồi nhập số kg mỗi NCC (vd 100kg = NCC A 20 + B 50 + C 30). "Giao thực" để trống = giao đủ.</div>
     </div>`;
 
     const dc = document.getElementById('pcRunDetail');
@@ -286,11 +391,8 @@
     document.querySelectorAll('.run-card[data-runid]').forEach(c => c.classList.remove('pc-sel'));
   };
 
+  /* Đọc lý do thiếu + ghi chú từ DOM (giao thực/SL NCC lưu trực tiếp qua onchange của allocation) */
   function readConfirmInputs(run) {
-    document.querySelectorAll('.pc-conf').forEach(inp => {
-      const l = run.lines.find(x => x.key === inp.dataset.rkey);
-      if (l) l.confirmedQty = inp.value === '' ? null : +inp.value;
-    });
     document.querySelectorAll('.pc-reason').forEach(sel => {
       const l = run.lines.find(x => x.key === sel.dataset.rkey);
       if (l) l.shortageReason = sel.value;
@@ -300,6 +402,58 @@
       if (l) l.note = inp.value;
     });
   }
+  const _line = (run, key) => run.lines.find(x => x.key === key);
+
+  /* ===== Thao tác phân bổ NCC cho 1 mã ===== */
+  /* Tự chọn NCC sao cao nhất nhận toàn bộ */
+  window.pcAutoStar = function (runId, key) {
+    const runs = getRuns(); const run = runs.find(r => r.id === runId); if (!run) return;
+    readConfirmInputs(run);
+    const l = _line(run, key); if (!l) return;
+    autoStarAllocate(l);
+    saveRuns(runs); renderRuns(); window.pcOpenRun(runId);
+  };
+  /* Thêm 1 dòng NCC chia phần (qty = phần còn thiếu) */
+  window.pcAddAlloc = function (runId, key) {
+    const runs = getRuns(); const run = runs.find(r => r.id === runId); if (!run) return;
+    readConfirmInputs(run);
+    const l = _line(run, key); if (!l) return;
+    if (!Array.isArray(l.allocations)) l.allocations = [];
+    l.allocations.push({ supplierId: '', supplierName: '', qty: Math.max(0, remainOf(l)), unitCost: 0, confirmedQty: null });
+    saveRuns(runs); window.pcOpenRun(runId);
+  };
+  window.pcDelAlloc = function (runId, key, ai) {
+    const runs = getRuns(); const run = runs.find(r => r.id === runId); if (!run) return;
+    readConfirmInputs(run);
+    const l = _line(run, key); if (!l || !l.allocations) return;
+    l.allocations.splice(ai, 1);
+    saveRuns(runs); window.pcOpenRun(runId);
+  };
+  window.pcSetAllocSup = function (runId, key, ai, name) {
+    const runs = getRuns(); const run = runs.find(r => r.id === runId); if (!run) return;
+    readConfirmInputs(run);
+    const l = _line(run, key); if (!l || !l.allocations[ai]) return;
+    const s = resolveOrCreateSupplier(name);
+    const a = l.allocations[ai];
+    a.supplierId = s ? s.id : ''; a.supplierName = s ? s.name : '';
+    /* lấy giá nhập của NCC cho mã này (nếu có khai) */
+    if (s) { const p = (s.products || []).find(pp => (l.productId && pp.id === l.productId) || norm(pp.name) === norm(l.name)); if (p) a.unitCost = +p.price || a.unitCost || 0; }
+    saveRuns(runs); renderRuns(); window.pcOpenRun(runId);
+  };
+  window.pcSetAllocQty = function (runId, key, ai, val) {
+    const runs = getRuns(); const run = runs.find(r => r.id === runId); if (!run) return;
+    readConfirmInputs(run);
+    const l = _line(run, key); if (!l || !l.allocations[ai]) return;
+    l.allocations[ai].qty = val === '' ? 0 : +val;
+    saveRuns(runs); window.pcOpenRun(runId);
+  };
+  window.pcSetAllocConf = function (runId, key, ai, val) {
+    const runs = getRuns(); const run = runs.find(r => r.id === runId); if (!run) return;
+    readConfirmInputs(run);
+    const l = _line(run, key); if (!l || !l.allocations[ai]) return;
+    l.allocations[ai].confirmedQty = val === '' ? null : +val;
+    saveRuns(runs); window.pcOpenRun(runId);
+  };
 
   /* Tìm NCC theo tên (không phân biệt hoa/thường); nếu chưa có → tạo mới luôn */
   function resolveOrCreateSupplier(name) {
@@ -410,10 +564,42 @@
   function closeDrawerSoft() { /* giữ drawer mở để xem; no-op */ }
 
   /* ===== Phiếu yêu cầu NCC ===== */
-  function supReqData(run, supKey) {
-    const lines = run.lines.filter(l => (l.supplierId || '__none__') === supKey);
-    const supName = lines[0] ? (lines[0].supplierName || '(chưa gán NCC)') : '';
-    return { lines, supName };
+  /* Chia khách theo từng dòng phân bổ NCC (ưu tiên đơn đặt trước lấp đầy NCC theo thứ tự).
+     Trả về mảng cùng index với line.allocations: mỗi phần tử = [{code,custName,qty}] */
+  function custSplitForLine(l) {
+    const slots = (l.allocations || []).map(a => ({ cap: +a.qty || 0, items: [] }));
+    const custs = [...(l.breakdown || [])].sort((a, b) => (a.createdAt || a.code) < (b.createdAt || b.code) ? -1 : 1);
+    let ai = 0;
+    custs.forEach(c => {
+      let need = +c.qty || 0;
+      while (need > 0.0001 && ai < slots.length) {
+        if (slots[ai].cap <= 0.0001) { ai++; continue; }
+        const take = Math.min(need, slots[ai].cap);
+        slots[ai].items.push({ code: c.code, custName: c.custName, qty: +take.toFixed(2) });
+        slots[ai].cap = +(slots[ai].cap - take).toFixed(3);
+        need = +(need - take).toFixed(3);
+        if (slots[ai].cap <= 0.0001) ai++;
+      }
+    });
+    return slots.map(s => s.items);
+  }
+  /* Dữ liệu đặt hàng cho 1 NCC: gộp các mã NCC đó cung cấp + chia khách (cho NCC lẻ) */
+  function supReqData(run, supId) {
+    const sObj = getSuppliers().find(s => s.id === supId) || {};
+    const supName = sObj.name || supId;
+    const type = supplyTypeOf(supId);
+    const items = [];
+    run.lines.forEach(l => {
+      const splits = custSplitForLine(l);
+      let qty = 0, cost = 0; const custs = [];
+      (l.allocations || []).forEach((a, ai) => {
+        if (a.supplierId !== supId) return;
+        qty += +a.qty || 0; cost += (+a.qty || 0) * (+a.unitCost || 0);
+        (splits[ai] || []).forEach(x => custs.push(x));
+      });
+      if (qty > 0.0001) items.push({ name: l.name, unit: l.unit, qty: +qty.toFixed(2), unitCost: qty ? cost / qty : 0, custs });
+    });
+    return { lines: items, supName, type };
   }
   function company() {
     const ci = S().get('companyInfo', {}) || {};
@@ -424,16 +610,18 @@
   window.pcPrintSupReq = function (runId, supKey) {
     const run = getRuns().find(r => r.id === runId); if (!run) return;
     readConfirmInputs(run);
-    const { lines, supName } = supReqData(run, supKey);
+    const { lines, supName, type } = supReqData(run, supKey);
     const c = company();
     const today = new Date().toLocaleDateString('vi-VN');
+    const isLe = type === 'le' || type === 'both';
+    const colHd = isLe ? 'Chia theo khách (NCC đóng sẵn)' : 'Chi tiết theo đơn';
     const rows = lines.map((l, i) => `<tr>
         <td class="stt">${i + 1}</td>
         <td><b>${esc(l.name)}</b></td>
-        <td class="num"><b>${fmtQty(l.totalQty)}</b> ${l.unit}</td>
-        <td style="font-size:11px;color:#555">${l.breakdown.map(b => esc(b.code) + ': ' + fmtQty(b.qty)).join(' · ')}</td>
+        <td class="num"><b>${fmtQty(l.qty)}</b> ${l.unit}</td>
+        <td style="font-size:11px;color:#555">${(l.custs || []).map(b => esc(isLe ? (b.custName || b.code) : b.code) + ': ' + fmtQty(b.qty)).join(' · ')}</td>
       </tr>`).join('');
-    const totalKg = lines.reduce((s, l) => s + l.totalQty, 0);
+    const totalKg = lines.reduce((s, l) => s + l.qty, 0);
     const html = `<!doctype html><html lang="vi"><head><meta charset="utf-8"><title>PHIẾU YÊU CẦU HÀNG</title>
 <style>@page{size:A4;margin:14mm 12mm}*{box-sizing:border-box;margin:0;padding:0;font-family:'Segoe UI',Arial,sans-serif}
 body{color:#1a1a1a;font-size:13px}.wrap{max-width:780px;margin:0 auto}
@@ -447,11 +635,11 @@ tbody tr:nth-child(even){background:#F4FAF2}tfoot td{background:#E8F5E9;font-wei
 .note{font-size:11.5px;color:#555;margin-top:14px;line-height:1.6}</style></head><body><div class="wrap">
 <div class="top"><img src="${c.logo}" onerror="this.style.display='none'"><div class="brand"><h1>${c.name}</h1><div class="sub">${esc(c.addr)} · ☎ ${esc(c.phone)}</div></div></div>
 <div class="title">PHIẾU YÊU CẦU HÀNG</div>
-<div class="meta"><div><b>Nhà cung cấp:</b> ${esc(supName)}</div><div><b>Ngày:</b> ${today} · Phiên ${run.id}</div></div>
-<table><thead><tr><th style="width:40px">STT</th><th>Sản phẩm</th><th style="width:110px">Số lượng</th><th>Chi tiết theo đơn</th></tr></thead>
+<div class="meta"><div><b>Nhà cung cấp:</b> ${esc(supName)} <span style="font-weight:400;color:#555">(${TYPE_LABEL[type]})</span></div><div><b>Ngày:</b> ${today} · Phiên ${run.id}</div></div>
+<table><thead><tr><th style="width:40px">STT</th><th>Sản phẩm</th><th style="width:110px">Số lượng</th><th>${colHd}</th></tr></thead>
 <tbody>${rows}</tbody>
 <tfoot><tr><td colspan="2" style="text-align:right">TỔNG</td><td class="num">${fmtQty(totalKg)} kg</td><td></td></tr></tfoot></table>
-<div class="note">⚖️ Đơn vị tính: KILOGRAM (KG). Cột "Chi tiết theo đơn" để đối chiếu khi giao thiếu.<br>Đề nghị NCC xác nhận sản lượng có thể giao + báo sớm mặt hàng thiếu (trái mùa / hết hàng).</div>
+<div class="note">⚖️ Đơn vị tính: KILOGRAM (KG). ${isLe ? 'NCC <b>lẻ</b>: đóng gói SẴN theo từng khách như cột bên.' : 'NCC <b>sỉ</b>: đóng 1 lô theo tổng số lượng.'}<br>Đề nghị NCC xác nhận sản lượng có thể giao + báo sớm mặt hàng thiếu (trái mùa / hết hàng).</div>
 </div></body></html>`;
     printViaIframe(html);
   };
@@ -459,11 +647,12 @@ tbody tr:nth-child(even){background:#F4FAF2}tfoot td{background:#E8F5E9;font-wei
   window.pcCopySupReq = function (runId, supKey) {
     const run = getRuns().find(r => r.id === runId); if (!run) return;
     readConfirmInputs(run);
-    const { lines, supName } = supReqData(run, supKey);
-    const totalKg = lines.reduce((s, l) => s + l.totalQty, 0);
-    const txt = `📋 PHIẾU YÊU CẦU HÀNG — ${run.id}\n🏭 NCC: ${supName}\n📅 ${new Date().toLocaleDateString('vi-VN')}\n────────────\n`
-      + lines.map((l, i) => `${i + 1}. ${l.name}: ${fmtQty(l.totalQty)} ${l.unit}\n   (${l.breakdown.map(b => b.code + ':' + fmtQty(b.qty)).join(' · ')})`).join('\n')
-      + `\n────────────\n📦 Tổng: ${fmtQty(totalKg)} kg · đơn vị KG\nĐề nghị NCC xác nhận + báo sớm hàng thiếu. Cảm ơn!\n— Nông Sản Tuấn Tú`;
+    const { lines, supName, type } = supReqData(run, supKey);
+    const isLe = type === 'le' || type === 'both';
+    const totalKg = lines.reduce((s, l) => s + l.qty, 0);
+    const txt = `📋 PHIẾU YÊU CẦU HÀNG — ${run.id}\n🏭 NCC: ${supName} (${TYPE_LABEL[type]})\n📅 ${new Date().toLocaleDateString('vi-VN')}\n────────────\n`
+      + lines.map((l, i) => `${i + 1}. ${l.name}: ${fmtQty(l.qty)} ${l.unit}` + (isLe && l.custs.length ? `\n   Chia khách: ${l.custs.map(b => (b.custName || b.code) + ' ' + fmtQty(b.qty) + l.unit).join(' · ')}` : '')).join('\n')
+      + `\n────────────\n📦 Tổng: ${fmtQty(totalKg)} kg · đơn vị KG\n${isLe ? 'NCC LẺ: đóng gói sẵn theo từng khách như trên.' : 'NCC SỈ: đóng 1 lô theo tổng.'}\nĐề nghị NCC xác nhận + báo sớm hàng thiếu. Cảm ơn!\n— Nông Sản Tuấn Tú`;
     copyText(txt, 'phiếu yêu cầu NCC');
   };
 

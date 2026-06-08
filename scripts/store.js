@@ -141,6 +141,7 @@
     'priceTiers',      /* Nhóm bảng giá theo nhóm KH (±% + override) — gửi báo giá riêng */
     'procurementRuns', /* Phiên gom hàng → đặt NCC (Kho) — CRITICAL */
     'supplierClaims',  /* Khoản đòi lại NCC khi hàng NCC giao hỏng (Trả hàng) */
+    'supplierMeta',    /* Loại NCC (sỉ/lẻ/cả hai) — cloud suppliers không có cột này */
     'audit_log',       /* Truy vết NV — HIGH */
     'inv_movements',   /* Sổ xuất nhập kho — HIGH */
     /* 'snapshots' KHÔNG sync cloud: mỗi bản backup copy TOÀN BỘ data (gồm 268 SP) →
