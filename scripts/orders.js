@@ -13,6 +13,14 @@
   let currentStatus = null;
   let currentService = null;
   let orderItems = [];   // mặt hàng của đơn đang tạo (sản phẩm + giá ngày)
+  let orderTier = '';    // nhóm giá áp dụng cho đơn đang tạo ('' = giá gốc; theo nhóm giá của KH)
+
+  /* Đơn giá 1 SP theo NHÓM GIÁ đang chọn của đơn (fallback giá gốc) */
+  function priceForOrder(productId) {
+    return (typeof window.tierPriceOn === 'function')
+      ? window.tierPriceOn(productId, window.todayISO(), orderTier)
+      : window.priceOn(productId, window.todayISO());
+  }
 
   const STATUS = {
     confirmed:  { icon:'📝', label:'Mới',         sub:'chờ điều phối',     color:'#3B82F6' },
@@ -699,8 +707,10 @@
       partners.map(p => `<option value="${p.id}">${p.code} · ${p.name}${p.vehiclePlate?' · '+p.vehiclePlate:''}</option>`).join('');
     const prodList = window.STORE.get('products', window.PRODUCTS || []);
     const prodOpts = `<option value="">-- Chọn sản phẩm --</option>` +
-      prodList.map(p => `<option value="${p.id}">${p.name} · ${window.fmt(window.priceOn(p.id, window.todayISO()))}đ/${p.unit}</option>`).join('');
+      prodList.map(p => `<option value="${p.id}">${p.name} · ${window.fmt(priceForOrder(p.id))}đ/${p.unit}</option>`).join('');
     orderItems = [];
+    orderTier = '';
+    const tierOpts = window.priceTierOptions ? window.priceTierOptions('') : '<option value="">— Mặc định (Giá gốc) —</option>';
     const nextCode = window.STORE.nextOrderCode();
     /* NV phụ trách — lấy từ staff thật, default = user đang đăng nhập */
     const meUser = (window.AUTH && window.AUTH.currentUser && window.AUTH.currentUser()) || {};
@@ -725,6 +735,13 @@
         </div>
         <div><label>Nhóm hàng chính</label>
           <select id="oSvc" onchange="window.onChangeService(this.value)">${svcOpts}</select></div>
+      </div>
+      <!-- ====== NHÓM GIÁ ÁP DỤNG (tự lấy theo KH — sửa được) ====== -->
+      <div class="form-row" style="align-items:flex-end">
+        <div><label>💲 Nhóm giá áp dụng ${window.helpTip ? window.helpTip('Bảng giá KH này được nhận. Tự lấy theo "Nhóm giá" đã gán trong hồ sơ KH — đổi tại đây nếu cần (giá các mặt hàng sẽ tính lại theo nhóm).') : ''}</label>
+          <select id="oPriceTier" onchange="window.onOrderTierChange(this.value)">${tierOpts}</select>
+        </div>
+        <div><div id="oTierNote" style="font-size:11.5px;color:var(--muted);padding:8px 2px">Chọn KH để tự áp nhóm giá của khách.</div></div>
       </div>
       <div class="form-row">
         <div><label>Hình thức giao</label>
@@ -934,7 +951,7 @@
     if (qty <= 0) { window.toast('Nhập số lượng', 'warn'); return; }
     const p = window.productById(id);
     if (!p) return;
-    const basePrice = window.priceOn(id, window.todayISO());
+    const basePrice = priceForOrder(id);
     const existing = orderItems.find(x => x.id === id);
     if (existing) {
       existing.qty = Math.round((existing.qty + qty) * 100) / 100;
@@ -1033,7 +1050,7 @@
       if (!p) { p = matchProductByName(it.name); learnWord = p ? it.name : null; }
       /* (3) Không khớp gì → bỏ vào unmatched (sẽ hỏi user dạy AI) */
       if (!p) { unmatched.push(it.name); return; }
-      const price = window.priceOn(p.id, window.todayISO());
+      const price = priceForOrder(p.id);
       const existing = orderItems.find(x => x.id === p.id);
       if (existing) {
         existing.qty = Math.round((existing.qty + qty) * 100) / 100;
@@ -1097,7 +1114,7 @@
         window.CustPrefs.addAlias(custId, word, pid);
         const p = window.productById(pid);
         if (p) {
-          const price = window.priceOn(pid, window.todayISO());
+          const price = priceForOrder(pid);
           /* Thêm với SL=1 default — user sẽ chỉnh sau */
           orderItems.push({ id: pid, name: p.name, unit: p.unit, img: p.img, qty: 1, price, total: price });
           learned.push(word);
@@ -1118,15 +1135,20 @@
     const c = custId ? window.STORE.get('customers', []).find(x => x.id === custId) : null;
     const aliasCtx = (custId && window.CustPrefs) ? window.CustPrefs.aliasContextForAI(custId) : '';
 
-    /* Build catalog ngắn gọn để AI ưu tiên match đúng */
+    /* Build catalog để AI ưu tiên match đúng — đưa TOÀN BỘ danh mục (cắt an toàn 300 SP) */
     const products = window.STORE.get('products', window.PRODUCTS || []);
-    const catalogHint = products.slice(0, 80).map(p => `${p.id}=${p.name}`).join(', ');
+    const catalogHint = products.slice(0, 300).map(p => `${p.id}=${p.name}`).join(', ');
 
     const basePrompt = `Đọc ảnh chứa danh sách mặt hàng nông sản đặt mua (tiếng Việt).
 Trả JSON: {"items":[{"name":"tên mặt hàng","qty":<số lượng>}]}.
 Số lượng là số nguyên/thập phân (vd 5, 2.5). KHÔNG bao gồm đơn vị "kg" trong qty.
 
-${aliasCtx ? aliasCtx + '\n\n' : ''}DANH MỤC SP CỦA SHOP (id=tên — chỉ liệt kê 1 phần): ${catalogHint}
+⚠️ QUAN TRỌNG — ĐỌC ĐẦY ĐỦ:
+- Đọc HẾT MỌI DÒNG trong ảnh từ trên xuống dưới, KHÔNG được bỏ sót dòng nào.
+- Kể cả chữ viết tay mờ, chữ nhỏ, nhiều cột, gạch đầu dòng, hay tin nhắn dài — liệt kê TẤT CẢ.
+- Nếu ảnh có 30 món thì items phải đủ 30 phần tử. Thà đoán còn hơn bỏ sót.
+
+${aliasCtx ? aliasCtx + '\n\n' : ''}DANH MỤC SP CỦA SHOP (id=tên): ${catalogHint}
 
 QUY TẮC ƯU TIÊN khi đọc tên mơ hồ:
 1. Nếu có TỪ ĐIỂN RIÊNG của KH ở trên → DÙNG đúng tên SP đó (vd "hành" của KH này = "Hành tây trắng" thì viết "Hành tây trắng" trong items).
@@ -1325,9 +1347,66 @@ CHỈ TRẢ JSON, không giải thích gì thêm.`;
     if (c && c.mainCats && c.mainCats[0]) {
       const sel = document.getElementById('oSvc'); if (sel) sel.value = c.mainCats[0];
     }
+    /* === Tự áp NHÓM GIÁ theo hồ sơ KH === */
+    const tierSel = document.getElementById('oPriceTier');
+    if (tierSel) {
+      const t = (c && c.priceTier != null) ? String(c.priceTier) : '';
+      tierSel.value = t;
+      applyOrderTier(t, { silent: true, fromCust: c });
+    }
     /* === Cá nhân hoá: hiện gợi ý + nhắc nhở alias === */
     renderCustPrefBox(custId);
   };
+
+  /* Đổi nhóm giá thủ công trên form đơn → tính lại giá các mặt hàng */
+  window.onOrderTierChange = function (val) {
+    applyOrderTier(val, { silent: false });
+  };
+
+  /* Áp nhóm giá: cập nhật orderTier, ghi chú, tính lại giá các mã (trừ SP ngoài DM),
+     và làm mới nhãn giá trong dropdown chọn SP. */
+  function applyOrderTier(val, opts) {
+    opts = opts || {};
+    orderTier = val || '';
+    const note = document.getElementById('oTierNote');
+    const tName = (typeof window.tierName === 'function' && orderTier) ? window.tierName(orderTier) : '';
+    const t = (typeof window.priceTierById === 'function') ? window.priceTierById(orderTier) : null;
+    const mk = t ? (+t.markup || 0) : 0;
+    if (note) {
+      if (!orderTier) {
+        note.innerHTML = opts.fromCust && !(opts.fromCust.priceTier)
+          ? '👤 KH chưa gán nhóm giá → dùng <b>Giá gốc</b>. Đổi tại đây nếu cần.'
+          : 'Đang dùng <b>Giá gốc</b> (không markup).';
+        note.style.color = 'var(--muted)';
+      } else {
+        note.innerHTML = `💲 Áp <b>${tName}</b> (${mk >= 0 ? '+' : ''}${mk}% so giá gốc)${opts.fromCust ? ' — theo hồ sơ KH' : ''}. Giá các mặt hàng đã tính lại.`;
+        note.style.color = '#15803D';
+      }
+    }
+    /* Tính lại giá các mã đã thêm theo nhóm mới — chỉ SP trong danh mục (có id), bỏ qua SP ngoài DM */
+    let repriced = 0;
+    orderItems.forEach(it => {
+      if (it.custom || !it.id) return;
+      const np = priceForOrder(it.id);
+      if (np && np !== it.price) {
+        it.price = np; it.basePrice = np;
+        it.total = Math.round((+it.qty || 0) * np);
+        it.priceConfirmed = false; /* để sale rà lại sau khi đổi nhóm giá */
+        repriced++;
+      }
+    });
+    /* Làm mới nhãn giá trong dropdown chọn SP */
+    const prodSel = document.getElementById('oProd');
+    if (prodSel) {
+      const prodList = window.STORE.get('products', window.PRODUCTS || []);
+      const cur = prodSel.value;
+      prodSel.innerHTML = `<option value="">-- Chọn sản phẩm --</option>` +
+        prodList.map(p => `<option value="${p.id}">${p.name} · ${window.fmt(priceForOrder(p.id))}đ/${p.unit}</option>`).join('');
+      prodSel.value = cur;
+    }
+    if (orderItems.length) renderOrderItems();
+    if (!opts.silent && repriced) window.toast(`💲 Đã tính lại giá ${repriced} mặt hàng theo ${tName || 'Giá gốc'}`, 'success');
+  }
 
   /* Render box "Đặt như lần trước" + alias context cho KH */
   function renderCustPrefBox(custId) {
@@ -1381,7 +1460,7 @@ CHỈ TRẢ JSON, không giải thích gì thêm.`;
     const sug = window.CustPrefs.suggestItems(custId);
     sug.items.forEach(it => {
       const p = window.productById(it.id); if (!p) return;
-      const price = window.priceOn(it.id, window.todayISO());
+      const price = priceForOrder(it.id);
       const existing = orderItems.find(x => x.id === it.id);
       if (existing) existing.qty += it.qty;
       else orderItems.push({ id: it.id, name: p.name, unit: p.unit, img: p.img, qty: it.qty, price, total: Math.round(it.qty * price) });
@@ -1394,7 +1473,7 @@ CHỈ TRẢ JSON, không giải thích gì thêm.`;
   /* Thêm 1 SP từ chip gợi ý */
   window.addOneFromSuggestion = function(productId, qty) {
     const p = window.productById(productId); if (!p) return;
-    const price = window.priceOn(productId, window.todayISO());
+    const price = priceForOrder(productId);
     const existing = orderItems.find(x => x.id === productId);
     if (existing) { existing.qty += +qty; existing.total = Math.round(existing.qty * existing.price); }
     else orderItems.push({ id: productId, name: p.name, unit: p.unit, img: p.img, qty: +qty, price, total: Math.round(qty * price) });
@@ -1545,10 +1624,13 @@ CHỈ TRẢ JSON, không giải thích gì thêm.`;
       status: initStatus,
       staff: window.formVal('#oStaff'),
       note: window.formVal('#oNote') || '',
+      priceTier: orderTier || '',
+      priceTierName: (orderTier && typeof window.tierName === 'function') ? window.tierName(orderTier) : '',
       items: orderItems.slice(),
     };
     window.STORE.add('orders', newOrder);
     orderItems = [];
+    orderTier = '';
     window.closeModal();
     const profitMsg = external ? ` · LN ${window.fmtShort(freight - partnerCost)}₫` : '';
     window.toast('✓ Đã tạo ' + newOrder.code + profitMsg, 'success');

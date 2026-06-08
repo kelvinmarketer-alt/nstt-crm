@@ -246,6 +246,38 @@ window.priceOn = function(productId, dateISO) {
   return e ? e.sell : 0;
 };
 
+/* ============ NHÓM GIÁ (price tiers) — helper TOÀN CỤC ============
+   Dùng được ở MỌI trang (orders không nạp products.js nên cần bản global này).
+   tierId rỗng/0 → giá GỐC. >0 → áp markup% hoặc override riêng của nhóm. */
+window.priceTierById = function (tierId) {
+  if (!tierId) return null;
+  const tiers = window.STORE && window.STORE.get('priceTiers', null);
+  if (!Array.isArray(tiers) || !tiers.length) return null;
+  return tiers.find(t => String(t.id) === String(tierId)) || null;
+};
+window.tierName = function (tierId) {
+  const t = window.priceTierById(tierId);
+  return t ? t.name : '';
+};
+/* Giá 1 SP theo nhóm giá tierId (mặc định = giá gốc nếu không có nhóm) */
+window.tierPriceOn = function (productId, dateISO, tierId) {
+  const base = window.priceOn(productId, dateISO);
+  const t = window.priceTierById(tierId);
+  if (!t) return base;
+  if (t.overrides && t.overrides[productId] != null) return +t.overrides[productId] || 0;
+  return Math.round((base || 0) * (1 + (+t.markup || 0) / 100));
+};
+/* <option> nhóm giá — bản global (customers.js có bản riêng, ưu tiên giữ tương thích) */
+if (typeof window.priceTierOptions !== 'function') {
+  window.priceTierOptions = function (sel) {
+    let tiers = window.STORE && window.STORE.get('priceTiers', null);
+    const _old = Array.isArray(tiers) && tiers.length === 3 && tiers[0] && tiers[0].name === 'Giá lẻ';
+    if (!Array.isArray(tiers) || !tiers.length || _old) tiers = Array.from({ length: 8 }, (_, i) => ({ id: i + 1, name: 'Nhóm ' + (i + 1) }));
+    const ic = ['①', '②', '③', '④', '⑤', '⑥', '⑦', '⑧'];
+    return `<option value="">— Mặc định (Giá gốc) —</option>` + tiers.map(t => `<option value="${t.id}" ${String(sel) === String(t.id) ? 'selected' : ''}>${ic[(t.id - 1) % 8] || ''} ${t.name}</option>`).join('');
+  };
+}
+
 /* ============================================================
    INLINE EDIT — click cell = sửa nhanh, không cần nút Edit
    ────────────────────────────────────────────────────────────

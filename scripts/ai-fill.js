@@ -102,7 +102,7 @@
     const url = `https://generativelanguage.googleapis.com/v1beta/models/${model || 'gemini-2.0-flash'}:generateContent?key=${encodeURIComponent(key)}`;
     const body = {
       contents: [{ parts: [{ text: prompt }, { inline_data: { mime_type: mime, data: b64 } }] }],
-      generationConfig: { response_mime_type: 'application/json', temperature: 0 },
+      generationConfig: { response_mime_type: 'application/json', temperature: 0, maxOutputTokens: 8192 },
     };
     const r = await fetch(url, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) });
     const j = await r.json();
@@ -129,7 +129,7 @@
       method: 'POST',
       headers: { 'Content-Type': 'application/json', 'x-api-key': key, 'anthropic-version': '2023-06-01', 'anthropic-dangerous-direct-browser-access': 'true' },
       body: JSON.stringify({
-        model: model || 'claude-haiku-4-5', max_tokens: 2048,
+        model: model || 'claude-haiku-4-5', max_tokens: 8192,
         messages: [{ role: 'user', content: [{ type: 'image', source: { type: 'base64', media_type: mime, data: b64 } }, { type: 'text', text: prompt }] }],
       }),
     });
@@ -165,27 +165,50 @@
       return geminiVision(p.apiKey, p.model, b64, mime, prompt);
     },
 
-    /* opts: { title, guideHtml, prompt, onResult(data), task?:'customer'|'order'|'product'|'adspend'|'invoice' } */
+    /* opts: { title, guideHtml, prompt, onResult(data), task?:'customer'|'order'|'product'|'adspend'|'invoice' }
+       LƯU Ý: dùng OVERLAY RIÊNG (id #aiFillOverlay) — KHÔNG gọi window.openModal.
+       Vì openModal xoá modal đang mở → nếu mở từ trong form "Tạo đơn" (đang là modal)
+       thì form đơn bị huỷ, AI đọc xong không có chỗ ghi kết quả → "không hoạt động trong form".
+       Overlay xếp CHỒNG lên modal đơn (z-index cao), đọc xong onResult ghi thẳng vào form đơn. */
     openFillModal(opts) {
       const has = this.ready();
       const taskId = opts.task;
       const picked = pickProvider(taskId);
       const pickedLabel = picked ? `${picked.provider.toUpperCase()} · ${picked.model || 'default'}` : '—';
-      window.openModal(opts.title || '📷 Điền bằng ảnh (AI)', `
-        ${opts.guideHtml ? `<div style="font-size:12.5px;color:var(--muted);margin-bottom:10px;line-height:1.5">${opts.guideHtml}</div>` : ''}
-        ${has ? `<div style="font-size:11.5px;color:var(--ok);margin-bottom:8px;padding:6px 10px;background:#F0FDF4;border-radius:6px">🤖 Đang dùng: <b>${pickedLabel}</b>${taskId ? ` cho task <code>${taskId}</code>` : ''} <span style="color:var(--muted);font-weight:400">· đổi ở Cài đặt → AI Form Filler</span></div>`
-              : `<div style="background:var(--warn-bg);color:var(--warn);padding:10px 12px;border-radius:8px;font-size:12.5px;margin-bottom:10px">⚠️ Chưa cấu hình AI. Vào <b>Cài đặt → Tích hợp → AI Form Filler</b> dán API key (Gemini FREE 1.500 lượt/ngày).</div>`}
-        <div id="aiDrop" style="border:2px dashed var(--line);border-radius:10px;padding:22px 14px;text-align:center;cursor:pointer;background:#FAFBFA">
-          <input type="file" id="aiFile" accept="image/*" capture="environment" style="display:none">
-          <div id="aiDropText" style="color:var(--muted);font-size:13px;line-height:1.6">📷 Bấm chọn ảnh · kéo-thả · hoặc dán (Ctrl+V)<br><span style="font-size:11px">Chụp bảng giá / tin nhắn khách / danh thiếp / đơn viết tay</span></div>
-          <img id="aiPreview" style="display:none;max-width:100%;max-height:240px;border-radius:8px;margin:0 auto">
-        </div>
-        <div id="aiStatus" style="font-size:12.5px;margin-top:10px;min-height:18px"></div>
-      `, {
-        footer: `<button class="btn btn-ghost" onclick="window.AI._cancel()">Hủy</button>
-                 <button class="btn btn-primary" id="aiRunBtn" ${has ? '' : 'disabled'} onclick="window.AI._run()">🤖 Xử lý bằng AI</button>`,
-        width: '520px',
-      });
+      /* Xoá overlay AI cũ (nếu còn) — KHÔNG đụng tới #modal-bg của form bên dưới */
+      document.getElementById('aiFillOverlay')?.remove();
+      const ov = document.createElement('div');
+      ov.id = 'aiFillOverlay';
+      ov.className = 'modal-bg open';
+      ov.style.zIndex = '100060'; /* trên modal đơn (200) + dropdown KH (100001) */
+      ov.innerHTML = `
+        <div class="modal" style="width:min(520px,94vw);max-width:520px">
+          <div class="modal-head">
+            <h3>${opts.title || '📷 Điền bằng ảnh (AI)'}</h3>
+            <button class="modal-close" onclick="window.AI._cancel()" title="Đóng (Esc)">✕</button>
+          </div>
+          <div class="modal-body">
+            ${opts.guideHtml ? `<div style="font-size:12.5px;color:var(--muted);margin-bottom:10px;line-height:1.5">${opts.guideHtml}</div>` : ''}
+            ${has ? `<div style="font-size:11.5px;color:var(--ok);margin-bottom:8px;padding:6px 10px;background:#F0FDF4;border-radius:6px">🤖 Đang dùng: <b>${pickedLabel}</b>${taskId ? ` cho task <code>${taskId}</code>` : ''} <span style="color:var(--muted);font-weight:400">· đổi ở Cài đặt → AI Form Filler</span></div>`
+                  : `<div style="background:var(--warn-bg);color:var(--warn);padding:10px 12px;border-radius:8px;font-size:12.5px;margin-bottom:10px">⚠️ Chưa cấu hình AI. Vào <b>Cài đặt → Tích hợp → AI Form Filler</b> dán API key (Gemini FREE 1.500 lượt/ngày).</div>`}
+            <div id="aiDrop" style="border:2px dashed var(--line);border-radius:10px;padding:22px 14px;text-align:center;cursor:pointer;background:#FAFBFA">
+              <input type="file" id="aiFile" accept="image/*" capture="environment" style="display:none">
+              <div id="aiDropText" style="color:var(--muted);font-size:13px;line-height:1.6">📷 Bấm chọn ảnh · kéo-thả · hoặc dán (Ctrl+V)<br><span style="font-size:11px">Chụp bảng giá / tin nhắn khách / danh thiếp / đơn viết tay</span></div>
+              <img id="aiPreview" style="display:none;max-width:100%;max-height:240px;border-radius:8px;margin:0 auto">
+            </div>
+            <div id="aiStatus" style="font-size:12.5px;margin-top:10px;min-height:18px"></div>
+          </div>
+          <div class="modal-foot">
+            <button class="btn btn-ghost" onclick="window.AI._cancel()">Hủy</button>
+            <button class="btn btn-primary" id="aiRunBtn" ${has ? '' : 'disabled'} onclick="window.AI._run()">🤖 Xử lý bằng AI</button>
+          </div>
+        </div>`;
+      /* Click nền (ngoài modal) → đóng */
+      ov.addEventListener('click', (e) => { if (e.target === ov) window.AI._cancel(); });
+      document.body.appendChild(ov);
+      /* Esc đóng overlay AI (ưu tiên overlay trước modal đơn) */
+      this._escHandler = (e) => { if (e.key === 'Escape' && document.getElementById('aiFillOverlay')) { e.stopPropagation(); window.AI._cancel(); } };
+      document.addEventListener('keydown', this._escHandler, true);
       this._opts = opts; this._img = null;
       const drop = document.getElementById('aiDrop'), file = document.getElementById('aiFile');
       drop.onclick = () => file.click();
@@ -207,7 +230,13 @@
       } catch (e) { window.toast(e.message, 'warn'); }
     },
 
-    _cancel() { document.removeEventListener('paste', this._paste); window.closeModal(); },
+    _closeOverlay() {
+      document.removeEventListener('paste', this._paste);
+      if (this._escHandler) { document.removeEventListener('keydown', this._escHandler, true); this._escHandler = null; }
+      document.getElementById('aiFillOverlay')?.remove();
+    },
+
+    _cancel() { this._closeOverlay(); },
 
     async _run() {
       if (!this._img) { window.toast('Chọn/dán ảnh trước', 'warn'); return; }
@@ -215,8 +244,7 @@
       st.innerHTML = '⏳ AI đang đọc ảnh & trích xuất dữ liệu...'; btn.disabled = true;
       try {
         const data = await this.extract(this._img.base64, this._img.mime, this._opts.prompt, this._opts.task);
-        document.removeEventListener('paste', this._paste);
-        window.closeModal();
+        this._closeOverlay();
         this._opts.onResult(data);
       } catch (e) {
         btn.disabled = false;

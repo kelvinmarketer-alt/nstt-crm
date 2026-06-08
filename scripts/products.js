@@ -526,7 +526,7 @@
       task: 'product',
       title: '📷 Cập nhật giá bằng ảnh (AI)',
       guideHtml: 'Đính kèm <b>ảnh bảng giá</b> (viết tay / Excel / Zalo...). AI đọc tên sản phẩm + giá bán và tự điền vào cột giá hôm nay cho các SP khớp tên. Kiểm tra rồi bấm <b>Lưu bảng giá</b>.<br><b>Cấu trúc gợi ý:</b> mỗi dòng = "Tên sản phẩm — giá/kg".',
-      prompt: 'Đọc ảnh bảng giá nông sản (tiếng Việt). Trả về JSON mảng: [{"name":"tên sản phẩm tiếng Việt","price": số tiền VND dạng số nguyên (bỏ dấu chấm và đơn vị)}]. Chỉ lấy GIÁ BÁN. Bỏ qua dòng không rõ giá. CHỈ trả JSON, không giải thích.',
+      prompt: 'Đọc ảnh bảng giá nông sản (tiếng Việt). Trả về JSON mảng: [{"name":"tên sản phẩm tiếng Việt","price": số tiền VND dạng số nguyên (bỏ dấu chấm và đơn vị)}]. Chỉ lấy GIÁ BÁN.\n\n⚠️ ĐỌC ĐẦY ĐỦ: liệt kê HẾT MỌI DÒNG từ trên xuống dưới, KHÔNG bỏ sót dòng nào — kể cả chữ viết tay/mờ/nhiều cột. Nếu bảng có 50 dòng thì mảng phải đủ ~50 phần tử. Chỉ bỏ qua dòng KHÔNG rõ giá. CHỈ trả JSON, không giải thích.',
       onResult: applyAIPrices,
     });
   };
@@ -886,7 +886,7 @@
       task: 'product',
       title: '📷 Cập nhật giá catalog bằng ảnh (AI)',
       guideHtml: 'Đính kèm <b>ảnh bảng giá</b> (viết tay / Excel / Zalo / báo giá NCC). AI đọc tên SP + giá nhập + giá bán (nếu có) → tự cập nhật vào catalog hôm nay.',
-      prompt: 'Đọc ảnh bảng giá nông sản (tiếng Việt). Trả JSON mảng: [{"name":"tên SP","buy": giá nhập VND nguyên (0 nếu không có), "sell": giá bán VND nguyên}]. Số bỏ dấu chấm/đơn vị. CHỈ trả JSON.',
+      prompt: 'Đọc ảnh bảng giá nông sản (tiếng Việt). Trả JSON mảng: [{"name":"tên SP","buy": giá nhập VND nguyên (0 nếu không có), "sell": giá bán VND nguyên}]. Số bỏ dấu chấm/đơn vị.\n\n⚠️ ĐỌC ĐẦY ĐỦ: liệt kê HẾT MỌI DÒNG từ trên xuống dưới, KHÔNG bỏ sót dòng nào — kể cả chữ viết tay/mờ/nhiều cột. Nếu bảng có 50 dòng thì mảng phải đủ ~50 phần tử. CHỈ trả JSON.',
       onResult: (data) => {
         const list = Array.isArray(data) ? data : (data.products || data.items || []);
         if (!list.length) { window.toast('Không đọc được SP từ ảnh', 'warn'); return; }
