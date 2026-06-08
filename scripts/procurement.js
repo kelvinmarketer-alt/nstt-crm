@@ -375,7 +375,7 @@
         <button class="btn btn-navy" onclick="window.pcSaveConfirm('${run.id}')">💾 Lưu</button>
         <button class="btn btn-primary" onclick="window.pcApplyAlloc('${run.id}')">✅ Chốt &amp; phân bổ về đơn + báo Sale</button>
       </div>
-      <div style="font-size:11px;color:var(--muted);margin-top:8px">💡 Mỗi mã tự gán NCC sao cao nhất. Nếu 1 NCC không đủ → bấm <b>➕ Thêm NCC chia phần</b> rồi nhập số kg mỗi NCC (vd 100kg = NCC A 20 + B 50 + C 30). "Giao thực" để trống = giao đủ.</div>
+      <div style="font-size:11px;color:var(--muted);margin-top:8px">💡 Mỗi mã tự gán NCC sao cao nhất. Nếu 1 NCC không đủ → <b>➕ Thêm NCC chia phần</b>. <b>Tự cân:</b> sửa số kg 1 NCC thì NCC cuối tự nhận phần dư cho đủ tổng; muốn để dư cho NCC mới thì sửa ở dòng NCC cuối. "Giao thực" để trống = giao đủ.</div>
     </div>`;
 
     const dc = document.getElementById('pcRunDetail');
@@ -445,6 +445,13 @@
     readConfirmInputs(run);
     const l = _line(run, key); if (!l || !l.allocations[ai]) return;
     l.allocations[ai].qty = val === '' ? 0 : +val;
+    /* TỰ CÂN: sửa 1 NCC KHÔNG phải dòng cuối → DÒNG CUỐI tự nhận phần dư để đủ tổng.
+       (Sửa chính dòng cuối → để dư hiển thị "còn thiếu", chờ thêm NCC mới hấp thụ.) */
+    const last = l.allocations.length - 1;
+    if (ai < last && l.allocations.length > 1) {
+      const sumExceptLast = l.allocations.reduce((s, a, idx) => idx === last ? s : s + (+a.qty || 0), 0);
+      l.allocations[last].qty = +Math.max(0, l.totalQty - sumExceptLast).toFixed(2);
+    }
     saveRuns(runs); window.pcOpenRun(runId);
   };
   window.pcSetAllocConf = function (runId, key, ai, val) {
