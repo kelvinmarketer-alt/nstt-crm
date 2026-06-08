@@ -80,6 +80,7 @@
   };
 
   async function init() {
+    if (window.renderAppShell) window.renderAppShell('order-samples', 'Mẫu đơn AI — nhớ nét chữ');
     if (!window.OrderSamples) { document.getElementById('osHost').innerHTML = '<div style="padding:30px;text-align:center;color:var(--danger)">Module OrderSamples chưa tải.</div>'; return; }
     try { _all = await window.OrderSamples.all(); } catch (e) { _all = []; }
     renderStats(); buildFilter();

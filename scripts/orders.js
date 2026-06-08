@@ -1087,17 +1087,15 @@
 
   /* Modal hỏi user map các tên AI không hiểu cho 1 KH */
   function askUserToMapUnmatched(custId, unmatchedNames) {
-    const products = window.STORE.get('products', window.PRODUCTS || []) || [];
     const c = window.STORE.get('customers', []).find(x => x.id === custId);
-    const opts = `<option value="">— Bỏ qua —</option>` + products.map(p => `<option value="${p.id}">${p.id} · ${p.name}</option>`).join('');
     window.openModal('🤔 Có ' + unmatchedNames.length + ' từ AI không hiểu — bạn dạy hệ thống nhé?', `
       <div style="background:#FEF3C7;color:#92400E;padding:10px 12px;border-radius:7px;font-size:12.5px;margin-bottom:12px">
-        💡 KH <b>${c?.name||custId}</b> có thể dùng từ riêng (vd "hành"="hành tây"). Map 1 lần — <b>lần sau AI tự hiểu</b>.
+        💡 KH <b>${c?.name||custId}</b> có thể dùng từ riêng (vd "hành"="hành tây"). Gõ tên SP để tìm — map 1 lần, <b>lần sau AI tự hiểu</b>. Để trống = bỏ qua.
       </div>
       ${unmatchedNames.map((w, i) => `
         <div style="display:grid;grid-template-columns:1fr 2fr;gap:8px;margin-bottom:8px;align-items:center">
           <div style="font-weight:600">"${w}"</div>
-          <select id="map_${i}" data-word="${w}" style="border:1px solid var(--line);border-radius:5px;padding:6px;font-size:12px">${opts}</select>
+          <input class="prodpick" id="map_${i}" data-word="${(w||'').replace(/"/g,'&quot;')}" data-pid="" placeholder="Gõ tên SP để tìm…" style="border:1px solid var(--line);border-radius:5px;padding:6px 9px;font-size:12.5px">
         </div>
       `).join('')}
     `, {
@@ -1105,13 +1103,14 @@
               <button class="btn btn-primary" onclick="window._saveLearnedMaps('${custId}')">💾 Dạy hệ thống + thêm vào đơn</button>`,
       width:'520px', stack:true
     });
+    if (window.wireAllProductSearch) window.wireAllProductSearch(document.querySelector('.modal-bg:last-of-type') || document);
   }
 
   window._saveLearnedMaps = function(custId) {
     const learned = [];
-    document.querySelectorAll('[id^=map_]').forEach(sel => {
+    document.querySelectorAll('input[id^=map_].prodpick').forEach(sel => {
       const word = sel.dataset.word;
-      const pid = sel.value;
+      const pid = sel.dataset.pid;
       if (word && pid) {
         window.CustPrefs.addAlias(custId, word, pid);
         const p = window.productById(pid);
@@ -1512,7 +1511,6 @@ CHỈ TRẢ JSON, không giải thích gì thêm.`;
       return `<tr><td>"${w}"</td><td>→ ${prod ? prod.name + ' <span style="color:var(--muted);font-family:monospace;font-size:11px">'+pid+'</span>' : '<i style="color:#DC2626">SP không còn</i>'}</td><td>${dq}</td><td><button class="btn btn-ghost btn-sm" style="color:var(--danger)" onclick="window._delAlias('${custId}','${w}')">✕</button></td></tr>`;
     }).join('') || `<tr><td colspan="4" style="padding:14px;text-align:center;color:var(--muted)">Chưa có từ điển nào. Thêm bên dưới ↓</td></tr>`;
 
-    const prodOpts = `<option value="">— Chọn SP chuẩn —</option>` + products.map(x => `<option value="${x.id}">${x.id} · ${x.name}</option>`).join('');
     window.openModal('📖 Từ điển riêng của ' + (c?.name || custId), `
       <div style="background:#EFF6FF;color:#1E40AF;padding:10px 12px;border-radius:8px;font-size:12.5px;margin-bottom:12px;line-height:1.55">
         💡 <b>Cá nhân hoá per KH</b> — giải quyết tình huống KH "${c?.name||'này'}" nhắn ngắn (vd "hành 50kg") nhưng kho có nhiều loại hành (tây/ta/lá). Bạn dạy hệ thống 1 lần — sau đó AI tự hiểu khi đọc ảnh đơn của KH.
@@ -1528,7 +1526,7 @@ CHỈ TRẢ JSON, không giải thích gì thêm.`;
       <h3 style="font-size:12px;color:var(--navy);text-transform:uppercase;margin:14px 0 6px">+ Thêm từ điển mới</h3>
       <div style="display:grid;grid-template-columns:1fr 2fr 90px 80px;gap:6px;align-items:end">
         <div><label style="font-size:11px;color:var(--muted)">Từ KH viết</label><input id="alWord" placeholder="hành" style="width:100%;border:1px solid var(--line);border-radius:5px;padding:6px;font-size:12px"></div>
-        <div><label style="font-size:11px;color:var(--muted)">= SP nào</label><select id="alPid" style="width:100%;border:1px solid var(--line);border-radius:5px;padding:6px;font-size:12px">${prodOpts}</select></div>
+        <div><label style="font-size:11px;color:var(--muted)">= SP nào (gõ tìm)</label><input class="prodpick" id="alPid" data-pid="" placeholder="Gõ tên SP…" style="width:100%;border:1px solid var(--line);border-radius:5px;padding:6px 9px;font-size:12px"></div>
         <div><label style="font-size:11px;color:var(--muted)">SL TB</label><input id="alQty" type="number" placeholder="50" style="width:100%;border:1px solid var(--line);border-radius:5px;padding:6px;font-size:12px"></div>
         <div><button class="btn btn-primary btn-sm" onclick="window._addAlias('${custId}')">+ Thêm</button></div>
       </div>
@@ -1547,6 +1545,7 @@ CHỈ TRẢ JSON, không giải thích gì thêm.`;
       footer:`<button class="btn btn-ghost" onclick="window.closeModal()">Đóng</button>`,
       width:'620px'
     });
+    if (window.wireAllProductSearch) window.wireAllProductSearch(document.querySelector('.modal-bg:last-of-type') || document);
     if (window._renderAliasSamples) window._renderAliasSamples(custId);
   };
 
@@ -1587,9 +1586,9 @@ CHỈ TRẢ JSON, không giải thích gì thêm.`;
 
   window._addAlias = function(custId) {
     const w = document.getElementById('alWord').value.trim();
-    const pid = document.getElementById('alPid').value;
+    const pid = document.getElementById('alPid').dataset.pid || '';
     const qty = parseFloat(document.getElementById('alQty').value) || 0;
-    if (!w || !pid) { window.toast('Nhập từ + chọn SP','warn'); return; }
+    if (!w || !pid) { window.toast('Nhập từ + gõ chọn SP','warn'); return; }
     window.CustPrefs.addAlias(custId, w, pid, qty);
     window.toast('✓ Đã thêm từ điển','success');
     window.openCustAliasMgr(custId);  /* Re-render modal */

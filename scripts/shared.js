@@ -283,6 +283,51 @@ window.setCustPriceTier = function (custId, tierId) {
   window.STORE.set('custPriceTiers', map);
 };
 
+/* ============ Ô TÌM SẢN PHẨM (gõ-lọc) — dùng chung ============
+   Thay cho <select> 1000 SP. Gắn vào 1 <input class="prodpick">: gõ → lọc →
+   click chọn → lưu productId vào input.dataset.pid. Đọc kết quả bằng el.dataset.pid. */
+window.wireProductSearch = function (input, opts) {
+  opts = opts || {};
+  if (!input || input._ppWired) return; input._ppWired = true;
+  input.setAttribute('autocomplete', 'off');
+  const norm = s => (s || '').toString().toLowerCase().normalize('NFD').replace(/[̀-ͯ]/g, '').replace(/đ/g, 'd').trim();
+  let dd = null;
+  const close = () => { if (dd) { dd.remove(); dd = null; } };
+  function show() {
+    const prods = window.STORE.get('products', window.PRODUCTS || []) || [];
+    const q = norm(input.value);
+    let list = q ? prods.filter(p => norm(p.name + ' ' + p.id).includes(q)) : prods.slice();
+    list = list.slice(0, 16);
+    close();
+    if (!list.length) return;
+    dd = document.createElement('div');
+    const r = input.getBoundingClientRect();
+    let top = r.bottom + 2;
+    const maxH = Math.min(320, list.length * 38 + 8);
+    if (top + maxH > window.innerHeight && r.top - maxH > 0) top = r.top - maxH - 2;
+    dd.style.cssText = `position:fixed;z-index:100090;left:${r.left}px;top:${top}px;width:${Math.max(r.width, 260)}px;max-height:320px;overflow:auto;background:#fff;border:1px solid var(--line);border-radius:8px;box-shadow:0 8px 24px rgba(0,0,0,.18)`;
+    dd.innerHTML = list.map(p => `<div class="pps-item" data-id="${p.id}" data-name="${(p.name || '').replace(/"/g, '&quot;')}" style="padding:8px 11px;font-size:12.5px;cursor:pointer;border-bottom:1px solid #F1F5F9;display:flex;justify-content:space-between;gap:8px;align-items:center"><span>${p.name} <span style="color:#94A3B8;font-size:11px">/${p.unit || 'kg'}</span></span><span style="color:#94A3B8;font-size:11px;font-family:monospace">${p.id}</span></div>`).join('');
+    document.body.appendChild(dd);
+    dd.querySelectorAll('.pps-item').forEach(it => {
+      it.onmouseover = () => { dd.querySelectorAll('.pps-item').forEach(x => x.style.background = ''); it.style.background = '#F0FDF4'; };
+      it.onmousedown = (e) => {
+        e.preventDefault();
+        input.value = it.dataset.name; input.dataset.pid = it.dataset.id;
+        input.style.background = '#F0FDF4'; input.style.fontWeight = '600';
+        close();
+        if (opts.onPick) opts.onPick({ id: it.dataset.id, name: it.dataset.name });
+      };
+    });
+  }
+  input.addEventListener('focus', show);
+  input.addEventListener('input', () => { input.dataset.pid = ''; input.style.background = ''; input.style.fontWeight = ''; show(); });
+  input.addEventListener('blur', () => setTimeout(close, 170));
+  window.addEventListener('scroll', () => { if (dd) show(); }, true);
+};
+window.wireAllProductSearch = function (root) {
+  (root || document).querySelectorAll('input.prodpick:not([data-ppwired])').forEach(el => { el.setAttribute('data-ppwired', '1'); window.wireProductSearch(el); });
+};
+
 /* <option> nhóm giá — bản global (customers.js có bản riêng, ưu tiên giữ tương thích) */
 if (typeof window.priceTierOptions !== 'function') {
   window.priceTierOptions = function (sel) {
