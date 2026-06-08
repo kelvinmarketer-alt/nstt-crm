@@ -36,8 +36,11 @@
      `from` = DB snake_case → JS camelCase (khi đọc về app) */
   const FIELD_MAP = {
     customers: {
+      /* priceTier: KHÔNG có cột trong DB → map null để KHÔNG vỡ sync KH.
+         Nhóm giá của KH lưu ở KV 'custPriceTiers' (sync qua master_data, roaming đa máy). */
       to:   { group:'group_name', staffOwner:'staff_owner', lastContact:'last_contact', lastOrder:'last_order',
-              orders:'orders_count', debtOverdue:'debt_overdue', orderFreq:'order_freq', mainCats:'main_cats' },
+              orders:'orders_count', debtOverdue:'debt_overdue', orderFreq:'order_freq', mainCats:'main_cats',
+              priceTier: null },
       from: { group_name:'group', staff_owner:'staffOwner', last_contact:'lastContact', last_order:'lastOrder',
               orders_count:'orders', debt_overdue:'debtOverdue', order_freq:'orderFreq', main_cats:'mainCats' },
     },

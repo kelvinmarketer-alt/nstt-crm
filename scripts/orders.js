@@ -1347,12 +1347,12 @@ CHỈ TRẢ JSON, không giải thích gì thêm.`;
     if (c && c.mainCats && c.mainCats[0]) {
       const sel = document.getElementById('oSvc'); if (sel) sel.value = c.mainCats[0];
     }
-    /* === Tự áp NHÓM GIÁ theo hồ sơ KH === */
+    /* === Tự áp NHÓM GIÁ theo hồ sơ KH (nguồn: KV custPriceTiers, fallback field) === */
     const tierSel = document.getElementById('oPriceTier');
     if (tierSel) {
-      const t = (c && c.priceTier != null) ? String(c.priceTier) : '';
+      const t = (typeof window.custPriceTier === 'function') ? window.custPriceTier(custId) : ((c && c.priceTier != null) ? String(c.priceTier) : '');
       tierSel.value = t;
-      applyOrderTier(t, { silent: true, fromCust: c });
+      applyOrderTier(t, { silent: true, fromCust: c, custTier: t });
     }
     /* === Cá nhân hoá: hiện gợi ý + nhắc nhở alias === */
     renderCustPrefBox(custId);
@@ -1374,7 +1374,7 @@ CHỈ TRẢ JSON, không giải thích gì thêm.`;
     const mk = t ? (+t.markup || 0) : 0;
     if (note) {
       if (!orderTier) {
-        note.innerHTML = opts.fromCust && !(opts.fromCust.priceTier)
+        note.innerHTML = (opts.fromCust && !opts.custTier)
           ? '👤 KH chưa gán nhóm giá → dùng <b>Giá gốc</b>. Đổi tại đây nếu cần.'
           : 'Đang dùng <b>Giá gốc</b> (không markup).';
         note.style.color = 'var(--muted)';

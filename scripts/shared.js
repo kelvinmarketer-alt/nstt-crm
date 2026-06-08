@@ -267,6 +267,22 @@ window.tierPriceOn = function (productId, dateISO, tierId) {
   if (t.overrides && t.overrides[productId] != null) return +t.overrides[productId] || 0;
   return Math.round((base || 0) * (1 + (+t.markup || 0) / 100));
 };
+/* Nhóm giá GÁN cho 1 KH — nguồn chuẩn = KV 'custPriceTiers' (sync đa máy),
+   fallback field priceTier trên bản ghi KH (cache cũ/local). */
+window.custPriceTier = function (custId) {
+  if (!custId) return '';
+  const map = (window.STORE && window.STORE.get('custPriceTiers', {})) || {};
+  if (map[custId] != null && map[custId] !== '') return String(map[custId]);
+  const c = window.STORE && (window.STORE.get('customers', []) || []).find(x => x.id === custId);
+  return (c && c.priceTier != null) ? String(c.priceTier) : '';
+};
+window.setCustPriceTier = function (custId, tierId) {
+  if (!custId) return;
+  const map = (window.STORE && window.STORE.get('custPriceTiers', {})) || {};
+  if (tierId == null || tierId === '') delete map[custId]; else map[custId] = String(tierId);
+  window.STORE.set('custPriceTiers', map);
+};
+
 /* <option> nhóm giá — bản global (customers.js có bản riêng, ưu tiên giữ tương thích) */
 if (typeof window.priceTierOptions !== 'function') {
   window.priceTierOptions = function (sel) {

@@ -617,6 +617,8 @@
       ordersList: [], notes: [],
     });
     window.STORE.add('customers', newCust);
+    /* Nhóm giá KH → KV custPriceTiers (sync đa máy; cloud customers không có cột price_tier) */
+    if (window.setCustPriceTier) window.setCustPriceTier(code, window.formVal('#addPriceTier'));
     window.closeModal();
     window.toast('✓ Đã thêm khách hàng ' + code, 'success');
 
@@ -656,7 +658,7 @@
       </div>
       <div class="form-row">
         <div><label>Nhóm giá (bảng giá KH nhận)</label>
-          <select id="ePriceTier">${window.priceTierOptions ? window.priceTierOptions(c.priceTier || '') : '<option value="">Mặc định</option>'}</select></div>
+          <select id="ePriceTier">${window.priceTierOptions ? window.priceTierOptions((window.custPriceTier ? window.custPriceTier(c.id) : c.priceTier) || '') : '<option value="">Mặc định</option>'}</select></div>
         <div></div>
       </div>
       <div class="form-row wide"><label>Địa chỉ</label><input id="eAddress" value="${c.address}"></div>
@@ -678,6 +680,8 @@
       address: window.formVal('#eAddress'),
     };
     window.STORE.update('customers', id, patch);
+    /* Nhóm giá KH → KV custPriceTiers (sync đa máy) */
+    if (window.setCustPriceTier) window.setCustPriceTier(id, window.formVal('#ePriceTier'));
     window.closeModal();
     window.toast('✓ Đã cập nhật ' + id, 'success');
   };
