@@ -306,7 +306,11 @@ window.wireProductSearch = function (input, opts) {
     const maxH = Math.min(320, list.length * 38 + 8);
     if (top + maxH > window.innerHeight && r.top - maxH > 0) top = r.top - maxH - 2;
     dd.style.cssText = `position:fixed;z-index:100090;left:${r.left}px;top:${top}px;width:${Math.max(r.width, 260)}px;max-height:320px;overflow:auto;background:#fff;border:1px solid var(--line);border-radius:8px;box-shadow:0 8px 24px rgba(0,0,0,.18)`;
-    dd.innerHTML = list.map(p => `<div class="pps-item" data-id="${p.id}" data-name="${(p.name || '').replace(/"/g, '&quot;')}" style="padding:8px 11px;font-size:12.5px;cursor:pointer;border-bottom:1px solid #F1F5F9;display:flex;justify-content:space-between;gap:8px;align-items:center"><span>${p.name} <span style="color:#94A3B8;font-size:11px">/${p.unit || 'kg'}</span></span><span style="color:#94A3B8;font-size:11px;font-family:monospace">${p.id}</span></div>`).join('');
+    dd.innerHTML = list.map(p => {
+      let prHtml = '';
+      if (opts.priceFn) { try { const pr = opts.priceFn(p.id); if (pr) prHtml = `<span style="color:#15803D;font-size:11px;font-weight:700;white-space:nowrap">${window.fmt(pr)}đ</span>`; } catch (e) {} }
+      return `<div class="pps-item" data-id="${p.id}" data-name="${(p.name || '').replace(/"/g, '&quot;')}" style="padding:8px 11px;font-size:12.5px;cursor:pointer;border-bottom:1px solid #F1F5F9;display:flex;justify-content:space-between;gap:8px;align-items:center"><span>${p.name} <span style="color:#94A3B8;font-size:11px">/${p.unit || 'kg'}</span></span><span style="display:flex;gap:8px;align-items:center">${prHtml}<span style="color:#94A3B8;font-size:11px;font-family:monospace">${p.id}</span></span></div>`;
+    }).join('');
     document.body.appendChild(dd);
     dd.querySelectorAll('.pps-item').forEach(it => {
       it.onmouseover = () => { dd.querySelectorAll('.pps-item').forEach(x => x.style.background = ''); it.style.background = '#F0FDF4'; };

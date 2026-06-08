@@ -677,9 +677,7 @@
         let p = prods.find(x => window.AI.norm(x.name) === inm)
           || prods.find(x => { const xn = window.AI.norm(x.name); return xn.includes(inm) || inm.includes(xn); });
         if (p) {
-          document.getElementById('oProd').value = p.id;
-          document.getElementById('oProdQty').value = it.qty || 1;
-          window.addOrderItem();
+          window.addOrderItem(p.id, it.qty || 1);
           added++;
         } else miss.push(it.name);
       });
@@ -707,8 +705,6 @@
     const partnerOpts = `<option value="">-- Chọn đối tác --</option>` +
       partners.map(p => `<option value="${p.id}">${p.code} · ${p.name}${p.vehiclePlate?' · '+p.vehiclePlate:''}</option>`).join('');
     const prodList = window.STORE.get('products', window.PRODUCTS || []);
-    const prodOpts = `<option value="">-- Chọn sản phẩm --</option>` +
-      prodList.map(p => `<option value="${p.id}">${p.name} · ${window.fmt(priceForOrder(p.id))}đ/${p.unit}</option>`).join('');
     orderItems = [];
     orderTier = '';
     _pendingSample = null;
@@ -769,7 +765,7 @@
         <button type="button" class="btn btn-ghost btn-sm" onclick="window.addOrderItemsFromExcel()" title="Upload Excel 2 cột: Sản phẩm + Số lượng">📥 Từ Excel</button>
       </div>
       <div class="form-row" style="align-items:flex-end">
-        <div style="flex:2"><label>Chọn sản phẩm</label><select id="oProd">${prodOpts}</select></div>
+        <div style="flex:2"><label>Chọn sản phẩm <span style="font-weight:400;color:var(--muted);font-size:11px">(gõ tên/mã để tìm)</span></label><input class="prodpick" id="oProd" data-pid="" placeholder="Gõ tên hoặc mã SP… (vd: cà chua, SP012)" style="width:100%;border:1px solid var(--line);border-radius:7px;padding:8px 11px;font-size:13px"></div>
         <div><label>Số lượng</label><input id="oProdQty" type="number" value="1" min="0" step="0.1"></div>
         <div style="flex:0 0 auto"><label>&nbsp;</label><button type="button" class="btn btn-primary btn-sm" style="width:100%;white-space:nowrap" onclick="window.addOrderItem()">+ Thêm 1 món</button></div>
         <div style="flex:0 0 auto"><label>&nbsp;</label><button type="button" class="btn btn-ghost btn-sm" style="width:100%;white-space:nowrap" onclick="window.addCustomOrderItem()" title="Thêm SP khách đặt NGOÀI danh mục công ty — gõ tên + giá tự do">✏️ SP ngoài DM</button></div>
@@ -821,6 +817,11 @@
           if (c) window.onOrderCustChange(c.id);
         },
       });
+    }
+    /* Ô "Chọn sản phẩm" — gõ-tìm (thay dropdown 1000 SP), hiện giá theo nhóm giá KH */
+    const oProdEl = document.getElementById('oProd');
+    if (oProdEl && window.wireProductSearch) {
+      window.wireProductSearch(oProdEl, { priceFn: priceForOrder, onPick: () => { const q = document.getElementById('oProdQty'); if (q) q.focus(); } });
     }
     /* Auto-tính lợi nhuận khi thay đổi giá */
     ['oFreight','oPartnerCost'].forEach(id => {
@@ -946,10 +947,14 @@
     if (typeof updateProfit === 'function') updateProfit();
   }
 
-  window.addOrderItem = function () {
-    const id = window.formVal('#oProd');
-    const qty = parseFloat(document.getElementById('oProdQty').value) || 0;
-    if (!id) { window.toast('Chọn sản phẩm', 'warn'); return; }
+  /* addOrderItem(): đọc từ ô gõ-tìm #oProd (dataset.pid) + #oProdQty.
+     addOrderItem(id, qty): thêm trực tiếp (cho luồng AI/Excel gọi). */
+  window.addOrderItem = function (explicitId, explicitQty) {
+    const fromInput = explicitId == null;
+    const oProdEl = document.getElementById('oProd');
+    const id = fromInput ? (oProdEl && oProdEl.dataset.pid) : explicitId;
+    const qty = fromInput ? (parseFloat(document.getElementById('oProdQty').value) || 0) : (parseFloat(explicitQty) || 0);
+    if (!id) { window.toast('Gõ tìm & chọn sản phẩm', 'warn'); return; }
     if (qty <= 0) { window.toast('Nhập số lượng', 'warn'); return; }
     const p = window.productById(id);
     if (!p) return;
@@ -966,8 +971,11 @@
         total: Math.round(qty * basePrice)
       });
     }
+    /* Reset ô chọn để thêm món tiếp theo nhanh */
+    if (fromInput && oProdEl) { oProdEl.value = ''; oProdEl.dataset.pid = ''; oProdEl.style.background = ''; oProdEl.style.fontWeight = ''; }
     document.getElementById('oProdQty').value = 1;
     renderOrderItems();
+    if (fromInput && oProdEl) oProdEl.focus();
   };
 
   /* Thêm SP THỦ CÔNG (khách đặt ngoài danh mục công ty) — gõ tên + giá tự do */
@@ -1415,15 +1423,7 @@ CHỈ TRẢ JSON, không giải thích gì thêm.`;
         repriced++;
       }
     });
-    /* Làm mới nhãn giá trong dropdown chọn SP */
-    const prodSel = document.getElementById('oProd');
-    if (prodSel) {
-      const prodList = window.STORE.get('products', window.PRODUCTS || []);
-      const cur = prodSel.value;
-      prodSel.innerHTML = `<option value="">-- Chọn sản phẩm --</option>` +
-        prodList.map(p => `<option value="${p.id}">${p.name} · ${window.fmt(priceForOrder(p.id))}đ/${p.unit}</option>`).join('');
-      prodSel.value = cur;
-    }
+    /* Ô gõ-tìm SP hiện giá theo nhóm giá hiện tại tự động (priceFn đọc orderTier live) — không cần rebuild. */
     if (orderItems.length) renderOrderItems();
     if (!opts.silent && repriced) window.toast(`💲 Đã tính lại giá ${repriced} mặt hàng theo ${tName || 'Giá gốc'}`, 'success');
   }
