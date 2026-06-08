@@ -6,10 +6,15 @@
    - Khi huỷ: nếu đã received → trừ kho lại
    ========================================================= */
 (function () {
+  /* NCC ảo "Thu mua ngoài" — mã chưa có NCC cố định, thu mua đi chợ/vãng lai.
+     KHÔNG lưu vào bảng suppliers (tránh phình + không hiện như NCC gắn sao trong gom đơn). */
+  const EXT_SUP_ID = 'EXT-MARKET';
+  const EXT_SUP = { id: EXT_SUP_ID, name: '🛒 Thu mua ngoài', paymentTerm: 'COD', system: true };
+
   function getPur() { return window.STORE.get('purchases', window.PURCHASES || []) || []; }
   function getSup() { return window.STORE.get('suppliers', window.SUPPLIERS || []) || []; }
   function getProds() { return window.STORE.get('products', window.PRODUCTS || []) || []; }
-  function findSup(id) { return getSup().find(s => s.id === id); }
+  function findSup(id) { return id === EXT_SUP_ID ? EXT_SUP : getSup().find(s => s.id === id); }
 
   function renderKpis() {
     const list = getPur();
@@ -143,12 +148,29 @@
     const list = getPur();
     const i = list.findIndex(x => x.id === id);
     if (i < 0 || list[i].status !== 'ordered') return;
-    if (!confirm('Xác nhận đã nhận hàng? Kho sẽ tự động cộng các SP trong phiếu.')) return;
+    const isExt = list[i].supplierId === EXT_SUP_ID || (findSup(list[i].supplierId) || {}).system;
+    const willStock = !list[i].noStock;
+    const confMsg = isExt
+      ? 'Xác nhận đã nhận hàng thu mua ngoài?\n→ Ghi CHI TIỀN MẶT vào sổ quỹ kế toán + cập nhật giá vốn' + (willStock ? ' + cộng kho.' : ' (không cộng kho).')
+      : 'Xác nhận đã nhận hàng?' + (willStock ? ' Kho sẽ tự động cộng các SP trong phiếu.' : ' (Phiếu này KHÔNG cộng tồn kho.)');
+    if (!confirm(confMsg)) return;
     list[i].status = 'received';
-    list[i]._invApplied = false; /* trigger inventory.js subscribe */
-    /* Cộng công nợ NCC nếu chưa COD */
+    list[i]._invApplied = false; /* trigger inventory.js subscribe (bị bỏ qua nếu noStock) */
     const sup = findSup(list[i].supplierId);
-    if (sup && sup.paymentTerm !== 'COD') {
+    if (isExt) {
+      /* Thu mua ngoài: trả tiền mặt ngay → ghi PHIẾU CHI vào sổ quỹ kế toán (schema chuẩn type:'out') */
+      list[i].paid = list[i].total;
+      const cash = window.STORE.get('cashEntries', []) || [];
+      const seq = String(cash.length + 1).padStart(4, '0');
+      cash.unshift({
+        no: 'PCTMN' + seq, date: list[i].date || window.todayVN(),
+        type: 'out', party: 'Thu mua ngoài', account: 'Tiền mặt',
+        amount: list[i].total,
+        desc: 'Thu mua ngoài ' + list[i].id + ' · ' + (list[i].items || []).length + ' mã',
+      });
+      window.STORE.set('cashEntries', cash);
+    } else if (sup && sup.paymentTerm !== 'COD') {
+      /* Cộng công nợ NCC nếu chưa COD */
       window.STORE.update('suppliers', sup.id, {
         debt: (sup.debt || 0) + list[i].total,
         totalSpend: (sup.totalSpend || 0) + list[i].total,
@@ -174,8 +196,10 @@
     });
     window.STORE.set('products', prods);
     window.STORE.set('purchases', list);
-    if (window.audit) window.audit.log('purchase.receive', `Nhận ${id} (${window.fmt(list[i].total)} ₫)`);
-    window.toast('✓ Đã nhận hàng, cộng kho + cập nhật giá nhập', 'success');
+    if (window.audit) window.audit.log('purchase.receive', `Nhận ${id} (${window.fmt(list[i].total)} ₫)${isExt ? ' [thu mua ngoài]' : ''}`);
+    window.toast(isExt
+      ? '✓ Đã nhận · ghi chi tiền mặt vào sổ quỹ + cập nhật giá vốn' + (willStock ? ' + cộng kho' : '')
+      : '✓ Đã nhận hàng' + (willStock ? ', cộng kho' : '') + ' + cập nhật giá nhập', 'success');
   };
 
   window.cancelPur = function (id) {
@@ -225,20 +249,32 @@
     window.toast('✓ Đã ghi thanh toán + phiếu chi', 'success');
   };
 
-  /* ====== Tạo phiếu mới ====== */
-  window.openPurModal = function (forSup) {
+  /* ====== Tạo phiếu mới ======
+     forSup: id NCC chọn sẵn (vd 'EXT-MARKET' cho thu mua ngoài)
+     presetItems: [{name, qty, price}] điền sẵn (vd từ gom đơn → thu mua ngoài) */
+  window.openPurModal = function (forSup, presetItems) {
     const sups = getSup().filter(s => s.active);
     const prods = getProds();
-    const nextId = 'PN-2026-' + String(getPur().length + 1).padStart(4,'0');
-    window.openModal('+ Tạo phiếu nhập', `
-      <div style="background:#EFF6FF;color:#1E40AF;padding:9px 12px;border-radius:7px;font-size:12px;margin-bottom:12px">
-        💡 <b>Cách dùng:</b> Chọn NCC → thêm các SP đã lấy → bấm Lưu (status: "Đã đặt"). Khi hàng về kho, vào trang Phiếu nhập bấm "✓ Đã nhận" để tự cộng kho.
+    const isExt = forSup === EXT_SUP_ID;
+    const nextId = (isExt ? 'TMN-2026-' : 'PN-2026-') + String(getPur().length + 1).padStart(4,'0');
+    /* Thu mua ngoài mặc định KHÔNG cộng tồn kho (mua cho đơn trong ngày, giao thẳng) */
+    const stockChecked = isExt ? '' : 'checked';
+    window.openModal(isExt ? '🛒 Phiếu thu mua ngoài' : '+ Tạo phiếu nhập', `
+      <div style="background:${isExt ? '#FFFBEB;color:#92400E' : '#EFF6FF;color:#1E40AF'};padding:9px 12px;border-radius:7px;font-size:12px;margin-bottom:12px">
+        ${isExt
+          ? '🛒 <b>Thu mua ngoài:</b> nhập danh sách mua chợ/vãng lai kèm <b>giá thật</b>. Khi bấm "✓ Đã nhận" → tự ghi <b>chi tiền mặt vào sổ quỹ kế toán</b> + cập nhật <b>giá vốn</b>. Có thể dùng <b>📷 Ảnh AI</b> đọc phiếu viết tay.'
+          : '💡 <b>Cách dùng:</b> Chọn NCC → thêm các SP đã lấy → bấm Lưu (status: "Đã đặt"). Khi hàng về kho, vào trang Phiếu nhập bấm "✓ Đã nhận" để tự cộng kho.'}
       </div>
       <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:10px">
         <div><label style="font-size:12px;color:var(--muted)">Mã phiếu</label><input id="pn_id" value="${nextId}" style="width:100%;border:1px solid var(--line);border-radius:6px;padding:7px;font-size:13px;font-family:monospace"></div>
         <div><label style="font-size:12px;color:var(--muted)">Ngày nhập</label><input id="pn_date" type="date" value="${(window.todayISO ? window.todayISO() : new Date().toISOString().slice(0,10))}" style="width:100%;border:1px solid var(--line);border-radius:6px;padding:7px;font-size:13px"></div>
-        <div style="grid-column:span 2"><label style="font-size:12px;color:var(--muted)">NCC *</label><select id="pn_sup" style="width:100%;border:1px solid var(--line);border-radius:6px;padding:7px;font-size:13px">${sups.map(s => `<option value="${s.id}" ${forSup===s.id?'selected':''}>${s.name} · ${s.paymentTerm}</option>`).join('')}</select></div>
+        <div style="grid-column:span 2"><label style="font-size:12px;color:var(--muted)">NCC *</label><select id="pn_sup" style="width:100%;border:1px solid var(--line);border-radius:6px;padding:7px;font-size:13px">
+          <option value="${EXT_SUP_ID}" ${isExt?'selected':''}>🛒 Thu mua ngoài (chợ/vãng lai) · COD</option>
+          ${sups.map(s => `<option value="${s.id}" ${forSup===s.id?'selected':''}>${s.name} · ${s.paymentTerm}</option>`).join('')}</select></div>
       </div>
+      <label style="display:flex;align-items:center;gap:7px;font-size:12px;color:var(--muted);margin-bottom:6px;cursor:pointer">
+        <input type="checkbox" id="pn_stock" ${stockChecked}> Cộng vào tồn kho khi nhận ${window.helpTip('Tắt nếu hàng mua về giao thẳng cho khách trong ngày (không nhập kho tồn). Thu mua ngoài thường TẮT.')}
+      </label>
       <div style="display:flex;align-items:center;gap:8px">
         <label style="font-size:12px;color:var(--muted);font-weight:600;flex:1">Mặt hàng nhập ${window.helpTip('Bấm "+ Thêm dòng" để thêm thủ công, hoặc dùng "📥 Excel" / "📷 AI ảnh" để thêm hàng loạt.')}</label>
         <button type="button" class="btn btn-ghost btn-sm" onclick="window.pnBulkExcel()" title="Import items từ Excel hàng loạt" style="font-size:11px;padding:3px 8px">📥 Excel</button>
@@ -257,9 +293,13 @@
               <button class="btn btn-primary" onclick="window._pnSave()">Lưu phiếu</button>`,
       width:'620px'
     });
-    /* Add first row */
+    /* Add first row(s) */
     window._pnPRODS = prods;
-    window._pnAddRow();
+    if (Array.isArray(presetItems) && presetItems.length) {
+      presetItems.forEach(it => window._pnAddRow({ name: it.name, qty: it.qty, price: it.price }));
+    } else {
+      window._pnAddRow();
+    }
   };
 
   const _pnNorm = s => (s || '').toLowerCase().normalize('NFD').replace(/[̀-ͯ]/g, '').replace(/đ/g, 'd').trim();
@@ -359,6 +399,7 @@
     if (!items.length) { window.toast('Thêm ít nhất 1 mặt hàng (tên + SL + giá)', 'warn'); return; }
     const dt = document.getElementById('pn_date').value;
     const m = dt.match(/(\d+)-(\d+)-(\d+)/);
+    const stockCb = document.getElementById('pn_stock');
     const obj = {
       id: document.getElementById('pn_id').value,
       supplierId: document.getElementById('pn_sup').value,
@@ -367,6 +408,7 @@
       total: items.reduce((s,i) => s + i.total, 0),
       paid: 0,
       items,
+      noStock: stockCb ? !stockCb.checked : false,   /* không cộng tồn kho (mua giao thẳng) */
       note: document.getElementById('pn_note').value,
     };
     const list = getPur();

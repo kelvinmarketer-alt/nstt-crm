@@ -273,6 +273,7 @@
     const perOrder = suppliersPerOrder(run);
     const nSup = Object.keys(bySup).length;
     const nIncomplete = run.lines.filter(l => remainOf(l) > 0.001).length;
+    const nExt = run.lines.filter(l => suppliersForProduct(l.productId, l.name).length === 0).length;
 
     let body = supDL + `
       <div style="background:linear-gradient(135deg,#1B5E20,#2E7D32);color:#fff;padding:14px 18px;position:relative">
@@ -290,6 +291,7 @@
         <div><b style="font-size:16px;color:var(--navy)">${fmtQty(totalKg)}</b> kg tổng</div>
         <div><b style="font-size:16px;color:var(--navy)">${nSup}</b> nhà cung cấp</div>
         ${nIncomplete ? `<div style="color:#B45309"><b>${nIncomplete}</b> mã chưa phân bổ đủ</div>` : '<div style="color:#15803D">✓ đã phân bổ đủ</div>'}
+        ${nExt ? `<div style="color:#B45309">🛒 <b>${nExt}</b> mã thu mua ngoài</div>` : ''}
       </div>
       <div style="font-size:11.5px;color:var(--muted);margin-bottom:4px">Số NCC mỗi đơn:</div>
       <div style="display:flex;gap:6px;flex-wrap:wrap">${run.orderCodes.map(code => {
@@ -369,6 +371,27 @@
           </div>
         </div>`;
       });
+    }
+
+    /* ===== THU MUA NGOÀI (mã chưa có NCC) ===== */
+    const extData = extReqData(run);
+    if (extData.lines.length) {
+      const extKg = extData.lines.reduce((s, l) => s + l.qty, 0);
+      body += `<div style="font-weight:800;color:#B45309;font-size:12.5px;margin:14px 0 8px">🛒 THU MUA NGOÀI <span style="font-weight:400;color:var(--muted)">(mã chưa NCC nào cung cấp — thu mua đi chợ/ngoài)</span></div>
+        <div class="sup-block" style="margin-bottom:12px;border:1px solid #FDE68A">
+          <div class="hd" style="background:linear-gradient(135deg,#B45309,#D97706)">🛒 Danh sách thu mua ngoài <span style="opacity:.85;font-weight:400;font-size:11px">${extData.lines.length} mã · ${fmtQty(extKg)}kg</span>
+            <div style="flex:1"></div>
+            <button class="btn btn-ghost btn-sm" style="background:rgba(255,255,255,.2);color:#fff;border:none" onclick="window.pcPrintExtReq('${run.id}')">🖨 In phiếu</button>
+            <button class="btn btn-ghost btn-sm" style="background:rgba(255,255,255,.2);color:#fff;border:none" onclick="window.pcCopyExtReq('${run.id}')">📋 Copy Zalo</button>
+          </div>
+          <div style="padding:8px 12px">
+          ${extData.lines.map(it => `<div style="font-size:12px;padding:3px 0;border-bottom:1px dashed #EEF2F0">
+            <b>${esc(it.name)}</b>: ${fmtQty(it.qty)} ${it.unit}
+            ${it.custs.length ? `<div style="font-size:10.5px;color:var(--muted);margin-top:1px">Cho: ${it.custs.map(b => esc(b.custName || b.code) + ' ' + fmtQty(b.qty) + it.unit).join(' · ')}</div>` : ''}
+          </div>`).join('')}
+          </div>
+          <div style="padding:0 12px 10px;font-size:11px;color:#92400E">💡 Cuối ngày: thu mua nhập phiếu kèm <b>giá thật</b> ở <b>Phiếu nhập → 🛒 Thu mua ngoài</b> (đọc ảnh AI được) → tự vào sổ quỹ kế toán + cập nhật giá vốn.</div>
+        </div>`;
     }
 
     body += `<div style="position:sticky;bottom:0;background:#fff;padding-top:10px;border-top:1px solid var(--line);display:flex;gap:8px;flex-wrap:wrap">
@@ -608,6 +631,62 @@
     });
     return { lines: items, supName, type };
   }
+  /* ===== THU MUA NGOÀI: các mã KHÔNG NCC nào cung cấp → bộ phận thu mua đi chợ/ngoài ===== */
+  function extReqData(run) {
+    const lines = (run.lines || [])
+      .filter(l => suppliersForProduct(l.productId, l.name).length === 0)
+      .map(l => ({
+        name: l.name, unit: l.unit, qty: +(+l.totalQty || 0).toFixed(2),
+        custs: (l.breakdown || []).map(b => ({ code: b.code, custName: b.custName, qty: +(+b.qty || 0).toFixed(2) })),
+      }));
+    return { lines };
+  }
+  window.pcCopyExtReq = function (runId) {
+    const run = getRuns().find(r => r.id === runId); if (!run) return;
+    const { lines } = extReqData(run);
+    if (!lines.length) { window.toast && window.toast('Không có mã thu mua ngoài', 'info'); return; }
+    const totalKg = lines.reduce((s, l) => s + l.qty, 0);
+    const txt = `🛒 DANH SÁCH THU MUA NGOÀI — ${run.id}\n📅 ${new Date().toLocaleDateString('vi-VN')}\n────────────\n`
+      + lines.map((l, i) => `${i + 1}. ${l.name}: ${fmtQty(l.qty)} ${l.unit}` + (l.custs.length ? `\n   Cho: ${l.custs.map(b => (b.custName || b.code) + ' ' + fmtQty(b.qty) + l.unit).join(' · ')}` : '')).join('\n')
+      + `\n────────────\n📦 Tổng: ${fmtQty(totalKg)} kg\n⚠ Mua xong GHI RÕ GIÁ từng mã để cuối ngày nhập sổ (Phiếu nhập → Thu mua ngoài). Cảm ơn!\n— Nông Sản Tuấn Tú`;
+    copyText(txt, 'danh sách thu mua ngoài');
+  };
+  window.pcPrintExtReq = function (runId) {
+    const run = getRuns().find(r => r.id === runId); if (!run) return;
+    const { lines } = extReqData(run);
+    if (!lines.length) { window.toast && window.toast('Không có mã thu mua ngoài', 'info'); return; }
+    const c = company();
+    const today = new Date().toLocaleDateString('vi-VN');
+    const rows = lines.map((l, i) => `<tr>
+        <td class="stt">${i + 1}</td>
+        <td><b>${esc(l.name)}</b></td>
+        <td class="num"><b>${fmtQty(l.qty)}</b> ${l.unit}</td>
+        <td style="font-size:11px;color:#555">${(l.custs || []).map(b => esc(b.custName || b.code) + ': ' + fmtQty(b.qty)).join(' · ')}</td>
+        <td class="num" style="width:120px"></td>
+      </tr>`).join('');
+    const totalKg = lines.reduce((s, l) => s + l.qty, 0);
+    const html = `<!doctype html><html lang="vi"><head><meta charset="utf-8"><title>PHIẾU THU MUA NGOÀI</title>
+<style>@page{size:A4;margin:14mm 12mm}*{box-sizing:border-box;margin:0;padding:0;font-family:'Segoe UI',Arial,sans-serif}
+body{color:#1a1a1a;font-size:13px}.wrap{max-width:780px;margin:0 auto}
+.top{display:flex;align-items:center;gap:14px;border-bottom:3px solid #B45309;padding-bottom:10px}
+.top img{width:64px;height:64px;object-fit:contain}.brand h1{font-size:19px;color:#B45309;font-weight:800}.brand .sub{font-size:11px;color:#555;margin-top:4px}
+.title{text-align:center;font-size:21px;font-weight:800;color:#B45309;letter-spacing:1px;margin:14px 0 2px}
+.meta{display:flex;justify-content:space-between;font-size:12.5px;margin:8px 2px}.meta b{color:#B45309}
+table{width:100%;border-collapse:collapse;font-size:13px;margin-top:8px}th,td{border:1px solid #E5C99B;padding:7px 9px}
+th{background:#B45309;color:#fff;font-size:12px;text-transform:uppercase}td.stt{text-align:center;width:40px;color:#777}td.num{text-align:center;font-weight:700;color:#B45309}
+tbody tr:nth-child(even){background:#FFFBEB}tfoot td{background:#FEF3C7;font-weight:800;color:#B45309}
+.note{font-size:11.5px;color:#555;margin-top:14px;line-height:1.6}</style></head><body><div class="wrap">
+<div class="top"><img src="${c.logo}" onerror="this.style.display='none'"><div class="brand"><h1>${c.name}</h1><div class="sub">${esc(c.addr)} · ☎ ${esc(c.phone)}</div></div></div>
+<div class="title">PHIẾU THU MUA NGOÀI</div>
+<div class="meta"><div><b>Bộ phận:</b> Thu mua (chợ/vãng lai)</div><div><b>Ngày:</b> ${today} · Phiên ${run.id}</div></div>
+<table><thead><tr><th style="width:40px">STT</th><th>Sản phẩm</th><th style="width:100px">Cần mua</th><th>Cho khách</th><th style="width:120px">Giá mua (₫/kg)</th></tr></thead>
+<tbody>${rows}</tbody>
+<tfoot><tr><td colspan="2" style="text-align:right">TỔNG</td><td class="num">${fmtQty(totalKg)} kg</td><td></td><td></td></tr></tfoot></table>
+<div class="note">⚖️ Đơn vị tính: KILOGRAM (KG). Đây là các mặt hàng <b>chưa có NCC cố định</b> → mua ngoài.<br><b>Lưu ý:</b> điền GIÁ MUA thực tế từng mã ở cột cuối → cuối ngày nhập vào app (Phiếu nhập → 🛒 Thu mua ngoài) để vào sổ quỹ + tính giá vốn.</div>
+</div></body></html>`;
+    printViaIframe(html);
+  };
+
   function company() {
     const ci = S().get('companyInfo', {}) || {};
     const origin = (typeof location !== 'undefined' && location.origin && location.origin !== 'null') ? location.origin : 'https://app.nongsantuantuhanoi.vn';

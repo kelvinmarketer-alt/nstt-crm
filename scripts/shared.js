@@ -1218,13 +1218,24 @@ window.toast = function(message, type = 'info') {
    Chỉ đóng khi bấm X, Esc, hoặc nút trong footer.
    Nếu muốn đóng khi click ngoài → truyền opts.dismissOnBackdrop:true */
 window.openModal = function(title, bodyHTML, opts = {}) {
-  const existing = document.getElementById('modal-bg');
-  if (existing) existing.remove();
+  /* opts.stack=true → XẾP CHỒNG lên modal đang mở (giữ modal dưới, ẩn tạm) thay vì xoá.
+     Dùng cho modal lồng (vd: preview import mở từ trong form Tạo phiếu). Mặc định = thay thế. */
+  let layers = Array.from(document.querySelectorAll('.modal-bg'));
+  if (opts.stack && layers.length) {
+    const top = layers[layers.length - 1];
+    top.style.display = 'none';
+    top.setAttribute('data-stack-hidden', '1');
+  } else if (layers.length) {
+    layers.forEach(l => l.remove());
+  }
+  const depth = document.querySelectorAll('.modal-bg').length;   /* số modal còn lại */
+  const id = depth === 0 ? 'modal-bg' : 'modal-bg-' + depth;
+  const z = 200 + depth * 60;
   const backdropClick = opts.dismissOnBackdrop
     ? `onclick="if(event.target===this)window.closeModal()"`
     : '';
   const html = `
-    <div id="modal-bg" class="modal-bg open" ${backdropClick}>
+    <div id="${id}" class="modal-bg open" style="z-index:${z}" ${backdropClick}>
       <div class="modal" style="width:min(${opts.width||'520px'},94vw);max-width:${opts.width||'520px'}">
         <div class="modal-head">
           <h3>${title}</h3>
@@ -1235,16 +1246,24 @@ window.openModal = function(title, bodyHTML, opts = {}) {
       </div>
     </div>`;
   document.body.insertAdjacentHTML('beforeend', html);
-  /* Esc đóng modal */
+  /* Esc đóng modal trên cùng */
   if (!window._modalEscHandler) {
     window._modalEscHandler = (e) => {
-      if (e.key === 'Escape' && document.getElementById('modal-bg')) window.closeModal();
+      if (e.key === 'Escape' && document.querySelector('.modal-bg')) window.closeModal();
     };
     document.addEventListener('keydown', window._modalEscHandler);
   }
 };
 window.closeModal = function() {
-  document.getElementById('modal-bg')?.remove();
+  const layers = Array.from(document.querySelectorAll('.modal-bg'));
+  if (!layers.length) return;
+  layers[layers.length - 1].remove();          /* đóng modal trên cùng */
+  const rem = Array.from(document.querySelectorAll('.modal-bg'));
+  if (rem.length) {                              /* lộ lại modal dưới (nếu có) */
+    const t = rem[rem.length - 1];
+    t.style.display = '';
+    t.removeAttribute('data-stack-hidden');
+  }
 };
 
 /* ============ HELP GUIDES ============ */

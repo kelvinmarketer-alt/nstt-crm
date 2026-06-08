@@ -84,6 +84,7 @@
       footer: `<button class="btn btn-ghost" onclick="window.closeModal()">Hủy</button>
                <button class="btn btn-primary" onclick="window._biConfirmImport()">✓ Import ${records.length} dòng</button>`,
       width: '720px',
+      stack: true,   /* xếp chồng — KHÔNG xoá form (vd phiếu nhập) đang mở bên dưới */
     });
     window._biPendingRecords = records;
     window._biPendingOpts = opts;

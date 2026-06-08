@@ -88,7 +88,7 @@
     let changed = false;
     const list = purchases || [];
     list.forEach(p => {
-      if (p.status === 'received' && !p._invApplied) {
+      if (p.status === 'received' && !p._invApplied && !p.noStock) {
         (p.items || []).forEach(it => {
           if (it.productId) {
             window.invApply(it.productId, +(it.qty || 0));

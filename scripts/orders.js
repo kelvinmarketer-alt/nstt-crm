@@ -1101,7 +1101,7 @@
     `, {
       footer:`<button class="btn btn-ghost" onclick="window.closeModal()">Hủy</button>
               <button class="btn btn-primary" onclick="window._saveLearnedMaps('${custId}')">💾 Dạy hệ thống + thêm vào đơn</button>`,
-      width:'520px'
+      width:'520px', stack:true
     });
   }
 
@@ -1203,6 +1203,7 @@ CHỈ TRẢ JSON, không giải thích gì thêm.`;
           items = data.slice(1).map(r => ({ name: String(r[0] || '').trim(), qty: parseFloat(r[1]) || 0 })).filter(it => it.name && it.qty);
         }
         if (!items.length) { window.toast('Không có dòng dữ liệu hợp lệ', 'warn'); return; }
+        if (document.querySelector('.modal-bg[data-stack-hidden]')) window.closeModal(); /* đóng pre-modal Excel, lộ lại form đơn */
         applyBulkItems(items, 'Excel');
       } catch (err) {
         window.toast('Lỗi đọc file: ' + err.message, 'danger');
@@ -1232,7 +1233,7 @@ CHỈ TRẢ JSON, không giải thích gì thêm.`;
       </div>
     `, {
       footer: `<button class="btn btn-primary" onclick="window.closeModal()">Đóng</button>`,
-      width: '480px',
+      width: '480px', stack: true,
     });
   };
 
