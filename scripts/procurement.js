@@ -203,8 +203,72 @@
 
   /* ============ ② PHIÊN GOM (master-detail) ============ */
   /* Phiên ĐÃ CHỐT & phân bổ (applied) hoặc đã xuất kho (closed) → rời danh sách gom, vào "Lịch sử".
-     LƯU Ý: 'confirmed' = chỉ mới "Lưu xác nhận NCC" → VẪN đang gom (không vào lịch sử). */
+     LƯU Ý: 'confirmed' = phiên cũ (đã xác nhận) cũng coi là đã gom → vào lịch sử. */
   const _isDoneRun = (r) => r.status === 'applied' || r.status === 'closed' || r.status === 'confirmed';
+
+  /* ===== Chọn/xoá phiên (đơn lẻ + hàng loạt) ===== */
+  window._pcRunSel = window._pcRunSel || new Set();
+  /* checkbox + nút xoá trên 1 thẻ phiên */
+  function _runCardCtrls(rid) {
+    return `<input type="checkbox" class="pc-run-cb" ${window._pcRunSel.has(rid) ? 'checked' : ''} onclick="event.stopPropagation();window._pcToggleRunSel('${rid}',this.checked)" title="Chọn để xoá hàng loạt" style="width:15px;height:15px;flex-shrink:0;cursor:pointer">`;
+  }
+  function _runDelBtn(rid) {
+    return `<button onclick="event.stopPropagation();window.pcDeleteRun('${rid}')" title="Xoá phiên (đơn trả về giai đoạn ①)" style="background:none;border:none;color:#B91C1C;cursor:pointer;font-size:14px">🗑</button>`;
+  }
+  /* Thanh hành động hàng loạt — hiện khi có phiên được chọn */
+  function _bulkBar() {
+    const n = window._pcRunSel.size;
+    if (!n) return '';
+    return `<div style="display:flex;align-items:center;gap:10px;background:#FEF2F2;border:1px solid #FECACA;border-radius:8px;padding:8px 11px;margin-bottom:8px">
+      <span style="font-size:12px;font-weight:700;color:#B91C1C">Đã chọn ${n} phiên</span>
+      <div style="flex:1"></div>
+      <button class="btn btn-ghost btn-sm" onclick="window._pcClearRunSel()">Bỏ chọn</button>
+      <button class="btn btn-sm" style="background:#DC2626;color:#fff" onclick="window.pcBulkDeleteRuns()">🗑 Xoá ${n} phiên đã chọn</button>
+    </div>`;
+  }
+  window._pcToggleRunSel = function (rid, on) { if (on) window._pcRunSel.add(rid); else window._pcRunSel.delete(rid); renderRuns(); renderRunHistory(); };
+  window._pcClearRunSel = function () { window._pcRunSel.clear(); renderRuns(); renderRunHistory(); };
+
+  /* Xoá 1 phiên gom → trả các đơn về giai đoạn ① (chọn đơn → gom) */
+  window.pcDeleteRun = function (runId, skipConfirm) {
+    const runs = getRuns(); const run = runs.find(r => r.id === runId); if (!run) return;
+    if (!skipConfirm && !confirm(`Xoá phiên ${runId}?\nCác đơn trong phiên sẽ trả về giai đoạn ① (chọn đơn → gom).`)) return;
+    const orders = getOrders(); let och = false;
+    (run.orderCodes || []).forEach(code => {
+      const o = orders.find(x => x.code === code);
+      if (o && (o.whStatus === 'gathering' || o.whStatus === 'confirmed')) { o.whStatus = ''; och = true; }
+    });
+    if (och) S().set('orders', orders);
+    saveRuns(runs.filter(r => r.id !== runId));
+    window._pcRunSel.delete(runId);
+    if (window._pcActiveRun === runId) { window._pcActiveRun = null; window.pcCloseDetail && window.pcCloseDetail(); }
+    if (!skipConfirm) { window.toast?.('🗑 Đã xoá phiên ' + runId + ' · đơn trả về giai đoạn ①', 'danger'); renderAll(); }
+  };
+  window.pcBulkDeleteRuns = function () {
+    const ids = [...window._pcRunSel];
+    if (!ids.length) return;
+    if (!confirm(`Xoá ${ids.length} phiên đã chọn?\nTất cả đơn trong các phiên này sẽ trả về giai đoạn ①.`)) return;
+    ids.forEach(id => window.pcDeleteRun(id, true));
+    window._pcRunSel.clear();
+    window.toast?.(`🗑 Đã xoá ${ids.length} phiên · đơn trả về giai đoạn ①`, 'danger');
+    renderAll();
+  };
+  /* Trả 1 đơn từ ③ Xuất kho về ② Phiên gom (gán lại NCC) */
+  window.pcReturnToGom = function (code) {
+    const orders = getOrders(); const o = orders.find(x => x.code === code); if (!o) return;
+    const runs = getRuns(); const run = runs.find(r => Array.isArray(r.orderCodes) && r.orderCodes.includes(code));
+    if (run) {
+      if (!confirm(`Trả đơn ${code} về giai đoạn ② (phiên ${run.id}) để gán lại NCC?`)) return;
+      run.status = 'draft'; saveRuns(runs);
+      o.whStatus = 'gathering';
+    } else {
+      if (!confirm(`Đơn ${code} không còn thuộc phiên gom nào.\nTrả về giai đoạn ① (chọn đơn → gom)?`)) return;
+      o.whStatus = '';
+    }
+    S().set('orders', orders);
+    window.toast?.(run ? `↩ Đã trả ${code} về giai đoạn ② (phiên ${run.id})` : `↩ Đã trả ${code} về giai đoạn ①`, 'info');
+    renderAll();
+  };
 
   function renderRunHistory() {
     const host = document.getElementById('pcRunHistory');
@@ -215,17 +279,19 @@
     if (!hist.length) { host.innerHTML = ''; return; }
     /* mới chốt lên đầu */
     hist.sort((a, b) => (a.confirmedAt || '') < (b.confirmedAt || '') ? 1 : -1);
-    host.innerHTML = hist.map(r => {
+    host.innerHTML = _bulkBar() + hist.map(r => {
       normalizeRun(r);
       const totalKg = r.lines.reduce((s, l) => s + l.totalQty, 0);
       const st = r.status === 'closed' ? ['Đã xuất kho', '#1B5E20'] : ['Đã chốt', '#15803D'];
       const when = r.confirmedAt ? new Date(r.confirmedAt).toLocaleString('vi-VN') : '';
       return `<div class="run-card" style="display:flex;align-items:center;gap:10px;flex-wrap:wrap;cursor:pointer" onclick="window.pcOpenRun('${r.id}')">
+        ${_runCardCtrls(r.id)}
         <div style="font-weight:800;color:var(--navy)">${r.id}</div>
         <span class="tag" style="background:${st[1]}1f;color:${st[1]};font-weight:700;font-size:10.5px">${st[0]}</span>
         <span style="font-size:11.5px;color:var(--muted)">${r.orderCodes.length} đơn · ${r.lines.length} mã · ${fmtQty(totalKg)} kg${when ? ' · ' + when : ''}</span>
         <div style="flex:1"></div>
         <button class="btn btn-ghost btn-sm" onclick="event.stopPropagation();window.pcOpenRun('${r.id}')">👁 Xem lại</button>
+        ${_runDelBtn(r.id)}
       </div>`;
     }).join('');
   }
@@ -243,7 +309,7 @@
       return;
     }
     const stLabel = { draft: ['Nháp', '#64748B'], sent: ['Đã gửi NCC', '#0EA5E9'], confirmed: ['Đã xác nhận', '#15803D'], closed: ['Đã xuất kho', '#1B5E20'] };
-    host.innerHTML = runs.map(r => {
+    host.innerHTML = _bulkBar() + runs.map(r => {
       const [lb, clr] = stLabel[r.status] || stLabel.draft;
       normalizeRun(r);
       const nNone = r.lines.filter(l => remainOf(l) > 0.001).length;
@@ -251,8 +317,11 @@
       const sel = window._pcActiveRun === r.id ? ' pc-sel' : '';
       return `<div class="run-card${sel}" data-runid="${r.id}" onclick="window.pcOpenRun('${r.id}')" style="padding:11px 13px">
         <div style="display:flex;align-items:center;gap:7px;flex-wrap:wrap">
+          ${_runCardCtrls(r.id)}
           <div style="font-weight:800;font-size:14px;color:var(--navy)">${r.id}</div>
           <span class="tag" style="background:${clr}1f;color:${clr};font-weight:700;font-size:10.5px">${lb}</span>
+          <div style="flex:1"></div>
+          ${_runDelBtn(r.id)}
         </div>
         <div style="font-size:11.5px;color:var(--muted);margin-top:5px">${r.orderCodes.length} đơn · ${r.lines.length} mã · ${fmtQty(totalKg)} kg</div>
         ${nNone > 0 ? `<div style="margin-top:6px"><span class="tag" style="background:#FEF3C7;color:#B45309;font-weight:700;font-size:10.5px">⚠ ${nNone} mã chưa phân bổ đủ NCC</span></div>` : `<div style="margin-top:6px"><span style="font-size:11px;color:#15803D;font-weight:700">✓ đã phân bổ đủ NCC</span></div>`}
@@ -805,6 +874,7 @@ tbody tr:nth-child(even){background:#F4FAF2}tfoot td{background:#E8F5E9;font-wei
             ${hasShort ? `<span class="tag" style="background:#FEE2E2;color:#B91C1C">⚠ thiếu ${o.shortages.length} mã</span>` : ''}
             <div style="flex:1"></div>
             <span style="font-size:12px;color:var(--muted)">${(o.items || []).length} mã · ${fmtQty(kg)} kg</span>
+            <button class="btn btn-ghost btn-sm" onclick="window.pcReturnToGom('${o.code}')" title="Trả đơn về giai đoạn ② (gán lại NCC)">↩ Trả về gom</button>
             <button class="btn btn-ghost btn-sm" onclick="window.pcEditOrder('${o.code}')" title="Sửa đơn (nhập sai)">✏️ Sửa</button>
             <button class="btn btn-ghost btn-sm" style="color:var(--danger)" onclick="window.pcDeleteOrder('${o.code}')" title="Xoá hẳn đơn này">🗑 Xoá</button>
             <button class="btn btn-navy btn-sm" onclick="window.pcPrintRelease('${o.code}')">🖨 Phiếu xuất kho</button>
