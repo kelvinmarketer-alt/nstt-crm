@@ -153,12 +153,23 @@
   let currentCat = null;          // lọc danh mục
   let catQuery = '';              // tìm SP theo tên trong Danh mục
   const _catNorm = s => (s || '').toString().toLowerCase().normalize('NFD').replace(/[̀-ͯ]/g, '').replace(/đ/g, 'd').trim();
+  /* CHỈ cập nhật LƯỚI — KHÔNG dựng lại ô input (giữ bộ gõ tiếng Việt + focus) */
   window.catSearchInput = function (v) {
     catQuery = v;
-    renderCatalog();
-    const el = document.getElementById('catSearch');
-    if (el) { el.focus(); const L = el.value.length; try { el.setSelectionRange(L, L); } catch (e) {} }
+    if (window.renderCatalogGrid) window.renderCatalogGrid();
   };
+  function _syncCatSearchUI() {
+    const clr = document.getElementById('catSearchClear');
+    const cnt = document.getElementById('catSearchCount');
+    const chips = document.getElementById('catChips');
+    const q = _catNorm(catQuery);
+    if (clr) clr.style.display = catQuery ? '' : 'none';
+    if (chips) chips.style.display = q ? 'none' : '';
+    if (cnt) {
+      if (q) { cnt.style.display = ''; cnt.innerHTML = `🔍 Tìm "<b>${(catQuery || '').replace(/</g, '&lt;')}</b>" trên toàn bộ — <b>${(window._catLastCount || 0)}</b> kết quả`; }
+      else cnt.style.display = 'none';
+    }
+  }
   let boardDate = maxDate();      // ngày đang xem ở bảng giá
 
   /* Lọc + sắp xếp cho bảng giá (board + marketing) */
@@ -710,30 +721,23 @@
   };
 
   /* ============ DANH MỤC SẢN PHẨM ============ */
-  function renderCatalog() {
-    const ps = products();
-    const counts = { all: ps.length };
-    ps.forEach(p => counts[p.cat] = (counts[p.cat] || 0) + 1);
-    const chips = `<button class="chip ${!currentCat ? 'active' : ''}" onclick="window.filterCat(null)">Tất cả <span class="cnt">${counts.all}</span></button>` +
-      CATS.map(c => `<button class="chip ${currentCat === c.id ? 'active' : ''}" onclick="window.filterCat('${c.id}')" style="${currentCat === c.id ? 'background:' + c.color + ';color:#fff;border-color:' + c.color : ''}">${c.icon} ${c.label} <span class="cnt">${counts[c.id] || 0}</span></button>`).join('') +
-      `<button class="chip" onclick="window.openCategoryManager && window.openCategoryManager()" style="border-style:dashed;color:var(--navy)" title="Đổi biểu tượng / tên danh mục">🏷️ Quản lý danh mục</button>`;
-
-    /* Sắp xếp theo NHÓM (đúng thứ tự danh mục), trong nhóm theo tên A→Z */
+  /* Build danh sách SP card (theo nhóm hoặc theo từ khoá tìm) — dùng chung */
+  function _catRows(ps) {
+    ps = ps || products();
     const catOrder = {};
     CATS.forEach((c, i) => catOrder[c.id] = i);
     const q = _catNorm(catQuery);
-    /* Có từ khoá → tìm theo TÊN trên TOÀN BỘ SP (bỏ lọc nhóm); không thì lọc theo nhóm */
     const list = ps.filter(p => q ? (_catNorm(p.name).includes(q) || _catNorm(p.id).includes(q)) : (!currentCat || p.cat === currentCat))
       .sort((a, b) => {
         const ca = catOrder[a.cat] ?? 999, cb = catOrder[b.cat] ?? 999;
         if (ca !== cb) return ca - cb;
         return (a.name || '').localeCompare(b.name || '', 'vi');
       });
+    window._catLastCount = list.length;
     const rows = list.map(p => {
       const cat = catMeta(p.cat);
       const e = window.priceEntryOn(p, window.todayISO());
       const buy = e ? e.buy : 0, sell = e ? e.sell : 0;
-      const margin = sell - buy;
       return `<div class="cat-card" data-id="${p.id}" style="display:flex;align-items:center;gap:10px;padding:9px 11px;border:1px solid var(--line);border-radius:10px;background:#fff">
         <div class="checkbox" onclick="this.classList.toggle('on')" style="flex:none"></div>
         <div onclick="event.stopPropagation();window.quickEditProductImage('${p.id}')" title="Bấm để đổi ảnh trực tiếp" style="position:relative;width:42px;height:42px;cursor:pointer;flex:none">
@@ -757,8 +761,26 @@
           </div>
         </div>
       </div>`;
-    }).join('') || `<div style="grid-column:1/-1;padding:30px;text-align:center;color:var(--muted)">Chưa có sản phẩm.</div>`;
+    }).join('') || `<div style="grid-column:1/-1;padding:30px;text-align:center;color:var(--muted)">${_catNorm(catQuery) ? 'Không tìm thấy SP nào khớp.' : 'Chưa có sản phẩm.'}</div>`;
+    return { rows, count: list.length };
+  }
+  /* Chỉ cập nhật lưới + đếm — KHÔNG đụng ô input (bộ gõ tiếng Việt an toàn) */
+  window.renderCatalogGrid = function () {
+    const g = document.getElementById('catalogGrid');
+    if (!g) { renderCatalog(); return; }
+    g.innerHTML = _catRows().rows;
+    _syncCatSearchUI();
+  };
 
+  function renderCatalog() {
+    const ps = products();
+    const counts = { all: ps.length };
+    ps.forEach(p => counts[p.cat] = (counts[p.cat] || 0) + 1);
+    const chips = `<button class="chip ${!currentCat ? 'active' : ''}" onclick="window.filterCat(null)">Tất cả <span class="cnt">${counts.all}</span></button>` +
+      CATS.map(c => `<button class="chip ${currentCat === c.id ? 'active' : ''}" onclick="window.filterCat('${c.id}')" style="${currentCat === c.id ? 'background:' + c.color + ';color:#fff;border-color:' + c.color : ''}">${c.icon} ${c.label} <span class="cnt">${counts[c.id] || 0}</span></button>`).join('') +
+      `<button class="chip" onclick="window.openCategoryManager && window.openCategoryManager()" style="border-style:dashed;color:var(--navy)" title="Đổi biểu tượng / tên danh mục">🏷️ Quản lý danh mục</button>`;
+
+    const { rows } = _catRows(ps);
     document.getElementById('catalogView').innerHTML = `
       <div class="chart-card" style="margin-bottom:14px">
         <div style="display:flex;gap:10px;align-items:center;flex-wrap:wrap">
@@ -767,16 +789,20 @@
           <button class="btn btn-ghost btn-sm" onclick="window.openBulkPriceImport()">📥 Nhập hàng loạt (paste Excel)</button>
         </div>
       </div>
-      <div style="margin-bottom:12px;position:relative">
-        <input id="catSearch" value="${(catQuery || '').replace(/"/g, '&quot;')}" oninput="window.catSearchInput(this.value)" placeholder="🔍 Tìm sản phẩm theo tên / mã (vd: cà chua, SP243)..." autocomplete="off" style="width:100%;border:1px solid var(--line);border-radius:9px;padding:10px 38px 10px 14px;font-size:13.5px;outline:none">
-        ${catQuery ? `<button onclick="window.catSearchInput('')" title="Xoá tìm" style="position:absolute;right:8px;top:50%;transform:translateY(-50%);background:none;border:none;cursor:pointer;color:#9CA3AF;font-size:16px">✕</button>` : ''}
+      <div style="margin-bottom:10px;position:relative">
+        <input id="catSearch" oninput="window.catSearchInput(this.value)" placeholder="🔍 Tìm sản phẩm theo tên / mã (vd: cà chua, SP243)..." autocomplete="off" style="width:100%;border:1px solid var(--line);border-radius:9px;padding:10px 38px 10px 14px;font-size:13.5px;outline:none">
+        <button id="catSearchClear" onclick="window.catSearchInput('')" title="Xoá tìm" style="display:none;position:absolute;right:8px;top:50%;transform:translateY(-50%);background:none;border:none;cursor:pointer;color:#9CA3AF;font-size:16px">✕</button>
       </div>
-      ${q ? `<div style="font-size:12px;color:#15803D;font-weight:600;margin-bottom:10px">🔍 Tìm "<b>${(catQuery || '').replace(/</g, '&lt;')}</b>" trên toàn bộ — <b>${list.length}</b> kết quả</div>` : `<div class="quick-chips" style="margin-bottom:14px">${chips}</div>`}
+      <div id="catSearchCount" style="font-size:12px;color:#15803D;font-weight:600;margin-bottom:10px;display:none"></div>
+      <div class="quick-chips" id="catChips" style="margin-bottom:14px">${chips}</div>
       <div style="display:flex;align-items:center;gap:9px;margin-bottom:10px;padding:8px 12px;background:#fff;border:1px solid var(--line);border-radius:9px">
         <div id="catSelectAll" class="checkbox" onclick="this.classList.toggle('on')" title="Chọn / bỏ tất cả"></div>
         <span style="font-size:12.5px;color:var(--muted)">Chọn tất cả · tick từng SP để <b>sửa nhóm / xóa hàng loạt</b> (thanh thao tác hiện ở dưới)</span>
       </div>
       <div id="catalogGrid" style="display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:10px">${rows}</div>`;
+    /* khôi phục giá trị ô tìm sau khi dựng lại view (đổi tab/nhóm) */
+    const se = document.getElementById('catSearch'); if (se) se.value = catQuery || '';
+    _syncCatSearchUI();
 
     /* Wire inline edit cho giá (input có sẵn) */
     document.querySelectorAll('#catalogView .cat-price').forEach(inp => {
@@ -930,7 +956,7 @@
     });
   };
 
-  window.filterCat = function (id) { currentCat = id; renderCatalog(); };
+  window.filterCat = function (id) { currentCat = id; catQuery = ''; renderCatalog(); };
 
   function productForm(p) {
     const catOpts = CATS.map(c => `<option value="${c.id}" ${p && p.cat === c.id ? 'selected' : ''}>${c.icon} ${c.label}</option>`).join('');
