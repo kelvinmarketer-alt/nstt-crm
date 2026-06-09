@@ -257,44 +257,57 @@ ${FAV ? `<link rel="icon" type="image/svg+xml" href="${FAV}">` : ''}
     if (!o) { window.toast && window.toast('Không tìm thấy đơn ' + code, 'warn'); return; }
     if (!window.openModal) { window.printOrderForCustomer && window.printOrderForCustomer(code); return; }
 
+    const row = (id, checked, icon, color, title, desc) => `
+      <label style="display:flex;align-items:flex-start;gap:10px;border:1px solid var(--line);border-radius:9px;padding:11px 12px;margin-bottom:8px;cursor:pointer">
+        <input type="checkbox" id="${id}" ${checked ? 'checked' : ''} style="margin-top:3px;width:16px;height:16px;accent-color:${color}">
+        <div style="flex:1"><div style="font-weight:700;color:${color};font-size:13px">${icon} ${title}</div>
+        <div style="font-size:11px;color:var(--muted);margin-top:2px">${desc}</div></div>
+      </label>`;
     window.openModal('🖨 In phiếu đơn ' + code, `
-      <div style="background:#EFF6FF;color:#1E40AF;padding:10px 12px;border-radius:8px;font-size:12.5px;margin-bottom:14px;line-height:1.55">
-        💡 <b>Có 3 phiếu khác nhau cho 3 mục đích</b> — chọn loại phù hợp:
-      </div>
-      <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:10px">
-        <button onclick="window.closeModal();window.printOrderForCustomer('${code}')" style="background:#fff;border:2px solid #1B5E20;border-radius:10px;padding:14px;cursor:pointer;text-align:left;line-height:1.4">
-          <div style="font-size:24px">📄</div>
-          <div style="font-weight:800;color:#1B5E20;margin-top:4px;font-size:13px">Phiếu xác nhận đơn</div>
-          <div style="font-size:10.5px;color:var(--muted);margin-top:4px">Cho <b>KHÁCH HÀNG</b><br>· Trước khi giao<br>· Đối chiếu công nợ</div>
-        </button>
-        <button onclick="window.closeModal();window.printOrderForShipper('${code}')" style="background:#fff;border:2px solid #D97706;border-radius:10px;padding:14px;cursor:pointer;text-align:left;line-height:1.4">
-          <div style="font-size:24px">🛵</div>
-          <div style="font-weight:800;color:#D97706;margin-top:4px;font-size:13px">Phiếu giao Shipper</div>
-          <div style="font-size:10.5px;color:var(--muted);margin-top:4px">Cho <b>SHIPPER</b><br>· Mang theo xe<br>· Tick + ký nhận POD</div>
-        </button>
-        <button onclick="window.closeModal();window.printDeliveryNote('${code}')" style="background:#fff;border:2px solid #C00000;border-radius:10px;padding:14px;cursor:pointer;text-align:left;line-height:1.4">
-          <div style="font-size:24px">🧾</div>
-          <div style="font-weight:800;color:#C00000;margin-top:4px;font-size:13px">Phiếu xuất kho</div>
-          <div style="font-size:10.5px;color:var(--muted);margin-top:4px">Kèm <b>HĐ bán hàng</b><br>· Sau khi giao xong<br>· SL xuất vs thực nhận<br>· Ký 4 bên</div>
-        </button>
-      </div>
-      <div style="margin-top:14px;padding:9px 12px;background:#FEF3C7;border-radius:7px;font-size:11.5px;color:#92400E">
-        💾 <b>Lưu PDF:</b> sau khi bấm In → trong hộp Print chọn <b>"Save as PDF"</b>.
+      <div style="font-size:12.5px;color:var(--muted);margin-bottom:12px">Tick (các) phiếu cần in theo giai đoạn — in 1 cái hoặc cả 3 tuỳ ý:</div>
+      ${row('prt_cust', true,  '📄', '#1B5E20', 'Phiếu xác nhận đơn (Khách)', 'Đơn giá + tổng tiền · công nợ · đối chiếu trước khi giao')}
+      ${row('prt_ship', false, '🛵', '#D97706', 'Phiếu giao cho Shipper', 'Địa chỉ + SĐT to · tick mặt hàng · khung COD · ô POD')}
+      ${row('prt_wh',   false, '🧾', '#C00000', 'Phiếu báo hàng / xuất kho (Kho)', 'Mặt hàng + số lượng cho Kho chuẩn bị')}
+      <div style="margin-top:6px;padding:11px 12px;background:#F0FDF4;border:1px solid #BBF7D0;border-radius:9px">
+        <div style="font-size:12px;color:#15803D;font-weight:600;margin-bottom:6px">📤 Bắt đầu quy trình Kho</div>
+        <div style="font-size:11.5px;color:var(--muted);margin-bottom:8px">Gửi phiếu báo hàng vào nhóm Kho (Telegram) rồi chuyển thẳng sang <b>Gom hàng → NCC</b>.</div>
+        <button class="btn btn-primary btn-sm" onclick="window._sendBaoHangAndGo('${code}')">📤 Gửi Kho + sang Gom hàng</button>
       </div>
     `, {
-      footer: `<button class="btn btn-ghost" onclick="window.closeModal()">Hủy</button>
-               <button class="btn btn-ghost" onclick="window.printBothOrderPdfs && window.printBothOrderPdfs('${code}')">📑 Cả 3 phiếu (mở 3 tab)</button>`,
-      width: '700px',
+      footer: `<button class="btn btn-ghost" onclick="window.closeModal()">Đóng</button>
+               <button class="btn btn-primary" onclick="window._printSelectedPhieu('${code}')">🖨 In phiếu đã chọn</button>`,
+      width: '440px',
     });
   };
 
-  /* Mở rộng printBothOrderPdfs để in cả 3 */
-  const origBoth = window.printBothOrderPdfs;
+  /* In các phiếu được tick — tuần tự */
+  window._printSelectedPhieu = function (code) {
+    const seq = [];
+    if (document.getElementById('prt_cust')?.checked) seq.push(() => window.printOrderForCustomer && window.printOrderForCustomer(code));
+    if (document.getElementById('prt_ship')?.checked) seq.push(() => window.printOrderForShipper && window.printOrderForShipper(code));
+    if (document.getElementById('prt_wh')?.checked) seq.push(() => window.printDeliveryNote && window.printDeliveryNote(code));
+    if (!seq.length) { window.toast && window.toast('Tick ít nhất 1 phiếu để in', 'warn'); return; }
+    window.closeModal && window.closeModal();
+    seq.forEach((fn, i) => setTimeout(fn, i * 800));
+  };
+
+  /* Gửi phiếu báo hàng cho Kho (Telegram) → chuyển sang Gom hàng */
+  window._sendBaoHangAndGo = function (code) {
+    window.closeModal && window.closeModal();
+    const go = () => { window.location.href = 'procurement.html'; };
+    if (window.sendBaoHangTelegram) {
+      window.sendBaoHangTelegram(code, false)
+        .then(r => { if (r && r.ok) window.toast && window.toast('📋 Đã gửi Kho — chuyển sang Gom hàng…', 'success'); setTimeout(go, 800); })
+        .catch(() => setTimeout(go, 300));
+    } else { window.toast && window.toast('Chuyển sang Gom hàng…', 'info'); setTimeout(go, 300); }
+  };
+
+  /* In cả 3 (tương thích ngược) */
   window.printBothOrderPdfs = function (code) {
     window.closeModal && window.closeModal();
     window.printOrderForCustomer && window.printOrderForCustomer(code);
-    setTimeout(() => window.printOrderForShipper && window.printOrderForShipper(code), 600);
-    setTimeout(() => window.printDeliveryNote && window.printDeliveryNote(code), 1200);
+    setTimeout(() => window.printOrderForShipper && window.printOrderForShipper(code), 700);
+    setTimeout(() => window.printDeliveryNote && window.printDeliveryNote(code), 1400);
   };
 
 })();
