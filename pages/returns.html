@@ -101,11 +101,16 @@
         ${r.item ? `<b>${r.item.name}</b> · ${r.qtyReturn||0}${r.item.unit||'kg'}<br>` : ''}
         <span style="color:var(--muted)">${r.reason}</span>
         <div style="margin-top:3px;display:flex;gap:4px;flex-wrap:wrap">
+          ${r.caseType==='onsite' ? '<span style="background:#EDE9FE;color:#6D28D9;font-size:10px;font-weight:700;padding:1px 6px;border-radius:99px">TH1 Đồng kiểm</span>' : r.caseType==='later' ? '<span style="background:#FCE7F3;color:#9D174D;font-size:10px;font-weight:700;padding:1px 6px;border-radius:99px">TH2 Trả sau</span>' : ''}
           ${r.disposition==='restock' ? '<span style="background:#DCFCE7;color:#15803D;font-size:10px;font-weight:700;padding:1px 6px;border-radius:99px">🏬 Nhập lại kho</span>' : r.disposition==='discard' ? '<span style="background:#FEE2E2;color:#B91C1C;font-size:10px;font-weight:700;padding:1px 6px;border-radius:99px">🗑 Hao hụt</span>' : ''}
           ${r.fault==='supplier' ? `<span style="background:#FEF3C7;color:#B45309;font-size:10px;font-weight:700;padding:1px 6px;border-radius:99px">🏭 Đòi NCC${r.supplierName?': '+r.supplierName:''}</span>` : r.fault==='shipping' ? '<span style="background:#E0E7FF;color:#3730A3;font-size:10px;font-weight:700;padding:1px 6px;border-radius:99px">🚚 Lỗi vận chuyển</span>' : r.fault==='customer' ? '<span style="background:#F1F5F9;color:#475569;font-size:10px;font-weight:700;padding:1px 6px;border-radius:99px">👤 Lỗi KH</span>' : ''}
         </div>
       </td>
-      <td style="padding:10px;text-align:right;font-weight:700;color:#DC2626">${window.fmt(r.refundTotal)} ₫<div style="font-size:9px;color:var(--muted);font-weight:400">${r.refundMode==='cash'?'chi tiền mặt':'giảm công nợ'}</div></td>
+      <td style="padding:10px;text-align:right;font-size:12px">${
+        (r.resolution && r.resolution.startsWith('replace'))
+          ? `<span style="font-weight:700;color:#1E40AF">🔄 Bù hàng</span><div style="font-size:9px;color:var(--muted)">${r.resolution==='replace_next'?'hôm sau':'hôm nay'}${r.replacementCode?' · '+r.replacementCode:''}</div>`
+          : `<span style="font-weight:700;color:#DC2626">${window.fmt(r.refundTotal)} ₫</span><div style="font-size:9px;color:var(--muted);font-weight:400">${r.refundMode==='cash'?'chi tiền mặt':'trừ công nợ'}</div>`
+      }</td>
       <td style="padding:10px"><span style="background:${stClr[r.status]}1f;color:${stClr[r.status]};padding:2px 8px;border-radius:99px;font-size:11px;font-weight:700">${stLab[r.status]}</span></td>
       <td style="padding:10px">${r.status==='pending' ? `<button class="btn btn-ghost btn-sm" onclick="window.processReturn('${r.id}')">✓ Xử lý</button>` : ''}</td>
     </tr>`).join('');
@@ -151,28 +156,59 @@
     fr.readAsDataURL(f);
   };
 
+  function _rtIsoDay(offset) {
+    const d = (window.todayDate && window.todayDate()) || new Date();
+    if (offset) d.setDate(d.getDate() + offset);
+    return d.toISOString().slice(0, 10);
+  }
+  /* Tạo ĐƠN GIAO BÙ riêng (tiền 0) cho mặt hàng trả — when: 'today' | 'next' */
+  function _rtCreateReplacement(r, when) {
+    const orig = getOrd().find(o => o.code === r.orderCode);
+    if (!orig || !r.item) return null;
+    const code = window.STORE.nextOrderCode ? window.STORE.nextOrderCode() : ('NSTT-' + Math.floor(100000 + Math.random() * 899999));
+    const deliverDate = _rtIsoDay(when === 'next' ? 1 : 0);
+    const whenLbl = when === 'next' ? 'HÔM SAU (NCC nhập dư)' : 'NGAY hôm nay (mua ngoài/kho)';
+    const ro = {
+      code, cust: orig.cust, custName: orig.custName, custPhone: orig.custPhone || '',
+      serviceType: orig.serviceType, transportMode: orig.transportMode,
+      pickup: orig.pickup, drop: orig.drop, date: viToday(), deliverDate,
+      shipShift: orig.shipShift || '', shipTime: orig.shipTime || '',
+      items: [{ id: r.item.id, name: r.item.name, unit: r.item.unit || 'kg', qty: r.qtyReturn || 0, price: 0, total: 0, priceConfirmed: true }],
+      goods: 'Giao bù: ' + r.item.name + ' ' + (r.qtyReturn || 0) + (r.item.unit || 'kg'),
+      weight: r.qtyReturn || 0, freight: 0, cod: 0, payBy: 'Đã thanh toán',
+      status: 'new', whStatus: '',
+      note: `🔄 GIAO BÙ đơn ${r.orderCode} (${whenLbl}) — lý do: ${r.reason}`,
+      isReplacement: true, replacementFor: r.orderCode, staff: orig.staff || '',
+    };
+    window.STORE.add('orders', ro);
+    return ro;
+  }
+
   window.processReturn = function(id) {
     const list = getR();
     const i = list.findIndex(x => x.id === id);
     if (i < 0) return;
     const r = list[i];
+    const res = r.resolution || 'refund';
+    const resLbl = res === 'refund'
+      ? `TRỪ hoá đơn ${window.fmt(r.refundTotal)}₫ (${r.refundMode === 'cash' ? 'tiền mặt' : 'giảm nợ'})`
+      : res === 'replace_next' ? 'Bù hàng HÔM SAU (tạo đơn giao bù + báo NCC)' : 'Bù hàng NGAY hôm nay (tạo đơn giao bù)';
     const summary = [
       r.item ? `Mặt hàng: ${r.item.name} ${r.qtyReturn||0}${r.item.unit||'kg'}` : '',
       `Hàng trả: ${r.disposition==='restock' ? 'NHẬP LẠI KHO' : 'BỎ (hao hụt)'}`,
-      r.refundTotal>0 ? `Hoàn ${window.fmt(r.refundTotal)}₫ — ${r.refundMode==='cash'?'chi tiền mặt':'giảm công nợ KH'}` : 'Không hoàn tiền',
+      'Cách xử lý: ' + resLbl,
       r.fault==='supplier' && r.supplierId ? `Đòi lại NCC: ${r.supplierName}` : ''
     ].filter(Boolean).join('\n');
     if (!confirm(`Xử lý đơn trả ${r.id}?\n\n${summary}`)) return;
 
     const msgs = [];
-    r.status = 'refunded';
 
     /* 1) Nhập lại kho nếu hàng còn dùng được */
     if (r.disposition === 'restock' && r.item && r.item.id && r.qtyReturn > 0) {
       const inv = window.STORE.get('inventory', []) || [];
       let item = inv.find(x => x.productId === r.item.id);
       if (!item) {
-        item = { id:'INV'+Date.now().toString(36), productId:r.item.id, stock:0, minStock:10, maxStock:100, avgDaily:5, lastIn:'', lastOut:'', location:'Kho A1' };
+        item = { id:'INV'+Math.floor(performance.now()).toString(36), productId:r.item.id, stock:0, minStock:10, maxStock:100, avgDaily:5, lastIn:'', lastOut:'', location:'Kho A1' };
         inv.push(item);
       }
       item.stock = Math.max(0, (item.stock||0) + r.qtyReturn);
@@ -181,33 +217,51 @@
       msgs.push(`+${r.qtyReturn}${r.item.unit||'kg'} vào kho`);
     }
 
-    /* 2) Hoàn tiền: giảm công nợ KH hoặc chi tiền mặt */
-    if (r.refundTotal > 0) {
-      if (r.refundMode === 'cash') {
-        /* Phiếu chi đúng schema sổ quỹ (type:'out', party, desc) — số phiếu riêng tránh trùng dải PC- của Kế toán */
-        window.STORE.add('cashEntries', {
-          no: 'PCTH-' + Date.now().toString(36).toUpperCase(),
-          date: r.date, type: 'out', party: r.custName,
-          desc: 'Hoàn tiền trả hàng ' + r.orderCode + (r.item ? ' · ' + r.item.name : ''),
-          account: 'Tiền mặt', amount: r.refundTotal,
-          staff: window.CURRENT_USER?.name || '',
-        });
-        /* Trừ số dư tài khoản Tiền mặt nếu có */
-        const accs = window.STORE.get('paymentAccounts', []) || [];
-        const acc = accs.find(a => (a.name || '').toLowerCase().includes('tiền mặt'));
-        if (acc) window.STORE.update('paymentAccounts', acc.id, { balance: (+acc.balance || 0) - r.refundTotal });
-        msgs.push('tạo phiếu chi');
-      } else {
-        const custs = window.STORE.get('customers', []) || [];
-        const c = custs.find(x => x.id === r.custId) || custs.find(x => x.name === r.custName);
-        if (c) {
-          window.STORE.update('customers', c.id, {
-            debt: Math.max(0, (+c.debt || 0) - r.refundTotal),
-            debtOverdue: Math.max(0, (+c.debtOverdue || 0) - r.refundTotal),
+    /* 2) Giải quyết theo CÁCH XỬ LÝ */
+    if (res === 'refund') {
+      /* Không lấy nữa → trừ vào hoá đơn (giảm nợ / chi tiền mặt) */
+      r.status = 'refunded';
+      if (r.refundTotal > 0) {
+        if (r.refundMode === 'cash') {
+          window.STORE.add('cashEntries', {
+            no: 'PCTH-' + Math.floor(performance.now()).toString(36).toUpperCase(),
+            date: r.date, type: 'out', party: r.custName,
+            desc: 'Hoàn tiền trả hàng ' + r.orderCode + (r.item ? ' · ' + r.item.name : ''),
+            account: 'Tiền mặt', amount: r.refundTotal,
+            staff: window.CURRENT_USER?.name || '',
           });
-          msgs.push(`giảm công nợ ${r.custName}`);
-        } else { msgs.push('không tìm thấy KH để giảm nợ'); }
+          const accs = window.STORE.get('paymentAccounts', []) || [];
+          const acc = accs.find(a => (a.name || '').toLowerCase().includes('tiền mặt'));
+          if (acc) window.STORE.update('paymentAccounts', acc.id, { balance: (+acc.balance || 0) - r.refundTotal });
+          msgs.push('tạo phiếu chi');
+        } else {
+          const custs = window.STORE.get('customers', []) || [];
+          const c = custs.find(x => x.id === r.custId) || custs.find(x => x.name === r.custName);
+          if (c) {
+            window.STORE.update('customers', c.id, {
+              debt: Math.max(0, (+c.debt || 0) - r.refundTotal),
+              debtOverdue: Math.max(0, (+c.debtOverdue || 0) - r.refundTotal),
+            });
+            /* Ghi SỔ CÔNG NỢ: giảm nợ do trả hàng */
+            window.addDebtLedger && window.addDebtLedger({
+              custId: c.id, type: 'payment', amount: r.refundTotal, ref: r.id, date: r.date,
+              desc: 'Giảm nợ trả hàng ' + r.orderCode + (r.item ? ' · ' + r.item.name : ''),
+            });
+            msgs.push(`giảm công nợ ${r.custName}`);
+          } else { msgs.push('không tìm thấy KH để giảm nợ'); }
+        }
       }
+    } else {
+      /* Đòi bù hàng → tạo ĐƠN GIAO BÙ riêng (tiền 0) */
+      r.status = 'replaced';
+      const ro = _rtCreateReplacement(r, res === 'replace_next' ? 'next' : 'today');
+      if (ro) {
+        r.replacementCode = ro.code;
+        msgs.push('tạo đơn giao bù ' + ro.code + (res === 'replace_next' ? ' (hôm sau)' : ' (hôm nay)'));
+        if (res === 'replace_next' && window.sendTgMessage) {
+          window.sendTgMessage('alert', `📅 BÙ HÀNG HÔM SAU — đơn ${ro.code}\n👤 ${ro.custName}\n• ${r.item.name}: ${r.qtyReturn}${r.item.unit||'kg'}\n→ Báo NCC + Kho nhập dư hôm sau để bù.`).catch(()=>{});
+        }
+      } else msgs.push('không tạo được đơn bù (thiếu đơn gốc/mặt hàng)');
     }
 
     /* 3) Lỗi NCC → tạo khoản đòi lại NCC */
@@ -247,14 +301,35 @@
       <label style="${_lbl}">Mặt hàng trả *</label>
       <select id="rt_item" style="${_inp}"><option value="">— Chọn đơn trước —</option></select>
       <div style="display:flex;gap:8px">
-        <div style="flex:1"><label style="${_lbl}">Số lượng trả</label><input id="rt_qty" type="number" min="0" step="0.1" placeholder="VD: 2" style="${_inp}"></div>
-        <div style="flex:1"><label style="${_lbl}">Số tiền hoàn (₫)</label><input id="rt_refund" type="number" placeholder="VD: 80000" style="${_inp}"></div>
+        <div style="flex:1"><label style="${_lbl}">Số lượng trả</label><input id="rt_qty" type="number" min="0" step="0.1" placeholder="VD: 2" oninput="window._rtCalcRefund()" style="${_inp}"></div>
+        <div style="flex:1"><label style="${_lbl}">Trường hợp *</label>
+          <select id="rt_case" style="${_inp}">
+            <option value="onsite">TH1 · Đồng kiểm tại chỗ (ship + khách kiểm cùng)</option>
+            <option value="later">TH2 · Trả sau (khách phản ánh trong ngày)</option>
+          </select></div>
       </div>
       <label style="${_lbl}">Lý do *</label>
       <select id="rt_reason" style="${_inp}">
         <option>Rau hỏng/thối</option><option>Sai mặt hàng</option><option>Thiếu số lượng</option>
         <option>Không đúng chất lượng</option><option>KH đổi ý</option><option>Khác</option>
       </select>
+      <label style="${_lbl}">Cách xử lý *</label>
+      <select id="rt_resolution" onchange="window._rtOnResolution()" style="${_inp}">
+        <option value="refund">❌ Không lấy nữa → TRỪ vào hoá đơn (giảm công nợ)</option>
+        <option value="replace_today">🔄 Bù hàng NGAY hôm nay (mua ngoài / kho có sẵn)</option>
+        <option value="replace_next">📅 Bù hàng HÔM SAU (báo NCC + kho nhập dư)</option>
+      </select>
+      <div id="rt_refundWrap">
+        <div style="display:flex;gap:8px">
+          <div style="flex:1"><label style="${_lbl}">Số tiền trừ hoá đơn (₫)</label><input id="rt_refund" type="number" placeholder="tự tính theo SL × giá" style="${_inp}"></div>
+          <div style="flex:1"><label style="${_lbl}">Hình thức</label>
+            <select id="rt_mode" style="${_inp}">
+              <option value="debt">Giảm công nợ KH (B2B — khuyên dùng)</option>
+              <option value="cash">Chi tiền mặt (tạo phiếu chi)</option>
+            </select></div>
+        </div>
+      </div>
+      <div id="rt_replaceNote" style="display:none;background:#EFF6FF;color:#1E40AF;padding:8px 11px;border-radius:7px;font-size:11.5px;margin-bottom:8px"></div>
       <label style="${_lbl}">Hàng trả về xử lý thế nào?</label>
       <select id="rt_disp" style="${_inp}">
         <option value="discard">🗑 Bỏ — hao hụt (hỏng, không dùng được)</option>
@@ -270,11 +345,6 @@
         <label style="${_lbl}">NCC chịu trách nhiệm</label>
         <select id="rt_sup" style="${_inp}"><option value="">— Chọn NCC —</option>${sups.map(s => `<option value="${s.id}">${s.name}</option>`).join('')}</select>
       </div>
-      <label style="${_lbl}">Hoàn tiền bằng cách</label>
-      <select id="rt_mode" style="${_inp}">
-        <option value="debt">Giảm công nợ KH (B2B — khuyên dùng)</option>
-        <option value="cash">Chi tiền mặt (tạo phiếu chi)</option>
-      </select>
       <label style="${_lbl}">Ghi chú</label>
       <textarea id="rt_note" rows="2" style="width:100%;border:1px solid var(--line);border-radius:6px;padding:7px;font-size:13px"></textarea>
     `, {
@@ -290,11 +360,37 @@
     const items = (o && Array.isArray(o.items)) ? o.items : [];
     const itemSel = document.getElementById('rt_item');
     itemSel.innerHTML = items.length
-      ? items.map((it,idx) => `<option value="${idx}">${it.name} (đã giao ${it.qty||0}${it.unit||'kg'})</option>`).join('')
+      ? items.map((it,idx) => `<option value="${idx}" data-price="${it.price||0}">${it.name} (đã giao ${it.qty||0}${it.unit||'kg'})</option>`).join('')
       : '<option value="">(đơn này không có chi tiết mặt hàng)</option>';
+    itemSel.onchange = window._rtCalcRefund;
+    window._rtCalcRefund();
   };
   window._rtOnFault = function() {
     document.getElementById('rt_supWrap').style.display = document.getElementById('rt_fault').value === 'supplier' ? '' : 'none';
+  };
+  /* Tự tính số tiền trừ = SL trả × đơn giá mặt hàng */
+  window._rtCalcRefund = function() {
+    const itemSel = document.getElementById('rt_item');
+    const opt = itemSel && itemSel.options[itemSel.selectedIndex];
+    const price = opt ? (+opt.dataset.price || 0) : 0;
+    const qty = parseFloat(document.getElementById('rt_qty').value) || 0;
+    const rf = document.getElementById('rt_refund');
+    if (rf && price && qty) rf.value = Math.round(price * qty);
+  };
+  /* Đổi cách xử lý → ẩn/hiện ô trừ tiền vs hướng dẫn bù hàng */
+  window._rtOnResolution = function() {
+    const res = document.getElementById('rt_resolution').value;
+    const refundWrap = document.getElementById('rt_refundWrap');
+    const repNote = document.getElementById('rt_replaceNote');
+    const isRefund = res === 'refund';
+    refundWrap.style.display = isRefund ? '' : 'none';
+    if (isRefund) { repNote.style.display = 'none'; }
+    else {
+      repNote.style.display = 'block';
+      repNote.innerHTML = res === 'replace_today'
+        ? '🔄 <b>Bù NGAY hôm nay:</b> hệ thống tạo <b>đơn giao bù riêng</b> (tiền 0) giao trong ngày. Mã thiếu NCC sẽ vào <b>Thu mua ngoài</b> ở Gom hàng. KH <b>không bị trừ tiền</b> (giao bù).'
+        : '📅 <b>Bù HÔM SAU:</b> tạo <b>đơn giao bù riêng</b> lịch <b>ngày mai</b> — báo NCC + Kho <b>nhập dư</b> để bù. KH không bị trừ tiền.';
+    }
   };
 
   window._rtSave = function() {
@@ -314,6 +410,8 @@
       item: it ? { id: it.id, name: it.name, unit: it.unit || 'kg' } : null,
       qtyReturn: parseFloat(document.getElementById('rt_qty').value) || 0,
       reason: document.getElementById('rt_reason').value,
+      caseType: document.getElementById('rt_case').value,            /* onsite | later */
+      resolution: document.getElementById('rt_resolution').value,    /* refund | replace_today | replace_next */
       disposition: document.getElementById('rt_disp').value,
       fault: document.getElementById('rt_fault').value,
       refundMode: document.getElementById('rt_mode').value,

@@ -65,6 +65,8 @@
               custId: null, custPhone: null, source: null,
               /* nhóm giá đơn — metadata local (giá đã baked vào items[].price) → KHÔNG cột DB */
               priceTier: null, priceTierName: null,
+              /* đơn giao bù (trả hàng) — metadata local, KHÔNG cột DB */
+              isReplacement: null, replacementFor: null,
               /* drop legacy VTY fields */
               driver: null, external: null, partner: null },
       from: { order_date:'date', cust_name:'custName', customer_id:'cust', service_type:'serviceType',
