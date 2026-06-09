@@ -1,0 +1,34 @@
+name: Tự tạo đơn định kỳ (NSTT)
+
+on:
+  schedule:
+    # Chạy MỖI GIỜ (phút 5). Script tự kiểm tra giờ VN == giờ admin đã cài rồi mới tạo đơn.
+    - cron: '5 * * * *'
+  workflow_dispatch:
+    # Chạy thử thủ công — bỏ qua kiểm tra giờ
+    inputs:
+      force:
+        description: 'Bỏ qua kiểm tra giờ (chạy thử ngay)'
+        type: boolean
+        default: true
+
+jobs:
+  generate:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+      - name: Cài deps
+        working-directory: cron
+        run: npm install --no-audit --no-fund
+      - name: Tạo đơn định kỳ
+        working-directory: cron
+        env:
+          SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
+          SUPABASE_KEY: ${{ secrets.SUPABASE_KEY }}
+          TELEGRAM_BOT_TOKEN: ${{ secrets.TELEGRAM_BOT_TOKEN }}
+          TELEGRAM_CHAT_ID: ${{ secrets.TELEGRAM_CHAT_ID }}
+          FORCE: ${{ (github.event_name == 'workflow_dispatch' && inputs.force) && '1' || '' }}
+        run: node recurring-cron.mjs

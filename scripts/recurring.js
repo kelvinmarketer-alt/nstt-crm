@@ -470,8 +470,23 @@ CHỈ TRẢ JSON.`,
     runGenerator();
   };
 
+  /* === Cấu hình tự tạo đơn (admin chỉnh giờ) — lưu KV autoRecurring, cron đọc === */
+  window.saveAutoCfg = function () {
+    const enabled = !!document.getElementById('auto_enabled')?.checked;
+    const time = document.getElementById('auto_time')?.value || '21:00';
+    window.STORE.set('autoRecurring', { enabled, time });
+    window.toast && window.toast(enabled ? `🤖 Đã bật tự tạo đơn lúc ${time} mỗi ngày` : '⏸ Đã tắt tự tạo đơn', enabled ? 'success' : 'info');
+  };
+  function loadAutoCfg() {
+    const cfg = window.STORE.get('autoRecurring', { enabled: false, time: '21:00' }) || {};
+    const cb = document.getElementById('auto_enabled'); if (cb) cb.checked = !!cfg.enabled;
+    const tm = document.getElementById('auto_time'); if (tm && cfg.time) tm.value = cfg.time;
+  }
+
   /* Init */
   window.renderAppShell('recurring', 'Đơn định kỳ');
+  loadAutoCfg();
+  window.STORE.subscribe('autoRecurring', loadAutoCfg);
   document.getElementById('hbHost').innerHTML = window.helpBanner(
     '🔁 Đơn định kỳ là gì?',
     'Mẫu đơn lặp lại cho KH B2B đặt theo lịch (rau hằng ngày cho nhà hàng, hàng tuần cho bếp ăn...). Hệ thống <b>tự sinh đơn mới mỗi ngày</b> trong tuần đã cài. Không cần tạo thủ công — tiết kiệm 80% thao tác. Cần dừng giao thì bấm "⏸ Tạm dừng".',

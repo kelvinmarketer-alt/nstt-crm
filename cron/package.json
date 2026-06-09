@@ -1,0 +1,9 @@
+{
+  "name": "nstt-recurring-cron",
+  "private": true,
+  "type": "module",
+  "description": "Tự tạo đơn định kỳ NSTT cho ngày hôm sau (GitHub Actions)",
+  "dependencies": {
+    "@supabase/supabase-js": "^2.45.0"
+  }
+}

@@ -25,3 +25,4 @@ build/
 .git_vty_legacy_backup/
 
 # Backup folder VTY git history cũ — đã rename khỏi .git để init NSTT clean. KHÔNG commit.
+cron/node_modules/
