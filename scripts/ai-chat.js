@@ -433,7 +433,9 @@ ${recent}`;
             display:grid;place-items:center;transition:all 0.2s;
             position:relative;
           }
+          #aiChatBtn{cursor:grab;touch-action:none}
           #aiChatBtn:hover{transform:scale(1.08);box-shadow:0 10px 26px rgba(22,163,74,0.5)}
+          #aiChatBtn.dragging{cursor:grabbing;transform:scale(1.05)}
           #aiChatBtn .badge{
             position:absolute;top:-2px;right:-2px;
             background:#F59E0B;color:#fff;font-size:9px;font-weight:700;
@@ -548,7 +550,13 @@ ${recent}`;
         </div>
       `;
       document.body.appendChild(bubble);
-      document.getElementById('aiChatBtn').onclick = () => this.toggle();
+      this._restorePos();
+      /* Bong bóng KÉO-THẢ được (đi bất kỳ đâu, khỏi che nội dung) + nhớ vị trí.
+         Phân biệt: click = mở chat, kéo (>4px) = di chuyển. */
+      const btn = document.getElementById('aiChatBtn');
+      if (window.PointerEvent && btn) { this._makeDraggable(); }
+      else if (btn) { btn.onclick = () => this.toggle(); }
+      window.addEventListener('resize', () => { this._restorePos(); if (this.open) this._positionPanel(); });
 
       /* Load: conversation gần nhất hoặc tạo mới */
       const list = this.listConvs();
@@ -566,11 +574,75 @@ ${recent}`;
     toggle() {
       this.open = !this.open;
       const p = document.getElementById('aiChatPanel');
+      if (this.open) this._positionPanel();
       if (p) p.classList.toggle('open', this.open);
       if (this.open) {
         setTimeout(() => document.getElementById('aicInp')?.focus(), 100);
         this.scrollBottom();
       }
+    },
+
+    /* ===== KÉO-THẢ bong bóng AI ===== */
+    _makeDraggable() {
+      const wrap = document.getElementById('aiChatBubble');
+      const btn = document.getElementById('aiChatBtn');
+      if (!wrap || !btn) return;
+      let sx = 0, sy = 0, ox = 0, oy = 0, moved = false, dragging = false;
+      const self = this;
+      btn.addEventListener('pointerdown', (e) => {
+        dragging = true; moved = false;
+        const r = wrap.getBoundingClientRect();
+        ox = r.left; oy = r.top; sx = e.clientX; sy = e.clientY;
+        wrap.style.left = ox + 'px'; wrap.style.top = oy + 'px';
+        wrap.style.right = 'auto'; wrap.style.bottom = 'auto';
+        try { btn.setPointerCapture(e.pointerId); } catch (err) {}
+      });
+      btn.addEventListener('pointermove', (e) => {
+        if (!dragging) return;
+        const dx = e.clientX - sx, dy = e.clientY - sy;
+        if (!moved && (Math.abs(dx) > 4 || Math.abs(dy) > 4)) { moved = true; btn.classList.add('dragging'); }
+        if (!moved) return;
+        const w = wrap.offsetWidth, h = wrap.offsetHeight;
+        const nx = Math.max(4, Math.min(window.innerWidth - w - 4, ox + dx));
+        const ny = Math.max(4, Math.min(window.innerHeight - h - 4, oy + dy));
+        wrap.style.left = nx + 'px'; wrap.style.top = ny + 'px';
+        e.preventDefault();
+      });
+      const end = () => {
+        if (!dragging) return;
+        dragging = false; btn.classList.remove('dragging');
+        if (moved) { self._savePos(); if (self.open) self._positionPanel(); }
+        else { self.toggle(); }   /* không kéo = click = mở/đóng chat */
+      };
+      btn.addEventListener('pointerup', end);
+      btn.addEventListener('pointercancel', end);
+    },
+    _savePos() {
+      const wrap = document.getElementById('aiChatBubble'); if (!wrap) return;
+      const r = wrap.getBoundingClientRect();
+      try { localStorage.setItem('nstt_aichat_pos', JSON.stringify({ left: Math.round(r.left), top: Math.round(r.top) })); } catch (e) {}
+    },
+    _restorePos() {
+      let pos = null; try { pos = JSON.parse(localStorage.getItem('nstt_aichat_pos') || 'null'); } catch (e) {}
+      const wrap = document.getElementById('aiChatBubble'); if (!wrap || !pos) return;
+      const w = wrap.offsetWidth || 56, h = wrap.offsetHeight || 56;
+      const left = Math.max(4, Math.min(window.innerWidth - w - 4, pos.left));
+      const top = Math.max(4, Math.min(window.innerHeight - h - 4, pos.top));
+      wrap.style.left = left + 'px'; wrap.style.top = top + 'px';
+      wrap.style.right = 'auto'; wrap.style.bottom = 'auto';
+    },
+    /* Đặt panel chat cạnh bong bóng (mở lên/xuống, trái/phải tuỳ chỗ trống) */
+    _positionPanel() {
+      const wrap = document.getElementById('aiChatBubble');
+      const p = document.getElementById('aiChatPanel');
+      if (!wrap || !p) return;
+      const r = wrap.getBoundingClientRect();
+      const vw = window.innerWidth, vh = window.innerHeight;
+      p.style.left = p.style.right = p.style.top = p.style.bottom = 'auto';
+      if (r.left + r.width / 2 > vw / 2) p.style.right = Math.max(8, Math.round(vw - r.right)) + 'px';
+      else p.style.left = Math.max(8, Math.round(r.left)) + 'px';
+      if (r.top > vh / 2) p.style.bottom = Math.max(8, Math.round(vh - r.top + 10)) + 'px';
+      else p.style.top = Math.max(8, Math.round(r.bottom + 10)) + 'px';
     },
 
     toggleDrawer() {
