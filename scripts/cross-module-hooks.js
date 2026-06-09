@@ -121,17 +121,25 @@
         const isFinalSettled = (o.status === 'delivered' || o.status === 'reconciled');
         const isCancelled = (o.status === 'cancelled' || o.status === 'returned');
 
-        /* Trường hợp 1: đơn vừa delivered + chưa TT → cộng debt */
+        /* Trường hợp 1: đơn vừa delivered + chưa TT → cộng debt + ghi SỔ CÔNG NỢ (charge) */
         if (isFinalSettled && isUnpaid && !o._debtApplied) {
           c.debt = (c.debt || 0) + (o.freight || 0);
           o._debtApplied = true;
           changed = true;
+          window.addDebtLedger && window.addDebtLedger({
+            custId: c.id, type: 'charge', amount: o.freight || 0, ref: o.code,
+            date: o.deliveredAt || o.date, desc: 'Tiền hàng đơn ' + o.code,
+          });
         }
-        /* Trường hợp 2: đơn cancel/return sau khi đã cộng debt → trừ ra */
+        /* Trường hợp 2: đơn cancel/return sau khi đã cộng debt → trừ ra + ghi SỔ (reverse) */
         if (isCancelled && o._debtApplied) {
           c.debt = Math.max(0, (c.debt || 0) - (o.freight || 0));
           o._debtApplied = false;
           changed = true;
+          window.addDebtLedger && window.addDebtLedger({
+            custId: c.id, type: 'reverse', amount: o.freight || 0, ref: o.code + '-rev',
+            desc: 'Hoàn nợ (huỷ/trả đơn ' + o.code + ')',
+          });
         }
       });
       if (changed) {

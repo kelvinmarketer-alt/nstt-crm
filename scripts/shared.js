@@ -267,6 +267,38 @@ window.tierPriceOn = function (productId, dateISO, tierId) {
   if (t.overrides && t.overrides[productId] != null) return +t.overrides[productId] || 0;
   return Math.round((base || 0) * (1 + (+t.markup || 0) / 100));
 };
+/* ============ SỔ CÔNG NỢ theo ngày (debtLedger) ============
+   Mỗi dòng: { id, custId, date (dd/mm/yyyy), ts (ISO sort), type:'charge'|'payment'|'reverse',
+               amount, ref (mã đơn / số phiếu thu), desc }
+   - charge  = phát sinh nợ (đơn giao + Công nợ)  → +
+   - payment = trả nợ (phiếu thu)                  → −
+   - reverse = hoàn nợ (huỷ/trả đơn đã cộng nợ)     → −
+   c.debt vẫn là TỔNG chuẩn; sổ này là chi tiết phát sinh. Số dư đầu kỳ tự khớp về c.debt. */
+window.getDebtLedger = function (custId) {
+  const arr = (window.STORE && window.STORE.get('debtLedger', [])) || [];
+  return custId ? arr.filter(e => e.custId === custId) : arr;
+};
+window.addDebtLedger = function (e) {
+  if (!window.STORE || !e || !e.custId) return;
+  const now = new Date();
+  const entry = {
+    id: 'dl_' + (typeof performance !== 'undefined' && performance.now ? Math.floor(performance.now() * 1000).toString(36) : '') + Math.floor((1 + Math.random()) * 1e6).toString(36),
+    custId: e.custId,
+    date: e.date || now.toLocaleDateString('vi-VN'),
+    ts: e.ts || now.toISOString(),
+    type: e.type || 'charge',
+    amount: Math.round(+e.amount || 0),
+    ref: e.ref || '',
+    desc: e.desc || '',
+  };
+  if (!entry.amount) return;
+  const arr = (window.STORE.get('debtLedger', []) || []);
+  /* tránh trùng: cùng ref + type + custId thì bỏ qua (idempotent với hook chạy lại) */
+  if (entry.ref && arr.some(x => x.custId === entry.custId && x.ref === entry.ref && x.type === entry.type)) return;
+  arr.unshift(entry);
+  window.STORE.set('debtLedger', arr);
+};
+
 /* Nhóm giá GÁN cho 1 KH — nguồn chuẩn = KV 'custPriceTiers' (sync đa máy),
    fallback field priceTier trên bản ghi KH (cache cũ/local). */
 window.custPriceTier = function (custId) {

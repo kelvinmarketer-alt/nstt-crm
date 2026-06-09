@@ -642,6 +642,12 @@ Mong quý khách thu xếp thanh toán sớm. Cảm ơn!
       staff: window.CURRENT_USER.name,
     });
 
+    /* Ghi SỔ CÔNG NỢ (payment) */
+    window.addDebtLedger && window.addDebtLedger({
+      custId, type: 'payment', amount, ref: phieuNo, date,
+      desc: desc + (appliedInvoices.length ? ' (' + appliedInvoices.length + ' HĐ)' : ''),
+    });
+
     /* Cập nhật số dư TK */
     const accounts = window.STORE.get('paymentAccounts', []);
     const acc = accounts.find(a => a.name === account);

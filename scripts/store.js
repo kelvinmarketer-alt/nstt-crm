@@ -143,6 +143,7 @@
     'supplierClaims',  /* Khoản đòi lại NCC khi hàng NCC giao hỏng (Trả hàng) */
     'supplierMeta',    /* Loại NCC (sỉ/lẻ/cả hai) — cloud suppliers không có cột này */
     'custPriceTiers',  /* Nhóm giá gán cho từng KH {custId:tierId} — cloud customers không có cột price_tier */
+    'debtLedger',      /* Sổ công nợ theo ngày {custId,date,type,amount,ref} — phát sinh/trả nợ từng dòng */
     'audit_log',       /* Truy vết NV — HIGH */
     'inv_movements',   /* Sổ xuất nhập kho — HIGH */
     /* 'snapshots' KHÔNG sync cloud: mỗi bản backup copy TOÀN BỘ data (gồm 268 SP) →

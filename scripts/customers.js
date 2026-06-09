@@ -80,6 +80,40 @@
     return (u && u.name) || (window.CURRENT_USER && window.CURRENT_USER.name) || '';
   }
 
+  /* ====== SỔ CÔNG NỢ THẬT theo ngày (thay bảng giả) ======
+     Lấy từ debtLedger (phát sinh từ đơn giao + phiếu thu). Số dư đầu kỳ tự khớp về c.debt
+     để chạy số luôn kết thúc đúng tổng nợ hiện tại — kể cả khi sổ bắt đầu giữa chừng. */
+  function renderDebtLedger(c) {
+    const dtb = document.querySelector('#debtTable tbody');
+    if (!dtb) return;
+    const fmt = window.fmt;
+    const ledger = (window.getDebtLedger ? window.getDebtLedger(c.id) : []).slice()
+      .sort((a, b) => (a.ts || '') < (b.ts || '') ? -1 : 1);   /* cũ → mới */
+    const totalDebt = +c.debt || 0;
+    if (!ledger.length && totalDebt <= 0) {
+      dtb.innerHTML = `<tr><td colspan="6" style="text-align:center;padding:30px;color:var(--ok)">✓ Không có công nợ.</td></tr>`;
+      return;
+    }
+    const sumCharge = ledger.filter(e => e.type === 'charge').reduce((s, e) => s + (+e.amount || 0), 0);
+    const sumMinus = ledger.filter(e => e.type !== 'charge').reduce((s, e) => s + (+e.amount || 0), 0);
+    let bal = totalDebt - sumCharge + sumMinus;   /* số dư đầu kỳ */
+    let rows = `<tr style="color:var(--muted)"><td>—</td><td>—</td><td><i>Số dư đầu kỳ</i></td><td class="num">—</td><td class="num">—</td><td class="num"><b>${fmt(Math.round(bal))}</b></td></tr>`;
+    ledger.forEach(e => {
+      const isCharge = e.type === 'charge';
+      bal += isCharge ? (+e.amount || 0) : -(+e.amount || 0);
+      rows += `<tr>
+        <td>${e.date || ''}</td>
+        <td style="font-family:ui-monospace,monospace;font-size:11px">${e.ref || '—'}</td>
+        <td>${e.desc || (isCharge ? 'Phát sinh nợ' : 'Trả nợ')}</td>
+        <td class="num" style="color:#B91C1C">${isCharge ? fmt(+e.amount || 0) : '—'}</td>
+        <td class="num" style="color:#15803D">${!isCharge ? fmt(+e.amount || 0) : '—'}</td>
+        <td class="num"><b>${fmt(Math.round(bal))}</b></td>
+      </tr>`;
+    });
+    rows += `<tr style="background:#FEFBF3"><td><b>Hiện tại</b></td><td>—</td><td><b>Còn nợ</b></td><td class="num">—</td><td class="num">—</td><td class="num" style="color:var(--warn);font-weight:800">${fmt(totalDebt)}</td></tr>`;
+    dtb.innerHTML = rows;
+  }
+
   let currentQuick = 'all';
   let curPage = 1;
   let pageSize = 25;
@@ -396,24 +430,7 @@
     document.getElementById('dbPaid').textContent = window.fmtVND(c.revenue - c.debt);
     document.getElementById('dbOwed').textContent = window.fmtVND(c.debt);
     document.getElementById('dbOver').textContent = window.fmtVND(c.debtOverdue);
-    const dtb = document.querySelector('#debtTable tbody');
-    if (c.debt > 0) {
-      dtb.innerHTML = `
-        <tr><td>01/04/2026</td><td>VAT-04A-128</td><td>Tiền hàng tháng 4</td>
-            <td class="num">${window.fmt(c.debt + 8_000_000)}</td>
-            <td class="num">—</td>
-            <td class="num">${window.fmt(c.debt + 8_000_000)}</td></tr>
-        <tr><td>15/04/2026</td><td>UNC-2604</td><td>Thanh toán đợt 1</td>
-            <td class="num">—</td>
-            <td class="num">${window.fmt(8_000_000)}</td>
-            <td class="num">${window.fmt(c.debt)}</td></tr>
-        <tr style="background:#FEFBF3"><td><b>Hiện tại</b></td><td>—</td><td>Số dư còn lại</td>
-            <td class="num">—</td><td class="num">—</td>
-            <td class="num" style="color:var(--warn);font-weight:700">${window.fmt(c.debt)}</td></tr>
-      `;
-    } else {
-      dtb.innerHTML = `<tr><td colspan="6" style="text-align:center;padding:30px;color:var(--ok)">✓ Không có công nợ.</td></tr>`;
-    }
+    renderDebtLedger(c);
 
     /* Notes */
     const nlist = c.notes || [];
