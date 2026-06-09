@@ -115,7 +115,9 @@
       list.forEach(o => {
         const c = custs.find(x => x.id === (o.cust || o.customer_id));
         if (!c) return;
-        const isUnpaid = (o.payBy === 'Công nợ' || o.payStatus === 'unpaid');
+        /* "Ghi nợ" = payBy chứa chữ "nợ" (Công nợ, ghi nợ…) hoặc payStatus unpaid.
+           COD / Đã thanh toán / Chuyển khoản → KHÔNG ghi nợ. */
+        const isUnpaid = (/nợ/i.test(o.payBy || '') || o.payStatus === 'unpaid');
         const isFinalSettled = (o.status === 'delivered' || o.status === 'reconciled');
         const isCancelled = (o.status === 'cancelled' || o.status === 'returned');
 

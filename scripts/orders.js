@@ -695,7 +695,8 @@
     const svcOpts = window.MD.options('services');
     const tmOpts = window.MD.options('transportModes');
     const unitOpts = window.MD.options('units');
-    const payOpts = window.MD.get('payMethods').map(p => `<option>${p.label}</option>`).join('');
+    /* Mặc định chọn "Công nợ" (đa phần đơn B2B ghi nợ) — robust dù master data có thứ tự khác */
+    const payOpts = window.MD.get('payMethods').map(p => `<option ${/nợ/i.test(p.label) ? 'selected' : ''}>${p.label}</option>`).join('');
     const custOpts = `<option value="">-- Chọn KH --</option>` +
       customers.map(c => `<option value="${c.id}" ${c.id===prefillCustId?'selected':''}>${c.code} · ${c.name}</option>`).join('');
     const drvOpts = `<option value="">-- Chọn shipper --</option>` +

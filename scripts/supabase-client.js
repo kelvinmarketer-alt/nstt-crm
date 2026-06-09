@@ -332,12 +332,28 @@
       return null;
     },
 
-    /* Update theo id — auto-strip cột lạ + retry */
+    /* Update theo id — auto-strip cột lạ + retry.
+       Dùng maybeSingle(): 0 row khớp → KHÔNG báo lỗi (tránh "Cannot coerce…"),
+       mà UPSERT (insert) vì bản ghi chỉ có ở local, chưa có trên cloud. */
     async update(table, id, patch, idColumn = 'id') {
       const mapped = mapTo(table, patch);
       for (let attempt = 0; attempt < 6; attempt++) {
-        const { data, error } = await client.from(table).update(mapped).eq(idColumn, id).select().single();
-        if (!error) return mapFrom(table, data);
+        const { data, error } = await client.from(table).update(mapped).eq(idColumn, id).select().maybeSingle();
+        if (!error) {
+          if (data) return mapFrom(table, data);
+          /* 0 row khớp → bản ghi chưa tồn tại trên cloud → INSERT (upsert) */
+          const full = Object.assign({}, mapped);
+          if (full[idColumn] == null) full[idColumn] = id;
+          for (let j = 0; j < 6; j++) {
+            const ins = await client.from(table).insert(full).select().single();
+            if (!ins.error) return mapFrom(table, ins.data);
+            const bc = parseUnknownColumn(ins.error.message);
+            if (bc && Object.prototype.hasOwnProperty.call(full, bc)) { delete full[bc]; continue; }
+            console.warn('[SB update→insert]', table, ins.error.message);
+            return null;   /* không toast — tránh spam khi thiếu cột NOT NULL ở patch lẻ */
+          }
+          return null;
+        }
         const badCol = parseUnknownColumn(error.message);
         if (badCol && Object.prototype.hasOwnProperty.call(mapped, badCol)) {
           delete mapped[badCol];

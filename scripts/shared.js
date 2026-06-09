@@ -780,9 +780,10 @@ window.MD_DEFAULTS = {
     { id:'qua',     label:'Quả' },
   ],
   payMethods: [
-    { id:'sender',   label:'Người gửi trả' },
-    { id:'receiver', label:'Người nhận trả' },
-    { id:'congno',   label:'Công nợ' },
+    { id:'congno',   label:'Công nợ' },               /* mặc định — đa phần đơn B2B ghi nợ */
+    { id:'cod',      label:'COD (thu khi giao)' },
+    { id:'paid',     label:'Đã thanh toán' },
+    { id:'transfer', label:'Chuyển khoản trước' },
   ],
   /* 34 tỉnh/thành VN 2026 (sau sáp nhập 1/7/2025) — khu vực Bắc xếp trước */
   provinces: [
