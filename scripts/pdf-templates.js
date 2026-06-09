@@ -172,7 +172,8 @@ ${FAV ? `<link rel="icon" type="image/svg+xml" href="${FAV}">` : ''}
       if (img.startsWith('../')) return _baseUrl + img.replace(/^\.\.\//, '');
       return _baseUrl + img;
     }
-    const _PH = 'data:image/svg+xml;base64,' + btoa(`<svg xmlns="http://www.w3.org/2000/svg" width="40" height="40" viewBox="0 0 40 40"><rect fill="#F0FDF4" width="40" height="40" rx="5"/><text x="20" y="27" text-anchor="middle" font-family="Arial" font-size="22">🥬</text></svg>`);
+    /* URL-encode thay vì btoa: btoa vỡ với ký tự ngoài Latin1 (emoji 🥬) → trước đây kẹt cả nút in */
+    const _PH = 'data:image/svg+xml,' + encodeURIComponent('<svg xmlns="http://www.w3.org/2000/svg" width="40" height="40" viewBox="0 0 40 40"><rect fill="#F0FDF4" width="40" height="40" rx="5"/><text x="20" y="27" text-anchor="middle" font-family="Arial" font-size="22">🥬</text></svg>');
     /* Ưu tiên PRODUCT_IMAGES embed (offline-safe, không cần fetch) */
     const _EMBED = window.PRODUCT_IMAGES || {};
     window._pdfGetImg = (it) => {
@@ -406,43 +407,53 @@ ${FAV2 ? `<link rel="icon" type="image/svg+xml" href="${FAV2}">` : ''}
   window.printOrder = function (code) {
     const o = getOrder(code);
     if (!o) { window.toast && window.toast('Không tìm thấy đơn ' + code, 'warn'); return; }
-    if (!window.openModal) {
-      /* Fallback nếu chưa load modal */
-      window.printOrderForCustomer(code);
-      return;
-    }
+    if (!window.openModal) { window.printOrderForCustomer(code); return; }
+    const row = (id, checked, icon, color, title, desc) => `
+      <label style="display:flex;align-items:flex-start;gap:10px;border:1px solid var(--line);border-radius:9px;padding:11px 12px;margin-bottom:8px;cursor:pointer">
+        <input type="checkbox" id="${id}" ${checked ? 'checked' : ''} style="margin-top:3px;width:16px;height:16px;accent-color:${color}">
+        <div style="flex:1"><div style="font-weight:700;color:${color};font-size:13px">${icon} ${title}</div>
+        <div style="font-size:11px;color:var(--muted);margin-top:2px">${desc}</div></div>
+      </label>`;
     window.openModal('🖨 In phiếu đơn ' + code, `
-      <div style="background:#EFF6FF;color:#1E40AF;padding:10px 12px;border-radius:8px;font-size:12.5px;margin-bottom:14px;line-height:1.55">
-        💡 <b>Có 2 phiếu khác nhau cho 2 đối tượng</b> — chọn loại phù hợp:
-      </div>
-      <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px">
-        <button onclick="window.closeModal();window.printOrderForCustomer('${code}')" style="background:#fff;border:2px solid #1B5E20;border-radius:10px;padding:18px;cursor:pointer;text-align:left;line-height:1.4">
-          <div style="font-size:26px">📄</div>
-          <div style="font-weight:800;color:#1B5E20;margin-top:6px;font-size:14px">Phiếu xác nhận đơn</div>
-          <div style="font-size:11.5px;color:var(--muted);margin-top:4px">Cho <b>KHÁCH HÀNG</b><br>· Đơn giá + tổng tiền<br>· Có công nợ + TK ngân hàng<br>· Ô ký 2 bên</div>
-        </button>
-        <button onclick="window.closeModal();window.printOrderForShipper('${code}')" style="background:#fff;border:2px solid #D97706;border-radius:10px;padding:18px;cursor:pointer;text-align:left;line-height:1.4">
-          <div style="font-size:26px">🛵</div>
-          <div style="font-weight:800;color:#D97706;margin-top:6px;font-size:14px">Phiếu giao cho Shipper</div>
-          <div style="font-size:11.5px;color:var(--muted);margin-top:4px">Cho <b>SHIPPER</b><br>· Địa chỉ + SĐT to<br>· Tick mặt hàng<br>· Khung COD to · Ô POD</div>
-        </button>
-      </div>
-      <div style="margin-top:14px;padding:9px 12px;background:#FEF3C7;border-radius:7px;font-size:11.5px;color:#92400E">
-        💾 <b>Lưu PDF:</b> sau khi bấm In → trong hộp Print chọn <b>"Save as PDF"</b> hoặc <b>"Microsoft Print to PDF"</b>.
+      <div style="font-size:12.5px;color:var(--muted);margin-bottom:12px">Tick (các) phiếu cần in theo giai đoạn — in 1 cái hoặc cả 3 tuỳ ý:</div>
+      ${row('prt_cust', true,  '📄', '#1B5E20', 'Phiếu xác nhận đơn (Khách)', 'Đơn giá + tổng tiền · công nợ · TK ngân hàng · ô ký 2 bên')}
+      ${row('prt_ship', false, '🛵', '#D97706', 'Phiếu giao cho Shipper', 'Địa chỉ + SĐT to · tick mặt hàng · khung COD · ô POD')}
+      ${row('prt_wh',   false, '🧾', '#C00000', 'Phiếu báo hàng / xuất kho (Kho)', 'Mặt hàng + số lượng cho Kho chuẩn bị — không có giá')}
+      <div style="margin-top:6px;padding:11px 12px;background:#F0FDF4;border:1px solid #BBF7D0;border-radius:9px">
+        <div style="font-size:12px;color:#15803D;font-weight:600;margin-bottom:6px">📤 Bắt đầu quy trình Kho</div>
+        <div style="font-size:11.5px;color:var(--muted);margin-bottom:8px">Gửi phiếu báo hàng vào nhóm Kho (Telegram) rồi chuyển thẳng sang <b>Gom hàng → NCC</b> để Kho làm tiếp.</div>
+        <button class="btn btn-primary btn-sm" onclick="window._sendBaoHangAndGo('${code}')">📤 Gửi Kho + sang Gom hàng</button>
       </div>
     `, {
-      footer: `<button class="btn btn-ghost" onclick="window.closeModal()">Hủy</button>
-               <button class="btn btn-ghost" onclick="window.printBothOrderPdfs('${code}')">📑 In CẢ 2 phiếu</button>`,
-      width: '520px',
+      footer: `<button class="btn btn-ghost" onclick="window.closeModal()">Đóng</button>
+               <button class="btn btn-primary" onclick="window._printSelectedPhieu('${code}')">🖨 In phiếu đã chọn</button>`,
+      width: '440px',
     });
   };
 
-  /* In cả 2 phiếu trong 2 tab — tiện khi cần cả 2 */
-  window.printBothOrderPdfs = function (code) {
+  /* In các phiếu được tick — tuần tự (mỗi phiếu 1 hộp in) */
+  window._printSelectedPhieu = function (code) {
+    const seq = [];
+    if (document.getElementById('prt_cust')?.checked) seq.push(() => window.printOrderForCustomer(code));
+    if (document.getElementById('prt_ship')?.checked) seq.push(() => window.printOrderForShipper(code));
+    if (document.getElementById('prt_wh')?.checked) seq.push(() => window.printDeliveryNote && window.printDeliveryNote(code));
+    if (!seq.length) { window.toast && window.toast('Tick ít nhất 1 phiếu để in', 'warn'); return; }
     window.closeModal && window.closeModal();
-    window.printOrderForCustomer(code);
-    setTimeout(() => window.printOrderForShipper(code), 600);
+    seq.forEach((fn, i) => setTimeout(fn, i * 800));
   };
+
+  /* Gửi phiếu báo hàng cho Kho (Telegram) → chuyển sang trang Gom hàng */
+  window._sendBaoHangAndGo = function (code) {
+    window.closeModal && window.closeModal();
+    const go = () => { window.location.href = 'procurement.html'; };
+    if (window.sendBaoHangTelegram) {
+      window.sendBaoHangTelegram(code, false)
+        .then(r => { if (r && r.ok) window.toast && window.toast('📋 Đã gửi Kho — chuyển sang Gom hàng…', 'success'); setTimeout(go, 800); })
+        .catch(() => setTimeout(go, 300));
+    } else { window.toast && window.toast('Chuyển sang Gom hàng…', 'info'); setTimeout(go, 300); }
+  };
+  /* tương thích ngược (cũ gọi printBothOrderPdfs) */
+  window.printBothOrderPdfs = function (code) { window.closeModal && window.closeModal(); window.printOrderForCustomer(code); setTimeout(() => window.printOrderForShipper(code), 700); };
 
   /* Mở popup window in */
   /* In qua IFRAME cùng origin — không cần cho phép popup (fix "chưa hoạt động") */
