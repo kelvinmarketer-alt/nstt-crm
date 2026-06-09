@@ -118,7 +118,7 @@
     const el = document.getElementById(map[tab] || 'stepGather');
     if (el) el.scrollIntoView({ behavior: 'smooth', block: 'start' });
   };
-  function renderAll() { renderGather(); renderRuns(); renderRelease(); }
+  function renderAll() { renderGather(); renderRuns(); renderRunHistory(); renderRelease(); }
 
   /* ============ ① CHỌN ĐƠN → GOM ============ */
   let picked = new Set();
@@ -202,14 +202,44 @@
   };
 
   /* ============ ② PHIÊN GOM (master-detail) ============ */
+  /* Phiên ĐÃ CHỐT & phân bổ (applied) hoặc đã xuất kho (closed) → rời danh sách gom, vào "Lịch sử".
+     LƯU Ý: 'confirmed' = chỉ mới "Lưu xác nhận NCC" → VẪN đang gom (không vào lịch sử). */
+  const _isDoneRun = (r) => r.status === 'applied' || r.status === 'closed';
+
+  function renderRunHistory() {
+    const host = document.getElementById('pcRunHistory');
+    const sec = document.getElementById('stepHistory');
+    if (!host) return;
+    const hist = getRuns().filter(_isDoneRun);
+    if (sec) sec.style.display = hist.length ? '' : 'none';
+    if (!hist.length) { host.innerHTML = ''; return; }
+    /* mới chốt lên đầu */
+    hist.sort((a, b) => (a.confirmedAt || '') < (b.confirmedAt || '') ? 1 : -1);
+    host.innerHTML = hist.map(r => {
+      normalizeRun(r);
+      const totalKg = r.lines.reduce((s, l) => s + l.totalQty, 0);
+      const st = r.status === 'closed' ? ['Đã xuất kho', '#1B5E20'] : ['Đã chốt', '#15803D'];
+      const when = r.confirmedAt ? new Date(r.confirmedAt).toLocaleString('vi-VN') : '';
+      return `<div class="run-card" style="display:flex;align-items:center;gap:10px;flex-wrap:wrap;cursor:pointer" onclick="window.pcOpenRun('${r.id}')">
+        <div style="font-weight:800;color:var(--navy)">${r.id}</div>
+        <span class="tag" style="background:${st[1]}1f;color:${st[1]};font-weight:700;font-size:10.5px">${st[0]}</span>
+        <span style="font-size:11.5px;color:var(--muted)">${r.orderCodes.length} đơn · ${r.lines.length} mã · ${fmtQty(totalKg)} kg${when ? ' · ' + when : ''}</span>
+        <div style="flex:1"></div>
+        <button class="btn btn-ghost btn-sm" onclick="event.stopPropagation();window.pcOpenRun('${r.id}')">👁 Xem lại</button>
+      </div>`;
+    }).join('');
+  }
+
   function renderRuns() {
     const host = document.getElementById('pcRunList');
     if (!host) return;
-    const runs = getRuns();
+    const allRuns = getRuns();
+    const runs = allRuns.filter(r => !_isDoneRun(r));   /* chỉ phiên ĐANG gom */
     if (!runs.length) {
-      host.innerHTML = `<div style="background:#fff;border:1px solid var(--line);border-radius:10px;padding:24px;text-align:center;color:var(--muted);font-size:12.5px">Chưa có phiên gom.<br>Chọn đơn ở bước ① để tạo.</div>`;
+      const doneNote = allRuns.length ? '<br><span style="font-size:11px">Các phiên đã chốt xem ở <b>Lịch sử đã gom</b> bên dưới.</span>' : '';
+      host.innerHTML = `<div style="background:#fff;border:1px solid var(--line);border-radius:10px;padding:24px;text-align:center;color:var(--muted);font-size:12.5px">Chưa có phiên gom đang xử lý.<br>Chọn đơn ở bước ① để tạo.${doneNote}</div>`;
       const det = document.getElementById('pcRunDetail');
-      if (det) det.innerHTML = `<div class="pc-detail-empty">Chưa có phiên gom nào.</div>`;
+      if (det && !window._pcActiveRun) det.innerHTML = `<div class="pc-detail-empty">← Tạo / chọn một phiên gom để gán NCC.</div>`;
       return;
     }
     const stLabel = { draft: ['Nháp', '#64748B'], sent: ['Đã gửi NCC', '#0EA5E9'], confirmed: ['Đã xác nhận', '#15803D'], closed: ['Đã xuất kho', '#1B5E20'] };
@@ -394,12 +424,22 @@
         </div>`;
     }
 
-    body += `<div style="position:sticky;bottom:0;background:#fff;padding-top:10px;border-top:1px solid var(--line);display:flex;gap:8px;flex-wrap:wrap">
+    if (_isDoneRun(run)) {
+      /* Phiên đã chốt (xem lại từ Lịch sử) — không cho chốt lại, chỉ xem + in phiếu NCC */
+      body += `<div style="position:sticky;bottom:0;background:#fff;padding-top:10px;border-top:1px solid var(--line)">
+        <div style="background:#F0FDF4;border:1px solid #BBF7D0;border-radius:8px;padding:10px 12px;font-size:12px;color:#15803D">
+          ✓ <b>Phiên đã chốt &amp; phân bổ</b>${run.confirmedAt ? ' lúc ' + new Date(run.confirmedAt).toLocaleString('vi-VN') : ''}. Xem lại phân bổ + in phiếu NCC ở trên. Xuất kho → giao shipper ở <b>bước ③</b>.
+        </div>
+      </div>
+    </div>`;
+    } else {
+      body += `<div style="position:sticky;bottom:0;background:#fff;padding-top:10px;border-top:1px solid var(--line);display:flex;gap:8px;flex-wrap:wrap">
         <button class="btn btn-navy" onclick="window.pcSaveConfirm('${run.id}')">💾 Lưu</button>
         <button class="btn btn-primary" onclick="window.pcApplyAlloc('${run.id}')">✅ Chốt &amp; phân bổ về đơn + báo Sale</button>
       </div>
       <div style="font-size:11px;color:var(--muted);margin-top:8px">💡 Mỗi mã tự gán NCC sao cao nhất. Nếu 1 NCC không đủ → <b>➕ Thêm NCC chia phần</b>. <b>Tự cân:</b> sửa số kg 1 NCC thì NCC cuối tự nhận phần dư cho đủ tổng; muốn để dư cho NCC mới thì sửa ở dòng NCC cuối. "Giao thực" để trống = giao đủ.</div>
     </div>`;
+    }
 
     const dc = document.getElementById('pcRunDetail');
     if (dc) dc.innerHTML = body;
@@ -573,7 +613,8 @@
       }
     });
     S().set('orders', orders);
-    run.status = 'confirmed';
+    run.status = 'applied';                       /* CHỐT & phân bổ xong → vào Lịch sử đã gom */
+    run.confirmedAt = new Date().toISOString();
     saveRuns(runs);
 
     /* Báo Sale: gom theo đơn → 1 tin Telegram (kênh 'alert') */
@@ -587,9 +628,11 @@
         if (r.ok) window.toast?.('📨 Đã báo Sale ' + shortCodes.length + ' đơn thiếu vào "' + r.channel + '"', 'success');
       });
     }
-    window.toast?.(`✅ Đã chốt ${run.id}: ghi SL về ${run.orderCodes.length} đơn` + (shortCodes.length ? ` · ${shortCodes.length} đơn thiếu` : ' · đủ hàng'), 'success');
-    window.pcOpenRun(runId);
-    closeDrawerSoft();
+    window.toast?.(`✅ Đã chốt ${run.id}: ghi SL về ${run.orderCodes.length} đơn` + (shortCodes.length ? ` · ${shortCodes.length} đơn thiếu` : ' · đủ hàng') + ' · đã chuyển sang Lịch sử đã gom', 'success');
+    /* Phiên rời danh sách đang gom → vào Lịch sử; mở bước ③ để xuất kho */
+    window._pcActiveRun = null;
+    renderRuns(); renderRunHistory(); renderRelease();
+    window.pcCloseDetail && window.pcCloseDetail();
   };
   function closeDrawerSoft() { /* giữ drawer mở để xem; no-op */ }
 
