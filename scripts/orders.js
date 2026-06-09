@@ -1974,6 +1974,9 @@ ${o.note ? `\n📝 Ghi chú: ${o.note}` : ''}
   render();
   setTimeout(applyOrdColPrefs, 100);
   if (prefillCust) setTimeout(() => window.openCreateOrder(prefillCust), 200);
+  /* Mở thẳng chi tiết 1 đơn khi tới từ trang khác (vd Gom hàng → ✏️ Sửa) */
+  const openCode = urlParams.get('open');
+  if (openCode) setTimeout(() => window.openOrder && window.openOrder(openCode), 300);
 
   /* Đếm số đơn web đang chờ duyệt → badge trên nút "🛒 Đơn web chờ duyệt" */
   window.refreshWebPendBadge = async function () {

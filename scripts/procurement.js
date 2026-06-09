@@ -204,7 +204,7 @@
   /* ============ ② PHIÊN GOM (master-detail) ============ */
   /* Phiên ĐÃ CHỐT & phân bổ (applied) hoặc đã xuất kho (closed) → rời danh sách gom, vào "Lịch sử".
      LƯU Ý: 'confirmed' = chỉ mới "Lưu xác nhận NCC" → VẪN đang gom (không vào lịch sử). */
-  const _isDoneRun = (r) => r.status === 'applied' || r.status === 'closed';
+  const _isDoneRun = (r) => r.status === 'applied' || r.status === 'closed' || r.status === 'confirmed';
 
   function renderRunHistory() {
     const host = document.getElementById('pcRunHistory');
@@ -572,9 +572,11 @@
   window.pcSaveConfirm = function (runId) {
     const runs = getRuns(); const run = runs.find(r => r.id === runId); if (!run) return;
     readConfirmInputs(run);
-    run.status = 'confirmed';
+    /* CHỈ lưu tiến độ — KHÔNG đổi status (giữ phiên ở danh sách đang gom).
+       Chỉ "Chốt & phân bổ" mới đẩy sang Lịch sử. */
+    if (_isDoneRun(run)) run.status = 'draft';   /* lỡ ở trạng thái done mà bấm Lưu lại → kéo về active */
     saveRuns(runs);
-    window.toast?.('💾 Đã lưu xác nhận NCC cho ' + runId, 'success');
+    window.toast?.('💾 Đã lưu tiến độ gán NCC cho ' + runId, 'success');
     window.pcOpenRun(runId);
   };
 
@@ -803,12 +805,43 @@ tbody tr:nth-child(even){background:#F4FAF2}tfoot td{background:#E8F5E9;font-wei
             ${hasShort ? `<span class="tag" style="background:#FEE2E2;color:#B91C1C">⚠ thiếu ${o.shortages.length} mã</span>` : ''}
             <div style="flex:1"></div>
             <span style="font-size:12px;color:var(--muted)">${(o.items || []).length} mã · ${fmtQty(kg)} kg</span>
+            <button class="btn btn-ghost btn-sm" onclick="window.pcEditOrder('${o.code}')" title="Sửa đơn (nhập sai)">✏️ Sửa</button>
+            <button class="btn btn-ghost btn-sm" style="color:var(--danger)" onclick="window.pcDeleteOrder('${o.code}')" title="Xoá hẳn đơn này">🗑 Xoá</button>
             <button class="btn btn-navy btn-sm" onclick="window.pcPrintRelease('${o.code}')">🖨 Phiếu xuất kho</button>
             <button class="btn btn-primary btn-sm" onclick="window.pcDispatch('${o.code}')">🛵 Giao shipper</button>
           </div>
         </div>`;
       }).join('');
   }
+
+  /* Sửa đơn (nhập sai) → mở chi tiết đơn ở trang Đơn hàng */
+  window.pcEditOrder = function (code) {
+    window.location.href = 'orders.html?open=' + encodeURIComponent(code);
+  };
+  /* Xoá hẳn đơn nhập sai — gỡ khỏi mọi phiên gom + xoá khỏi store */
+  window.pcDeleteOrder = function (code) {
+    const o = getOrders().find(x => x.code === code); if (!o) return;
+    if (!confirm(`Xoá HẲN đơn ${code}${o.custName ? ' — ' + o.custName : ''}?\nKhông khôi phục được. Dùng khi đơn nhập sai.`)) return;
+    /* gỡ đơn khỏi các phiên gom (orderCodes + breakdown + tính lại totalQty) */
+    const runs = getRuns(); let rch = false;
+    runs.forEach(r => {
+      if (Array.isArray(r.orderCodes) && r.orderCodes.includes(code)) {
+        r.orderCodes = r.orderCodes.filter(c => c !== code);
+        (r.lines || []).forEach(l => {
+          if (Array.isArray(l.breakdown)) {
+            const before = l.breakdown.length;
+            l.breakdown = l.breakdown.filter(b => b.code !== code);
+            if (l.breakdown.length !== before) l.totalQty = +l.breakdown.reduce((s, b) => s + (+b.qty || 0), 0).toFixed(2);
+          }
+        });
+        rch = true;
+      }
+    });
+    if (rch) saveRuns(runs);
+    window.STORE.remove('orders', code);
+    window.toast?.('🗑 Đã xoá đơn ' + code, 'danger');
+    renderAll();
+  };
 
   window.pcPrintRelease = function (code) {
     const o = getOrders().find(x => x.code === code); if (!o) return;
