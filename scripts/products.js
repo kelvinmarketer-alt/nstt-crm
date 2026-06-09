@@ -972,8 +972,8 @@
         <div><label>Ghi chú</label><input id="pNote" value="${p ? (p.note || '') : ''}" placeholder="VD: Mộc Châu"></div>
       </div>
       <div class="form-row">
-        <div><label>Giá nhập hôm nay (₫)</label><input id="pBuy" type="number" value="${e ? e.buy : ''}" placeholder="0"></div>
-        <div><label>Giá bán hôm nay (₫) *</label><input id="pSell" type="number" value="${e ? e.sell : ''}" placeholder="0"></div>
+        <div><label>Giá nhập hôm nay (₫) *</label><input id="pBuy" type="number" value="${e ? e.buy : ''}" placeholder="0"></div>
+        <div></div>
       </div>
       <div class="form-row wide">
         <label>🖼 Ảnh sản phẩm</label>
@@ -1097,9 +1097,7 @@
 
   window.submitProduct = function (id) {
     const name = window.formVal('#pName');
-    const sell = parseInt(window.formVal('#pSell'), 10) || 0;
     if (!name) { window.toast('Nhập tên sản phẩm', 'warn'); return; }
-    if (!sell) { window.toast('Nhập giá bán', 'warn'); return; }
     const cat = window.formVal('#pCat');
     const unit = (window.formVal('#pUnit') || 'kg').toLowerCase();
     const note = window.formVal('#pNote');
@@ -1112,14 +1110,18 @@
       const p = window.productById(id);
       const hist = [...(p.priceHistory || [])];
       const ex = hist.find(h => h.date === today);
-      if (ex) { ex.buy = buy; ex.sell = sell; } else { hist.push({ date: today, buy, sell }); }
+      /* Chỉ cập nhật giá nhập — giữ nguyên giá bán đã có (không ghi đè về 0) */
+      if (ex) { ex.buy = buy; } else {
+        const prevSell = (window.priceEntryOn(p, today) || {}).sell || 0;
+        hist.push({ date: today, buy, sell: prevSell });
+      }
       window.STORE.update('products', id, { name, cat, unit, note, priceHistory: hist, img });
       window.toast('✓ Đã cập nhật ' + name, 'success');
     } else {
       window.STORE.add('products', {
         id: window.STORE.nextId('products', 'SP', 3),
         name, cat, unit, note, img,
-        priceHistory: [{ date: today, buy, sell }],
+        priceHistory: [{ date: today, buy, sell: 0 }],
       });
       window.toast('✓ Đã thêm ' + name, 'success');
     }
