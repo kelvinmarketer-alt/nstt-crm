@@ -1152,7 +1152,7 @@
         const samples = await window.OrderSamples.forCust(custId, 2);
         examples = samples.map(s => ({
           b64: s.b64, mime: s.mime,
-          resultText: (s.finalItems || []).map(it => `${it.name} = ${it.qty}`).join('; '),
+          resultText: (s.note ? '(ghi chú: ' + s.note + ') ' : '') + (s.finalItems || []).map(it => `${it.name} = ${it.qty}`).join('; '),
         })).filter(e => e.b64 && e.resultText);
       } catch (e) { /* IndexedDB lỗi → bỏ qua, vẫn đọc bình thường */ }
     }
@@ -1194,7 +1194,7 @@ CHỈ TRẢ JSON, không giải thích gì thêm.`;
         applyBulkItems(items, 'AI' + (aliasCtx ? ' (có từ điển KH)' : '') + (examples.length ? ' +mẫu' : ''));
         /* Ghi nhớ ảnh để lưu thành "mẫu nét chữ" khi đơn được lưu (chỉ khi đã chọn KH) */
         if (custId && meta && meta.dataURL) {
-          _pendingSample = { custId, custName: (c && c.name) || '', dataURL: meta.dataURL, rawItems: items.slice() };
+          _pendingSample = { custId, custName: (c && c.name) || '', dataURL: meta.dataURL, rawItems: items.slice(), note: (meta && meta.note) || '' };
         }
       },
     });
@@ -1683,7 +1683,7 @@ CHỈ TRẢ JSON, không giải thích gì thêm.`;
           await window.OrderSamples.add({
             custId: ps.custId, custName: ps.custName || (cust && cust.name) || '',
             b64: small.b64, mime: small.mime,
-            rawItems: ps.rawItems, finalItems,
+            rawItems: ps.rawItems, finalItems, note: ps.note || '',
           });
           window.toast && window.toast('🧠 Đã lưu mẫu nét chữ của KH — lần sau AI đọc đơn chính xác hơn', 'success');
         } catch (e) { console.warn('[order sample save]', e); }

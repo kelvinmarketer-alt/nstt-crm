@@ -225,6 +225,10 @@
               <div id="aiDropText" style="color:var(--muted);font-size:13px;line-height:1.6">📷 Bấm chọn ảnh · kéo-thả · hoặc dán (Ctrl+V)<br><span style="font-size:11px">Chụp bảng giá / tin nhắn khách / danh thiếp / đơn viết tay</span></div>
               <img id="aiPreview" style="display:none;max-width:100%;max-height:240px;border-radius:8px;margin:0 auto">
             </div>
+            <div style="margin-top:10px">
+              <label style="font-size:12px;font-weight:600;color:var(--navy);display:block;margin-bottom:4px">📝 Ghi chú cho AI <span style="font-weight:400;color:var(--muted)">— giải thích cách đọc (không bắt buộc)</span></label>
+              <textarea id="aiNote" rows="2" placeholder="VD: SP A ghi '3+5+2' nghĩa là CỘNG lại = 10kg · 'rau' của khách này = rau muống · bỏ qua dòng tô đậm ở trên cùng…" style="width:100%;border:1px solid var(--line);border-radius:7px;padding:8px 10px;font-size:12.5px;resize:vertical"></textarea>
+            </div>
             <div id="aiStatus" style="font-size:12.5px;margin-top:10px;min-height:18px"></div>
           </div>
           <div class="modal-foot">
@@ -271,10 +275,15 @@
       if (!this._img) { window.toast('Chọn/dán ảnh trước', 'warn'); return; }
       const st = document.getElementById('aiStatus'), btn = document.getElementById('aiRunBtn');
       const exN = (this._opts.examples || []).filter(e => e && e.b64).length;
-      st.innerHTML = '⏳ AI đang đọc ảnh & trích xuất dữ liệu...' + (exN ? ` <span style="color:var(--ok)">(dùng ${exN} mẫu nét chữ KH)</span>` : ''); btn.disabled = true;
+      /* Ghi chú người dùng → chèn vào prompt (ưu tiên cao) để AI đọc đúng ý */
+      const note = (document.getElementById('aiNote')?.value || '').trim();
+      const prompt = note
+        ? this._opts.prompt + `\n\n📝 GHI CHÚ TỪ NGƯỜI DÙNG — ƯU TIÊN TUÂN THEO khi đọc/điền:\n${note}`
+        : this._opts.prompt;
+      st.innerHTML = '⏳ AI đang đọc ảnh & trích xuất dữ liệu...' + (exN ? ` <span style="color:var(--ok)">(dùng ${exN} mẫu nét chữ KH)</span>` : '') + (note ? ' <span style="color:var(--ok)">(có ghi chú)</span>' : ''); btn.disabled = true;
       try {
-        const data = await this.extract(this._img.base64, this._img.mime, this._opts.prompt, this._opts.task, this._opts.examples);
-        const meta = { dataURL: this._img.dataURL, b64: this._img.base64, mime: this._img.mime };
+        const data = await this.extract(this._img.base64, this._img.mime, prompt, this._opts.task, this._opts.examples);
+        const meta = { dataURL: this._img.dataURL, b64: this._img.base64, mime: this._img.mime, note };
         this._closeOverlay();
         this._opts.onResult(data, meta);
       } catch (e) {

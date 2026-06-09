@@ -105,6 +105,7 @@
         b64: rec.b64 || '',
         rawItems: rec.rawItems || [],
         finalItems: rec.finalItems || [],
+        note: rec.note || '',
       };
       await reqP(tx('readwrite').put(full));
       /* Cap MAX_PER_CUST — xoá mẫu cũ nhất của KH này */
