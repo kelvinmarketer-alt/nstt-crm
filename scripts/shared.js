@@ -827,6 +827,7 @@ window.NAV = [
   ]},
   { section: 'Tài chính', items: [
     { id: 'finance',    label: 'Tài chính',   icon: '💰', href: 'finance.html', badgeKey: 'debt' },
+    { id: 'debt-summary', label: 'Công nợ tổng hợp (CFO)', icon: '🧮', href: 'cong-no-tong-hop.html' },
     { id: 'adspend',    label: 'Chi phí Ads', icon: '📣', href: 'adspend.html' },
     /* Ẩn theo yêu cầu: Loyalty (chiết khấu/tích điểm)
     { id: 'loyalty',    label: 'Loyalty (tích điểm)', icon: '⭐', href: 'loyalty.html' },

@@ -1,0 +1,86 @@
+<!doctype html>
+<html lang="vi">
+<head>
+<meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Công nợ tổng hợp · Nông Sản Tuấn Tú</title>
+<link rel="stylesheet" href="../styles/tokens.css"><link rel="stylesheet" href="../styles/app.css">
+<style>
+  .cn-wrap{overflow:auto;border:1px solid var(--line);border-radius:10px;background:#fff;max-height:72vh}
+  table.cn-tbl{border-collapse:separate;border-spacing:0;font-size:12px;min-width:100%}
+  table.cn-tbl th, table.cn-tbl td{padding:6px 9px;white-space:nowrap;border-bottom:1px solid #EEF2F0}
+  table.cn-tbl thead th{position:sticky;top:0;background:#F0FDF4;color:#15803D;font-weight:700;z-index:2;border-bottom:2px solid #15803D}
+  table.cn-tbl td.par, table.cn-tbl th.par{position:sticky;left:0;background:#fff;z-index:1;text-align:left;font-weight:600;border-right:1px solid var(--line);max-width:230px;overflow:hidden;text-overflow:ellipsis}
+  table.cn-tbl thead th.par{background:#E7F6E7;z-index:3}
+  table.cn-tbl td.num{text-align:right;font-variant-numeric:tabular-nums}
+  table.cn-tbl td.z{color:#CBD5E1}
+  table.cn-tbl tr:hover td{background:#F8FAF8}
+  table.cn-tbl tr:hover td.par{background:#F3FAF3}
+  table.cn-tbl tfoot td{position:sticky;bottom:0;background:#1B5E20;color:#fff;font-weight:700;border-top:2px solid #15803D}
+  table.cn-tbl tfoot td.par{background:#1B5E20;color:#fff}
+  .cn-paid{color:#16A34A;font-weight:700}.cn-owe{color:#B91C1C;font-weight:700}
+</style>
+</head>
+<body>
+<div class="app">
+  <aside class="sidebar"></aside>
+  <header class="topbar">
+    <div class="breadcrumb"></div><div class="top-spacer"></div>
+    <div class="search-global"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="7"/><path d="m21 21-4.3-4.3"/></svg><input placeholder="Tìm... (Ctrl+K)"></div>
+    <button class="icon-btn" title="Thông báo"><span style="font-size:18px">🔔</span><span class="dot"></span></button>
+    <button class="icon-btn" title="Hướng dẫn" onclick="window.location.href='docs.html'"><span style="font-size:18px">❓</span></button>
+  </header>
+
+  <main class="main">
+    <div style="display:flex;align-items:center;gap:12px;margin-bottom:14px">
+      <div>
+        <h1 style="margin:0;font-size:22px;color:var(--navy);font-weight:800">🧮 Công nợ tổng hợp đối tác</h1>
+        <div style="font-size:13px;color:var(--muted);margin-top:2px">Ma trận đối tác × ngày — tự sinh từ đơn hàng. Theo dõi <b>đã thu / chưa thu</b> · xuất Excel cho CFO.</div>
+      </div>
+    </div>
+
+    <div class="chart-card" style="margin-bottom:14px">
+      <div style="display:flex;gap:12px;align-items:flex-end;flex-wrap:wrap">
+        <div><label style="font-size:12px;color:var(--muted);display:block;margin-bottom:4px">Từ ngày</label>
+          <input type="date" id="cnFrom" style="padding:7px 10px;border:1px solid var(--line);border-radius:7px"></div>
+        <div><label style="font-size:12px;color:var(--muted);display:block;margin-bottom:4px">Đến ngày</label>
+          <input type="date" id="cnTo" style="padding:7px 10px;border:1px solid var(--line);border-radius:7px"></div>
+        <button class="btn btn-primary" onclick="window.cnRender()">🔄 Xem báo cáo</button>
+        <div style="display:flex;gap:5px;flex-wrap:wrap">
+          <button class="btn btn-ghost btn-sm" onclick="window.cnPreset('k1')" title="Ngày 1–15 tháng này">Kỳ 1</button>
+          <button class="btn btn-ghost btn-sm" onclick="window.cnPreset('k2')" title="Ngày 16–cuối tháng này">Kỳ 2</button>
+          <button class="btn btn-ghost btn-sm" onclick="window.cnPreset('month')" title="Cả tháng này">Tháng này</button>
+          <button class="btn btn-ghost btn-sm" onclick="window.cnPreset('prev')" title="Tháng trước">Tháng trước</button>
+        </div>
+        <div style="flex:1"></div>
+        <div><label style="font-size:12px;color:var(--muted);display:block;margin-bottom:4px">Đơn vị</label>
+          <select id="cnUnit" onchange="window.cnRender()" style="padding:7px 10px;border:1px solid var(--line);border-radius:7px">
+            <option value="1000">Nghìn đồng (như Book1)</option>
+            <option value="1">Đồng (đầy đủ)</option>
+          </select></div>
+        <button class="btn btn-ghost" onclick="window.cnExport()" title="Xuất file Excel gửi CFO">📥 Xuất Excel</button>
+      </div>
+      <div id="cnSummary" style="margin-top:10px;font-size:12.5px;color:var(--muted)"></div>
+    </div>
+
+    <div class="cn-wrap"><table class="cn-tbl" id="cnTable"><tbody><tr><td style="padding:30px;text-align:center;color:var(--muted)">Chọn khoảng ngày rồi bấm "Xem báo cáo".</td></tr></tbody></table></div>
+    <div style="font-size:11.5px;color:var(--muted);margin-top:8px">💡 Mỗi ô = tổng tiền các đơn của đối tác đó trong ngày. <b>Đã thu</b> lấy từ phiếu thu (sổ công nợ) trong kỳ · <b>Chưa thu</b> = phát sinh − đã thu · <b>Công nợ hiện tại</b> = tổng nợ còn lại của KH.</div>
+  </main>
+</div>
+
+<aside class="drawer" id="drawer"><div id="drawerContent" style="padding:0"></div></aside>
+
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<script src="../scripts/supabase-config.js"></script>
+<script src="../scripts/supabase-client.js"></script>
+<script src="../scripts/shared.js"></script><script src="../scripts/store.js"></script>
+<script src="../scripts/auth.js"></script><script src="../scripts/help-tips.js"></script>
+<script src="../scripts/ux-improvements.js"></script>
+<script>if(window.AUTH) window.AUTH.requireAuth();</script>
+<script src="../data/products.js"></script>
+<script src="../data/customers.js"></script>
+<script src="../data/orders.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
+<script src="../scripts/cong-no-tong-hop.js"></script>
+<script src="../scripts/system-core.js"></script>
+<script src="../scripts/ai-chat.js"></script>
+</body></html>
