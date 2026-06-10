@@ -250,8 +250,11 @@
       /* Bỏ field nội bộ/transient (bắt đầu '_') — KHÔNG phải cột DB.
          VD: _prefRecorded, _source, _cashApplied, _payrollId, _adspendId */
       if (k.charAt(0) === '_') continue;
-      const newKey = m[k] || k;
-      if (newKey === null) continue;
+      /* FIX: dùng hasOwnProperty — KHÔNG dùng `m[k] || k` vì khi m[k]===null
+         thì `null || k` ra k (null là falsy) → field map-null KHÔNG bị bỏ,
+         lọt lên cloud thành cột lạ → vỡ insert. Map null = CHỦ ĐÍCH bỏ field. */
+      const newKey = Object.prototype.hasOwnProperty.call(m, k) ? m[k] : k;
+      if (newKey === null) continue;   /* field được map null → bỏ hẳn (không gửi cloud) */
       let v = obj[k];
       /* Convert VN date → ISO before insert if this JS field is a date */
       if (df[k] !== undefined) v = vnToIso(v, df[k]);
@@ -318,7 +321,7 @@
     /* Insert 1 record — auto-strip cột lạ + retry (chống schema mismatch mọi bảng) */
     async insert(table, record) {
       const mapped = mapTo(table, record);
-      for (let attempt = 0; attempt < 6; attempt++) {
+      for (let attempt = 0; attempt < 30; attempt++) {   /* đủ lượt strip mọi cột lạ (trước đây 6 → thiếu) */
         const { data, error } = await client.from(table).insert(mapped).select().single();
         if (!error) return mapFrom(table, data);
         const badCol = parseUnknownColumn(error.message);
@@ -339,14 +342,14 @@
        mà UPSERT (insert) vì bản ghi chỉ có ở local, chưa có trên cloud. */
     async update(table, id, patch, idColumn = 'id') {
       const mapped = mapTo(table, patch);
-      for (let attempt = 0; attempt < 6; attempt++) {
+      for (let attempt = 0; attempt < 30; attempt++) {
         const { data, error } = await client.from(table).update(mapped).eq(idColumn, id).select().maybeSingle();
         if (!error) {
           if (data) return mapFrom(table, data);
           /* 0 row khớp → bản ghi chưa tồn tại trên cloud → INSERT (upsert) */
           const full = Object.assign({}, mapped);
           if (full[idColumn] == null) full[idColumn] = id;
-          for (let j = 0; j < 6; j++) {
+          for (let j = 0; j < 30; j++) {
             const ins = await client.from(table).insert(full).select().single();
             if (!ins.error) return mapFrom(table, ins.data);
             const bc = parseUnknownColumn(ins.error.message);
