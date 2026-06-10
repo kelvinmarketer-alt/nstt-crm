@@ -768,8 +768,11 @@
       </div>
       <div id="orderItemsBox" style="margin:6px 0 12px"></div>
       <div class="form-row">
-        <div><label>Tóm tắt hàng *</label><input id="oGoods" placeholder="tự điền từ mặt hàng (có thể sửa)"></div>
         <div><label>Trọng lượng (kg) <span style="font-weight:400;color:var(--muted);font-size:11px">(tự tính theo kg — sửa được)</span></label><input id="oWeight" type="number" placeholder="0" data-auto="1" oninput="this.dataset.auto='0'"></div>
+        <div><label>Đơn vị khác <span style="font-weight:400;color:var(--muted);font-size:11px">(bắp/quả/hộp/túi… — tự tính)</span></label><input id="oOtherUnits" placeholder="vd: 3 bắp, 3 quả, 2 túi" data-auto="1" oninput="this.dataset.auto='0'"></div>
+      </div>
+      <div class="form-row wide">
+        <label>Tóm tắt hàng * <span style="font-weight:400;color:var(--muted);font-size:11px">(tên mặt hàng — có thể sửa)</span></label><input id="oGoods" placeholder="tự điền tên các mặt hàng (có thể sửa)" data-auto="1" oninput="this.dataset.auto='0'">
       </div>
       <input type="hidden" id="oQty" value="1"><input type="hidden" id="oUnit" value="kg">
       <div class="form-row">
@@ -954,16 +957,16 @@
       const u = _normUnit(x.unit);   /* "kilogram (kg)"/"Kg" → "kg" để không bỏ sót */
       return s + (u === 'kg' || u === 'g' ? (+x.qty || 0) * (u === 'g' ? 0.001 : 1) : 0);
     }, 0);
-    /* Tóm tắt hàng = CHỈ tổng theo đơn vị: "Trọng lượng 44kg · Đơn vị khác: 3 bắp, 2 hộp, 3 quả" */
+    /* Tóm tắt hàng = tên các mặt hàng (số lượng đã có ở Trọng lượng + Đơn vị khác) */
     const g = document.getElementById('oGoods');
-    if (g) {
+    if (g && g.dataset.auto !== '0') g.value = orderItems.map(x => x.name).join(', ');
+    /* Đơn vị khác = gộp các đơn vị KHÔNG phải kg: "3 bắp, 3 quả, 2 túi" */
+    const ou = document.getElementById('oOtherUnits');
+    if (ou && ou.dataset.auto !== '0') {
       const others = {};
       orderItems.forEach(x => { const u = _normUnit(x.unit); if (u !== 'kg' && u !== 'g') others[u] = (others[u] || 0) + (+x.qty || 0); });
       const okeys = Object.keys(others).sort((a, b) => a.localeCompare(b, 'vi'));
-      const parts = [];
-      if (totalKg > 0) parts.push(`Trọng lượng ${_fmtNum(totalKg)}kg`);
-      if (okeys.length) parts.push(`Đơn vị khác: ${okeys.map(u => `${_fmtNum(others[u])} ${u}`).join(', ')}`);
-      g.value = parts.join(' · ');
+      ou.value = okeys.map(u => `${_fmtNum(others[u])} ${u}`).join(', ');
     }
     const f = document.getElementById('oFreight');
     if (f) f.value = total || '';
