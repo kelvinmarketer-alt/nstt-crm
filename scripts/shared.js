@@ -231,6 +231,50 @@ window.todayVN = function() {
 window.productById = function(id) {
   return window.STORE.get('products', window.PRODUCTS || []).find(p => p.id === id) || null;
 };
+
+/* ============ MATCH SP THEO TÊN — CHẶT (không đoán bừa) ============
+   Dùng chung cho mọi luồng AI/Excel (đơn hàng, bảng giá, catalog).
+   Nguyên tắc: THÀ KHÔNG KHỚP còn hơn khớp NHẦM sang SP khác.
+   - Khớp đúng tuyệt đối tên (đã chuẩn hoá) → nhận.
+   - Khớp theo TỪ: chỉ nhận khi TẤT CẢ từ của tên ngắn hơn đều nằm trong tên kia
+     (so theo từ trọn vẹn, KHÔNG so chuỗi con → tránh "xanh" dính "Xả"),
+     tên ngắn phải có ≥2 từ, và có ≥1 từ "đặc trưng" (không phải từ chung chung).
+   Trả về product hoặc null. */
+window._matchNorm = function (s) {
+  return (s || '').toString().toLowerCase().normalize('NFD')
+    .replace(/[̀-ͯ]/g, '').replace(/đ/g, 'd')
+    .replace(/[^a-z0-9 ]/g, ' ').replace(/\s+/g, ' ').trim();
+};
+/* Từ chung chung — không đủ để xác định 1 SP nếu đứng 1 mình */
+window._matchStopwords = new Set(['rau','cu','qua','trai','la','to','nho','xanh','do','vang','trang','tim','non','gia','sieu','thi','dl','mc','dac','biet','loai','kg','hop','bo','cay','trung','dep','sach','ta','tau','tay','cai','con','mini','baby','size','loai1','loai2']);
+window.matchProductSmart = function (name, productsArg) {
+  if (!name) return null;
+  const products = productsArg || window.STORE.get('products', window.PRODUCTS || []);
+  const norm = window._matchNorm;
+  const n = norm(name);
+  if (!n) return null;
+  /* 1) Khớp đúng tuyệt đối */
+  let p = products.find(x => norm(x.name) === n);
+  if (p) return p;
+  /* 2) Khớp theo từ trọn vẹn */
+  const toks = s => new Set(norm(s).split(' ').filter(t => t.length >= 2));
+  const nTok = toks(name);
+  if (!nTok.size) return null;
+  let best = null, bestScore = -1;
+  products.forEach(x => {
+    const xTok = toks(x.name);
+    if (!xTok.size) return;
+    let inter = 0, distinct = 0;
+    nTok.forEach(t => { if (xTok.has(t)) { inter++; if (!window._matchStopwords.has(t)) distinct++; } });
+    const small = Math.min(nTok.size, xTok.size);
+    const cov = inter / small;                 /* tên ngắn được phủ bao nhiêu */
+    const confident = cov === 1 && small >= 2 && distinct >= 1;
+    if (!confident) return;
+    const jac = inter / (nTok.size + xTok.size - inter);   /* gần kích thước → ưu tiên */
+    if (jac > bestScore) { bestScore = jac; best = x; }
+  });
+  return best;
+};
 /* Bản ghi giá áp dụng cho 1 ngày: mới nhất có date ≤ dateISO (fallback: bản sớm nhất) */
 window.priceEntryOn = function(product, dateISO) {
   const h = (product && product.priceHistory) || [];

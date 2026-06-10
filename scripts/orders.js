@@ -670,19 +670,9 @@
         || customers.find(x => { const xn = window.AI.norm(x.name); return xn.includes(nm) || nm.includes(xn); });
       if (c) { const sel = document.getElementById('oCust'); if (sel) sel.value = c.id; }
 
-      const prods = window.STORE.get('products', window.PRODUCTS || []);
-      let added = 0; const miss = [];
-      (d.items || []).forEach(it => {
-        const inm = window.AI.norm(it.name);
-        let p = prods.find(x => window.AI.norm(x.name) === inm)
-          || prods.find(x => { const xn = window.AI.norm(x.name); return xn.includes(inm) || inm.includes(xn); });
-        if (p) {
-          window.addOrderItem(p.id, it.qty || 1);
-          added++;
-        } else miss.push(it.name);
-      });
       if (d.note) { const n = document.getElementById('oNote'); if (n) n.value = d.note; }
-      window.toast(`🤖 AI: ${c ? 'KH ' + c.name + ' · ' : '(chưa khớp KH) '}${added} mặt hàng${miss.length ? ' · thiếu: ' + miss.slice(0, 4).join(', ') : ''}`, added ? 'success' : 'warn');
+      /* Dùng chung pipeline: matcher chặt + tự thêm SP ngoài DM + cảnh báo (không bỏ sót) */
+      applyBulkItems(d.items || [], 'AI ảnh đơn' + (c ? ' · ' + c.name : ' · (chưa khớp KH)'));
     }, 220);
   }
 
@@ -1041,58 +1031,114 @@
     return null;
   }
 
-  /* === Áp dụng list items {name, qty} vào orderItems === */
+  /* === Áp dụng list items {name, qty} vào orderItems ===
+     Nguyên tắc: KHÔNG bỏ sót dòng nào, KHÔNG đoán bừa.
+     - Khớp chắc chắn (từ điển KH / matcher chặt) → thêm SP trong DM.
+     - Không khớp → thêm thành "SP ngoài danh mục" (giá để trống) + CẢNH BÁO. */
   function applyBulkItems(items, source) {
-    let added = 0, updated = 0, unmatched = [];
+    let added = 0, updated = 0, off = 0;
     let viaAlias = 0;                                       /* match nhờ từ điển KH */
+    const offNames = [];                                   /* SP mới chưa có trong DM */
     const custId = window.formVal && window.formVal('#oCust');
     const products = window.STORE.get('products', window.PRODUCTS || []);
 
     items.forEach(it => {
       const qty = parseFloat(it.qty) || 0;
       if (!qty) return;
-      let p = null, learnWord = null;
+      const rawName = (it.name || '').toString().trim();
+      if (!rawName) return;
+      let p = null;
       /* (1) Ưu tiên từ điển riêng của KH */
       if (custId && window.CustPrefs) {
-        const r = window.CustPrefs.resolveItem(custId, it.name);
+        const r = window.CustPrefs.resolveItem(custId, rawName);
         if (r) { p = products.find(x => x.id === r.productId); if (p) viaAlias++; }
       }
-      /* (2) Fallback fuzzy match catalog chung */
-      if (!p) { p = matchProductByName(it.name); learnWord = p ? it.name : null; }
-      /* (3) Không khớp gì → bỏ vào unmatched (sẽ hỏi user dạy AI) */
-      if (!p) { unmatched.push(it.name); return; }
-      const price = priceForOrder(p.id);
-      const existing = orderItems.find(x => x.id === p.id);
-      if (existing) {
-        existing.qty = Math.round((existing.qty + qty) * 100) / 100;
-        existing.total = Math.round(existing.qty * existing.price);
-        updated++;
-      } else {
-        orderItems.push({ id: p.id, name: p.name, unit: p.unit, img: p.img, qty, price, total: Math.round(qty * price) });
-        added++;
-      }
-      /* (4) Nếu match qua fuzzy + tên KH viết ngắn hơn tên SP gốc → đề xuất dạy KH */
-      if (learnWord && custId && window.CustPrefs) {
-        const norm = s => (s||'').toLowerCase().normalize('NFD').replace(/[̀-ͯ]/g,'').replace(/đ/g,'d');
-        if (norm(learnWord).length < norm(p.name).length - 2) {
-          /* Async — không block UI. Đợi 1s sau khi toast hiện rồi mới hỏi */
-          setTimeout(() => window.CustPrefs.promptToLearn(custId, learnWord, p.id), (added+updated)*500);
+      /* (2) Matcher CHẶT — chỉ nhận khi chắc chắn (tránh khớp nhầm SP khác) */
+      if (!p) p = window.matchProductSmart ? window.matchProductSmart(rawName, products) : matchProductByName(rawName);
+
+      if (p) {
+        const price = priceForOrder(p.id);
+        const existing = orderItems.find(x => x.id === p.id);
+        if (existing) {
+          existing.qty = Math.round((existing.qty + qty) * 100) / 100;
+          existing.total = Math.round(existing.qty * existing.price);
+          updated++;
+        } else {
+          orderItems.push({ id: p.id, name: p.name, unit: p.unit, img: p.img, qty, price, basePrice: price, priceConfirmed: false, total: Math.round(qty * price) });
+          added++;
         }
+      } else {
+        /* (3) KHÔNG có trong DM → thêm thành SP ngoài danh mục (không bỏ sót) */
+        orderItems.push({ id: null, custom: true, fromAI: true, name: rawName, unit: 'kg', img: '', qty, price: 0, basePrice: 0, priceConfirmed: false, total: 0 });
+        off++; offNames.push(rawName);
       }
     });
     renderOrderItems();
     /* Refresh box gợi ý */
     if (custId) renderCustPrefBox(custId);
 
-    const aliasNote = viaAlias ? ` · 🎯 ${viaAlias} dùng từ điển KH` : '';
-    const msg = `✓ ${source}: +${added} mới · ${updated} cập nhật${aliasNote}` + (unmatched.length ? ` · ${unmatched.length} không khớp: ${unmatched.slice(0,3).join(', ')}${unmatched.length>3?'...':''}` : '');
-    window.toast(msg, added + updated ? 'success' : 'warn');
+    const aliasNote = viaAlias ? ` · 🎯 ${viaAlias} từ điển KH` : '';
+    const offNote = off ? ` · ⚠️ ${off} SP ngoài DM (mới)` : '';
+    window.toast(`✓ ${source}: +${added} mới · ${updated} cộng dồn${aliasNote}${offNote}`, (added + updated + off) ? 'success' : 'warn');
 
-    /* Nếu có unmatched + có KH → mở modal hỏi user mapping thủ công */
-    if (unmatched.length && custId && window.CustPrefs) {
-      setTimeout(() => askUserToMapUnmatched(custId, unmatched), 800);
-    }
+    /* Có SP ngoài DM → cảnh báo rõ + cho phép map về SP đã có (tuỳ chọn) */
+    if (off) setTimeout(() => warnOffCatalogItems(offNames, custId), 400);
   }
+
+  /* Cảnh báo + xử lý các SP AI đọc được nhưng CHƯA có trong danh mục */
+  function warnOffCatalogItems(names, custId) {
+    const uniq = [...new Set(names.map(s => (s || '').trim()).filter(Boolean))];
+    if (!uniq.length) return;
+    const c = custId ? window.STORE.get('customers', []).find(x => x.id === custId) : null;
+    window.openModal('⚠️ ' + uniq.length + ' sản phẩm CHƯA có trong danh mục', `
+      <div style="background:#FEF3C7;color:#92400E;padding:11px 13px;border-radius:8px;font-size:12.5px;margin-bottom:13px;line-height:1.55">
+        Các mặt hàng dưới đây <b>không tìm thấy trong danh mục sản phẩm</b> nên đã được thêm vào đơn dưới dạng
+        <b>“SP ngoài danh mục”</b> (giá để trống — Sale tự nhập). <b>Không mặt hàng nào bị bỏ sót.</b><br>
+        👉 Nếu thực ra là SP đã có (khách gọi tên khác), gõ chọn đúng SP để <b>chuyển về SP trong DM</b>${c ? ' — và AI sẽ nhớ cho lần sau' : ''}. Để trống = giữ là hàng ngoài DM.
+      </div>
+      ${uniq.map((w, i) => `
+        <div style="display:grid;grid-template-columns:1fr 1.6fr;gap:8px;margin-bottom:8px;align-items:center">
+          <div style="font-weight:600;color:#92400E">🆕 "${(w || '').replace(/"/g, '&quot;')}"</div>
+          <input class="prodpick" id="off_${i}" data-word="${(w || '').replace(/"/g, '&quot;')}" data-pid="" placeholder="(tuỳ chọn) gõ tên SP đúng trong DM…" style="border:1px solid var(--line);border-radius:5px;padding:6px 9px;font-size:12.5px">
+        </div>`).join('')}
+    `, {
+      footer: `<button class="btn btn-ghost" onclick="window.closeModal()">Giữ là SP ngoài DM</button>
+               <button class="btn btn-primary" onclick="window._resolveOffCatalog('${custId || ''}')">💾 Chuyển SP đã chọn về DM</button>`,
+      width: '560px', stack: true
+    });
+    if (window.wireAllProductSearch) window.wireAllProductSearch(document.querySelector('.modal-bg:last-of-type') || document);
+  }
+
+  /* User map 1 vài SP ngoài DM về SP thật → chuyển dòng tại chỗ + dạy từ điển KH */
+  window._resolveOffCatalog = function (custId) {
+    let n = 0;
+    document.querySelectorAll('input[id^=off_].prodpick').forEach(sel => {
+      const word = sel.dataset.word, pid = sel.dataset.pid;
+      if (!word || !pid) return;
+      const p = window.productById(pid); if (!p) return;
+      const line = orderItems.find(x => x.custom && x.fromAI && x.id === null
+        && (x.name || '').trim().toLowerCase() === word.trim().toLowerCase());
+      if (!line) return;
+      const price = priceForOrder(pid);
+      const dup = orderItems.find(x => x.id === pid);
+      if (dup && dup !== line) {            /* đã có dòng cùng SP → gộp số lượng */
+        dup.qty = Math.round((dup.qty + line.qty) * 100) / 100;
+        dup.total = Math.round(dup.qty * dup.price);
+        const idx = orderItems.indexOf(line); if (idx >= 0) orderItems.splice(idx, 1);
+      } else {                              /* chuyển dòng off → SP trong DM */
+        line.id = pid; line.custom = false; line.fromAI = false;
+        line.name = p.name; line.unit = p.unit; line.img = p.img;
+        line.price = price; line.basePrice = price; line.priceConfirmed = false;
+        line.total = Math.round(line.qty * price);
+      }
+      if (custId && window.CustPrefs) window.CustPrefs.addAlias(custId, word, pid);
+      n++;
+    });
+    renderOrderItems();
+    if (custId) renderCustPrefBox(custId);
+    window.closeModal();
+    if (n) window.toast(`✓ Đã chuyển ${n} SP về danh mục${custId ? ' + AI đã nhớ' : ''}`, 'success');
+  };
 
   /* Modal hỏi user map các tên AI không hiểu cho 1 KH */
   function askUserToMapUnmatched(custId, unmatchedNames) {
@@ -1159,22 +1205,27 @@
 
     /* Build catalog để AI ưu tiên match đúng — đưa TOÀN BỘ danh mục (cắt an toàn 300 SP) */
     const products = window.STORE.get('products', window.PRODUCTS || []);
-    const catalogHint = products.slice(0, 300).map(p => `${p.id}=${p.name}`).join(', ');
+    const catalogHint = products.slice(0, 800).map(p => p.name).join(', ');
 
     const basePrompt = `Đọc ảnh chứa danh sách mặt hàng nông sản đặt mua (tiếng Việt).
 Trả JSON: {"items":[{"name":"tên mặt hàng","qty":<số lượng>}]}.
 Số lượng là số nguyên/thập phân (vd 5, 2.5). KHÔNG bao gồm đơn vị "kg" trong qty.
 
-⚠️ QUAN TRỌNG — ĐỌC ĐẦY ĐỦ:
+⚠️ QUAN TRỌNG — ĐỌC ĐẦY ĐỦ, KHÔNG BỎ SÓT:
 - Đọc HẾT MỌI DÒNG trong ảnh từ trên xuống dưới, KHÔNG được bỏ sót dòng nào.
 - Kể cả chữ viết tay mờ, chữ nhỏ, nhiều cột, gạch đầu dòng, hay tin nhắn dài — liệt kê TẤT CẢ.
-- Nếu ảnh có 30 món thì items phải đủ 30 phần tử. Thà đoán còn hơn bỏ sót.
+- Nếu ảnh có 30 món thì items phải đủ 30 phần tử. Thà thừa còn hơn thiếu.
 
-${aliasCtx ? aliasCtx + '\n\n' : ''}DANH MỤC SP CỦA SHOP (id=tên): ${catalogHint}
+⚠️ KHÔNG ĐƯỢC TỰ ĐỔI SANG SP KHÁC:
+- Ghi ĐÚNG tên mặt hàng như trong ảnh. TUYỆT ĐỐI KHÔNG suy đoán/thay thế sang một mặt hàng khác chỉ vì nghe giống.
+- Nếu mặt hàng KHÔNG có trong danh mục bên dưới → VẪN ghi đúng tên đọc được (hệ thống sẽ tự xử lý là "hàng ngoài danh mục"). KHÔNG bỏ qua, KHÔNG ép về SP gần giống.
 
-QUY TẮC ƯU TIÊN khi đọc tên mơ hồ:
-1. Nếu có TỪ ĐIỂN RIÊNG của KH ở trên → DÙNG đúng tên SP đó (vd "hành" của KH này = "Hành tây trắng" thì viết "Hành tây trắng" trong items).
-2. Nếu không có alias → giữ nguyên tên KH viết, sẽ match fuzzy sau.
+${aliasCtx ? aliasCtx + '\n\n' : ''}DANH MỤC SP CỦA SHOP (chỉ để tham khảo CHÍNH TẢ tên, KHÔNG bắt buộc phải nằm trong list này): ${catalogHint}
+
+QUY TẮC khi đọc tên:
+1. Nếu có TỪ ĐIỂN RIÊNG của KH ở trên → DÙNG đúng tên SP đó (vd "hành" của KH này = "Hành tây trắng" thì viết "Hành tây trắng").
+2. Nếu tên đọc được trùng/gần trùng 1 tên trong danh mục (chỉ khác chính tả/dấu) → dùng tên chuẩn trong danh mục.
+3. Còn lại → giữ NGUYÊN tên KH viết.
 
 CHỈ TRẢ JSON, không giải thích gì thêm.`;
 

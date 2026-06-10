@@ -555,15 +555,16 @@
     const ps = products();
     let matched = 0; const miss = [];
     list.forEach(it => {
-      const nm = window.AI.norm(it.name);
       const price = parseInt(String(it.price == null ? '' : it.price).replace(/[^0-9]/g, ''), 10) || 0;
-      if (!nm || !price) return;
-      let p = ps.find(x => window.AI.norm(x.name) === nm)
-        || ps.find(x => { const xn = window.AI.norm(x.name); return xn.includes(nm) || nm.includes(xn); });
+      if (!it.name || !price) return;
+      /* Matcher CHẶT — không khớp nhầm sang SP khác */
+      const p = window.matchProductSmart ? window.matchProductSmart(it.name, ps)
+        : ps.find(x => window.AI.norm(x.name) === window.AI.norm(it.name));
       if (p) { const inp = document.querySelector('.bprice[data-id="' + p.id + '"]'); if (inp) { inp.value = price; matched++; } }
       else miss.push(it.name);
     });
-    window.toast(`✓ AI đã điền ${matched} giá${miss.length ? ' · chưa khớp: ' + miss.slice(0, 4).join(', ') : ''} — kiểm tra rồi bấm "Lưu bảng giá".`, matched ? 'success' : 'warn');
+    window.toast(`✓ AI điền ${matched} giá${miss.length ? ' · ⚠️ ' + miss.length + ' SP chưa có trong DM: ' + miss.slice(0, 4).join(', ') + (miss.length > 4 ? '…' : '') : ''} — kiểm tra rồi bấm "Lưu bảng giá".`, matched ? 'success' : 'warn');
+    if (miss.length) console.warn('[AI giá] SP chưa khớp DM:', miss);
   }
 
   window.copyYesterday = function () {
@@ -932,10 +933,11 @@
         if (!list.length) { window.toast('Không đọc được SP từ ảnh', 'warn'); return; }
         const ps = products(); let n = 0, created = 0; const today = window.todayISO();
         list.forEach(it => {
-          const nm = window.AI.norm(it.name);
           const buy = parseInt(String(it.buy == null ? '' : it.buy).replace(/[^0-9]/g, ''), 10) || 0;
           const sell = parseInt(String(it.sell == null ? '' : it.sell).replace(/[^0-9]/g, ''), 10) || 0;
-          const p = ps.find(x => window.AI.norm(x.name) === nm) || ps.find(x => { const xn = window.AI.norm(x.name); return xn.includes(nm) || nm.includes(xn); });
+          /* Matcher CHẶT — không khớp nhầm; không khớp = tạo SP mới (đúng ý đồ catalog) */
+          const p = window.matchProductSmart ? window.matchProductSmart(it.name, ps)
+            : ps.find(x => window.AI.norm(x.name) === window.AI.norm(it.name));
           if (!p) {
             if (!it.name || !String(it.name).trim()) return;
             window.STORE.add('products', { id: window.STORE.nextId('products', 'SP', 3), name: String(it.name).trim(), cat: 'khac', unit: 'kg', img: '', priceHistory: (buy || sell) ? [{ date: today, buy, sell: sell || buy }] : [] });
