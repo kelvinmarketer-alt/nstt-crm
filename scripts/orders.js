@@ -5,6 +5,17 @@
   const SVC = Object.fromEntries((window.SERVICE_TYPES || []).map(s => [s.id, s]));
   /* 1 đơn có thể có NHIỀU nhóm hàng — serviceType lưu chuỗi ghép "id1,id2" */
   const svcIdsOf = o => String((o && o.serviceType) || '').split(',').map(s => s.trim()).filter(Boolean);
+
+  /* ===== Ô tiền: hiển thị có dấu chấm (1.531.250), đọc về số nguyên ===== */
+  const _moneyVal = (sel) => parseInt(String((window.formVal && window.formVal(sel)) || '').replace(/\D/g, ''), 10) || 0;
+  window._fmtMoneyInput = function (el) {
+    const start = el.selectionStart, before = el.value.length;
+    const d = el.value.replace(/\D/g, '');
+    el.value = d ? Number(d).toLocaleString('vi-VN') : '';
+    /* giữ con trỏ tương đối khi gõ ở cuối */
+    const after = el.value.length;
+    if (start != null) { try { el.selectionStart = el.selectionEnd = Math.max(0, start + (after - before)); } catch (e) {} }
+  };
   const TM  = Object.fromEntries((window.TRANSPORT_MODES || []).map(t => [t.id, t]));
   let orders = window.STORE.get('orders', window.ORDERS || []);
   /* Migration: localStorage còn đơn schema cũ (logistics, chưa có items) → seed lại đơn nông sản */
@@ -776,8 +787,8 @@
       </div>
       <input type="hidden" id="oQty" value="1"><input type="hidden" id="oUnit" value="kg">
       <div class="form-row">
-        <div><label>Tổng tiền hàng (₫) *</label><input id="oFreight" type="number" placeholder="0"></div>
-        <div><label>COD / Thu hộ (₫)</label><input id="oCod" type="number" placeholder="0"></div>
+        <div><label>Tổng tiền hàng (₫) *</label><input id="oFreight" type="text" inputmode="numeric" oninput="window._fmtMoneyInput(this)" placeholder="0"></div>
+        <div><label>COD / Thu hộ (₫)</label><input id="oCod" type="text" inputmode="numeric" oninput="window._fmtMoneyInput(this)" placeholder="0"></div>
       </div>
       <div class="form-row">
         <div><label>Hình thức TT</label>
@@ -969,7 +980,7 @@
       ou.value = okeys.map(u => `${_fmtNum(others[u])} ${u}`).join(', ');
     }
     const f = document.getElementById('oFreight');
-    if (f) f.value = total || '';
+    if (f) f.value = total ? Number(total).toLocaleString('vi-VN') : '';
     /* Trọng lượng tự đồng bộ = tổng kg (trừ khi user tự sửa tay → data-auto=0) */
     const w = document.getElementById('oWeight');
     if (w && w.dataset.auto !== '0') w.value = totalKg > 0 ? totalKg.toFixed(2) : '';
@@ -1393,8 +1404,8 @@ CHỈ TRẢ JSON, không giải thích gì thêm.`;
   };
 
   function updateProfit() {
-    const freight = parseInt(window.formVal('#oFreight'), 10) || 0;
-    const cost = parseInt(window.formVal('#oPartnerCost'), 10) || 0;
+    const freight = _moneyVal('#oFreight');
+    const cost = parseInt(String(window.formVal('#oPartnerCost') || '').replace(/\D/g, ''), 10) || 0;
     const profit = freight - cost;
     const profitEl = document.getElementById('oProfit');
     if (profitEl) {
@@ -1717,7 +1728,7 @@ CHỈ TRẢ JSON, không giải thích gì thêm.`;
   window.submitCreateOrder = function(initStatus) {
     const custId = window.formVal('#oCust');
     const goods = window.formVal('#oGoods');
-    const freight = parseInt(window.formVal('#oFreight'), 10) || 0;
+    const freight = _moneyVal('#oFreight');
     if (!custId) { window.toast('Chọn khách hàng', 'warn'); return; }
     if (!goods) { window.toast('Nhập tên hàng hóa', 'warn'); return; }
     if (!freight) { window.toast('Nhập cước', 'warn'); return; }
@@ -1770,7 +1781,7 @@ CHỈ TRẢ JSON, không giải thích gì thêm.`;
       weight: parseInt(window.formVal('#oWeight'), 10) || 0,
       unit: window.formVal('#oUnit') || 'kg',
       freight,
-      cod: parseInt(window.formVal('#oCod'), 10) || 0,
+      cod: _moneyVal('#oCod'),
       payBy: window.formVal('#oPayBy'),
       driver, driverName, vehicle,
       external: false,
