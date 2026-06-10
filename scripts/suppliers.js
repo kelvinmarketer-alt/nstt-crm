@@ -217,11 +217,20 @@
           </select></div>
         <div style="grid-column:span 2"><label style="font-size:12px;color:var(--muted)">Sản phẩm cung cấp <span style="color:var(--navy);font-weight:600">(${prods.length} SP từ "Sản phẩm &amp; Giá")</span> ${window.helpTip('Danh sách này LẤY TRỰC TIẾP từ module Sản phẩm & Giá. Thêm/bớt SP ở đó thì danh sách này tự cập nhật. Tick SP + nhập giá nhập riêng nếu muốn.')}</label>
           <input id="sf_prodSearch" placeholder="🔍 Gõ tên SP để lọc nhanh..." oninput="window._supFilterProds(this.value)" style="width:100%;border:1px solid var(--line);border-radius:6px;padding:7px;font-size:13px;margin-top:4px">
+          <!-- Thanh thao tác hàng loạt: chọn tất cả + đặt giá + bỏ chọn -->
+          <div style="display:flex;align-items:center;gap:7px;flex-wrap:wrap;margin-top:6px;padding:7px 9px;background:#F0FDF4;border:1px solid #BBF7D0;border-radius:7px;font-size:12px">
+            <label style="display:flex;align-items:center;gap:5px;cursor:pointer;font-weight:700;color:#15803D"><input type="checkbox" id="sf_selAll" onclick="window._supToggleAllProds(this.checked)" style="cursor:pointer"> Chọn tất cả <span style="font-weight:400;color:var(--muted)">(đang hiện)</span></label>
+            <span id="sf_selCount" style="color:var(--muted)">${(s.products||[]).length} đã chọn</span>
+            <div style="flex:1;min-width:6px"></div>
+            <input type="number" id="sf_bulkPrice" min="0" step="100" placeholder="giá nhập" style="width:92px;border:1px solid var(--line);border-radius:5px;padding:4px 6px;font-size:12px">
+            <button type="button" class="btn btn-ghost btn-sm" style="font-size:11.5px;padding:3px 8px" onclick="window._supBulkPrice()" title="Áp giá nhập cho mọi SP đã tick">💲 Đặt giá cho SP đã tick</button>
+            <button type="button" class="btn btn-ghost btn-sm" style="font-size:11.5px;padding:3px 8px;color:var(--danger)" onclick="window._supClearProds()" title="Bỏ tick toàn bộ">✕ Bỏ tick tất cả</button>
+          </div>
           <div id="sf_prodList" style="max-height:210px;overflow:auto;border:1px solid var(--line);border-radius:6px;margin-top:6px;padding:4px">
             ${prods.length ? prods.map(p => {
               const sel = (s.products || []).find(x => x.id === p.id);
               return `<label class="sf-prow" data-name="${esc(normN(p.name))}">
-                <input type="checkbox" data-prod="${p.id}" data-pname="${esc(p.name)}" ${sel?'checked':''}>
+                <input type="checkbox" data-prod="${p.id}" data-pname="${esc(p.name)}" ${sel?'checked':''} onchange="window._supUpdateProdCount()">
                 <span>${p.name} <span style="color:var(--muted);font-size:11px">/${p.unit||'kg'}</span></span>
                 <input type="number" min="0" step="100" data-pprice="${p.id}" value="${sel&&sel.price?sel.price:''}" placeholder="giá nhập" onclick="event.stopPropagation()">
               </label>`;
@@ -245,6 +254,43 @@
     document.querySelectorAll('#sf_prodList .sf-prow').forEach(row => {
       row.style.display = (!nq || (row.dataset.name || '').includes(nq)) ? '' : 'none';
     });
+  };
+
+  /* ===== Thao tác HÀNG LOẠT sản phẩm cung cấp ===== */
+  window._supUpdateProdCount = function () {
+    const checked = document.querySelectorAll('#sf_prodList input[data-prod]:checked').length;
+    const total = document.querySelectorAll('#sf_prodList input[data-prod]').length;
+    const el = document.getElementById('sf_selCount'); if (el) el.textContent = checked + ' đã chọn';
+    /* tick "chọn tất cả" nếu mọi dòng ĐANG HIỆN đều đã tick */
+    const visible = [...document.querySelectorAll('#sf_prodList .sf-prow')].filter(r => r.style.display !== 'none');
+    const visChecked = visible.filter(r => r.querySelector('input[data-prod]')?.checked).length;
+    const sa = document.getElementById('sf_selAll'); if (sa) sa.checked = visible.length > 0 && visChecked === visible.length;
+  };
+  /* Tick / bỏ tick tất cả SP ĐANG HIỆN (tôn trọng bộ lọc tìm) */
+  window._supToggleAllProds = function (on) {
+    document.querySelectorAll('#sf_prodList .sf-prow').forEach(row => {
+      if (row.style.display === 'none') return;
+      const cb = row.querySelector('input[data-prod]'); if (cb) cb.checked = on;
+    });
+    window._supUpdateProdCount();
+  };
+  /* Bỏ tick toàn bộ (kể cả đang ẩn do lọc) */
+  window._supClearProds = function () {
+    document.querySelectorAll('#sf_prodList input[data-prod]:checked').forEach(cb => { cb.checked = false; });
+    window._supUpdateProdCount();
+  };
+  /* Đặt 1 giá nhập cho MỌI SP đã tick (để trống ô giá = xoá giá) */
+  window._supBulkPrice = function () {
+    const raw = (document.getElementById('sf_bulkPrice') || {}).value;
+    const v = parseInt(raw, 10) || 0;
+    const checked = [...document.querySelectorAll('#sf_prodList input[data-prod]:checked')];
+    if (!checked.length) { window.toast('Chưa tick SP nào — tick các SP cần đặt giá trước', 'warn'); return; }
+    let n = 0;
+    checked.forEach(cb => {
+      const priceEl = document.querySelector('#sf_prodList [data-pprice="' + cb.dataset.prod + '"]');
+      if (priceEl) { priceEl.value = v > 0 ? v : ''; n++; }
+    });
+    window.toast(`✓ Đặt giá ${v > 0 ? window.fmt(v) + 'đ' : '(trống)'} cho ${n} SP đã tick`, 'success');
   };
 
   window._supSave = function (isEdit) {
