@@ -273,7 +273,7 @@
       return `<tr data-id="${p.id}">
         <td><div class="checkbox" onclick="this.classList.toggle('on')"></div></td>
         <td><div style="display:flex;align-items:center;gap:8px">
-          ${p.img ? `<img src="${p.img}" alt="" loading="lazy" style="width:34px;height:34px;object-fit:cover;border-radius:6px;background:#eef3ee;flex:none" onerror="this.style.visibility='hidden'">` : ''}
+          ${p.img ? `<img class="lazy-prodimg" data-pid="${p.id}" alt="" style="width:34px;height:34px;object-fit:cover;border-radius:6px;background:#eef3ee;flex:none" onerror="this.style.visibility='hidden'">` : ''}
           <b>${p.name}</b></div></td>
         <td><span class="tag" style="background:${cat.color}20;color:${cat.color}">${cat.icon} ${cat.label}</span></td>
         <td style="color:var(--muted)">/${p.unit}</td>
@@ -371,6 +371,7 @@
       });
     });
     wireBoardToolbar(renderBoard);
+    _observeCatImages();
   }
 
   /* ============ BẢNG GIÁ MARKETING ============
@@ -406,7 +407,7 @@
         : `<span style="color:${diff>0?'#DC2626':'#15803D'};font-weight:600">${diff>0?'+':''}${window.fmt(diff)}</span>`;
       return `<tr>
         <td><div style="display:flex;align-items:center;gap:8px">
-          ${p.img ? `<img src="${p.img}" alt="" loading="lazy" style="width:32px;height:32px;object-fit:cover;border-radius:6px;background:#eef3ee;flex:none" onerror="this.style.visibility='hidden'">` : ''}
+          ${p.img ? `<img class="lazy-prodimg" data-pid="${p.id}" alt="" style="width:32px;height:32px;object-fit:cover;border-radius:6px;background:#eef3ee;flex:none" onerror="this.style.visibility='hidden'">` : ''}
           <b>${p.name}</b></div></td>
         <td><span class="tag" style="background:${cat.color}20;color:${cat.color}">${cat.icon} ${cat.label}</span></td>
         <td style="color:var(--muted)">/${p.unit}</td>
@@ -478,6 +479,7 @@
       });
     });
     wireBoardToolbar(renderMkt);
+    _observeCatImages();
   }
 
   window._mktQuick = function (giaNum) {
@@ -742,7 +744,7 @@
       return `<div class="cat-card" data-id="${p.id}" style="display:flex;align-items:center;gap:10px;padding:9px 11px;border:1px solid var(--line);border-radius:10px;background:#fff">
         <div class="checkbox" onclick="this.classList.toggle('on')" style="flex:none"></div>
         <div onclick="event.stopPropagation();window.quickEditProductImage('${p.id}')" title="Bấm để đổi ảnh trực tiếp" style="position:relative;width:42px;height:42px;cursor:pointer;flex:none">
-          ${p.img ? `<img src="${p.img}" alt="" loading="lazy" style="width:42px;height:42px;object-fit:cover;border-radius:7px;background:#eef3ee" onerror="this.parentElement.querySelector('.ph')?(this.style.display='none'):null">` : ''}
+          ${p.img ? `<img class="lazy-prodimg" data-pid="${p.id}" alt="" style="width:42px;height:42px;object-fit:cover;border-radius:7px;background:#eef3ee" onerror="this.style.visibility='hidden'">` : ''}
           ${p.img ? '' : `<div class="ph" style="width:42px;height:42px;border-radius:7px;background:#eef3ee;display:grid;place-items:center;color:#9CA3AF;font-size:15px">📷</div>`}
           <span style="position:absolute;right:-4px;bottom:-4px;background:var(--navy);color:#fff;border-radius:50%;width:17px;height:17px;display:grid;place-items:center;font-size:9px;box-shadow:0 1px 3px rgba(0,0,0,.3)">✎</span>
         </div>
@@ -765,12 +767,27 @@
     }).join('') || `<div style="grid-column:1/-1;padding:30px;text-align:center;color:var(--muted)">${_catNorm(catQuery) ? 'Không tìm thấy SP nào khớp.' : 'Chưa có sản phẩm.'}</div>`;
     return { rows, count: list.length };
   }
+  /* === LAZY-LOAD ảnh SP: chỉ nạp base64 khi card cuộn tới (tránh nhồi 8MB ảnh vào DOM) === */
+  var _catImgObserver = null;   /* var (không let) — tránh TDZ vì renderBoard/Mkt gọi trước dòng này */
+  function _observeCatImages() {
+    if (_catImgObserver) _catImgObserver.disconnect();
+    const imgs = document.querySelectorAll('img.lazy-prodimg[data-pid]');
+    if (!imgs.length) return;
+    const load = (img) => { const p = window.productById(img.dataset.pid); if (p && p.img) img.src = p.img; };
+    if (!('IntersectionObserver' in window)) { imgs.forEach(load); return; }
+    _catImgObserver = new IntersectionObserver((entries, obs) => {
+      entries.forEach(en => { if (en.isIntersecting) { load(en.target); obs.unobserve(en.target); } });
+    }, { rootMargin: '300px' });
+    imgs.forEach(img => _catImgObserver.observe(img));
+  }
+
   /* Chỉ cập nhật lưới + đếm — KHÔNG đụng ô input (bộ gõ tiếng Việt an toàn) */
   window.renderCatalogGrid = function () {
     const g = document.getElementById('catalogGrid');
     if (!g) { renderCatalog(); return; }
     g.innerHTML = _catRows().rows;
     _syncCatSearchUI();
+    _observeCatImages();
   };
 
   function renderCatalog() {
@@ -804,6 +821,9 @@
     /* khôi phục giá trị ô tìm sau khi dựng lại view (đổi tab/nhóm) */
     const se = document.getElementById('catSearch'); if (se) se.value = catQuery || '';
     _syncCatSearchUI();
+
+    /* Lazy-load ảnh SP (chỉ nạp khi cuộn tới) */
+    _observeCatImages();
 
     /* Wire inline edit cho giá (input có sẵn) */
     document.querySelectorAll('#catalogView .cat-price').forEach(inp => {
