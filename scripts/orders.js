@@ -3,6 +3,8 @@
    ========================================================= */
 (function () {
   const SVC = Object.fromEntries((window.SERVICE_TYPES || []).map(s => [s.id, s]));
+  /* 1 đơn có thể có NHIỀU nhóm hàng — serviceType lưu chuỗi ghép "id1,id2" */
+  const svcIdsOf = o => String((o && o.serviceType) || '').split(',').map(s => s.trim()).filter(Boolean);
   const TM  = Object.fromEntries((window.TRANSPORT_MODES || []).map(t => [t.id, t]));
   let orders = window.STORE.get('orders', window.ORDERS || []);
   /* Migration: localStorage còn đơn schema cũ (logistics, chưa có items) → seed lại đơn nông sản */
@@ -55,7 +57,7 @@
 
   function renderServiceChips() {
     const counts = { all: orders.length };
-    orders.forEach(o => counts[o.serviceType] = (counts[o.serviceType]||0)+1);
+    orders.forEach(o => svcIdsOf(o).forEach(id => counts[id] = (counts[id]||0)+1));
     const html = `<button class="chip ${!currentService?'active':''}" onclick="filterService(null)">Tất cả <span class="cnt">${counts.all}</span></button>` +
       (window.SERVICE_TYPES||[]).map(s =>
         `<button class="chip ${currentService===s.id?'active':''}" onclick="filterService('${s.id}')" style="${currentService===s.id?'background:'+s.color+';color:#fff;border-color:'+s.color:''}">${s.icon} ${s.label} <span class="cnt">${counts[s.id]||0}</span></button>`
@@ -227,7 +229,7 @@
 
   function match(o) {
     if (currentStatus && o.status !== currentStatus) return false;
-    if (currentService && o.serviceType !== currentService) return false;
+    if (currentService && !svcIdsOf(o).includes(currentService)) return false;
     const q = document.getElementById('qSearch').value.trim().toLowerCase();
     if (q && ![o.code, o.custName, o.driverName, o.vehicle, o.cust].some(x => (x||'').toLowerCase().includes(q))) return false;
     const tm = document.getElementById('fMode').value;
@@ -538,14 +540,15 @@
     const o = orders.find(x => x.code === code);
     if (!o) return;
     window._currentOrderCode = code;   /* dùng cho action buttons trong tab Hành động */
-    const svc = SVC[o.serviceType] || {icon:'❓', label:o.serviceType, color:'#666'};
+    const svcList = svcIdsOf(o).map(id => SVC[id] || {icon:'❓', label:id, color:'#666'});
+    if (!svcList.length && o.serviceType) svcList.push({icon:'❓', label:o.serviceType, color:'#666'});
     const tm = o.transportMode ? TM[o.transportMode] : null;
     const st = STATUS[o.status];
 
     document.getElementById('dCode').textContent = o.code;
     document.getElementById('dMeta').innerHTML = `
       <span class="status-pill st-${o.status}">${st.icon} ${st.label}</span>
-      <span class="svc-tag" style="background:${svc.color}20;color:${svc.color}">${svc.icon} ${svc.label}</span>
+      ${svcList.map(svc => `<span class="svc-tag" style="background:${svc.color}20;color:${svc.color}">${svc.icon} ${svc.label}</span>`).join(' ')}
       ${tm ? `<span class="tm-tag">${tm.icon} ${tm.label}</span>` : ''}
       <span>· ${o.date}</span>
     `;
@@ -554,7 +557,7 @@
     document.getElementById('dCod').textContent = o.cod ? window.fmtShort(o.cod) + ' ₫' : '—';
     document.getElementById('dWeight').textContent = o.weight ? o.weight + ' kg' : '—';
     document.getElementById('dUnit').textContent = o.qty + ' ' + o.unit.toLowerCase();
-    document.getElementById('dService').textContent = svc.label;
+    document.getElementById('dService').textContent = svcList.map(s => s.label).join(', ') || '—';
     document.getElementById('dMode').textContent = tm ? tm.label : '—';
 
     document.getElementById('iCode').textContent  = o.code;
@@ -682,7 +685,9 @@
     const drivers = window.STORE.get('shippers', window.DRIVERS || []);
     const vehicles = window.STORE.get('vehicles', window.VEHICLES || []);
     const partners = window.STORE.get('partners', window.PARTNERS || []).filter(p => p.active);
-    const svcOpts = window.MD.options('services');
+    const svcItems = (window.MD.get && window.MD.get('services')) || window.SERVICE_TYPES || [];
+    const svcChecks = svcItems.map(s => `<label class="oSvc-chip" style="display:inline-flex;align-items:center;gap:5px;padding:5px 10px;border:1px solid var(--line);border-radius:16px;cursor:pointer;font-size:12.5px;user-select:none;background:#fff;white-space:nowrap">
+        <input type="checkbox" class="oSvcChk" value="${s.id}" style="margin:0;cursor:pointer" onchange="window._oSvcToggle(this)">${s.icon || ''} ${s.label}</label>`).join('');
     const tmOpts = window.MD.options('transportModes');
     const unitOpts = window.MD.options('units');
     /* Mặc định chọn "Công nợ" (đa phần đơn B2B ghi nợ) — robust dù master data có thứ tự khác */
@@ -722,8 +727,8 @@
           <div id="oCust_box"></div>
           <input type="hidden" id="oCust" value="">
         </div>
-        <div><label>Nhóm hàng chính</label>
-          <select id="oSvc" onchange="window.onChangeService(this.value)">${svcOpts}</select></div>
+        <div><label>Nhóm hàng chính <span style="font-weight:400;color:var(--muted);font-size:11px">(tích chọn — 1 đơn có thể nhiều nhóm)</span></label>
+          <div id="oSvcBox" style="display:flex;flex-wrap:wrap;gap:6px;padding:8px;border:1px solid var(--line);border-radius:7px;max-height:120px;overflow:auto;background:#FAFAFB">${svcChecks}</div></div>
       </div>
       <!-- ====== NHÓM GIÁ ÁP DỤNG (tự lấy theo KH — sửa được) ====== -->
       <div class="form-row" style="align-items:flex-end">
@@ -764,7 +769,7 @@
       <div id="orderItemsBox" style="margin:6px 0 12px"></div>
       <div class="form-row">
         <div><label>Tóm tắt hàng *</label><input id="oGoods" placeholder="tự điền từ mặt hàng (có thể sửa)"></div>
-        <div><label>Trọng lượng (kg)</label><input id="oWeight" type="number" placeholder="0"></div>
+        <div><label>Trọng lượng (kg) <span style="font-weight:400;color:var(--muted);font-size:11px">(tự tính theo kg — sửa được)</span></label><input id="oWeight" type="number" placeholder="0" data-auto="1" oninput="this.dataset.auto='0'"></div>
       </div>
       <input type="hidden" id="oQty" value="1"><input type="hidden" id="oUnit" value="kg">
       <div class="form-row">
@@ -792,7 +797,6 @@
                <button class="btn btn-primary" onclick="window.submitCreateOrder('confirmed')">🚚 Tạo & gửi điều hành</button>`,
       width:'980px'
     });
-    window.onChangeService(document.getElementById('oSvc').value);
     renderOrderItems();
 
     /* ============ Mount autocomplete KH ============ */
@@ -828,6 +832,10 @@
       box.innerHTML = '<div style="font-size:12px;color:var(--muted);padding:4px 0">Chưa có mặt hàng. Chọn sản phẩm + số lượng rồi bấm "+ Thêm".</div>';
     } else {
       const total = orderItems.reduce((s, x) => s + x.total, 0);
+      /* Danh sách đơn vị (cho SP ngoài DM tự chọn) */
+      let units = ((window.MD && window.MD.get && window.MD.get('units')) || []).map(u => (u.label || u)).filter(Boolean);
+      if (!units.length) units = ['kg', 'quả', 'bó', 'hộp', 'cây', 'túi', 'gói', 'lạng', 'con', 'chai', 'mớ'];
+      const unitSelHtml = (cur, i) => `<select class="oi-unit" data-idx="${i}" style="width:64px;padding:3px 4px;border:1px solid #C4B5FD;border-radius:5px;font-size:11px;background:#F5F3FF;font-weight:600" title="Chọn đơn vị bán">${units.map(u => `<option ${String(u).toLowerCase() === String(cur || '').toLowerCase() ? 'selected' : ''}>${u}</option>`).join('')}</select>`;
       /* Tổng số mã (count) + tổng trọng lượng (kg) */
       const totalSKU = orderItems.length;
       const totalKg = orderItems.reduce((s, x) => {
@@ -859,7 +867,7 @@
           <td><div style="display:flex;align-items:center;gap:8px">${it.img ? `<img src="${it.img}" alt="" style="width:30px;height:30px;object-fit:cover;border-radius:5px;flex:none" onerror="this.style.display='none'">` : ''}<div style="flex:1;min-width:0">${it.custom
               ? `<input value="${(it.name||'').replace(/"/g,'&quot;')}" data-idx="${i}" class="oi-name" placeholder="Gõ tên SP khách đặt..." style="width:100%;min-width:150px;padding:4px 7px;border:1px solid #C4B5FD;border-radius:5px;font-size:12.5px;font-weight:600;background:#F5F3FF"><div style="font-size:9px;color:#7C3AED;font-weight:700;margin-top:1px">✏️ NGOÀI DANH MỤC</div>`
               : `<b>${it.name}</b>`}${it.priceConfirmed===false?'<div style="font-size:10px;color:#A16207">⚠ chưa xác nhận giá</div>':''}</div></div></td>
-          <td class="num"><div style="display:flex;align-items:center;gap:4px;justify-content:flex-end"><input type="number" min="0" step="0.5" value="${it.qty}" data-idx="${i}" class="oi-qty" style="width:64px;padding:4px 6px;text-align:right;border:1px solid var(--line);border-radius:5px;font-size:12.5px;font-weight:600" title="Sửa số lượng"><span style="font-size:11px;color:var(--muted)">${it.unit}</span></div></td>
+          <td class="num"><div style="display:flex;align-items:center;gap:4px;justify-content:flex-end"><input type="number" min="0" step="0.5" value="${it.qty}" data-idx="${i}" class="oi-qty" style="width:64px;padding:4px 6px;text-align:right;border:1px solid var(--line);border-radius:5px;font-size:12.5px;font-weight:600" title="Sửa số lượng">${it.custom ? unitSelHtml(it.unit, i) : `<span style="font-size:11px;color:var(--muted)">${it.unit}</span>`}</div></td>
           <td class="num">
             <input type="number" min="0" step="100" value="${it.price||0}" data-idx="${i}" class="oi-price" style="width:100px;padding:4px 6px;text-align:right;border:1px solid ${it.priceConfirmed===false?'#FCD34D':'var(--line)'};border-radius:5px;font-size:12.5px;font-weight:600;background:${it.priceConfirmed===false?'#FEF9C3':'#fff'}" title="Sale có quyền sửa giá theo đối tác">
             ${it.basePrice && it.price !== it.basePrice ? `<div style="font-size:10px;color:var(--muted);margin-top:2px">Gốc: ${window.fmt(it.basePrice)}</div>` : ''}
@@ -873,7 +881,7 @@
         </tr>`).join('')}</tbody>
         <tfoot>
           <tr style="background:#F0FDF4;border-top:2px solid #15803D">
-            <td colspan="2" style="padding:8px"><b style="color:#15803D">📊 Tổng:</b> <span style="color:var(--muted);font-size:12px">${totalSKU} mã · ${totalKg > 0 ? totalKg.toFixed(2) + ' kg · ' : ''}${totalQty.toFixed(2)} đv</span></td>
+            <td colspan="2" style="padding:8px"><b style="color:#15803D">📊 Tổng:</b> <span style="color:var(--muted);font-size:12px">${totalSKU} mã · <b title="Tổng khối lượng các mã tính bằng kg">${totalKg.toFixed(2)} kg</b> · <span title="Tổng số lượng mọi đơn vị (gồm cả quả, bó, hộp…)">${totalQty.toFixed(2)} đơn vị</span></span></td>
             <td class="num"><b>${totalQty.toFixed(2)}</b></td>
             <td class="num">—</td>
             <td class="num">${orderItems.filter(x => x.priceConfirmed === false).length ? '<span style="color:#A16207;font-size:11px">⚠ '+orderItems.filter(x => x.priceConfirmed === false).length+' chưa xác nhận</span>' : '<span style="color:#15803D;font-size:11px">✓ đã xác nhận hết</span>'}</td>
@@ -923,6 +931,13 @@
           }
         });
       });
+      /* Wire đổi đơn vị cho SP ngoài DM */
+      box.querySelectorAll('.oi-unit').forEach(sel => {
+        sel.addEventListener('change', (e) => {
+          const it = orderItems[+e.target.dataset.idx];
+          if (it) { it.unit = e.target.value; renderOrderItems(); }
+        });
+      });
     }
     const total = orderItems.reduce((s, x) => s + x.total, 0);
     const totalKg = orderItems.reduce((s, x) => {
@@ -933,8 +948,9 @@
     if (g) g.value = orderItems.map(x => `${x.name} x${x.qty}${x.unit}`).join(', ');
     const f = document.getElementById('oFreight');
     if (f) f.value = total || '';
+    /* Trọng lượng tự đồng bộ = tổng kg (trừ khi user tự sửa tay → data-auto=0) */
     const w = document.getElementById('oWeight');
-    if (w && !w.value && totalKg > 0) w.value = totalKg.toFixed(2);
+    if (w && w.dataset.auto !== '0') w.value = totalKg > 0 ? totalKg.toFixed(2) : '';
     if (typeof updateProfit === 'function') updateProfit();
   }
 
@@ -1423,9 +1439,9 @@ CHỈ TRẢ JSON, không giải thích gì thêm.`;
     const c = window.STORE.get('customers', []).find(x => x.id === custId);
     const drop = document.getElementById('oDrop');
     if (c && drop) drop.value = c.address || '';
-    /* gợi ý nhóm hàng chính theo KH */
-    if (c && c.mainCats && c.mainCats[0]) {
-      const sel = document.getElementById('oSvc'); if (sel) sel.value = c.mainCats[0];
+    /* gợi ý nhóm hàng chính theo KH — tích sẵn tất cả nhóm của KH (multi-select) */
+    if (c && Array.isArray(c.mainCats) && c.mainCats.length && window.setOrderSvcIds) {
+      window.setOrderSvcIds(c.mainCats);
     }
     /* === Tự áp NHÓM GIÁ theo hồ sơ KH (nguồn: KV custPriceTiers, fallback field) === */
     const tierSel = document.getElementById('oPriceTier');
@@ -1656,6 +1672,26 @@ CHỈ TRẢ JSON, không giải thích gì thêm.`;
     if (modeWrap) modeWrap.style.display = isLienTinh ? '' : 'none';
   };
 
+  /* Nhóm hàng chính = MULTI-SELECT (checkbox). Tô màu chip khi tích. */
+  window._oSvcToggle = function (chk) {
+    const chip = chk.closest('.oSvc-chip'); if (!chip) return;
+    chip.style.background = chk.checked ? '#DCFCE7' : '#fff';
+    chip.style.borderColor = chk.checked ? '#16A34A' : 'var(--line)';
+    chip.style.color = chk.checked ? '#15803D' : '';
+    chip.style.fontWeight = chk.checked ? '600' : '';
+  };
+  window.getOrderSvcIds = function () {
+    return Array.from(document.querySelectorAll('#oSvcBox .oSvcChk:checked')).map(c => c.value);
+  };
+  /* Tích sẵn 1 danh sách id nhóm hàng (dùng khi prefill theo KH) */
+  window.setOrderSvcIds = function (ids) {
+    const set = new Set((ids || []).filter(Boolean));
+    document.querySelectorAll('#oSvcBox .oSvcChk').forEach(chk => {
+      chk.checked = set.has(chk.value);
+      window._oSvcToggle(chk);
+    });
+  };
+
   window.submitCreateOrder = function(initStatus) {
     const custId = window.formVal('#oCust');
     const goods = window.formVal('#oGoods');
@@ -1689,7 +1725,7 @@ CHỈ TRẢ JSON, không giải thích gì thêm.`;
     const driverName = drv ? drv.name : '—';
     const vehicle = drv ? (drv.primaryPlate || 'Xe máy') : '—';
 
-    const svcId = window.formVal('#oSvc');
+    const svcIds = window.getOrderSvcIds ? window.getOrderSvcIds() : [];
     const newOrder = {
       code: window.formVal('#oCode'),
       date: new Date().toLocaleString('vi-VN'),
@@ -1703,7 +1739,7 @@ CHỈ TRẢ JSON, không giải thích gì thêm.`;
       source: 'manual',        /* nguồn đơn: tự tạo (vs 'web') */
       custName: cust ? cust.name : '—',
       custPhone: cust ? cust.phone : '',
-      serviceType: svcId,
+      serviceType: svcIds.join(','),   /* nhiều nhóm hàng — chuỗi ghép id1,id2 (cột text, không cần schema mới) */
       transportMode: window.formVal('#oMode') || 'giao-ngay',
       pickup: 'Kho Tuấn Tú · 36 Tân Mai, Hoàng Mai, HN',
       drop: window.formVal('#oDrop') || (cust ? cust.address : '—'),
