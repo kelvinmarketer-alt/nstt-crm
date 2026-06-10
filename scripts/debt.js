@@ -671,7 +671,7 @@ Mong quý khách thu xếp thanh toán sớm. Cảm ơn!
     const company = window.STORE.get('companyInfo', null) || {
       name:'Công ty TNHH Nông Sản Tuấn Tú Hà Nội', shortName:'Nông Sản Tuấn Tú Hà Nội',
       address:'Số 88 Trần Duy Hưng, Cầu Giấy, Hà Nội',
-      tax:'0109876543', hotline:'0836 676 086', email:'contact@nongsantuantu.com'
+      tax:'011032211', hotline:'0836 676 086', email:'nongsantuantuhanoi@gmail.com'
     };
     const html = `<!doctype html><html><head><meta charset="utf-8"><title>Phiếu thu ${r.no}</title>
       <style>

@@ -213,7 +213,8 @@
           <select id="hCust" onchange="window.onHCustChange(this)">
             <option value="">-- Chọn KH B2B --</option>
             ${custOpts}
-          </select></div>
+          </select>
+          <div id="hVatElig" style="font-size:11.5px;margin-top:4px;display:none;line-height:1.4"></div></div>
         <div><label>MST</label><input id="hTax" placeholder="2300xxxxxx"></div>
       </div>
       <div class="form-row wide"><label>Diễn giải *</label>
@@ -237,6 +238,21 @@
     const opt = sel.options[sel.selectedIndex];
     const tax = opt?.dataset.tax || '';
     document.getElementById('hTax').value = tax;
+    /* Cờ ưu tiên xuất VAT — đối tác lấy hàng ≥15 ngày */
+    const el = document.getElementById('hVatElig'); if (!el) return;
+    const cid = sel.value;
+    const c = cid ? (window.STORE.get('customers', []) || []).find(x => x.id === cid) : null;
+    if (!c) { el.style.display = 'none'; el.innerHTML = ''; return; }
+    const days = window.custRelationDays ? window.custRelationDays(c) : null;
+    const elig = window.vatEligible ? window.vatEligible(c) : false;
+    el.style.display = '';
+    if (elig) {
+      el.style.color = '#15803D';
+      el.innerHTML = `✅ <b>Đủ điều kiện ưu tiên xuất VAT</b> (đã lấy hàng ${days} ngày ≥ ${window.VAT_MIN_DAYS} ngày).`;
+    } else {
+      el.style.color = '#B45309';
+      el.innerHTML = `⚠️ <b>Chưa đủ điều kiện ưu tiên VAT</b> ${days != null ? `(mới lấy hàng ${days} ngày, cần ≥ ${window.VAT_MIN_DAYS})` : '(chưa có dữ liệu ngày lấy hàng)'} — vẫn xuất được nếu cần.`;
+    }
   };
   window.recalcVAT = function() {
     const net = parseInt(window.formVal('#hNet'), 10) || 0;
@@ -288,7 +304,7 @@
     const company = window.STORE.get('companyInfo', null) || {
       name:'Công ty TNHH Nông Sản Tuấn Tú Hà Nội', shortName:'Nông Sản Tuấn Tú Hà Nội',
       address:'Số 88 Trần Duy Hưng, Cầu Giấy, Hà Nội',
-      tax:'0109876543', hotline:'0836 676 086', email:'contact@nongsantuantu.com',
+      tax:'011032211', hotline:'0836 676 086', email:'nongsantuantuhanoi@gmail.com',
       bank:'Vietcombank · 1021xxxxxx',
     };
     const total = (i.net||0) + (i.vat||0);

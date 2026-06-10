@@ -407,6 +407,26 @@ window.debtOverdueInfo = function (custId) {
 };
 window.debtOverdueDays = function (custId) { return window.debtOverdueInfo(custId).days; };
 
+/* ============ ƯU TIÊN XUẤT VAT — đối tác lấy hàng ≥15 ngày ============
+   Chính sách: ưu tiên xuất hoá đơn VAT cho đối tác lấy hàng tối thiểu 15 ngày trở lên. */
+window.VAT_MIN_DAYS = 15;
+window._vnDateObj = function (s) {
+  const m = String(s || '').match(/(\d{1,2})\/(\d{1,2})\/(\d{4})/);
+  return m ? new Date(+m[3], +m[2] - 1, +m[1]) : null;
+};
+/* Số ngày KH đã "lấy hàng" tính từ lần đầu (created) đến nay */
+window.custRelationDays = function (c) {
+  const start = window._vnDateObj(c && c.created);
+  if (!start || isNaN(start)) return null;
+  return Math.floor((Date.now() - start.getTime()) / 86400000);
+};
+window.vatEligible = function (c) {
+  if (!c) return false;
+  const days = window.custRelationDays(c);
+  const hasOrders = (+c.orders > 0) || (Array.isArray(c.ordersList) && c.ordersList.length > 0) || (+c.revenue > 0);
+  return days != null && days >= window.VAT_MIN_DAYS && hasOrders;
+};
+
 /* ============ Ô TÌM SẢN PHẨM (gõ-lọc) — dùng chung ============
    Thay cho <select> 1000 SP. Gắn vào 1 <input class="prodpick">: gõ → lọc →
    click chọn → lưu productId vào input.dataset.pid. Đọc kết quả bằng el.dataset.pid. */
@@ -1642,7 +1662,7 @@ window.INTEGRATIONS = [
         {v:'efy',  l:'EFY (rẻ)'},
         {v:'viettel', l:'Viettel SInvoice'},
       ]},
-      { key:'taxCode', label:'MST DN', type:'text', placeholder:'0109876543' },
+      { key:'taxCode', label:'MST DN', type:'text', placeholder:'011032211' },
       { key:'apiEndpoint', label:'API Endpoint', type:'text', placeholder:'https://api.vnpt-invoice.com.vn/...' },
       { key:'apiUser', label:'API Username', type:'text' },
       { key:'apiKey', label:'API Key / Token', type:'password' },

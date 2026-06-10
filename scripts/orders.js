@@ -16,6 +16,19 @@
     const after = el.value.length;
     if (start != null) { try { el.selectionStart = el.selectionEnd = Math.max(0, start + (after - before)); } catch (e) {} }
   };
+
+  /* Nhắc khung giờ nhận đơn + vận chuyển theo CA GIAO (quy trình báo hàng Tuấn Tú) */
+  const _SHIFT_HINTS = {
+    'Sáng':  '🌅 Đơn giao SÁNG: chốt đơn <b>trước 22h30 tối hôm trước</b> · xe giao <b>5h–11h sáng</b>.',
+    'Chiều': '🌇 Đơn giao CHIỀU: chốt đơn <b>12h30–13h30 cùng ngày</b> · xe giao <b>15h30–17h30 chiều</b>.',
+    'Trưa':  '🕛 Giao buổi TRƯA — sắp theo lịch xe, liên hệ điều phối xác nhận giờ.',
+    'Tối':   '🌙 Giao buổi TỐI — liên hệ điều phối xác nhận khung giờ.',
+  };
+  window._oShiftHint = function (v) {
+    const el = document.getElementById('oShiftHint'); if (!el) return;
+    if (v && _SHIFT_HINTS[v]) { el.innerHTML = _SHIFT_HINTS[v]; el.style.display = ''; }
+    else { el.innerHTML = ''; el.style.display = 'none'; }
+  };
   const TM  = Object.fromEntries((window.TRANSPORT_MODES || []).map(t => [t.id, t]));
   let orders = window.STORE.get('orders', window.ORDERS || []);
   /* Migration: localStorage còn đơn schema cũ (logistics, chưa có items) → seed lại đơn nông sản */
@@ -757,7 +770,8 @@
       <div class="form-row">
         <div><label>📅 Ngày giao ${window.helpTip ? window.helpTip('Ngày KH muốn nhận hàng — Kho gom đơn + đặt NCC theo ngày này.') : ''}</label><input id="oDeliverDate" type="date" value="${(window.todayDate?window.todayDate():new Date()).toISOString().slice(0,10)}"></div>
         <div><label>🕐 Ca giao</label>
-          <select id="oShipShift"><option value="">— chọn ca —</option><option value="Sáng">Sáng</option><option value="Trưa">Trưa</option><option value="Chiều">Chiều</option><option value="Tối">Tối</option></select></div>
+          <select id="oShipShift" onchange="window._oShiftHint(this.value)"><option value="">— chọn ca —</option><option value="Sáng">Sáng</option><option value="Trưa">Trưa</option><option value="Chiều">Chiều</option><option value="Tối">Tối</option></select>
+          <div id="oShiftHint" style="font-size:11.5px;color:#92400E;margin-top:4px;display:none;line-height:1.45"></div></div>
       </div>
       <div class="form-row">
         <div><label>⏰ Giờ giao yêu cầu</label><input id="oShipTime" placeholder="VD: trước 6h sáng, 14h-15h..."></div>
