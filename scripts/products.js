@@ -1012,42 +1012,21 @@
       </div>`;
   }
 
-  /* Chọn ảnh từ máy → nén canvas → base64 vào #pImg */
-  window._prodPickImage = function (input) {
-    const f = input.files && input.files[0];
-    if (!f) return;
-    if (f.size > 12 * 1024 * 1024) { window.toast('Ảnh quá lớn (>12MB)', 'warn'); return; }
-    const reader = new FileReader();
-    reader.onload = ev => {
-      const img = new Image();
-      img.onload = () => {
-        const MAX = 400;
-        let w = img.width, h = img.height;
-        if (w > h && w > MAX) { h = Math.round(h * MAX / w); w = MAX; }
-        else if (h > MAX) { w = Math.round(w * MAX / h); h = MAX; }
-        const cv = document.createElement('canvas'); cv.width = w; cv.height = h;
-        cv.getContext('2d').drawImage(img, 0, 0, w, h);
-        let data;
-        try { data = cv.toDataURL('image/jpeg', 0.82); }
-        catch (e) { window.toast('Không đọc được ảnh', 'warn'); return; }
-        const fld = document.getElementById('pImg'); if (fld) fld.value = data;
-        const pv = document.getElementById('pImgPreview'); if (pv) { pv.src = data; pv.style.visibility = 'visible'; }
-        window.toast('✓ Đã chọn ảnh · ' + Math.round(data.length / 1024) + 'KB', 'success');
-      };
-      img.onerror = () => window.toast('File không phải ảnh hợp lệ', 'warn');
-      img.src = ev.target.result;
-    };
-    reader.readAsDataURL(f);
-  };
-  window._prodClearImage = function () {
-    const fld = document.getElementById('pImg'); if (fld) fld.value = '';
-    const pv = document.getElementById('pImgPreview'); if (pv) { pv.src = ''; pv.style.visibility = 'hidden'; }
-    const file = document.getElementById('pImgFile'); if (file) file.value = '';
-    window.toast('Đã xóa ảnh sản phẩm', 'info');
-  };
-
-  /* Nén ảnh file → base64 (~400px) rồi callback */
-  function _resizeToBase64(file, cb) {
+  /* === KHO ẢNH SP (Supabase Storage) — upload anon, fallback base64 nếu chưa có quyền === */
+  async function _uploadProdImgToStorage(blob) {
+    const cfg = window.SUPABASE_CONFIG;
+    if (!cfg || cfg.mode !== 'supabase' || !cfg.url || !cfg.anonKey) throw new Error('no-supabase');
+    const path = 'p_' + Date.now() + '_' + Math.random().toString(36).slice(2, 8) + '.jpg';
+    const res = await fetch(cfg.url + '/storage/v1/object/product-images/' + path, {
+      method: 'POST',
+      headers: { apikey: cfg.anonKey, Authorization: 'Bearer ' + cfg.anonKey, 'Content-Type': 'image/jpeg', 'x-upsert': 'true' },
+      body: blob,
+    });
+    if (!res.ok) throw new Error('upload ' + res.status);
+    return cfg.url + '/storage/v1/object/public/product-images/' + path;
+  }
+  /* Nén ảnh ~400px → callback({dataURL, blob}) */
+  function _compressProdImage(file, cb) {
     if (!file) return;
     if (file.size > 12 * 1024 * 1024) { window.toast('Ảnh quá lớn (>12MB)', 'warn'); return; }
     const reader = new FileReader();
@@ -1059,12 +1038,45 @@
         else if (h > MAX) { w = Math.round(w * MAX / h); h = MAX; }
         const cv = document.createElement('canvas'); cv.width = w; cv.height = h;
         cv.getContext('2d').drawImage(im, 0, 0, w, h);
-        try { cb(cv.toDataURL('image/jpeg', 0.82)); } catch (e) { window.toast('Không đọc được ảnh', 'warn'); }
+        let dataURL;
+        try { dataURL = cv.toDataURL('image/jpeg', 0.82); }
+        catch (e) { window.toast('Không đọc được ảnh', 'warn'); return; }
+        cv.toBlob(blob => cb({ dataURL, blob: blob || null }), 'image/jpeg', 0.82);
       };
       im.onerror = () => window.toast('File không phải ảnh hợp lệ', 'warn');
       im.src = ev.target.result;
     };
     reader.readAsDataURL(file);
+  }
+  /* Nén → thử upload kho ảnh → trả LINK; nếu chưa có quyền/ lỗi → trả base64 (vẫn lưu được) */
+  function _prepProductImage(file, cb) {
+    window.toast('Đang xử lý ảnh…', 'info');
+    _compressProdImage(file, ({ dataURL, blob }) => {
+      if (!blob) { cb(dataURL); return; }
+      _uploadProdImgToStorage(blob).then(url => cb(url)).catch(() => cb(dataURL));
+    });
+  }
+
+  /* Chọn ảnh từ máy (form thêm/sửa SP) → upload kho → #pImg = link (fallback base64) */
+  window._prodPickImage = function (input) {
+    const f = input.files && input.files[0];
+    if (!f) return;
+    _prepProductImage(f, (val) => {
+      const fld = document.getElementById('pImg'); if (fld) fld.value = val;
+      const pv = document.getElementById('pImgPreview'); if (pv) { pv.src = val; pv.style.visibility = 'visible'; }
+      window.toast(/^https?:/.test(val) ? '✓ Đã tải ảnh lên kho' : '✓ Đã chọn ảnh', 'success');
+    });
+  };
+  window._prodClearImage = function () {
+    const fld = document.getElementById('pImg'); if (fld) fld.value = '';
+    const pv = document.getElementById('pImgPreview'); if (pv) { pv.src = ''; pv.style.visibility = 'hidden'; }
+    const file = document.getElementById('pImgFile'); if (file) file.value = '';
+    window.toast('Đã xóa ảnh sản phẩm', 'info');
+  };
+
+  /* (giữ tương thích) nén ảnh → trả LINK kho hoặc base64 */
+  function _resizeToBase64(file, cb) {
+    _prepProductImage(file, cb);
   }
 
   /* Đổi ảnh SP TRỰC TIẾP từ danh mục (không cần mở form sửa) */
