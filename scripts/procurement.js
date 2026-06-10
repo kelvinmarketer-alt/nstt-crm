@@ -401,7 +401,22 @@
     </div>`;
 
     /* ===== PHÂN BỔ NCC THEO TỪNG MÃ (chia nhiều NCC được) ===== */
-    body += `<div style="font-weight:800;color:var(--navy);font-size:12.5px;margin:4px 0 8px">🧮 PHÂN BỔ NCC THEO TỪNG MÃ <span style="font-weight:400;color:var(--muted)">(1 mã có thể chia nhiều NCC)</span></div>`;
+    body += `<div style="font-weight:800;color:var(--navy);font-size:12.5px;margin:4px 0 8px">🧮 PHÂN BỔ NCC THEO TỪNG MÃ <span style="font-weight:400;color:var(--muted)">(1 mã có thể chia nhiều NCC · tự gán NCC theo ⭐ sao)</span></div>`;
+    /* ===== THANH CHỌN NHIỀU + GÁN HÀNG LOẠT ===== */
+    if (!_isDoneRun(run)) {
+      body += `<div class="pc-bulkbar" style="display:flex;align-items:center;gap:8px;flex-wrap:wrap;background:#EFF6FF;border:1px solid #BFDBFE;border-radius:8px;padding:8px 10px;margin-bottom:10px;font-size:12px;position:sticky;top:0;z-index:5">
+        <label style="display:flex;align-items:center;gap:5px;cursor:pointer;font-weight:700;color:#1D4ED8"><input type="checkbox" id="pcChkAll" onclick="window.pcToggleAllLines(this.checked)" style="width:15px;height:15px;cursor:pointer"> Chọn tất cả</label>
+        <span id="pcSelCount" style="color:var(--muted)">0 mã chọn</span>
+        <div style="flex:1;min-width:8px"></div>
+        <button class="btn btn-ghost btn-sm" style="font-size:11.5px;padding:3px 9px" onclick="window.pcAutoStarSelected('${run.id}')" title="Tự gán NCC sao cao nhất — cho mã đã chọn, hoặc TẤT CẢ nếu chưa chọn">⭐ Tự chọn theo sao</button>
+        <select id="pcBulkSup" style="font-size:11.5px;border:1px solid var(--line);border-radius:5px;padding:4px 6px;max-width:180px">
+          <option value="">— gán NCC cho mã đã chọn… —</option>
+          ${sups.map(s => `<option value="${esc(s.id)}">${esc(s.name)}${s.rating ? ' ' + '★'.repeat(Math.round(+s.rating)) : ''}</option>`).join('')}
+        </select>
+        <button class="btn btn-primary btn-sm" style="font-size:11.5px;padding:3px 9px" onclick="window.pcBulkAssign('${run.id}')">Gán NCC</button>
+        <label style="display:flex;align-items:center;gap:4px;cursor:pointer;color:#1D4ED8;font-size:11px" title="Lưu mã này vào danh sách NCC cung cấp → lần gom sau tự gán theo sao"><input type="checkbox" id="pcBulkRemember" checked style="cursor:pointer"> 🧠 Ghi nhớ (lần sau tự gán)</label>
+      </div>`;
+    }
     run.lines.forEach(l => {
       const cands = suppliersForProduct(l.productId, l.name);
       const alloc = allocateLine(l);
@@ -410,6 +425,7 @@
       const okAlloc = Math.abs(remain) < 0.001;
       body += `<div class="pc-line" style="margin-bottom:10px">
         <div style="display:flex;align-items:center;gap:10px;flex-wrap:wrap;margin-bottom:6px">
+          ${_isDoneRun(run) ? '' : `<input type="checkbox" class="pc-linechk" data-key="${esc(l.key)}" onclick="window.pcUpdateSelCount()" style="width:15px;height:15px;cursor:pointer;flex:none" title="Chọn mã này để gán NCC hàng loạt">`}
           <div style="flex:1;min-width:130px"><b>${esc(l.name)}</b> <span style="color:var(--muted);font-size:11.5px">· cần <b style="color:var(--navy)">${fmtQty(l.totalQty)} ${l.unit}</b></span></div>
           <span class="tag" style="background:${okAlloc ? '#DCFCE7' : '#FEF3C7'};color:${okAlloc ? '#15803D' : '#B45309'};font-weight:700;font-size:10.5px">
             ${okAlloc ? '✓ đã phân bổ đủ' : `đã ${fmtQty(done)}/${fmtQty(l.totalQty)} · còn ${fmtQty(remain)} ${l.unit}`}</span>
@@ -544,6 +560,63 @@
     const l = _line(run, key); if (!l) return;
     autoStarAllocate(l);
     saveRuns(runs); renderRuns(); window.pcOpenRun(runId);
+  };
+
+  /* ===== CHỌN NHIỀU MÃ + GÁN HÀNG LOẠT ===== */
+  window.pcUpdateSelCount = function () {
+    const all = document.querySelectorAll('.pc-linechk');
+    const n = document.querySelectorAll('.pc-linechk:checked').length;
+    const el = document.getElementById('pcSelCount'); if (el) el.textContent = n + ' mã chọn';
+    const chkAll = document.getElementById('pcChkAll'); if (chkAll) chkAll.checked = n > 0 && n === all.length;
+  };
+  window.pcToggleAllLines = function (on) {
+    document.querySelectorAll('.pc-linechk').forEach(c => { c.checked = on; });
+    window.pcUpdateSelCount();
+  };
+  function _selectedLineKeys() {
+    return Array.from(document.querySelectorAll('.pc-linechk:checked')).map(c => c.dataset.key);
+  }
+  /* Gán 1 NCC (chọn từ dropdown) cho TẤT CẢ mã đã tick — qty = nhu cầu mỗi mã, giá lấy theo NCC nếu có khai */
+  window.pcBulkAssign = function (runId) {
+    const sel = document.getElementById('pcBulkSup'); const supId = sel && sel.value;
+    if (!supId) { window.toast?.('Chọn NCC ở ô bên cạnh để gán', 'warn'); return; }
+    const keys = _selectedLineKeys();
+    if (!keys.length) { window.toast?.('Chưa tick mã nào — tick các mã cần gán trước', 'warn'); return; }
+    const runs = getRuns(); const run = runs.find(r => r.id === runId); if (!run) return;
+    readConfirmInputs(run);
+    const sup = getSuppliers().find(s => s.id === supId); if (!sup) return;
+    const remember = !!(document.getElementById('pcBulkRemember') || {}).checked;
+    const newProds = Array.isArray(sup.products) ? sup.products.slice() : [];
+    let n = 0, learned = 0;
+    keys.forEach(k => {
+      const l = _line(run, k); if (!l) return;
+      const p = (sup.products || []).find(pp => (l.productId && pp.id === l.productId) || norm(pp.name) === norm(l.name));
+      l.allocations = [{ supplierId: sup.id, supplierName: sup.name, qty: l.totalQty, unitCost: p ? (+p.price || 0) : 0, confirmedQty: null }];
+      n++;
+      /* Ghi nhớ mapping NCC↔mã (chỉ khi NCC chưa khai mã này + có productId) → lần sau tự gán theo sao */
+      if (remember && l.productId && !newProds.some(pp => pp.id === l.productId)) {
+        newProds.push({ id: l.productId, name: l.name, price: 0 });
+        learned++;
+      }
+    });
+    if (remember && learned) window.STORE.update('suppliers', sup.id, { products: newProds });
+    saveRuns(runs); renderRuns(); window.pcOpenRun(runId);
+    window.toast?.(`✓ Đã gán NCC "${sup.name}" cho ${n} mã${learned ? ` · 🧠 ghi nhớ ${learned} mã mới` : ''}`, 'success');
+  };
+  /* Tự gán NCC sao cao nhất cho mã đã tick (không tick → áp dụng cho TẤT CẢ mã) */
+  window.pcAutoStarSelected = function (runId) {
+    const runs = getRuns(); const run = runs.find(r => r.id === runId); if (!run) return;
+    readConfirmInputs(run);
+    let keys = _selectedLineKeys();
+    const applyAll = !keys.length;
+    if (applyAll) keys = run.lines.map(l => l.key);
+    let n = 0, miss = 0;
+    keys.forEach(k => {
+      const l = _line(run, k); if (!l) return;
+      if (suppliersForProduct(l.productId, l.name).length) { autoStarAllocate(l); n++; } else miss++;
+    });
+    saveRuns(runs); renderRuns(); window.pcOpenRun(runId);
+    window.toast?.(`⭐ Tự gán ${n} mã theo sao${applyAll ? ' (tất cả)' : ''}${miss ? ` · ${miss} mã chưa có NCC → thu mua ngoài` : ''}`, n ? 'success' : 'warn');
   };
   /* Thêm 1 dòng NCC chia phần (qty = phần còn thiếu) */
   window.pcAddAlloc = function (runId, key) {
