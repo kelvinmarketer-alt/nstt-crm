@@ -164,6 +164,7 @@
 
   /* ===== Khởi tạo: mặc định = tháng này, tự render khi có data ===== */
   function init() {
+    if (window.renderAppShell) window.renderAppShell('debt-summary', 'Công nợ tổng hợp');
     const now = window.todayDate ? window.todayDate() : new Date();
     const first = new Date(now.getFullYear(), now.getMonth(), 1);
     const fEl = document.getElementById('cnFrom'), tEl = document.getElementById('cnTo');
