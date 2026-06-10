@@ -828,6 +828,16 @@
   function renderOrderItems() {
     const box = document.getElementById('orderItemsBox');
     if (!box) return;
+    /* Chuẩn hoá đơn vị hiển thị: "kilogram (kg)"→"kg", "Kg"→"kg" */
+    const _normUnit = u => { let s = (u || '').toString().trim().toLowerCase(); const m = s.match(/\(([^)]+)\)/); if (m) s = m[1].trim(); return s || 'đv'; };
+    const _fmtNum = n => Number.isInteger(n) ? String(n) : String(Math.round(n * 100) / 100);
+    /* Gộp số lượng theo TỪNG đơn vị → "17 kg · 3 bắp · 3 quả · 2 túi" (kg đứng đầu) */
+    const _unitBreakdown = () => {
+      const by = {};
+      orderItems.forEach(x => { const u = _normUnit(x.unit); by[u] = (by[u] || 0) + (+x.qty || 0); });
+      const keys = Object.keys(by).sort((a, b) => a === 'kg' ? -1 : b === 'kg' ? 1 : a.localeCompare(b, 'vi'));
+      return keys.map(u => `${_fmtNum(by[u])} ${u}`).join(' · ');
+    };
     if (!orderItems.length) {
       box.innerHTML = '<div style="font-size:12px;color:var(--muted);padding:4px 0">Chưa có mặt hàng. Chọn sản phẩm + số lượng rồi bấm "+ Thêm".</div>';
     } else {
@@ -881,8 +891,8 @@
         </tr>`).join('')}</tbody>
         <tfoot>
           <tr style="background:#F0FDF4;border-top:2px solid #15803D">
-            <td colspan="2" style="padding:8px"><b style="color:#15803D">📊 Tổng:</b> <span style="color:var(--muted);font-size:12px">${totalSKU} mã · <b title="Tổng khối lượng các mã tính bằng kg">${totalKg.toFixed(2)} kg</b> · <span title="Tổng số lượng mọi đơn vị (gồm cả quả, bó, hộp…)">${totalQty.toFixed(2)} đơn vị</span></span></td>
-            <td class="num"><b>${totalQty.toFixed(2)}</b></td>
+            <td colspan="2" style="padding:8px"><b style="color:#15803D">📊 Tổng:</b> <span style="color:var(--muted);font-size:12px">${totalSKU} mã · </span><b style="color:#15803D;font-size:12.5px" title="Tách rõ theo từng đơn vị">${_unitBreakdown()}</b></td>
+            <td class="num"></td>
             <td class="num">—</td>
             <td class="num">${orderItems.filter(x => x.priceConfirmed === false).length ? '<span style="color:#A16207;font-size:11px">⚠ '+orderItems.filter(x => x.priceConfirmed === false).length+' chưa xác nhận</span>' : '<span style="color:#15803D;font-size:11px">✓ đã xác nhận hết</span>'}</td>
             <td class="num"><b style="color:var(--red);font-size:14px">${window.fmt(total)} ₫</b></td>
@@ -941,11 +951,15 @@
     }
     const total = orderItems.reduce((s, x) => s + x.total, 0);
     const totalKg = orderItems.reduce((s, x) => {
-      const u = (x.unit || '').toLowerCase();
+      const u = _normUnit(x.unit);   /* "kilogram (kg)"/"Kg" → "kg" để không bỏ sót */
       return s + (u === 'kg' || u === 'g' ? (+x.qty || 0) * (u === 'g' ? 0.001 : 1) : 0);
     }, 0);
     const g = document.getElementById('oGoods');
-    if (g) g.value = orderItems.map(x => `${x.name} x${x.qty}${x.unit}`).join(', ');
+    if (g) {
+      const list = orderItems.map(x => `${x.name} x${_fmtNum(+x.qty || 0)} ${_normUnit(x.unit)}`).join(', ');
+      const bd = _unitBreakdown();
+      g.value = list + (bd ? `  ·  Tổng: ${bd}` : '');
+    }
     const f = document.getElementById('oFreight');
     if (f) f.value = total || '';
     /* Trọng lượng tự đồng bộ = tổng kg (trừ khi user tự sửa tay → data-auto=0) */
