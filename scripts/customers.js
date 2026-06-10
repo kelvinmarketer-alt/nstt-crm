@@ -573,7 +573,8 @@
       <div class="form-row">
         <div><label>Nhóm giá (bảng giá KH nhận)</label>
           <select id="addPriceTier">${window.priceTierOptions ? window.priceTierOptions('') : '<option value="">Mặc định</option>'}</select></div>
-        <div></div>
+        <div><label>Hạn công nợ ${window.helpTip ? window.helpTip('Số ngày KH được nợ trước khi tính QUÁ HẠN. Chính sách Tuấn Tú: đơn ~50kg → 3 ngày · 50–100kg → 7 ngày · >200tr/tháng → 15 ngày.') : ''}</label>
+          <select id="addCreditDays">${window.creditDaysOptions ? window.creditDaysOptions('') : '<option value="7">7 ngày</option>'}</select></div>
       </div>
       <div class="form-row">
         <div><label>NV phụ trách${isScoped() ? ' <span style="color:var(--muted);font-weight:400">(chính bạn)</span>' : ''}</label>
@@ -636,6 +637,7 @@
     window.STORE.add('customers', newCust);
     /* Nhóm giá KH → KV custPriceTiers (sync đa máy; cloud customers không có cột price_tier) */
     if (window.setCustPriceTier) window.setCustPriceTier(code, window.formVal('#addPriceTier'));
+    if (window.setCustCreditDays) window.setCustCreditDays(code, window.formVal('#addCreditDays'));
     window.closeModal();
     window.toast('✓ Đã thêm khách hàng ' + code, 'success');
 
@@ -676,7 +678,8 @@
       <div class="form-row">
         <div><label>Nhóm giá (bảng giá KH nhận)</label>
           <select id="ePriceTier">${window.priceTierOptions ? window.priceTierOptions((window.custPriceTier ? window.custPriceTier(c.id) : c.priceTier) || '') : '<option value="">Mặc định</option>'}</select></div>
-        <div></div>
+        <div><label>Hạn công nợ ${window.helpTip ? window.helpTip('Số ngày KH được nợ trước khi tính QUÁ HẠN. Chính sách: ~50kg→3 ngày · 50–100kg→7 ngày · >200tr/tháng→15 ngày.') : ''}</label>
+          <select id="eCreditDays">${window.creditDaysOptions ? window.creditDaysOptions(window.custCreditDays ? window.custCreditDays(c.id) : '') : '<option value="7">7 ngày</option>'}</select></div>
       </div>
       <div class="form-row wide"><label>Địa chỉ</label><input id="eAddress" value="${c.address}"></div>
     `, {
@@ -699,6 +702,7 @@
     window.STORE.update('customers', id, patch);
     /* Nhóm giá KH → KV custPriceTiers (sync đa máy) */
     if (window.setCustPriceTier) window.setCustPriceTier(id, window.formVal('#ePriceTier'));
+    if (window.setCustCreditDays) window.setCustCreditDays(id, window.formVal('#eCreditDays'));
     window.closeModal();
     window.toast('✓ Đã cập nhật ' + id, 'success');
   };

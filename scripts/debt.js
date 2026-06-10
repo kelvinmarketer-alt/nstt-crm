@@ -23,10 +23,9 @@
       .filter(c => c.debt > 0);
   }
 
+  /* Quá hạn THẬT theo hạn công nợ của KH (3/7/15 ngày) + sổ nợ — không còn hardcode */
   function overdueDays(c) {
-    if (c.id === 'KH003') return 35;
-    if (c.id === 'KH008') return 65;
-    return 0;
+    return (c && window.debtOverdueDays) ? window.debtOverdueDays(c.id) : 0;
   }
 
   /* === Cập nhật aging cards + tổng + bar (động từ data thật) === */
@@ -388,7 +387,7 @@ Mong quý khách thu xếp thanh toán sớm. Cảm ơn!
 
       <div class="form-row wide">
         <label>Mẫu tin nhắn (dùng <code>{name}</code>, <code>{debt}</code>, <code>{days}</code>)</label>
-        <textarea id="bulkTemplate" rows="4">Kính gửi {name}, NSTT xin nhắc nhở khoản công nợ {debt} ₫{days} đang chờ thanh toán. Mong quý khách thu xếp sớm. Cảm ơn! — Hotline NSTT 0903 111 222</textarea>
+        <textarea id="bulkTemplate" rows="4">Kính gửi {name}, NSTT xin nhắc nhở khoản công nợ {debt} ₫{days} đang chờ thanh toán. Mong quý khách thu xếp sớm. Cảm ơn! — Hotline NSTT 0836 676 086</textarea>
       </div>
 
       <div style="display:flex;align-items:center;gap:10px;margin-bottom:8px">
@@ -423,9 +422,9 @@ Mong quý khách thu xếp thanh toán sớm. Cảm ơn!
   window.refreshBulkTemplate = function() {
     const lv = (document.getElementById('bulkLevel') || {}).value || 'medium';
     const tpl = {
-      soft:   'Kính gửi {name}, xin nhắc nhẹ khoản công nợ {debt} ₫{days}. Khi rảnh quý khách thu xếp giúp ạ. Cảm ơn! — Hotline NSTT 0903 111 222',
-      medium: 'Kính gửi {name}, NSTT xin nhắc nhở khoản công nợ {debt} ₫{days} đang chờ thanh toán. Mong quý khách thu xếp sớm. Cảm ơn! — Hotline NSTT 0903 111 222',
-      strong: '⚠️ Kính gửi {name}, khoản nợ {debt} ₫{days} đã quá hạn lâu. Vui lòng thanh toán trước 7 ngày tới để tránh tạm dừng giao hàng. NSTT 0903 111 222',
+      soft:   'Kính gửi {name}, xin nhắc nhẹ khoản công nợ {debt} ₫{days}. Khi rảnh quý khách thu xếp giúp ạ. Cảm ơn! — Hotline NSTT 0836 676 086',
+      medium: 'Kính gửi {name}, NSTT xin nhắc nhở khoản công nợ {debt} ₫{days} đang chờ thanh toán. Mong quý khách thu xếp sớm. Cảm ơn! — Hotline NSTT 0836 676 086',
+      strong: '⚠️ Kính gửi {name}, khoản nợ {debt} ₫{days} đã quá hạn lâu. Vui lòng thanh toán trước 7 ngày tới để tránh tạm dừng giao hàng. NSTT 0836 676 086',
     };
     const ta = document.getElementById('bulkTemplate');
     if (ta) ta.value = tpl[lv] || tpl.medium;
@@ -672,7 +671,7 @@ Mong quý khách thu xếp thanh toán sớm. Cảm ơn!
     const company = window.STORE.get('companyInfo', null) || {
       name:'Công ty TNHH Nông Sản Tuấn Tú Hà Nội', shortName:'Nông Sản Tuấn Tú Hà Nội',
       address:'Số 88 Trần Duy Hưng, Cầu Giấy, Hà Nội',
-      tax:'0109876543', hotline:'0903 111 222', email:'contact@nongsantuantu.com'
+      tax:'0109876543', hotline:'0836 676 086', email:'contact@nongsantuantu.com'
     };
     const html = `<!doctype html><html><head><meta charset="utf-8"><title>Phiếu thu ${r.no}</title>
       <style>

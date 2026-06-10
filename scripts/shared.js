@@ -359,6 +359,54 @@ window.setCustPriceTier = function (custId, tierId) {
   window.STORE.set('custPriceTiers', map);
 };
 
+/* ============ CHÍNH SÁCH CÔNG NỢ (Tuấn Tú Farm) ============
+   Hạn nợ theo quy mô: ~50kg → 3 ngày · 50–100kg → 7 ngày · >200tr/tháng → 15 ngày.
+   Mỗi KH có "hạn công nợ" (số ngày) — lưu KV 'custCreditDays' (sync đa máy). */
+window.DEBT_POLICY = [
+  { days: 3,  label: 'Đơn ~50kg → nợ 3 ngày' },
+  { days: 7,  label: 'Đơn 50–100kg → nợ 7 ngày' },
+  { days: 15, label: '>200 triệu/tháng → nợ 15 ngày' },
+];
+window.DEBT_TERM_DEFAULT = 7;
+window.creditDaysOptions = function (sel) {
+  const cur = (sel == null || sel === '') ? window.DEBT_TERM_DEFAULT : +sel;
+  return [3, 7, 15].map(d => `<option value="${d}" ${cur === d ? 'selected' : ''}>${d} ngày</option>`).join('');
+};
+window.custCreditDays = function (custId) {
+  const map = (window.STORE && window.STORE.get('custCreditDays', {})) || {};
+  const v = map[custId];
+  return (v != null && v !== '') ? (+v || window.DEBT_TERM_DEFAULT) : window.DEBT_TERM_DEFAULT;
+};
+window.setCustCreditDays = function (custId, days) {
+  if (!custId) return;
+  const map = (window.STORE && window.STORE.get('custCreditDays', {})) || {};
+  if (days == null || days === '') delete map[custId]; else map[custId] = +days;
+  window.STORE.set('custCreditDays', map);
+};
+/* Quá hạn THẬT: lấy charge cũ nhất CHƯA trả (FIFO) trong sổ nợ, so với hạn nợ KH.
+   Trả {days, amount, term, sinceDate}. days=0 nếu chưa quá hạn / chưa đủ dữ liệu. */
+window.debtOverdueInfo = function (custId) {
+  const term = window.custCreditDays(custId);
+  const led = (window.getDebtLedger ? window.getDebtLedger(custId) : []) || [];
+  const empty = { days: 0, amount: 0, term: term, sinceDate: null };
+  if (!led.length) return empty;
+  const toDate = e => {
+    if (e.ts) { const d = new Date(e.ts); if (!isNaN(d)) return d; }
+    const m = String(e.date || '').match(/(\d{1,2})\/(\d{1,2})\/(\d{4})/);
+    return m ? new Date(+m[3], +m[2] - 1, +m[1]) : null;
+  };
+  const charges = led.filter(e => e.type === 'charge').map(e => ({ amt: +e.amount || 0, t: toDate(e) }))
+    .filter(c => c.t && c.amt > 0).sort((a, b) => a.t - b.t);
+  if (!charges.length) return empty;
+  let pay = led.filter(e => e.type === 'payment' || e.type === 'reverse').reduce((s, e) => s + (+e.amount || 0), 0);
+  for (const c of charges) { if (pay <= 0) break; const used = Math.min(pay, c.amt); c.amt -= used; pay -= used; }
+  const oldest = charges.find(c => c.amt > 0.5);
+  if (!oldest) return empty;
+  const ageDays = Math.floor((Date.now() - oldest.t.getTime()) / 86400000);
+  return { days: Math.max(0, ageDays - term), amount: charges.reduce((s, c) => s + Math.max(0, c.amt), 0), term: term, sinceDate: oldest.t };
+};
+window.debtOverdueDays = function (custId) { return window.debtOverdueInfo(custId).days; };
+
 /* ============ Ô TÌM SẢN PHẨM (gõ-lọc) — dùng chung ============
    Thay cho <select> 1000 SP. Gắn vào 1 <input class="prodpick">: gõ → lọc →
    click chọn → lưu productId vào input.dataset.pid. Đọc kết quả bằng el.dataset.pid. */
