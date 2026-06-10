@@ -954,11 +954,16 @@
       const u = _normUnit(x.unit);   /* "kilogram (kg)"/"Kg" → "kg" để không bỏ sót */
       return s + (u === 'kg' || u === 'g' ? (+x.qty || 0) * (u === 'g' ? 0.001 : 1) : 0);
     }, 0);
+    /* Tóm tắt hàng = CHỈ tổng theo đơn vị: "Trọng lượng 44kg · Đơn vị khác: 3 bắp, 2 hộp, 3 quả" */
     const g = document.getElementById('oGoods');
     if (g) {
-      const list = orderItems.map(x => `${x.name} x${_fmtNum(+x.qty || 0)} ${_normUnit(x.unit)}`).join(', ');
-      const bd = _unitBreakdown();
-      g.value = list + (bd ? `  ·  Tổng: ${bd}` : '');
+      const others = {};
+      orderItems.forEach(x => { const u = _normUnit(x.unit); if (u !== 'kg' && u !== 'g') others[u] = (others[u] || 0) + (+x.qty || 0); });
+      const okeys = Object.keys(others).sort((a, b) => a.localeCompare(b, 'vi'));
+      const parts = [];
+      if (totalKg > 0) parts.push(`Trọng lượng ${_fmtNum(totalKg)}kg`);
+      if (okeys.length) parts.push(`Đơn vị khác: ${okeys.map(u => `${_fmtNum(others[u])} ${u}`).join(', ')}`);
+      g.value = parts.join(' · ');
     }
     const f = document.getElementById('oFreight');
     if (f) f.value = total || '';
