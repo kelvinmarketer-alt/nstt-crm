@@ -103,7 +103,8 @@
     const orders = window.STORE.get('orders', window.ORDERS || []);
     const filtered = orders.filter(o => {
       if (filters.custs.length && !filters.custs.includes(o.cust)) return false;
-      if (filters.svcs.length && !filters.svcs.includes(o.serviceType)) return false;
+      /* serviceType có thể là NHIỀU nhóm "id1,id2" — khớp nếu chứa 1 nhóm đang lọc */
+      if (filters.svcs.length && !String(o.serviceType || '').split(',').some(s => filters.svcs.includes(s.trim()))) return false;
       if (filters.modes.length && o.transportMode && !filters.modes.includes(o.transportMode)) return false;
       if (filters.staff.length && !filters.staff.includes(o.staff)) return false;
       if (filters.statuses.length && !filters.statuses.includes(o.status)) return false;

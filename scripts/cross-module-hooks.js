@@ -66,121 +66,172 @@
     }
 
     /* ============================================================
-       1+2. Orders delivered → trừ kho · Purchases received → cộng kho
-       (Đã có sẵn trong inventory.js — chỉ duplicate ở đây để chạy global) */
-    window.STORE.subscribe('orders', orders => {
-      let changed = false;
-      const list = orders || [];
-      list.forEach(o => {
-        if ((o.status === 'delivered' || o.status === 'reconciled') && !o._invApplied) {
-          (o.items || []).forEach(it => {
-            if (it.id) {
-              window.invApply(it.id, -(it.qty || 0));
-              window.invRecordMovement(it.id, -(it.qty || 0), 'sale', `Xuất bán cho ${o.custName}`, o.code);
-            }
-          });
-          o._invApplied = true;
-          changed = true;
-        }
-      });
-      if (changed) window.STORE.set('orders', list);
-    });
-
-    window.STORE.subscribe('purchases', purchases => {
-      let changed = false;
-      const list = purchases || [];
-      list.forEach(p => {
-        if (p.status === 'received' && !p._invApplied && !p.noStock) {
-          (p.items || []).forEach(it => {
-            if (it.productId) {
-              window.invApply(it.productId, +(it.qty || 0));
-              window.invRecordMovement(it.productId, +(it.qty || 0), 'purchase', `Nhập từ NCC`, p.id);
-            }
-          });
-          p._invApplied = true;
-          changed = true;
-        }
-      });
-      if (changed) window.STORE.set('purchases', list);
-    });
+       GATE + IDEMPOTENCY (chống áp dụng LẶP đa thiết bị)
+       - Cờ `_xxxApplied` chỉ sống per-máy (bị strip khi sync) → máy mới mở app
+         từng bị CỘNG NỢ / TRỪ KHO LẶP. Nay nguồn quyết định = SỔ CÁI đã sync
+         (debtLedger / inv_movements): có bút toán ref rồi → KHÔNG áp dụng lại.
+       - GATE: chỉ chạy khi dữ liệu cloud của các key liên quan ĐÃ TẢI XONG
+         (STORE.isPreloaded) — tránh quyết định trên cache rỗng.
+       ============================================================ */
+    const S = window.STORE;
+    const ready = (...keys) => !S.isPreloaded || keys.every(k => S.isPreloaded(k));
+    const mvHas = (refId, type) => (S.get('inv_movements', []) || []).some(m => m.refId === refId && m.type === type);
+    const dlHas = (ref, type) => (S.get('debtLedger', []) || []).some(e => e.ref === ref && e.type === type);
+    /* Kick preload sớm các sổ cái idempotency (get → tự preload từ cloud) */
+    S.get('inv_movements', []); S.get('debtLedger', []); S.get('cashEntries', []);
 
     /* ============================================================
-       3+4. Đơn KH chưa TT → cộng customer.debt
-       Đơn cancelled/returned → hoàn lại debt
+       1. Orders delivered → trừ kho (idempotent qua inv_movements ref=code)
        ============================================================ */
-    window.STORE.subscribe('orders', orders => {
-      const list = orders || [];
-      const custs = window.STORE.get('customers', []) || [];
-      let changed = false;
-      list.forEach(o => {
-        const c = custs.find(x => x.id === (o.cust || o.customer_id));
-        if (!c) return;
-        /* "Ghi nợ" = payBy chứa chữ "nợ" (Công nợ, ghi nợ…) hoặc payStatus unpaid.
-           COD / Đã thanh toán / Chuyển khoản → KHÔNG ghi nợ. */
-        const isUnpaid = (/nợ/i.test(o.payBy || '') || o.payStatus === 'unpaid');
-        const isFinalSettled = (o.status === 'delivered' || o.status === 'reconciled');
-        const isCancelled = (o.status === 'cancelled' || o.status === 'returned');
+    let _invRunning = false;
+    function applyOrderInv() {
+      if (_invRunning || !ready('orders', 'inv_movements')) return;
+      _invRunning = true;
+      try {
+        const list = S.get('orders', []) || [];
+        let changed = false;
+        list.forEach(o => {
+          if ((o.status === 'delivered' || o.status === 'reconciled') && !o._invApplied) {
+            if (!mvHas(o.code, 'sale')) {
+              (o.items || []).forEach(it => {
+                if (it.id) {
+                  window.invApply(it.id, -(it.qty || 0));
+                  window.invRecordMovement(it.id, -(it.qty || 0), 'sale', `Xuất bán cho ${o.custName}`, o.code);
+                }
+              });
+            }
+            o._invApplied = true;   /* đã trừ (ở máy này hoặc máy khác) */
+            changed = true;
+          }
+        });
+        if (changed) S.set('orders', list);
+      } finally { _invRunning = false; }
+    }
+    S.subscribe('orders', applyOrderInv);
+    S.subscribe('__preloaded__', k => { if (k === 'orders' || k === 'inv_movements') applyOrderInv(); });
 
-        /* Trường hợp 1: đơn vừa delivered + chưa TT → cộng debt + ghi SỔ CÔNG NỢ (charge) */
-        if (isFinalSettled && isUnpaid && !o._debtApplied) {
-          c.debt = (c.debt || 0) + (o.freight || 0);
-          o._debtApplied = true;
-          changed = true;
-          window.addDebtLedger && window.addDebtLedger({
-            custId: c.id, type: 'charge', amount: o.freight || 0, ref: o.code,
-            date: o.deliveredAt || o.date, desc: 'Tiền hàng đơn ' + o.code,
-          });
-        }
-        /* Trường hợp 2: đơn cancel/return sau khi đã cộng debt → trừ ra + ghi SỔ (reverse) */
-        if (isCancelled && o._debtApplied) {
-          c.debt = Math.max(0, (c.debt || 0) - (o.freight || 0));
-          o._debtApplied = false;
-          changed = true;
-          window.addDebtLedger && window.addDebtLedger({
-            custId: c.id, type: 'reverse', amount: o.freight || 0, ref: o.code + '-rev',
-            desc: 'Hoàn nợ (huỷ/trả đơn ' + o.code + ')',
-          });
-        }
-      });
-      if (changed) {
-        window.STORE.set('customers', custs);
-        window.STORE.set('orders', list);
-      }
-    });
+    /* 2. Purchases received → cộng kho (idempotent qua inv_movements ref=p.id) */
+    let _purRunning = false;
+    function applyPurchaseInv() {
+      if (_purRunning || !ready('purchases', 'inv_movements')) return;
+      _purRunning = true;
+      try {
+        const list = S.get('purchases', []) || [];
+        let changed = false;
+        list.forEach(p => {
+          if (p.status === 'received' && !p._invApplied && !p.noStock) {
+            if (!mvHas(p.id, 'purchase')) {
+              (p.items || []).forEach(it => {
+                if (it.productId) {
+                  window.invApply(it.productId, +(it.qty || 0));
+                  window.invRecordMovement(it.productId, +(it.qty || 0), 'purchase', `Nhập từ NCC`, p.id);
+                }
+              });
+            }
+            p._invApplied = true;
+            changed = true;
+          }
+        });
+        if (changed) S.set('purchases', list);
+      } finally { _purRunning = false; }
+    }
+    S.subscribe('purchases', applyPurchaseInv);
+    S.subscribe('__preloaded__', k => { if (k === 'purchases' || k === 'inv_movements') applyPurchaseInv(); });
 
     /* ============================================================
-       5. Phiếu trả hàng status='refunded' → cộng lại kho
+       3+4. Đơn KH chưa TT → cộng customer.debt (idempotent qua debtLedger ref=code)
+       Đơn cancelled/returned → hoàn nợ (1 lần — có bút toán -rev là thôi)
        ============================================================ */
-    window.STORE.subscribe('returns', returns => {
-      let changed = false;
-      const list = returns || [];
-      const products = window.STORE.get('products', []) || [];
-      list.forEach(r => {
-        if ((r.status === 'refunded' || r.status === 'replaced') && !r._invApplied) {
-          (r.items || []).forEach(it => {
-            /* Returns có thể không lưu productId — tìm theo tên SP */
-            let pid = it.productId || it.id;
-            if (!pid && it.name) {
-              const p = products.find(x =>
-                (x.name||'').toLowerCase() === (it.name||'').toLowerCase());
-              pid = p ? p.id : null;
-            }
-            if (pid) {
-              window.invApply(pid, +(it.qty || 0));
-              window.invRecordMovement(pid, +(it.qty || 0), 'return', `KH trả hàng ${r.custName||''}`, r.id || r.orderCode);
-            }
-          });
-          r._invApplied = true;
-          changed = true;
+    let _debtRunning = false;
+    function applyOrderDebt() {
+      if (_debtRunning || !ready('orders', 'customers', 'debtLedger')) return;
+      _debtRunning = true;
+      try {
+        const list = S.get('orders', []) || [];
+        const custs = S.get('customers', []) || [];
+        let changed = false;
+        list.forEach(o => {
+          const c = custs.find(x => x.id === (o.cust || o.customer_id));
+          if (!c) return;
+          /* "Ghi nợ" = payBy chứa chữ "nợ"; COD/Chuyển khoản → KHÔNG ghi nợ. */
+          const isUnpaid = (/nợ/i.test(o.payBy || '') || o.payStatus === 'unpaid');
+          const isFinalSettled = (o.status === 'delivered' || o.status === 'reconciled');
+          const isCancelled = (o.status === 'cancelled' || o.status === 'returned');
+          const charged = dlHas(o.code, 'charge');
+          const reversed = dlHas(o.code + '-rev', 'reverse');
+
+          /* Cộng nợ 1 LẦN DUY NHẤT (sổ cái chưa có bút toán charge) */
+          if (isFinalSettled && isUnpaid && !charged) {
+            c.debt = (c.debt || 0) + (o.freight || 0);
+            o._debtApplied = true;
+            changed = true;
+            window.addDebtLedger && window.addDebtLedger({
+              custId: c.id, type: 'charge', amount: o.freight || 0, ref: o.code,
+              date: o.deliveredAt || o.date, desc: 'Tiền hàng đơn ' + o.code,
+            });
+          }
+          /* Hoàn nợ 1 LẦN (đã charge + chưa có bút toán -rev) */
+          if (isCancelled && charged && !reversed) {
+            c.debt = Math.max(0, (c.debt || 0) - (o.freight || 0));
+            o._debtApplied = false;
+            changed = true;
+            window.addDebtLedger && window.addDebtLedger({
+              custId: c.id, type: 'reverse', amount: o.freight || 0, ref: o.code + '-rev',
+              desc: 'Hoàn nợ (huỷ/trả đơn ' + o.code + ')',
+            });
+          }
+        });
+        if (changed) {
+          S.set('customers', custs);
+          S.set('orders', list);
         }
-      });
-      if (changed) window.STORE.set('returns', list);
-    });
+      } finally { _debtRunning = false; }
+    }
+    S.subscribe('orders', applyOrderDebt);
+    S.subscribe('__preloaded__', k => { if (k === 'orders' || k === 'customers' || k === 'debtLedger') applyOrderDebt(); });
+
+    /* ============================================================
+       5. Phiếu trả hàng refunded → cộng lại kho (idempotent qua inv_movements)
+       ============================================================ */
+    let _retRunning = false;
+    function applyReturnInv() {
+      if (_retRunning || !ready('returns', 'inv_movements')) return;
+      _retRunning = true;
+      try {
+        const list = S.get('returns', []) || [];
+        const products = S.get('products', []) || [];
+        let changed = false;
+        list.forEach(r => {
+          if ((r.status === 'refunded' || r.status === 'replaced') && !r._invApplied) {
+            const ref = r.id || r.orderCode;
+            if (!mvHas(ref, 'return')) {
+              (r.items || []).forEach(it => {
+                let pid = it.productId || it.id;
+                if (!pid && it.name) {
+                  const p = products.find(x => (x.name||'').toLowerCase() === (it.name||'').toLowerCase());
+                  pid = p ? p.id : null;
+                }
+                if (pid) {
+                  window.invApply(pid, +(it.qty || 0));
+                  window.invRecordMovement(pid, +(it.qty || 0), 'return', `KH trả hàng ${r.custName||''}`, ref);
+                }
+              });
+            }
+            r._invApplied = true;
+            changed = true;
+          }
+        });
+        if (changed) S.set('returns', list);
+      } finally { _retRunning = false; }
+    }
+    S.subscribe('returns', applyReturnInv);
+    S.subscribe('__preloaded__', k => { if (k === 'returns' || k === 'inv_movements') applyReturnInv(); });
 
     /* ============================================================
        6. Chi phí Ads mới → tạo phiếu chi vào cashEntries
        ============================================================ */
     window.STORE.subscribe('adspend', ads => {
+      if (!ready('adspend', 'cashEntries')) return;   /* đợi cloud về — dedup theo mã 'no' cần cashEntries thật */
       let changed = false;
       const list = ads || [];
       const cash = window.STORE.get('cashEntries', []) || [];
@@ -225,6 +276,7 @@
     window.STORE.subscribe('payrollExtra', payroll => {
       /* Schema mới: array of payslip {status, total, paidAt, staffName, month, ...} */
       if (!Array.isArray(payroll)) return; /* tránh ghi đè khi format sai */
+      if (!ready('payrollExtra', 'cashEntries')) return;
       let changed = false;
       const list = payroll;
       const cash = window.STORE.get('cashEntries', []) || [];

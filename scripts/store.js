@@ -179,6 +179,10 @@
     });
   }
 
+  /* Đã tải XONG (hoàn tất, không chỉ "đã bắt đầu") dữ liệu cloud cho key — dùng gate
+     cho các hook side-effect (trừ kho/cộng nợ) để KHÔNG chạy trên cache rỗng/cũ. */
+  const _preloadDone = new Set();
+
   /* Async load from Supabase, replace cache nếu DB có data */
   async function _preloadFromSupabase(key) {
     if (!isSupabaseMode()) return;
@@ -267,6 +271,10 @@
       _subscribeRealtime(key, table);
     } catch (e) {
       console.warn(`[STORE preload ${key}]`, e.message);
+    } finally {
+      _preloadDone.add(key);
+      /* Báo cho hook đang đợi gate (cross-module-hooks) re-check */
+      (_subs['__preloaded__'] || []).forEach(fn => { try { fn(key); } catch (e) {} });
     }
   }
 
@@ -491,6 +499,12 @@
 
     subscribe(key, fn) {
       (_subs[key] = _subs[key] || []).push(fn);
+    },
+
+    /* Dữ liệu cloud của key đã tải XONG chưa? (localStorage mode → luôn true).
+       Hook side-effect (kho/nợ) PHẢI đợi true mới chạy — tránh áp dụng trên cache rỗng. */
+    isPreloaded(key) {
+      return !isSupabaseMode() || _preloadDone.has(key);
     },
 
     reset(key) {
