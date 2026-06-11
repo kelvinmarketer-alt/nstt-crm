@@ -185,8 +185,8 @@
     const rows = Object.keys(r.daily).filter(d => r.daily[d] > 0).sort()
       .map(d => ({ date: isoVN(d), amount: r.daily[d] }));
     const totalPS = r.total, paid = r.paid || 0, remain = r.remain != null ? r.remain : totalPS;
-    /* chia 2 cột (trái STT 1..n, phải tiếp theo) — tối thiểu 8 dòng mỗi cột cho cân */
-    const half = Math.max(8, Math.ceil(rows.length / 2));
+    /* chia 2 cột (trái STT 1..n, phải tiếp theo) — CHỈ hiện đúng số dòng có dữ liệu */
+    const half = Math.max(1, Math.ceil(rows.length / 2));
     const colCell = (i) => {
       const e = rows[i];
       return `<td style="text-align:center">${e ? (i + 1) : ''}</td><td>${e ? e.date : ''}</td><td style="text-align:right">${e ? money(e.amount) : ''}</td><td></td>`;
