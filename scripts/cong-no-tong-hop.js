@@ -96,7 +96,7 @@
       <th class="num" style="background:#FEE2E2">CÔNG NỢ HT</th>
     </tr></thead>`;
     const body = `<tbody>${data.list.map(r => `<tr>
-      <td class="par" title="${(r.name || '').replace(/"/g, '&quot;')}">${r.name}</td>
+      <td class="par" title="Bấm để xem Thông báo công nợ — in / copy gửi khách"><a href="javascript:void(0)" onclick="window.cnShowNotice('${(r.key || '').replace(/'/g, "\\'")}')" style="color:var(--navy);font-weight:700;text-decoration:none;border-bottom:1px dotted var(--navy)">${r.name}</a></td>
       ${data.days.map(d => { const v = r.daily[d] || 0; return `<td class="num ${v ? '' : 'z'}">${v ? fmt(v) : '·'}</td>`; }).join('')}
       <td class="num"><b>${fmt(r.total)}</b></td>
       <td class="num cn-paid">${r.paid ? fmt(r.paid) : '·'}</td>
@@ -160,6 +160,117 @@
     const fn = `CONG-NO-TONG-HOP_${fromISO}_${toISO}.xlsx`;
     window.XLSX.writeFile(wb, fn);
     window.toast && window.toast('✓ Đã xuất ' + fn, 'success');
+  };
+
+  /* ===== PHIẾU "THÔNG BÁO CÔNG NỢ — KIÊM ĐỀ NGHỊ THANH TOÁN" (in / copy) ===== */
+  const money = v => (Math.round(+v || 0)).toLocaleString('vi-VN');
+  const isoVN = iso => { const m = iso.match(/(\d{4})-(\d{2})-(\d{2})/); return m ? `${m[3]}.${m[2]}.${m[1]}` : iso; };
+
+  window.cnShowNotice = function (custKey) {
+    if (!_last || !_last.list) { window.toast && window.toast('Bấm "Xem báo cáo" trước', 'warn'); return; }
+    const r = _last.list.find(x => x.key === custKey);
+    if (!r) { window.toast && window.toast('Không tìm thấy đối tác', 'warn'); return; }
+    const c = (S().get('customers', []) || []).find(x => x.id === custKey) || { name: r.name };
+    const ci = S().get('companyInfo', {}) || {};
+    const comp = {
+      name: ci.name || 'CÔNG TY TNHH NÔNG SẢN TUẤN TÚ HÀ NỘI',
+      tax: ci.tax || '0110302211',
+      address: ci.address || '36/147A - Tân Mai - Hoàng Mai - Hà Nội',
+      bank: ci.bank || 'OCB 28019999',
+      bankOwner: ci.bankOwner || 'Giáp Quỳnh Anh',
+      email: ci.email || 'nongsantuantuhanoi@gmail.com',
+      director: ci.director || ci.hotline || '0836 676 086',
+    };
+    /* các ngày phát sinh trong kỳ → dòng phiếu */
+    const rows = Object.keys(r.daily).filter(d => r.daily[d] > 0).sort()
+      .map(d => ({ date: isoVN(d), amount: r.daily[d] }));
+    const totalPS = r.total, paid = r.paid || 0, remain = r.remain != null ? r.remain : totalPS;
+    /* chia 2 cột (trái STT 1..n, phải tiếp theo) — tối thiểu 8 dòng mỗi cột cho cân */
+    const half = Math.max(8, Math.ceil(rows.length / 2));
+    const colCell = (i) => {
+      const e = rows[i];
+      return `<td style="text-align:center">${e ? (i + 1) : ''}</td><td>${e ? e.date : ''}</td><td style="text-align:right">${e ? money(e.amount) : ''}</td><td></td>`;
+    };
+    let bodyRows = '';
+    for (let i = 0; i < half; i++) bodyRows += `<tr>${colCell(i)}${colCell(i + half)}</tr>`;
+    const sumL = rows.slice(0, half).reduce((s, e) => s + e.amount, 0);
+    const sumR = rows.slice(half).reduce((s, e) => s + e.amount, 0);
+
+    const html = `<!doctype html><html lang="vi"><head><meta charset="utf-8"><title>Thông báo công nợ — ${(c.name || '').replace(/</g, '')}</title>
+    <style>
+      *{box-sizing:border-box} body{font-family:'Segoe UI',Arial,sans-serif;margin:0;padding:18px;color:#1a1a1a;background:#fff}
+      .pg{max-width:880px;margin:0 auto}
+      .hd{display:flex;gap:14px;align-items:flex-start;border-bottom:2px solid #1B5E20;padding-bottom:8px}
+      .hd img{width:74px;height:74px;object-fit:contain}
+      .cinfo{flex:1;font-size:12.5px;line-height:1.5}
+      .cinfo b{font-size:15px;color:#1B5E20}
+      .greet{display:flex;justify-content:space-between;margin-top:10px;font-size:13px}
+      h1{color:#C0392B;text-align:center;font-size:21px;margin:8px 0 2px}
+      .sub{text-align:center;font-style:italic;color:#C0392B;font-size:12.5px;margin-bottom:2px}
+      .note0{font-style:italic;font-size:12px;margin:6px 0}
+      table{width:100%;border-collapse:collapse;font-size:12.5px}
+      th,td{border:1px solid #555;padding:4px 7px}
+      thead th{background:#EAF5EA;text-align:center;font-weight:700}
+      .totrow td{font-weight:700;background:#FAFAFA}
+      .grand{background:#FFF7C2;color:#C0392B;font-weight:800;font-size:14px}
+      .ft{text-align:center;color:#C0392B;font-weight:700;font-size:12.5px;margin-top:10px;line-height:1.6}
+      .sign{display:flex;justify-content:space-around;margin-top:14px;font-size:12px;text-align:center}
+      .toolbar{position:sticky;top:0;background:#fff;padding:8px 0 12px;display:flex;gap:8px;justify-content:center}
+      .toolbar button{padding:8px 16px;border:none;border-radius:7px;font-size:13px;font-weight:700;cursor:pointer}
+      .b1{background:#1B5E20;color:#fff}.b2{background:#E8A33D;color:#fff}
+      @media print{.toolbar{display:none}body{padding:0}}
+    </style></head><body>
+    <div class="toolbar">
+      <button class="b1" onclick="window.print()">🖨 In phiếu</button>
+      <button class="b2" onclick="copyTxt()">📋 Copy nội dung</button>
+    </div>
+    <div class="pg" id="pg">
+      <div class="hd">
+        <img src="${location.origin}/assets/logo.png" onerror="this.style.display='none'">
+        <div class="cinfo">
+          <b>${comp.name}</b><br>
+          Mã Số Thuế: ${comp.tax}<br>
+          Địa Chỉ: ${comp.address}<br>
+          Số Tài Khoản: ${comp.bank} &nbsp;·&nbsp; Chủ TK: ${comp.bankOwner}<br>
+          Email: ${comp.email} &nbsp;·&nbsp; GĐĐH: ${comp.director}
+        </div>
+      </div>
+      <div class="greet"><div><b>Kính Gửi Quý Khách Hàng:</b> ${c.name || ''}<br><b>Địa Chỉ:</b> ${c.address || '—'}</div><div><b>Số Điện Thoại:</b> ${c.phone || '—'}</div></div>
+      <h1>THÔNG BÁO CÔNG NỢ – KIÊM ĐỀ NGHỊ THANH TOÁN</h1>
+      <div class="sub">từ ngày ${ddmm(_last.fromISO)}/${_last.fromISO.slice(0,4)} – ${ddmm(_last.toISO)}/${_last.toISO.slice(0,4)}</div>
+      <div class="note0">Chuyên Sỉ Rau Củ Quả Đà Lạt Và Rau Vùng Miền.</div>
+      <table>
+        <thead><tr><th>STT</th><th>Ngày Tháng</th><th>Số Tiền</th><th>Ghi Chú</th><th>STT</th><th>Ngày Tháng</th><th>Số Tiền</th><th>Ghi Chú</th></tr></thead>
+        <tbody>${bodyRows}</tbody>
+        <tfoot>
+          <tr class="totrow"><td colspan="2" style="text-align:center">Tổng</td><td style="text-align:right">${money(sumL)}</td><td></td><td colspan="2" style="text-align:center">Tổng</td><td style="text-align:right">${sumR ? money(sumR) : ''}</td><td></td></tr>
+          <tr class="grand"><td colspan="6" style="text-align:right">TỔNG SỐ TIỀN CÔNG NỢ${paid > 0 ? ' (đã thu ' + money(paid) + 'đ → còn phải thu)' : ''}</td><td colspan="2" style="text-align:right">${money(paid > 0 ? remain : totalPS)}</td></tr>
+        </tfoot>
+      </table>
+      <div class="ft">
+        Xin Trân Trọng Quý Khách Hàng Đã Tin Tưởng Đồng Hành Và Dành Thời Gian Quan Tâm.<br>
+        Với Mong Muốn Cố Gắng Hoàn Thiện, Chúng Tôi Xin Lắng Nghe, Tiếp Thu Và Bổ Sung Những Điều Thiếu Sót.<br>
+        Mọi Ý Kiến Đóng Góp Và Phản Hồi Xin Liên Hệ Giám Đốc Điều Hành: ${comp.director}
+      </div>
+      <div class="sign"><div><b>Đại Diện Bên Bán</b><br>(Ký, Đóng dấu)</div><div><b>Kế Toán Bên Bán</b><br>(Ký, Ghi Rõ Họ Tên)</div><div><b>Kế Toán Bên Mua</b><br>(Ký, Ghi Rõ Họ Tên)</div></div>
+    </div>
+    <script>
+      function copyTxt(){
+        var lines=[${JSON.stringify(comp.name)},'MST: '+${JSON.stringify(comp.tax)},'',
+          'THÔNG BÁO CÔNG NỢ – KIÊM ĐỀ NGHỊ THANH TOÁN',
+          'Kính gửi: '+${JSON.stringify(c.name || '')},
+          'Kỳ: ${ddmm(_last.fromISO)}/${_last.fromISO.slice(0,4)} - ${ddmm(_last.toISO)}/${_last.toISO.slice(0,4)}',''];
+        ${JSON.stringify(rows.map((e, i) => `${i + 1}. ${e.date}: ${money(e.amount)}đ`))}.forEach(function(l){lines.push(l)});
+        lines.push('');
+        lines.push('TỔNG CÔNG NỢ PHẢI THANH TOÁN: '+${JSON.stringify(money(paid > 0 ? remain : totalPS))}+'đ');
+        lines.push('STK: '+${JSON.stringify(comp.bank + ' · ' + comp.bankOwner)});
+        navigator.clipboard.writeText(lines.join('\\n')).then(function(){alert('✓ Đã copy nội dung — dán gửi khách (Zalo/SMS).');});
+      }
+    <\/script>
+    </body></html>`;
+    const w = window.open('', '_blank', 'width=920,height=900');
+    if (!w) { window.toast && window.toast('Trình duyệt chặn popup — cho phép popup để mở phiếu', 'warn'); return; }
+    w.document.write(html); w.document.close();
   };
 
   /* ===== Khởi tạo: mặc định = tháng này, tự render khi có data ===== */

@@ -6,6 +6,17 @@
   /* 1 đơn có thể có NHIỀU nhóm hàng — serviceType lưu chuỗi ghép "id1,id2" */
   const svcIdsOf = o => String((o && o.serviceType) || '').split(',').map(s => s.trim()).filter(Boolean);
 
+  /* ===== Gộp số lượng theo TỪNG đơn vị (dùng chung: form + chi tiết đơn) ===== */
+  const unitNorm = u => { let s = (u || '').toString().trim().toLowerCase(); const m = s.match(/\(([^)]+)\)/); if (m) s = m[1].trim(); return s || 'đv'; };
+  const fmtNum2 = n => Number.isInteger(n) ? String(n) : String(Math.round(n * 100) / 100);
+  /* items/groups [{unit,qty}] → "43 kg · 10 bắp · 2 hộp · 1 thùng" (kg đứng đầu) */
+  function unitBreakdownOf(items) {
+    const by = {};
+    (items || []).forEach(x => { const u = unitNorm(x.unit); by[u] = (by[u] || 0) + (+x.qty || 0); });
+    const keys = Object.keys(by).sort((a, b) => a === 'kg' ? -1 : b === 'kg' ? 1 : a.localeCompare(b, 'vi'));
+    return keys.map(u => `${fmtNum2(by[u])} ${u}`).join(' · ');
+  }
+
   /* ===== Ô tiền: hiển thị có dấu chấm (1.531.250), đọc về số nguyên ===== */
   const _moneyVal = (sel) => parseInt(String((window.formVal && window.formVal(sel)) || '').replace(/\D/g, ''), 10) || 0;
   window._fmtMoneyInput = function (el) {
@@ -538,10 +549,10 @@
       g.total += (+it.total || 0);
     });
     const groups = [...map.values()];
-    const totalQty = groups.reduce((s, g) => s + g.qty, 0);
     const totalAmt = groups.reduce((s, g) => s + g.total, 0);
+    const breakdown = unitBreakdownOf(groups);   /* tách theo từng đơn vị (kg/bắp/hộp/thùng…) */
     const cnt = document.getElementById('iGoodsCount');
-    if (cnt) cnt.textContent = `· ${groups.length} mã · ${totalQty.toFixed(2).replace(/\.00$/,'')} kg`;
+    if (cnt) cnt.textContent = `· ${groups.length} mã · ${breakdown}`;
     host.innerHTML = `
       <div style="font-size:11.5px;color:var(--muted);margin-bottom:8px">✓ Tick để soạn hàng — số lượng đã <b>gộp theo từng sản phẩm</b>.</div>
       <table class="mini-table" style="margin:0">
@@ -554,7 +565,7 @@
         </tr>`).join('')}</tbody>
         <tfoot><tr style="background:#F0FDF4;border-top:2px solid #15803D">
           <td></td><td colspan="2" style="padding:8px"><b style="color:#15803D">📊 Tổng cộng</b></td>
-          <td class="num"><b style="color:#15803D">${totalQty.toFixed(2).replace(/\.00$/,'')} kg</b></td>
+          <td class="num"><b style="color:#15803D">${breakdown}</b></td>
         </tr></tfoot>
       </table>
       <div style="text-align:right;font-size:12px;color:var(--muted);margin-top:6px">Thành tiền hàng: <b style="color:var(--red)">${window.fmt(totalAmt)} ₫</b></div>`;
@@ -580,7 +591,8 @@
     document.getElementById('dPay').textContent = o.payBy;
     document.getElementById('dCod').textContent = o.cod ? window.fmtShort(o.cod) + ' ₫' : '—';
     document.getElementById('dWeight').textContent = o.weight ? o.weight + ' kg' : '—';
-    document.getElementById('dUnit').textContent = o.qty + ' ' + o.unit.toLowerCase();
+    /* Ô nhỏ dưới khối lượng: tách theo từng đơn vị thay vì "1 kg" vô nghĩa */
+    document.getElementById('dUnit').textContent = unitBreakdownOf(o.items || []) || (o.qty + ' ' + (o.unit || 'kg').toLowerCase());
     document.getElementById('dService').textContent = svcList.map(s => s.label).join(', ') || '—';
     document.getElementById('dMode').textContent = tm ? tm.label : '—';
 

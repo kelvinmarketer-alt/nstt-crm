@@ -749,7 +749,7 @@
           <span style="position:absolute;right:-4px;bottom:-4px;background:var(--navy);color:#fff;border-radius:50%;width:17px;height:17px;display:grid;place-items:center;font-size:9px;box-shadow:0 1px 3px rgba(0,0,0,.3)">✎</span>
         </div>
         <div style="flex:1;min-width:0">
-          <div data-field="name" title="Click để sửa tên SP" style="line-height:1.3"><b>${p.name}</b><div style="color:var(--muted);font-size:11px">${p.en || p.note || ''}</div></div>
+          <div data-field="name" title="Click để sửa tên SP" style="line-height:1.3"><b>${p.name}</b><div style="color:var(--muted);font-size:11px">${p.note || ''}</div></div>
           <div style="display:flex;align-items:center;gap:7px;margin-top:4px;flex-wrap:wrap">
             <span data-field="cat" title="Click để đổi nhóm"><span class="tag" style="background:${cat.color}20;color:${cat.color}">${cat.icon} ${cat.label}</span></span>
             <span data-field="unit" title="Click để sửa đơn vị tính" style="color:var(--muted);font-size:11.5px">/${p.unit}</span>
@@ -863,7 +863,7 @@
           store: 'products',
           fields: {
             name: { type: 'text',
-                    format: (v, row) => `<b>${v}</b><div style="color:var(--muted);font-size:11px">${row?.en || row?.note || ''}</div>` },
+                    format: (v, row) => `<b>${v}</b><div style="color:var(--muted);font-size:11px">${row?.note || ''}</div>` },
             cat:  { type: 'select',
                     options: () => CATS.map(c => ({ value: c.id, label: (c.icon||'') + ' ' + c.label })),
                     format: v => { const m = catMeta(v); return `<span class="tag" style="background:${m.color}20;color:${m.color}">${m.icon} ${m.label}</span>`; } },
