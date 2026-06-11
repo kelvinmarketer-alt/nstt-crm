@@ -207,6 +207,11 @@
     });
     window.closeModal();
     window.toast(`✓ Đã tạo ${nOrder} đơn${nCust ? ' · ' + nCust + ' khách mới' : ''} — công nợ đã cập nhật.`, 'success');
-    setTimeout(() => { if (window.renderOrders) window.renderOrders(); else location.reload(); }, 400);
+    /* Refresh đúng ngữ cảnh: trang Công nợ CFO → cnRender; trang Đơn → renderOrders; còn lại reload */
+    setTimeout(() => {
+      if (window.cnRender) window.cnRender();
+      else if (window.renderOrders) window.renderOrders();
+      else location.reload();
+    }, 500);
   };
 })();

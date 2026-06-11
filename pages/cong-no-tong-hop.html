@@ -31,11 +31,13 @@
   </header>
 
   <main class="main">
-    <div style="display:flex;align-items:center;gap:12px;margin-bottom:14px">
+    <div style="display:flex;align-items:center;gap:12px;margin-bottom:14px;flex-wrap:wrap">
       <div>
         <h1 style="margin:0;font-size:22px;color:var(--navy);font-weight:800">🧮 Công nợ tổng hợp đối tác</h1>
         <div style="font-size:13px;color:var(--muted);margin-top:2px">Ma trận đối tác × ngày — tự sinh từ đơn hàng. Theo dõi <b>đã thu / chưa thu</b> · xuất Excel cho CFO.</div>
       </div>
+      <div style="flex:1"></div>
+      <button class="btn btn-primary" onclick="window.openPhieuImport && window.openPhieuImport()" title="Up file hoá đơn/phiếu bán hàng từng ngày (Excel) → tự tạo đơn + cập nhật công nợ">📥 Nhập hoá đơn ngày (Excel)</button>
     </div>
 
     <div class="chart-card" style="margin-bottom:14px">
@@ -81,6 +83,7 @@
 <script src="../data/orders.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
 <script src="../scripts/cong-no-tong-hop.js"></script>
+<script src="../scripts/import-phieu.js"></script>
 <script src="../scripts/system-core.js"></script>
 <script src="../scripts/ai-chat.js"></script>
 </body></html>
