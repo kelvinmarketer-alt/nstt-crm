@@ -1663,7 +1663,7 @@ window.INTEGRATIONS = [
         {v:'efy',  l:'EFY (rẻ)'},
         {v:'viettel', l:'Viettel SInvoice'},
       ]},
-      { key:'taxCode', label:'MST DN', type:'text', placeholder:'011032211' },
+      { key:'taxCode', label:'MST DN', type:'text', placeholder:'0110302211' },
       { key:'apiEndpoint', label:'API Endpoint', type:'text', placeholder:'https://api.vnpt-invoice.com.vn/...' },
       { key:'apiUser', label:'API Username', type:'text' },
       { key:'apiKey', label:'API Key / Token', type:'password' },
