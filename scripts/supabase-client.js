@@ -453,6 +453,16 @@
       if (error) { console.warn('[SB deleteKv]', key, error.message); return false; }
       return true;
     },
+    /* Realtime cho kv_store: NV đổi công nợ/chấm công/sổ kho ở máy này → máy khác thấy ngay.
+       callback({ key, value }) — value là JSONB đầy đủ của key đó (cả mảng/object).
+       ⚠ Cần chạy SQL 21-realtime-kv-store.sql để thêm kv_store vào publication. */
+    subscribeKv(callback) {
+      return client.channel('realtime-kv_store')
+        .on('postgres_changes', { event: '*', schema: 'public', table: 'kv_store' }, payload => {
+          const row = payload.new && payload.new.key ? payload.new : payload.old;
+          if (row && row.key) callback({ key: row.key, value: row.value });
+        }).subscribe();
+    },
     /* Xóa TẤT CẢ rows trong 1 bảng (1 API call) — filter idCol IS NOT NULL = mọi row */
     async clearTable(table, idColumn = 'id') {
       const { error } = await client.from(table).delete().not(idColumn, 'is', null);

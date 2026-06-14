@@ -220,6 +220,7 @@
          Bảng kv_store(key, value JSONB) — generic key-value sync.
          9 keys CRITICAL: NV mất chấm công + bảng lương nếu KHÔNG sync. */
       if (KV_KEYS.has(key) && window.SB_DATA?.getKv) {
+        _subscribeKvRealtime();   /* bật realtime kv_store (1 lần) khi có key KV đầu tiên được tải */
         const v = await window.SB_DATA.getKv(key);
         if (v != null && (!Array.isArray(v) || v.length > 0)) {
           /* Cloud có data → dùng, ghi đè local */
@@ -305,6 +306,31 @@
     } catch (e) {
       console.warn(`[STORE realtime ${key}]`, e.message);
       _realtimeSubs.delete(key);
+    }
+  }
+
+  /* === REALTIME cho kv_store (công nợ, chấm công, sổ kho, gom hàng...) ===
+     Subscribe MỘT LẦN cho cả bảng kv_store; mỗi thay đổi mang theo `key` → cập
+     nhật đúng STORE key đó. NV đổi công nợ ở máy này → máy khác thấy ngay (<1s). */
+  let _kvRealtimeOn = false;
+  function _subscribeKvRealtime() {
+    if (_kvRealtimeOn || !window.SB_DATA?.subscribeKv) return;
+    _kvRealtimeOn = true;
+    try {
+      window.SB_DATA.subscribeKv(({ key, value }) => {
+        if (!KV_KEYS.has(key)) return;            /* chỉ nhận key app quan tâm */
+        if (value == null) return;
+        const nextJson = JSON.stringify(value);
+        if (nextJson === JSON.stringify(_data[key])) return;  /* không đổi → bỏ (né echo của chính mình) */
+        _data[key] = value;
+        try { localStorage.setItem(PREFIX + key, nextJson); } catch (e) {}
+        (_subs[key] || []).forEach(fn => { try { fn(value); } catch (e) {} });
+        console.log(`[STORE] 🔴 Realtime kv: ${key} cập nhật từ máy khác`);
+      });
+      console.log('[STORE] 🔴 Realtime ON: kv_store');
+    } catch (e) {
+      _kvRealtimeOn = false;
+      console.warn('[STORE realtime kv]', e.message);
     }
   }
 
@@ -486,17 +512,26 @@
         }
       });
 
-      /* Items bị xoá: có ở oldMap nhưng không ở newMap */
-      oldArr.forEach(item => {
+      /* ⛔ KHÔNG xoá-the-thiếu (delete-by-omission) nữa.
+         Lý do AN TOÀN DỮ LIỆU đa người dùng: nếu mảng `value` mà caller truyền vào
+         bị CŨ (thiếu record vừa được NV khác thêm qua realtime), thì việc "có trong
+         baseline nhưng không có trong value" sẽ bị hiểu nhầm là XOÁ → mất đơn/KH của
+         người khác, reload là biến mất. Mọi thao tác xoá THẬT đều đi qua STORE.remove()
+         (gọi SB_DATA.remove trực tiếp), nên set() chỉ cần insert + update.
+         → set() giờ KHÔNG BAO GIỜ tự xoá record. */
+      const omitted = oldArr.filter(item => {
         const id = keyOf(item);
-        if (id != null && !newMap.has(id)) {
-          window.SB_DATA.remove(table, id, idCol)
-            .catch(e => console.warn(`[STORE set→remove ${key}]`, e));
-        }
+        return id != null && !newMap.has(id);
       });
-      /* Cập nhật baseline = trạng thái vừa đẩy lên cloud */
-      _synced[key] = JSON.stringify(value);
-      _persistSyncedIds(key, value);
+      if (omitted.length) {
+        console.warn(`[STORE set ${key}] BỎ QUA ${omitted.length} record vắng mặt (không auto-xoá — dùng STORE.remove nếu muốn xoá thật):`,
+          omitted.map(keyOf));
+      }
+      /* Baseline = HỢP của value (vừa đẩy) + record bị bỏ qua (vẫn còn trên cloud) →
+         lần set() sau không hiểu nhầm các record đó là "mới" rồi push lặp. */
+      const baseline = omitted.length ? value.concat(omitted) : value;
+      _synced[key] = JSON.stringify(baseline);
+      _persistSyncedIds(key, baseline);
     },
 
     /* Thêm item vào mảng */
