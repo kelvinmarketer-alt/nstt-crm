@@ -285,18 +285,70 @@
     if (_realtimeSubs.has(key) || !window.SB_DATA?.subscribe) return;
     _realtimeSubs.add(key);
     try {
-      window.SB_DATA.subscribe(table, () => {
-        /* Debounce 120ms — gộp change liên tiếp thành 1 pull, vẫn cảm giác tức thì (<1s) */
+      window.SB_DATA.subscribe(table, (evt) => {
+        /* TỐI ƯU BĂNG THÔNG: INSERT/UPDATE có sẵn bản ghi đầy đủ trong evt.new
+           → áp delta 1 record, KHÔNG kéo lại cả bảng. Chỉ DELETE / trường hợp lạ
+           mới full-merge (hiếm + cần baseline id-set để biết record nào bị xoá). */
+        try {
+          if (evt && evt.new && _preloaded.has(key) &&
+              (evt.type === 'INSERT' || evt.type === 'UPDATE')) {
+            if (_applyRealtimeUpsert(key, evt.new)) return;
+          }
+        } catch (e) { console.warn(`[STORE rt delta ${key}]`, e); }
+        /* Debounce 150ms — gộp change liên tiếp thành 1 pull, vẫn cảm giác tức thì (<1s) */
         clearTimeout(_rtTimers[key]);
         _rtTimers[key] = setTimeout(() => {
           _mergeTableFromCloud(key, table).catch(() => {});
-        }, 120);
+        }, 150);
       });
       console.log(`[STORE] 🔴 Realtime ON: ${key}`);
     } catch (e) {
       console.warn(`[STORE realtime ${key}]`, e.message);
       _realtimeSubs.delete(key);
     }
+  }
+
+  /* === REALTIME DELTA: áp 1 record (INSERT/UPDATE) từ máy khác mà KHÔNG kéo cả bảng ===
+     Trả về true nếu áp thành công; false → caller tự full-merge dự phòng.
+     An toàn dữ liệu:
+       • GIỮ flag '_' (cờ chống-lặp per-device) của bản ghi local hiện có.
+       • Baseline (_synced) chỉ cập nhật ĐÚNG record này — KHÔNG nuốt record
+         local-only chưa kịp đẩy lên cloud (tránh bug mất dữ liệu sau refresh). */
+  function _applyRealtimeUpsert(key, row) {
+    const idCol = ID_COLUMN[key] || 'id';
+    const keyOf = (it) => it && (it[idCol] != null ? it[idCol]
+                       : (it.id != null ? it.id : (it.code != null ? it.code : it.no)));
+    const rid = keyOf(row);
+    if (rid == null) return false;   /* không khớp được id → full-merge */
+
+    const arr = Array.isArray(_data[key]) ? _data[key].slice() : (_load(key, []) || []);
+    const idx = arr.findIndex(it => keyOf(it) === rid);
+    let merged;
+    if (idx >= 0) {
+      const lr = arr[idx];
+      const flags = {};
+      for (const k of Object.keys(lr)) if (k.charAt(0) === '_') flags[k] = lr[k];
+      merged = Object.assign({}, row, flags);
+      arr[idx] = merged;
+    } else {
+      merged = row;
+      arr.push(merged);
+    }
+    _data[key] = arr;
+    try { localStorage.setItem(PREFIX + key, JSON.stringify(arr)); } catch (e) {}
+
+    /* Cập nhật baseline CHỈ cho record này (không stringify cả _data → né nuốt local-only) */
+    let baseArr = [];
+    try { if (_synced[key] != null) baseArr = JSON.parse(_synced[key]); } catch (e) { baseArr = []; }
+    if (Array.isArray(baseArr)) {
+      const bidx = baseArr.findIndex(it => keyOf(it) === rid);
+      if (bidx >= 0) baseArr[bidx] = merged; else baseArr.push(merged);
+      _synced[key] = JSON.stringify(baseArr);
+      _persistSyncedIds(key, baseArr);
+    }
+
+    (_subs[key] || []).forEach(fn => { try { fn(arr); } catch (e) {} });
+    return true;
   }
 
   /* === MERGE + SELF-HEAL: pull cloud + đẩy record local-only (sync fail trước đó) ===

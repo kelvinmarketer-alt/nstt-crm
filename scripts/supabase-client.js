@@ -383,11 +383,26 @@
       return true;
     },
 
-    /* Subscribe realtime changes */
+    /* Subscribe realtime changes.
+       Truyền về 1 event ĐÃ CHUẨN HOÁ + ĐÃ map sang field app:
+         { type:'INSERT'|'UPDATE'|'DELETE', new:{...}|null, old:{...}|null }
+       Nhờ có `new` (bản ghi đầy đủ với INSERT/UPDATE) → STORE áp delta 1 record,
+       KHÔNG phải kéo lại TOÀN BỘ bảng (tiết kiệm ~90% băng thông egress). */
     subscribe(table, callback) {
+      const hasCols = (o) => o && typeof o === 'object' && Object.keys(o).length > 0;
       return client.channel('realtime-' + table)
         .on('postgres_changes', { event: '*', schema: 'public', table }, payload => {
-          callback(payload);
+          let evt;
+          try {
+            evt = {
+              type: payload.eventType,
+              new: hasCols(payload.new) ? mapFrom(table, payload.new) : null,
+              old: hasCols(payload.old) ? mapFrom(table, payload.old) : null,
+            };
+          } catch (e) {
+            evt = { type: payload.eventType || null, new: null, old: null };
+          }
+          callback(evt);
         }).subscribe();
     },
 
