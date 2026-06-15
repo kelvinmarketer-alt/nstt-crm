@@ -496,19 +496,32 @@
       const oldMap = new Map(oldArr.map(x => [keyOf(x), x]));
       const newMap = new Map(value.map(x => [keyOf(x), x]));
 
+      /* === CỘT ĐƯỢC BẢO VỆ khỏi lưu-cả-mảng (set) ===
+         products.img CHỈ được sửa qua trình sửa SP / chọn ảnh (STORE.update {img}).
+         Các thao tác lưu CẢ MẢNG products (đổi markup giá, nhận hàng cập nhật giá nhập…)
+         KHÔNG được phép ghi đè img — nếu máy đó có img CŨ/lệch thì sẽ làm "ảnh nhảy lung
+         tung" sang SP khác. Nên set() bỏ qua img: không so sánh, không gửi lên. */
+      const PROTECTED = { products: ['img'] };
+      const prot = PROTECTED[key];
+      const _strip = prot ? (o) => { const c = { ...o }; prot.forEach(f => delete c[f]); return c; } : null;
+
       /* Items mới hoặc thay đổi */
       value.forEach(item => {
         const id = keyOf(item);
         if (id == null) return;
         const old = oldMap.get(id);
         if (!old) {
-          /* New item → insert */
+          /* New item → insert (giữ nguyên cả img cho SP mới) */
           window.SB_DATA.insert(table, item)
             .catch(e => console.warn(`[STORE set→insert ${key}]`, e));
-        } else if (JSON.stringify(old) !== JSON.stringify(item)) {
-          /* Changed → update */
-          window.SB_DATA.update(table, id, item, idCol)
-            .catch(e => console.warn(`[STORE set→update ${key}]`, e));
+        } else {
+          const oC = _strip ? _strip(old) : old;
+          const iC = _strip ? _strip(item) : item;
+          if (JSON.stringify(oC) !== JSON.stringify(iC)) {
+            /* Changed → update; với bảng có cột bảo vệ thì KHÔNG gửi cột đó lên cloud */
+            window.SB_DATA.update(table, id, _strip ? iC : item, idCol)
+              .catch(e => console.warn(`[STORE set→update ${key}]`, e));
+          }
         }
       });
 
