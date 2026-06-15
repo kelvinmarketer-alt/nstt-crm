@@ -869,6 +869,45 @@ window.SERVICE_TYPES = [
   { id: 'khac',          label: 'Khác',          icon: '📦', color: '#6B7280' },
 ];
 
+/* === ĐỒNG BỘ DANH MỤC từ cloud (md_product_categories) ===========================
+   Danh mục được quản lý ở "Quản lý danh mục" → lưu master_data (cloud), DÙNG CHUNG
+   với website. Trước đây app KHÔNG đọc lại danh sách này → luôn revert về danh mục
+   cứng trong data/products.js (mất "Thuỷ Hải sản", "Trứng"… → hiện raw id "tom").
+   Nay: nạp danh mục cloud → ghi đè TẠI CHỖ vào PRODUCT_CATEGORIES + SERVICE_TYPES
+   (giữ nguyên reference để mọi module thấy). */
+window.applyCloudCategories = function (arr) {
+  if (!Array.isArray(arr) || !arr.length) return false;
+  ['SERVICE_TYPES', 'PRODUCT_CATEGORIES'].forEach(function (name) {
+    var a = window[name];
+    if (Array.isArray(a)) { a.length = 0; arr.forEach(function (c) { a.push(c); }); }
+    else window[name] = arr.slice();
+  });
+  return true;
+};
+/* Đồng bộ NGAY từ cache localStorage (trước khi orders/customers chụp snapshot SERVICE_TYPES) */
+try {
+  var _ccRaw = localStorage.getItem('vty_md_product_categories');
+  if (_ccRaw) { var _ccArr = JSON.parse(_ccRaw); if (Array.isArray(_ccArr) && _ccArr.length) { var ST = window.SERVICE_TYPES; ST.length = 0; _ccArr.forEach(function (c) { ST.push(c); }); } }
+} catch (e) {}
+/* Sau khi mọi script load: kéo bản cloud mới nhất + re-render khi về (lần đầu chưa có cache) */
+(function () {
+  function refresh() {
+    try { if (typeof window.rebuildOrderSvc === 'function') window.rebuildOrderSvc(); } catch (e) {}
+    ['renderCatalogGrid', 'renderBoard', 'renderOrders', 'renderCustomers'].forEach(function (fn) {
+      try { if (typeof window[fn] === 'function') window[fn](); } catch (e) {}
+    });
+  }
+  function start() {
+    if (!window.STORE) { setTimeout(start, 200); return; }
+    var cached = null;
+    try { cached = window.STORE.get('md_product_categories', null); } catch (e) {}
+    if (window.applyCloudCategories(cached)) refresh();
+    try { window.STORE.subscribe('md_product_categories', function (a) { if (window.applyCloudCategories(a)) refresh(); }); } catch (e) {}
+  }
+  if (document.readyState !== 'loading') start();
+  else document.addEventListener('DOMContentLoaded', start);
+})();
+
 /* Hình thức giao (thay phương thức vận chuyển logistics) */
 window.TRANSPORT_MODES = [
   { id: 'giao-ngay',  label: 'Giao trong ngày', icon: '🛵' },

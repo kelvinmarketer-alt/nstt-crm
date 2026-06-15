@@ -2,7 +2,9 @@
    Nông Sản Tuấn Tú Hà Nội — Trang Đơn hàng (Full CRUD)
    ========================================================= */
 (function () {
-  const SVC = Object.fromEntries((window.SERVICE_TYPES || []).map(s => [s.id, s]));
+  let SVC = Object.fromEntries((window.SERVICE_TYPES || []).map(s => [s.id, s]));
+  /* Cho phép dựng lại map nhóm hàng khi danh mục cloud nạp về (tránh hiện raw id "tom") */
+  window.rebuildOrderSvc = function () { SVC = Object.fromEntries((window.SERVICE_TYPES || []).map(s => [s.id, s])); };
   /* 1 đơn có thể có NHIỀU nhóm hàng — serviceType lưu chuỗi ghép "id1,id2" */
   const svcIdsOf = o => String((o && o.serviceType) || '').split(',').map(s => s.trim()).filter(Boolean);
 
