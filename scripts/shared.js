@@ -430,32 +430,69 @@ window.vatEligible = function (c) {
 /* ============ Ô TÌM SẢN PHẨM (gõ-lọc) — dùng chung ============
    Thay cho <select> 1000 SP. Gắn vào 1 <input class="prodpick">: gõ → lọc →
    click chọn → lưu productId vào input.dataset.pid. Đọc kết quả bằng el.dataset.pid. */
+/* Chuẩn hoá để so khớp: bỏ dấu, đ→d, thường hoá. */
+window.ppNorm = function (s) {
+  return (s || '').toString().toLowerCase().normalize('NFD').replace(/[̀-ͯ]/g, '').replace(/đ/g, 'd').trim();
+};
+/* Lọc + XẾP HẠNG sản phẩm theo độ khớp (khớp đầu/đúng từ lên trước → hết "Sả" bị chìm dưới "Sấu").
+   Trả về mảng đã lọc + sắp xếp; query rỗng → trả tất cả. */
+window.rankProducts = function (prods, query) {
+  const q = window.ppNorm(query);
+  if (!q) return (prods || []).slice();
+  const qtok = q.split(/\s+/).filter(Boolean);
+  const out = [];
+  (prods || []).forEach(p => {
+    const n = window.ppNorm(p.name);
+    const id = window.ppNorm(p.id);
+    let s = 99;
+    if (n === q) s = 0;                                   // trùng khít
+    else if (n.indexOf(q) === 0) s = 1;                   // tên bắt đầu bằng query
+    else {
+      const w = n.split(/[^a-z0-9]+/).filter(Boolean);
+      if (w.indexOf(q) >= 0) s = 2;                       // trùng nguyên 1 từ
+      else if (w.some(x => x.indexOf(q) === 0)) s = 3;    // 1 từ bắt đầu bằng query
+      else if (n.indexOf(q) >= 0) s = 4;                  // chứa chuỗi
+      else if (qtok.length > 1 && qtok.every(t => n.indexOf(t) >= 0)) s = 5; // đủ các từ khoá
+      else if (id.indexOf(q) >= 0) s = 6;                 // khớp mã SP
+    }
+    if (s < 99) out.push({ p: p, s: s, n: n });
+  });
+  out.sort((a, b) => a.s - b.s || a.n.localeCompare(b.n, 'vi'));
+  return out.map(x => x.p);
+};
+
 window.wireProductSearch = function (input, opts) {
   opts = opts || {};
   if (!input || input._ppWired) return; input._ppWired = true;
   input.setAttribute('autocomplete', 'off');
-  const norm = s => (s || '').toString().toLowerCase().normalize('NFD').replace(/[̀-ͯ]/g, '').replace(/đ/g, 'd').trim();
   let dd = null;
   const close = () => { if (dd) { dd.remove(); dd = null; } };
+  /* Chỉ ĐẶT LẠI VỊ TRÍ dd (không dựng lại) → giữ nguyên vị trí cuộn bên trong khi trang scroll */
+  function position() {
+    if (!dd) return;
+    const r = input.getBoundingClientRect();
+    let top = r.bottom + 2;
+    if (top + dd.offsetHeight > window.innerHeight && r.top - dd.offsetHeight > 0) top = r.top - dd.offsetHeight - 2;
+    dd.style.left = r.left + 'px';
+    dd.style.top = top + 'px';
+    dd.style.width = Math.max(r.width, 260) + 'px';
+  }
   function show() {
     const prods = window.STORE.get('products', window.PRODUCTS || []) || [];
-    const q = norm(input.value);
-    let list = q ? prods.filter(p => norm(p.name + ' ' + p.id).includes(q)) : prods.slice();
-    list = list.slice(0, 16);
+    const q = (input.value || '').trim();
+    let list = q ? window.rankProducts(prods, q) : prods.slice();
+    list = list.slice(0, 50);   /* trước 16 → SP bị cắt; nay 50 + cuộn được */
     close();
     if (!list.length) return;
     dd = document.createElement('div');
-    const r = input.getBoundingClientRect();
-    let top = r.bottom + 2;
-    const maxH = Math.min(320, list.length * 38 + 8);
-    if (top + maxH > window.innerHeight && r.top - maxH > 0) top = r.top - maxH - 2;
-    dd.style.cssText = `position:fixed;z-index:100090;left:${r.left}px;top:${top}px;width:${Math.max(r.width, 260)}px;max-height:320px;overflow:auto;background:#fff;border:1px solid var(--line);border-radius:8px;box-shadow:0 8px 24px rgba(0,0,0,.18)`;
+    dd.style.cssText = 'position:fixed;z-index:100090;max-height:340px;overflow-y:auto;background:#fff;border:1px solid var(--line);border-radius:8px;box-shadow:0 8px 24px rgba(0,0,0,.18)';
     dd.innerHTML = list.map(p => {
       let prHtml = '';
       if (opts.priceFn) { try { const pr = opts.priceFn(p.id); if (pr) prHtml = `<span style="color:#15803D;font-size:11px;font-weight:700;white-space:nowrap">${window.fmt(pr)}đ</span>`; } catch (e) {} }
       return `<div class="pps-item" data-id="${p.id}" data-name="${(p.name || '').replace(/"/g, '&quot;')}" style="padding:8px 11px;font-size:12.5px;cursor:pointer;border-bottom:1px solid #F1F5F9;display:flex;justify-content:space-between;gap:8px;align-items:center"><span>${p.name} <span style="color:#94A3B8;font-size:11px">/${p.unit || 'kg'}</span></span><span style="display:flex;gap:8px;align-items:center">${prHtml}<span style="color:#94A3B8;font-size:11px;font-family:monospace">${p.id}</span></span></div>`;
     }).join('');
     document.body.appendChild(dd);
+    position();
     dd.querySelectorAll('.pps-item').forEach(it => {
       it.onmouseover = () => { dd.querySelectorAll('.pps-item').forEach(x => x.style.background = ''); it.style.background = '#F0FDF4'; };
       it.onmousedown = (e) => {
@@ -470,7 +507,12 @@ window.wireProductSearch = function (input, opts) {
   input.addEventListener('focus', show);
   input.addEventListener('input', () => { input.dataset.pid = ''; input.style.background = ''; input.style.fontWeight = ''; show(); });
   input.addEventListener('blur', () => setTimeout(close, 170));
-  window.addEventListener('scroll', () => { if (dd) show(); }, true);
+  /* Trang cuộn → chỉ dời vị trí; KHÔNG dời/không dựng lại khi cuộn BÊN TRONG dropdown (để cuộn được) */
+  window.addEventListener('scroll', (e) => {
+    if (!dd) return;
+    if (e && e.target && e.target.nodeType === 1 && (dd === e.target || dd.contains(e.target))) return;
+    position();
+  }, true);
 };
 window.wireAllProductSearch = function (root) {
   (root || document).querySelectorAll('input.prodpick:not([data-ppwired])').forEach(el => { el.setAttribute('data-ppwired', '1'); window.wireProductSearch(el); });

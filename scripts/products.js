@@ -177,10 +177,17 @@
   const _norm = s => (s || '').toString().toLowerCase().normalize('NFD').replace(/[̀-ͯ]/g, '').replace(/đ/g, 'd');
   function applyBoardFilter(list) {
     let out = list.slice();
-    if (boardSearch) { const q = _norm(boardSearch); out = out.filter(p => _norm(p.name).includes(q)); }
+    const searching = !!boardSearch;
+    /* Khi đang tìm: lọc + XẾP HẠNG theo độ khớp (khớp đầu/đúng từ lên trước) — giữ thứ hạng, không sort lại theo tên */
+    if (searching) {
+      out = window.rankProducts ? window.rankProducts(out, boardSearch)
+                                : out.filter(p => _norm(p.name).includes(_norm(boardSearch)));
+    }
     if (boardCat) out = out.filter(p => p.cat === boardCat);
-    if (boardSort.col === 'name') out.sort((a, b) => (a.name || '').localeCompare(b.name || '', 'vi') * boardSort.dir);
-    else if (boardSort.col === 'cat') out.sort((a, b) => (catMeta(a.cat).label || '').localeCompare(catMeta(b.cat).label || '', 'vi') * boardSort.dir || (a.name || '').localeCompare(b.name || '', 'vi'));
+    if (!searching) {
+      if (boardSort.col === 'name') out.sort((a, b) => (a.name || '').localeCompare(b.name || '', 'vi') * boardSort.dir);
+      else if (boardSort.col === 'cat') out.sort((a, b) => (catMeta(a.cat).label || '').localeCompare(catMeta(b.cat).label || '', 'vi') * boardSort.dir || (a.name || '').localeCompare(b.name || '', 'vi'));
+    }
     return out;
   }
   const _sortArrow = col => boardSort.col === col ? (boardSort.dir > 0 ? ' ▲' : ' ▼') : ' ⇅';
@@ -730,12 +737,18 @@
     const catOrder = {};
     CATS.forEach((c, i) => catOrder[c.id] = i);
     const q = _catNorm(catQuery);
-    const list = ps.filter(p => q ? (_catNorm(p.name).includes(q) || _catNorm(p.id).includes(q)) : (!currentCat || p.cat === currentCat))
-      .sort((a, b) => {
-        const ca = catOrder[a.cat] ?? 999, cb = catOrder[b.cat] ?? 999;
-        if (ca !== cb) return ca - cb;
-        return (a.name || '').localeCompare(b.name || '', 'vi');
-      });
+    let list;
+    if (catQuery && window.rankProducts) {
+      /* Đang tìm → xếp theo độ khớp (khớp đầu/đúng từ lên trước) */
+      list = window.rankProducts(ps, catQuery);
+    } else {
+      list = ps.filter(p => q ? (_catNorm(p.name).includes(q) || _catNorm(p.id).includes(q)) : (!currentCat || p.cat === currentCat))
+        .sort((a, b) => {
+          const ca = catOrder[a.cat] ?? 999, cb = catOrder[b.cat] ?? 999;
+          if (ca !== cb) return ca - cb;
+          return (a.name || '').localeCompare(b.name || '', 'vi');
+        });
+    }
     window._catLastCount = list.length;
     const rows = list.map(p => {
       const cat = catMeta(p.cat);
