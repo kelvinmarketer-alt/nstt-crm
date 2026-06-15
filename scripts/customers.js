@@ -27,6 +27,20 @@
   }
   window._custTypeMeta = typeMeta;
 
+  /* Render Zalo/FB thành link an toàn: nhận SĐT / handle / URL → thẻ <a>. Escape nhãn chống XSS. */
+  function _socialLink(kind, val) {
+    val = (val || '').toString().trim();
+    if (!val) return '<span class="empty">(chưa có)</span>';
+    let href = val;
+    if (!/^https?:\/\//i.test(val)) {
+      if (kind === 'zalo') href = 'https://zalo.me/' + val.replace(/\s/g, '');
+      else href = 'https://facebook.com/' + val.replace(/^@/, '').replace(/\s/g, '');
+    }
+    const esc = s => String(s).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
+    const label = val.length > 30 ? val.slice(0, 28) + '…' : val;
+    return `<a href="${esc(href)}" target="_blank" rel="noopener" style="color:#339B21;text-decoration:none">${esc(label)} ↗</a>`;
+  }
+
   /* Decorate: thêm field thiếu / chuẩn hoá schema cho mock data */
   function decorate(c) {
     return {
@@ -301,11 +315,17 @@
         if (!c) return;
         const phone = (c.phone || '').replace(/\s/g,'');
         switch (btn.dataset.act) {
-          case 'zalo':
-            window.open('https://zalo.me/' + phone, '_blank');
-            window.toast('Mở Zalo: ' + c.phone, 'info');
+          case 'zalo': {
+            /* Ưu tiên link/SĐT Zalo đã lưu; nếu trống thì dùng SĐT chính */
+            const z = (c.zalo || '').trim();
+            const url = /^https?:\/\//i.test(z) ? z : ('https://zalo.me/' + (z || phone).replace(/\s/g, ''));
+            if (!z && !phone) { window.toast('KH chưa có Zalo/SĐT', 'warn'); break; }
+            window.open(url, '_blank');
+            window.toast('Mở Zalo: ' + (z || c.phone), 'info');
             break;
+          }
           case 'call':
+            if (!phone) { window.toast('KH chưa có SĐT', 'warn'); break; }
             window.location.href = 'tel:' + phone;
             window.toast('Đang gọi ' + c.phone, 'info');
             break;
@@ -386,8 +406,10 @@
 
     document.getElementById('iCode').textContent    = c.code;
     document.getElementById('iContact').textContent = c.contact;
-    document.getElementById('iPhone').textContent   = c.phone;
+    document.getElementById('iPhone').innerHTML     = c.phone || '<span class="empty">(chưa có)</span>';
     document.getElementById('iEmail').innerHTML     = c.email || '<span class="empty">(chưa có)</span>';
+    { const zEl = document.getElementById('iZalo'); if (zEl) zEl.innerHTML = _socialLink('zalo', c.zalo); }
+    { const fEl = document.getElementById('iFb');   if (fEl) fEl.innerHTML = _socialLink('fb', c.fb); }
     document.getElementById('iAddr').textContent    = c.address;
     document.getElementById('iType').textContent    = typeLab;
     document.getElementById('iGroup').textContent   = c.group;
@@ -560,8 +582,12 @@
           <select id="addGroup">${window.MD.options('custGroups', 'Mới')}</select></div>
       </div>
       <div class="form-row">
-        <div><label>SĐT chính *</label><input id="addPhone" placeholder="0912 xxx xxx"></div>
+        <div><label>SĐT <span style="color:var(--muted);font-weight:400;font-size:11px">(không bắt buộc)</span></label><input id="addPhone" placeholder="0912 xxx xxx"></div>
         <div><label>Email</label><input id="addEmail" type="email"></div>
+      </div>
+      <div class="form-row">
+        <div><label>Zalo <span style="color:var(--muted);font-weight:400;font-size:11px">(SĐT hoặc link)</span></label><input id="addZalo" placeholder="0912… hoặc https://zalo.me/..."></div>
+        <div><label>Facebook <span style="color:var(--muted);font-weight:400;font-size:11px">(link)</span></label><input id="addFb" placeholder="https://facebook.com/..."></div>
       </div>
       <div class="form-row wide"><label>Địa chỉ</label><input id="addAddress" placeholder="Số nhà, đường, phường, quận, tỉnh"></div>
       <div class="form-row">
@@ -610,7 +636,6 @@
     const name = window.formVal('#addName');
     const phone = window.formVal('#addPhone');
     if (!name) { window.toast('Tên KH là bắt buộc', 'warn'); return; }
-    if (!phone) { window.toast('SĐT là bắt buộc', 'warn'); return; }
 
     const code = window.formVal('#addCode');
     const newCust = decorate({
@@ -620,6 +645,7 @@
       priceTier: window.formVal('#addPriceTier'),
       name, contact: name,
       phone, email: window.formVal('#addEmail'),
+      zalo: window.formVal('#addZalo'), fb: window.formVal('#addFb'),
       address: window.formVal('#addAddress'),
       province: window.formVal('#addProvince'),
       orderFreq: window.formVal('#addFreq'),
@@ -666,6 +692,10 @@
         <div><label>SĐT</label><input id="ePhone" value="${c.phone}"></div>
       </div>
       <div class="form-row">
+        <div><label>Zalo <span style="color:var(--muted);font-weight:400;font-size:11px">(SĐT hoặc link)</span></label><input id="eZalo" value="${(c.zalo||'').replace(/"/g,'&quot;')}" placeholder="0912… hoặc https://zalo.me/..."></div>
+        <div><label>Facebook <span style="color:var(--muted);font-weight:400;font-size:11px">(link)</span></label><input id="eFb" value="${(c.fb||'').replace(/"/g,'&quot;')}" placeholder="https://facebook.com/..."></div>
+      </div>
+      <div class="form-row">
         <div><label>Email</label><input id="eEmail" value="${c.email||''}"></div>
         <div><label>NV phụ trách</label>
           <select id="eStaff">${
@@ -696,6 +726,8 @@
       contact: window.formVal('#eName'),
       phone: window.formVal('#ePhone'),
       email: window.formVal('#eEmail'),
+      zalo: window.formVal('#eZalo'),
+      fb: window.formVal('#eFb'),
       staffOwner: window.formVal('#eStaff'),
       address: window.formVal('#eAddress'),
     };
