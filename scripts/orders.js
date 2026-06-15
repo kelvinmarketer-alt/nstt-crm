@@ -16,6 +16,23 @@
     const keys = Object.keys(by).sort((a, b) => a === 'kg' ? -1 : b === 'kg' ? 1 : a.localeCompare(b, 'vi'));
     return keys.map(u => `${fmtNum2(by[u])} ${u}`).join(' · ');
   }
+  /* Tổng TRỌNG LƯỢNG thật (chỉ cộng các mặt hàng tính theo kg/g) → KHÔNG gộp gói/hộp/quả vào.
+     Trả null nếu đơn không có mặt hàng kg nào (để caller fallback về o.weight cũ). */
+  function kgTotalOf(items) {
+    let kg = 0, has = false;
+    (items || []).forEach(x => {
+      const u = unitNorm(x.unit);
+      if (u === 'kg')              { kg += (+x.qty || 0);          has = true; }
+      else if (u === 'g' || u === 'gram') { kg += (+x.qty || 0) * 0.001; has = true; }
+    });
+    return has ? kg : null;
+  }
+  /* Tách riêng các đơn vị KHÁC kg → "0.5 gói · 4 hộp" (để hiện cạnh số kg, không lặp kg). */
+  function nonKgBreakdownOf(items) {
+    const by = {};
+    (items || []).forEach(x => { const u = unitNorm(x.unit); if (u !== 'kg' && u !== 'g' && u !== 'gram') by[u] = (by[u] || 0) + (+x.qty || 0); });
+    return Object.keys(by).sort((a, b) => a.localeCompare(b, 'vi')).map(u => `${fmtNum2(by[u])} ${u}`).join(' · ');
+  }
 
   /* ===== Ô tiền: hiển thị có dấu chấm (1.531.250), đọc về số nguyên ===== */
   const _moneyVal = (sel) => parseInt(String((window.formVal && window.formVal(sel)) || '').replace(/\D/g, ''), 10) || 0;
@@ -153,11 +170,11 @@
             <div style="font-size:11.5px;color:var(--muted)">${o.cust || ''} · <span data-field="staff" title="Click để đổi NV phụ trách">${o.staff || ''}</span></div>
           </td>
           <td class="hide-md" data-field="drop" title="Click để sửa địa chỉ giao" style="font-size:12px">${dropStr}</td>
-          <td class="hide-md" style="font-size:12px" title="Tổng sản lượng các mặt hàng trong đơn">${(() => {
+          <td class="hide-md" style="font-size:12px" title="Tổng sản lượng — tách theo từng đơn vị (kg, gói, hộp… đếm RIÊNG, không cộng gộp)">${(() => {
               const its = Array.isArray(o.items) ? o.items : [];
-              const sumKg = its.reduce((s, it) => s + (+it.qty || 0), 0);
               const nSku = its.length;
-              if (sumKg > 0) return `<b>${sumKg.toFixed(2).replace(/\.?0+$/, '')} kg</b>${nSku ? ` <span style="color:var(--muted)">· ${nSku} mã</span>` : ''}`;
+              const bd = unitBreakdownOf(its);   /* "38.5 kg · 0.5 gói · 4 hộp" — KHÔNG cộng khác đơn vị thành kg */
+              if (bd) return `<b>${bd}</b>${nSku ? ` <span style="color:var(--muted)">· ${nSku} mã</span>` : ''}`;
               return o.weight ? `${o.weight} kg` : `${o.qty || 0} ${unitStr}`;
             })()}</td>
           <td class="num" data-field="freight" title="Click để sửa tiền hàng">${window.fmt(o.freight || 0)}</td>
@@ -590,9 +607,12 @@
     document.getElementById('dFreight').textContent = window.fmtShort(o.freight) + ' ₫';
     document.getElementById('dPay').textContent = o.payBy;
     document.getElementById('dCod').textContent = o.cod ? window.fmtShort(o.cod) + ' ₫' : '—';
-    document.getElementById('dWeight').textContent = o.weight ? o.weight + ' kg' : '—';
-    /* Ô nhỏ dưới khối lượng: tách theo từng đơn vị thay vì "1 kg" vô nghĩa */
-    document.getElementById('dUnit').textContent = unitBreakdownOf(o.items || []) || (o.qty + ' ' + (o.unit || 'kg').toLowerCase());
+    /* KHỐI LƯỢNG = tổng kg THẬT từ các mặt hàng (không tin o.weight cũ vì có thể lệch khi sửa items).
+       Số nhỏ bên dưới = các đơn vị KHÁC kg (gói/hộp/quả…) để không trùng số kg. */
+    const _kg = kgTotalOf(o.items || []);
+    document.getElementById('dWeight').textContent = _kg != null ? fmtNum2(_kg) + ' kg' : (o.weight ? o.weight + ' kg' : '—');
+    const _nonKg = nonKgBreakdownOf(o.items || []);
+    document.getElementById('dUnit').textContent = _nonKg || (_kg == null ? (o.qty + ' ' + (o.unit || 'kg').toLowerCase()) : '—');
     document.getElementById('dService').textContent = svcList.map(s => s.label).join(', ') || '—';
     document.getElementById('dMode').textContent = tm ? tm.label : '—';
 
@@ -600,7 +620,7 @@
     document.getElementById('iCust').textContent  = o.custName + ' (' + o.cust + ')';
     document.getElementById('iStaff').textContent = o.staff;
     document.getElementById('iDate').textContent  = o.date;
-    document.getElementById('iGoods').textContent = `${o.qty} ${o.unit.toLowerCase()} · ${o.goods}` + (o.weight ? ' · ' + o.weight + ' kg' : '');
+    document.getElementById('iGoods').textContent = `${o.qty} ${o.unit.toLowerCase()} · ${o.goods}` + (_kg != null ? ' · ' + fmtNum2(_kg) + ' kg' : (o.weight ? ' · ' + o.weight + ' kg' : ''));
     const shipEl = document.getElementById('iShip');
     if (shipEl) {
       const parts = [];
