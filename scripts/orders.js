@@ -167,9 +167,9 @@
                 <span class="tag" style="background:${src.color}1a;color:${src.color};font-weight:600;font-size:10.5px">${src.icon} ${src.label}</span>
               </div></td>
           <td class="hide-sm" data-field="date" title="Click để sửa ngày đặt" style="font-size:12px;color:var(--muted)">${o.date || '—'}</td>
-          <td>
-            <div style="font-weight:600" data-field="custName" title="Click để sửa tên KH">${o.custName || '—'}</div>
-            <div style="font-size:11.5px;color:var(--muted)">${o.cust || ''} · <span data-field="staff" title="Click để đổi NV phụ trách">${o.staff || ''}</span></div>
+          <td class="cust-col">
+            <div class="name-clamp" data-field="custName" title="Click để sửa tên KH">${o.custName || '—'}</div>
+            <div style="font-size:11.5px;color:var(--muted);white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${o.cust || ''} · <span data-field="staff" title="Click để đổi NV phụ trách">${o.staff || ''}</span></div>
           </td>
           <td class="hide-md" data-field="drop" title="Click để sửa địa chỉ giao" style="font-size:12px">${dropStr}</td>
           <td class="hide-md" style="font-size:12px" title="Tổng sản lượng — tách theo từng đơn vị (kg, gói, hộp… đếm RIÊNG, không cộng gộp)">${(() => {

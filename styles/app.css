@@ -242,16 +242,23 @@ tbody tr:hover{background:#FAFAFB}
 tbody tr.selected{background:var(--navy-soft)}
 tbody td.num{text-align:right; font-variant-numeric:tabular-nums; font-feature-settings:"tnum"}
 
-.cust-cell{display:flex; align-items:center; gap:10px}
+.cust-cell{display:flex; align-items:center; gap:10px; min-width:0}
 .cust-ava{
   width:34px; height:34px; border-radius:7px;
   display:grid; place-items:center;
   color:#fff; font-weight:700; font-size:12px;
   flex-shrink:0;
 }
-.cust-info{line-height:1.25}
-.cust-info .n1{font-weight:600; color:var(--text)}
-.cust-info .n2{font-size:11.5px; color:var(--muted)}
+.cust-info{line-height:1.25; min-width:0; flex:1}
+/* Tên gọn tối đa 2 dòng + … (hết xuống 3-4 dòng làm rối bảng) */
+.cust-info .n1, .name-clamp{
+  font-weight:600; color:var(--text);
+  display:-webkit-box; -webkit-line-clamp:2; -webkit-box-orient:vertical;
+  overflow:hidden; word-break:break-word; line-height:1.25;
+}
+.cust-info .n2{font-size:11.5px; color:var(--muted); white-space:nowrap; overflow:hidden; text-overflow:ellipsis}
+/* Cột tên (KH + đơn) đủ rộng để tên nằm 1-2 dòng, không bị bóp hẹp */
+td[data-field="name"], td.cust-col{min-width:190px; max-width:250px}
 
 /* ===== Tags ===== */
 .tag{
