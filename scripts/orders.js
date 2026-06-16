@@ -1133,6 +1133,18 @@
      - Khớp chắc chắn (từ điển KH / matcher chặt) → thêm SP trong DM.
      - Không khớp → thêm thành "SP ngoài danh mục" (giá để trống) + CẢNH BÁO. */
   const _rvEsc = s => String(s == null ? '' : s).replace(/&/g, '&amp;').replace(/"/g, '&quot;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+  /* Danh sách đơn vị (đọc master data, fallback bộ chuẩn) cho ô chọn ĐVT trong bảng duyệt */
+  function _rvUnitList() {
+    let u = ((window.MD && window.MD.get && window.MD.get('units')) || []).map(x => (x.label || x)).filter(Boolean);
+    if (!u.length) u = ['kg', 'bó', 'mớ', 'củ', 'quả', 'bắp', 'hộp', 'túi', 'gói', 'cây', 'con', 'khay', 'chai', 'lạng'];
+    return u;
+  }
+  function _rvUnitOpts(cur) {
+    const c = String(cur || 'kg').toLowerCase();
+    let list = _rvUnitList();
+    if (cur && !list.some(u => String(u).toLowerCase() === c)) list = [cur].concat(list);
+    return list.map(u => `<option ${String(u).toLowerCase() === c ? 'selected' : ''}>${_rvEsc(u)}</option>`).join('');
+  }
 
   /* B1: đọc file → ĐOÁN sản phẩm (chưa áp vào đơn) → mở bảng DUYỆT để NV sửa trước. */
   function applyBulkItems(items, source) {
@@ -1170,7 +1182,7 @@
           <div class="rv-status" data-idx="${i}" style="font-size:10px;margin-top:2px;font-weight:700;color:${d.matched ? '#15803D' : '#B45309'}">${d.matched ? '✓ trong danh mục' : '✏️ ngoài DM — chọn lại hoặc giữ gõ tay'}</div>
         </td>
         <td><input type="number" class="rv-qty" data-idx="${i}" value="${d.qty}" min="0" step="0.1" style="width:68px;text-align:right;border:1px solid var(--line);border-radius:6px;padding:6px"></td>
-        <td class="rv-unit" data-idx="${i}" style="font-size:11px;color:var(--muted)">${_rvEsc(d.unit || 'kg')}</td>
+        <td><select class="rv-unit-sel" data-idx="${i}" title="Đơn vị bán" style="width:64px;padding:5px 4px;border:1px solid var(--line);border-radius:6px;font-size:11.5px;background:#fff">${_rvUnitOpts(d.unit || 'kg')}</select></td>
         <td><button type="button" class="icon-btn" title="Bỏ dòng" onclick="this.closest('tr').remove()">🗑</button></td>
       </tr>`).join('');
     window.openModal('🔎 Duyệt ' + draft.length + ' mặt hàng đọc từ ' + source, `
@@ -1180,7 +1192,7 @@
       </div>
       <div style="max-height:50vh;overflow:auto;border:1px solid var(--line);border-radius:8px">
         <table class="mini-table" style="width:100%;margin:0"><thead><tr>
-          <th style="width:30px">#</th><th style="width:120px">Đọc từ file</th><th>Sản phẩm (sửa được)</th><th style="width:70px" class="num">SL</th><th style="width:46px">ĐVT</th><th style="width:32px"></th>
+          <th style="width:30px">#</th><th style="width:120px">Đọc từ file</th><th>Sản phẩm (sửa được)</th><th style="width:64px" class="num">SL</th><th style="width:72px">ĐVT</th><th style="width:32px"></th>
         </tr></thead><tbody id="rvBody">${rows}</tbody></table>
       </div>
     `, {
@@ -1199,7 +1211,12 @@
             if (st) { st.textContent = '✓ trong danh mục'; st.style.color = '#15803D'; }
             inp.style.background = '#fff'; inp.style.borderColor = 'var(--line)';
             const pp = window.productById(pk.id);
-            const uEl = scope.querySelector('.rv-unit[data-idx="' + inp.dataset.idx + '"]'); if (uEl && pp) uEl.textContent = pp.unit || 'kg';
+            const uEl = scope.querySelector('.rv-unit-sel[data-idx="' + inp.dataset.idx + '"]');
+            if (uEl && pp && pp.unit) {
+              const want = String(pp.unit).toLowerCase();
+              if (![].some.call(uEl.options, o => o.value.toLowerCase() === want)) uEl.add(new Option(pp.unit, pp.unit));
+              uEl.value = pp.unit;
+            }
           }
         });
         inp.addEventListener('input', () => {
@@ -1223,19 +1240,20 @@
       const name = (pick.value || '').trim();
       const pid = pick.dataset.pid || '';
       const qty = parseFloat((tr.querySelector('.rv-qty') || {}).value) || 0;
+      const unit = ((tr.querySelector('.rv-unit-sel') || {}).value || 'kg').trim();
       if (!name || !qty) return;
       const p = pid ? (window.productById(pid) || products.find(x => x.id === pid)) : null;
       if (p) {
         const price = priceForOrder(p.id);
         const ex = orderItems.find(x => x.id === p.id);
         if (ex) { ex.qty = Math.round((ex.qty + qty) * 100) / 100; ex.total = Math.round(ex.qty * ex.price); updated++; }
-        else { orderItems.push({ id: p.id, name: p.name, unit: p.unit, img: p.img, qty, price, basePrice: price, priceConfirmed: false, total: Math.round(qty * price) }); added++; }
+        else { orderItems.push({ id: p.id, name: p.name, unit: unit || p.unit, img: p.img, qty, price, basePrice: price, priceConfirmed: false, total: Math.round(qty * price) }); added++; }
         const raw = (tr.dataset.raw || '').trim();
         if (custId && window.CustPrefs && raw && raw.toLowerCase() !== p.name.toLowerCase()) window.CustPrefs.addAlias(custId, raw, p.id);
       } else {
         const ex = orderItems.find(x => x.custom && (x.name || '').trim().toLowerCase() === name.toLowerCase());
         if (ex) { ex.qty = Math.round((ex.qty + qty) * 100) / 100; ex.total = Math.round(ex.qty * ex.price); updated++; }
-        else { orderItems.push({ id: null, custom: true, fromAI: true, name, unit: 'kg', img: '', qty, price: 0, basePrice: 0, priceConfirmed: false, total: 0 }); off++; }
+        else { orderItems.push({ id: null, custom: true, fromAI: true, name, unit: unit || 'kg', img: '', qty, price: 0, basePrice: 0, priceConfirmed: false, total: 0 }); off++; }
       }
     });
     renderOrderItems();
