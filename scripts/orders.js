@@ -1132,55 +1132,117 @@
      Nguyên tắc: KHÔNG bỏ sót dòng nào, KHÔNG đoán bừa.
      - Khớp chắc chắn (từ điển KH / matcher chặt) → thêm SP trong DM.
      - Không khớp → thêm thành "SP ngoài danh mục" (giá để trống) + CẢNH BÁO. */
+  const _rvEsc = s => String(s == null ? '' : s).replace(/&/g, '&amp;').replace(/"/g, '&quot;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+
+  /* B1: đọc file → ĐOÁN sản phẩm (chưa áp vào đơn) → mở bảng DUYỆT để NV sửa trước. */
   function applyBulkItems(items, source) {
-    let added = 0, updated = 0, off = 0;
-    let viaAlias = 0;                                       /* match nhờ từ điển KH */
-    const offNames = [];                                   /* SP mới chưa có trong DM */
     const custId = window.formVal && window.formVal('#oCust');
     const products = window.STORE.get('products', window.PRODUCTS || []);
-
-    items.forEach(it => {
-      const qty = parseFloat(it.qty) || 0;
-      if (!qty) return;
+    const draft = [];
+    (items || []).forEach(it => {
       const rawName = (it.name || '').toString().trim();
       if (!rawName) return;
+      const qty = parseFloat(it.qty) || 0;
       let p = null;
-      /* (1) Ưu tiên từ điển riêng của KH */
       if (custId && window.CustPrefs) {
         const r = window.CustPrefs.resolveItem(custId, rawName);
-        if (r) { p = products.find(x => x.id === r.productId); if (p) viaAlias++; }
+        if (r) p = products.find(x => x.id === r.productId);
       }
-      /* (2) Matcher CHẶT — chỉ nhận khi chắc chắn (tránh khớp nhầm SP khác) */
       if (!p) p = window.matchProductSmart ? window.matchProductSmart(rawName, products) : matchProductByName(rawName);
+      draft.push({ raw: rawName, qty: qty || 1, pid: p ? p.id : '', name: p ? p.name : rawName, unit: p ? (p.unit || 'kg') : (it.unit || 'kg'), matched: !!p });
+    });
+    if (!draft.length) { window.toast('Không đọc được mặt hàng nào từ ' + source, 'warn'); return; }
+    showItemReview(draft, source, custId || '');
+  }
 
+  /* B2: bảng DUYỆT — mỗi dòng sửa được (chọn lại SP / gõ tay nếu ngoài DM), đổi SL, bỏ dòng. */
+  function showItemReview(draft, source, custId) {
+    const matchedN = draft.filter(d => d.matched).length;
+    const offN = draft.length - matchedN;
+    const rows = draft.map((d, i) => `
+      <tr data-raw="${_rvEsc(d.raw)}">
+        <td class="num" style="color:var(--muted)">${i + 1}</td>
+        <td style="font-size:11.5px;color:#92400E">"${_rvEsc(d.raw)}"</td>
+        <td>
+          <input class="prodpick rv-pick" data-idx="${i}" value="${_rvEsc(d.name)}" data-pid="${d.pid}"
+                 placeholder="Gõ tìm SP trong DM… (hoặc gõ tay nếu ngoài DM)"
+                 style="width:100%;min-width:170px;border:1px solid ${d.matched ? 'var(--line)' : '#FCD34D'};border-radius:6px;padding:6px 9px;font-size:12.5px;background:${d.matched ? '#fff' : '#FEF9C3'}">
+          <div class="rv-status" data-idx="${i}" style="font-size:10px;margin-top:2px;font-weight:700;color:${d.matched ? '#15803D' : '#B45309'}">${d.matched ? '✓ trong danh mục' : '✏️ ngoài DM — chọn lại hoặc giữ gõ tay'}</div>
+        </td>
+        <td><input type="number" class="rv-qty" data-idx="${i}" value="${d.qty}" min="0" step="0.1" style="width:68px;text-align:right;border:1px solid var(--line);border-radius:6px;padding:6px"></td>
+        <td class="rv-unit" data-idx="${i}" style="font-size:11px;color:var(--muted)">${_rvEsc(d.unit || 'kg')}</td>
+        <td><button type="button" class="icon-btn" title="Bỏ dòng" onclick="this.closest('tr').remove()">🗑</button></td>
+      </tr>`).join('');
+    window.openModal('🔎 Duyệt ' + draft.length + ' mặt hàng đọc từ ' + source, `
+      <div style="background:#EFF6FF;color:#1E40AF;padding:10px 12px;border-radius:8px;font-size:12px;margin-bottom:10px;line-height:1.55">
+        Kiểm tra & sửa từng dòng <b>trước khi vào đơn</b>. <b style="color:#15803D">${matchedN}</b> khớp danh mục · <b style="color:#B45309">${offN}</b> chưa khớp.<br>
+        • Nhận sai → gõ tìm & <b>chọn lại</b> SP đúng từ gợi ý. • SP <b>ngoài danh mục</b> → cứ gõ tên tay rồi để vậy (sẽ thêm dạng "SP ngoài DM", giá nhập sau). • Thừa → bấm 🗑.
+      </div>
+      <div style="max-height:50vh;overflow:auto;border:1px solid var(--line);border-radius:8px">
+        <table class="mini-table" style="width:100%;margin:0"><thead><tr>
+          <th style="width:30px">#</th><th style="width:120px">Đọc từ file</th><th>Sản phẩm (sửa được)</th><th style="width:70px" class="num">SL</th><th style="width:46px">ĐVT</th><th style="width:32px"></th>
+        </tr></thead><tbody id="rvBody">${rows}</tbody></table>
+      </div>
+    `, {
+      footer: `<button class="btn btn-ghost" onclick="window.closeModal()">Hủy</button>
+               <button class="btn btn-primary" onclick="window._commitReviewedItems('${custId || ''}', '${_rvEsc(source).replace(/'/g, '')}')">✓ Thêm vào đơn</button>`,
+      width: '740px', stack: true
+    });
+    /* Gắn ô tìm SP cho từng dòng + cập nhật nhãn trạng thái khi chọn/gõ */
+    setTimeout(() => {
+      const scope = document.querySelector('.modal-bg:last-of-type') || document;
+      scope.querySelectorAll('input.rv-pick').forEach(inp => {
+        window.wireProductSearch(inp, {
+          priceFn: priceForOrder,
+          onPick: (pk) => {
+            const st = scope.querySelector('.rv-status[data-idx="' + inp.dataset.idx + '"]');
+            if (st) { st.textContent = '✓ trong danh mục'; st.style.color = '#15803D'; }
+            inp.style.background = '#fff'; inp.style.borderColor = 'var(--line)';
+            const pp = window.productById(pk.id);
+            const uEl = scope.querySelector('.rv-unit[data-idx="' + inp.dataset.idx + '"]'); if (uEl && pp) uEl.textContent = pp.unit || 'kg';
+          }
+        });
+        inp.addEventListener('input', () => {
+          if (!inp.dataset.pid) {
+            const st = scope.querySelector('.rv-status[data-idx="' + inp.dataset.idx + '"]');
+            if (st) { st.textContent = '✏️ ngoài DM — gõ tay'; st.style.color = '#B45309'; }
+            inp.style.background = '#FEF9C3'; inp.style.borderColor = '#FCD34D';
+          }
+        });
+      });
+    }, 60);
+  }
+
+  /* B3: chốt — đọc các dòng đã duyệt → áp vào đơn (gộp trùng, học từ điển KH). */
+  window._commitReviewedItems = function (custId, source) {
+    const products = window.STORE.get('products', window.PRODUCTS || []);
+    const scope = document.querySelector('.modal-bg:last-of-type') || document;
+    let added = 0, updated = 0, off = 0;
+    scope.querySelectorAll('#rvBody tr').forEach(tr => {
+      const pick = tr.querySelector('.rv-pick'); if (!pick) return;
+      const name = (pick.value || '').trim();
+      const pid = pick.dataset.pid || '';
+      const qty = parseFloat((tr.querySelector('.rv-qty') || {}).value) || 0;
+      if (!name || !qty) return;
+      const p = pid ? (window.productById(pid) || products.find(x => x.id === pid)) : null;
       if (p) {
         const price = priceForOrder(p.id);
-        const existing = orderItems.find(x => x.id === p.id);
-        if (existing) {
-          existing.qty = Math.round((existing.qty + qty) * 100) / 100;
-          existing.total = Math.round(existing.qty * existing.price);
-          updated++;
-        } else {
-          orderItems.push({ id: p.id, name: p.name, unit: p.unit, img: p.img, qty, price, basePrice: price, priceConfirmed: false, total: Math.round(qty * price) });
-          added++;
-        }
+        const ex = orderItems.find(x => x.id === p.id);
+        if (ex) { ex.qty = Math.round((ex.qty + qty) * 100) / 100; ex.total = Math.round(ex.qty * ex.price); updated++; }
+        else { orderItems.push({ id: p.id, name: p.name, unit: p.unit, img: p.img, qty, price, basePrice: price, priceConfirmed: false, total: Math.round(qty * price) }); added++; }
+        const raw = (tr.dataset.raw || '').trim();
+        if (custId && window.CustPrefs && raw && raw.toLowerCase() !== p.name.toLowerCase()) window.CustPrefs.addAlias(custId, raw, p.id);
       } else {
-        /* (3) KHÔNG có trong DM → thêm thành SP ngoài danh mục (không bỏ sót) */
-        orderItems.push({ id: null, custom: true, fromAI: true, name: rawName, unit: 'kg', img: '', qty, price: 0, basePrice: 0, priceConfirmed: false, total: 0 });
-        off++; offNames.push(rawName);
+        const ex = orderItems.find(x => x.custom && (x.name || '').trim().toLowerCase() === name.toLowerCase());
+        if (ex) { ex.qty = Math.round((ex.qty + qty) * 100) / 100; ex.total = Math.round(ex.qty * ex.price); updated++; }
+        else { orderItems.push({ id: null, custom: true, fromAI: true, name, unit: 'kg', img: '', qty, price: 0, basePrice: 0, priceConfirmed: false, total: 0 }); off++; }
       }
     });
     renderOrderItems();
-    /* Refresh box gợi ý */
     if (custId) renderCustPrefBox(custId);
-
-    const aliasNote = viaAlias ? ` · 🎯 ${viaAlias} từ điển KH` : '';
-    const offNote = off ? ` · ⚠️ ${off} SP ngoài DM (mới)` : '';
-    window.toast(`✓ ${source}: +${added} mới · ${updated} cộng dồn${aliasNote}${offNote}`, (added + updated + off) ? 'success' : 'warn');
-
-    /* Có SP ngoài DM → cảnh báo rõ + cho phép map về SP đã có (tuỳ chọn) */
-    if (off) setTimeout(() => warnOffCatalogItems(offNames, custId), 400);
-  }
+    window.closeModal();
+    window.toast(`✓ ${source}: +${added} mới · ${updated} cộng dồn${off ? ` · ${off} ngoài DM` : ''}`, (added + updated + off) ? 'success' : 'warn');
+  };
 
   /* Cảnh báo + xử lý các SP AI đọc được nhưng CHƯA có trong danh mục */
   function warnOffCatalogItems(names, custId) {
