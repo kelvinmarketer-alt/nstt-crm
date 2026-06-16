@@ -1227,6 +1227,23 @@
           }
         });
       });
+      /* Đổi ĐVT khác đơn vị gốc của SP trong DM → nhắc: giá kg không còn đúng, Sale nhập giá theo ĐVT mới */
+      scope.querySelectorAll('select.rv-unit-sel').forEach(sel => {
+        sel.addEventListener('change', () => {
+          const idx = sel.dataset.idx;
+          const inp = scope.querySelector('.rv-pick[data-idx="' + idx + '"]');
+          const st = scope.querySelector('.rv-status[data-idx="' + idx + '"]');
+          const pid = inp && inp.dataset.pid;
+          if (!pid || !st) return;
+          const p = window.productById(pid); if (!p) return;
+          if (String(sel.value).toLowerCase() !== String(p.unit || '').toLowerCase()) {
+            st.textContent = `✓ trong DM · ⚠ ĐVT khác gốc (${p.unit}) → Sale nhập giá theo "${sel.value}"`;
+            st.style.color = '#B45309';
+          } else {
+            st.textContent = '✓ trong danh mục'; st.style.color = '#15803D';
+          }
+        });
+      });
     }, 60);
   }
 
@@ -1244,8 +1261,11 @@
       if (!name || !qty) return;
       const p = pid ? (window.productById(pid) || products.find(x => x.id === pid)) : null;
       if (p) {
-        const price = priceForOrder(p.id);
-        const ex = orderItems.find(x => x.id === p.id);
+        /* ĐVT khác đơn vị gốc (vd DM bán /kg nhưng đặt /mớ) → giá kg KHÔNG còn đúng:
+           để trống giá + bắt Sale xác nhận giá theo ĐVT mới (tránh tính nhầm tổng). */
+        const unitChanged = unit && p.unit && unit.toLowerCase() !== String(p.unit).toLowerCase();
+        const price = unitChanged ? 0 : priceForOrder(p.id);
+        const ex = orderItems.find(x => x.id === p.id && (x.unit || '').toLowerCase() === (unit || p.unit).toLowerCase());
         if (ex) { ex.qty = Math.round((ex.qty + qty) * 100) / 100; ex.total = Math.round(ex.qty * ex.price); updated++; }
         else { orderItems.push({ id: p.id, name: p.name, unit: unit || p.unit, img: p.img, qty, price, basePrice: price, priceConfirmed: false, total: Math.round(qty * price) }); added++; }
         const raw = (tr.dataset.raw || '').trim();
