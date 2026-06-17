@@ -875,10 +875,36 @@
         },
       });
     }
-    /* Ô "Chọn sản phẩm" — gõ-tìm (thay dropdown 1000 SP), hiện giá theo nhóm giá KH */
+    /* Ô "Chọn sản phẩm" — gõ-tìm + THÊM CHỈ BẰNG BÀN PHÍM:
+       gõ tên → ↑↓ chọn → Enter chọn SP (nhảy sang ô SL) → Enter ở SL = thêm món → quay lại ô tên.
+       Không khớp DM → Enter = nhận thành SP ngoài DM (sang SL) → Enter = thêm. */
     const oProdEl = document.getElementById('oProd');
+    const oQtyEl = document.getElementById('oProdQty');
+    const _focusQty = () => { if (oQtyEl) { oQtyEl.focus(); try { oQtyEl.select(); } catch (e) {} } };
     if (oProdEl && window.wireProductSearch) {
-      window.wireProductSearch(oProdEl, { priceFn: priceForOrder, onPick: () => { const q = document.getElementById('oProdQty'); if (q) q.focus(); } });
+      window.wireProductSearch(oProdEl, {
+        priceFn: priceForOrder,
+        onPick: _focusQty,
+        onEnterNoList: () => {
+          /* Gõ tên nhưng không có gợi ý khớp → coi là SP ngoài DM: tô vàng + sang ô SL để Enter thêm */
+          if (!(oProdEl.value || '').trim()) return;
+          oProdEl.dataset.pid = '';
+          oProdEl.style.background = '#FEF9C3'; oProdEl.style.fontWeight = '600';
+          _focusQty();
+          window.toast && window.toast('SP ngoài DM — nhập SL rồi Enter để thêm', 'info');
+        }
+      });
+    }
+    /* Enter ở ô SỐ LƯỢNG = thêm món (SP trong DM nếu đã chọn; nếu chưa thì lấy tên đã gõ làm SP ngoài DM) */
+    if (oQtyEl) {
+      oQtyEl.addEventListener('keydown', (e) => {
+        if (e.key !== 'Enter') return;
+        e.preventDefault();
+        if (oProdEl && oProdEl.dataset.pid) { window.addOrderItem(); return; }
+        const nm = (oProdEl && oProdEl.value || '').trim();
+        if (!nm) { window.toast && window.toast('Gõ tên SP rồi Enter', 'warn'); if (oProdEl) oProdEl.focus(); return; }
+        window._addOffItemFromForm(nm, parseFloat(oQtyEl.value) || 1);
+      });
     }
     /* Auto-tính lợi nhuận khi thay đổi giá */
     ['oFreight','oPartnerCost'].forEach(id => {
@@ -1082,6 +1108,21 @@
       const names = document.querySelectorAll('#orderItemsBox .oi-name');
       if (names.length) names[names.length - 1].focus();
     }, 30);
+  };
+
+  /* Thêm nhanh 1 SP NGOÀI DM theo tên đã gõ ở ô #oProd (luồng bàn phím) → gộp trùng + quay lại ô tên */
+  window._addOffItemFromForm = function (name, qty) {
+    name = (name || '').trim(); if (!name) return;
+    qty = qty > 0 ? qty : 1;
+    const ex = orderItems.find(x => x.custom && (x.name || '').trim().toLowerCase() === name.toLowerCase());
+    if (ex) { ex.qty = Math.round((ex.qty + qty) * 100) / 100; ex.total = Math.round(ex.qty * ex.price); }
+    else { orderItems.push({ id: null, custom: true, name, unit: 'kg', img: '', qty, price: 0, basePrice: 0, priceConfirmed: false, total: 0 }); }
+    const oProdEl = document.getElementById('oProd');
+    if (oProdEl) { oProdEl.value = ''; oProdEl.dataset.pid = ''; oProdEl.style.background = ''; oProdEl.style.fontWeight = ''; }
+    const q = document.getElementById('oProdQty'); if (q) q.value = 1;
+    renderOrderItems();
+    if (oProdEl) oProdEl.focus();
+    window.toast && window.toast('✓ Thêm "' + name + '" (ngoài DM) — nhập giá ở dòng hàng', 'success');
   };
 
   window.removeOrderItem = function (i) {
