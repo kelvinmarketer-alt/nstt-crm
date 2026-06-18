@@ -242,9 +242,12 @@
       bankOwner: ci.bankOwner || 'CTY TNHH NÔNG SẢN TUẤN TÚ HÀ NỘI',
       email: ci.email || 'nongsantuantuhanoi@gmail.com',
       director: ci.director || ci.hotline || '0836 676 086',
-      bankCode: ci.bankCode || 'MB',          /* mã NH cho VietQR (MB = MBBank) */
-      bankAcc: ci.bankAcc || '228666669999',  /* số TK cho VietQR */
     };
+    /* Tách mã NH + số TK cho VietQR — bám theo đúng dòng "Số Tài Khoản" (vd "MB 228666669999")
+       → đổi ngân hàng/STK chỉ cần sửa companyInfo.bank, QR tự đổi theo. */
+    const _bp = String(comp.bank || '').trim().match(/^(\S+)[\s:]+(\d[\d\s]*\d|\d)$/);
+    comp.bankCode = ci.bankCode || (_bp && _bp[1]) || 'MB';
+    comp.bankAcc = ci.bankAcc || (_bp && _bp[2].replace(/\s/g, '')) || '228666669999';
     /* các ngày phát sinh trong kỳ → dòng phiếu */
     const rows = Object.keys(r.daily).filter(d => r.daily[d] > 0).sort()
       .map(d => ({ date: isoVN(d), amount: r.daily[d] }));
