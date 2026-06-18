@@ -37,9 +37,26 @@
     const orders = S().get('orders', window.ORDERS || []) || [];
     const customers = S().get('customers', window.CUSTOMERS || []) || [];
     const ledger = S().get('debtLedger', []) || [];
+    const products = S().get('products', window.PRODUCTS || []) || [];
     const custById = {}; customers.forEach(c => custById[c.id] = c);
+    const prodById = {}; products.forEach(p => prodById[p.id] = p);
     const days = dayList(fromISO, toISO);
     const daySet = new Set(days);
+
+    /* GIÁ VỐN 1 đơn = Σ (số lượng × giá NHẬP của SP tại ngày đơn).
+       SP ngoài DM hoặc chưa có giá nhập → 0 (không tính được vốn). */
+    function orderCost(o, iso) {
+      const items = Array.isArray(o.items) ? o.items : [];
+      let c = 0, known = false;
+      items.forEach(it => {
+        const p = it.id ? prodById[it.id] : null;
+        const e = p ? window.priceEntryOn(p, iso) : null;
+        const buy = e ? (+e.buy || 0) : 0;
+        if (buy > 0) known = true;
+        c += (+it.qty || 0) * buy;
+      });
+      return { cost: c, hasItems: items.length > 0, known };
+    }
 
     const rows = {};
     orders.forEach(o => {
@@ -50,22 +67,39 @@
       const name = o.custName || (custById[o.cust] && custById[o.cust].name) || key;
       const amt = +o.freight || 0;
       if (!amt) return;
-      const r = rows[key] || (rows[key] = { key, name, daily: {}, total: 0 });
+      const r = rows[key] || (rows[key] = { key, name, daily: {}, dailyCost: {}, total: 0, cost: 0, noCostOrders: 0 });
       r.daily[iso] = (r.daily[iso] || 0) + amt;
       r.total += amt;
+      const oc = orderCost(o, iso);
+      r.dailyCost[iso] = (r.dailyCost[iso] || 0) + oc.cost;
+      r.cost += oc.cost;
+      if (!oc.hasItems || !oc.known) r.noCostOrders++;   /* đơn không có dữ liệu giá vốn → cảnh báo LN ước tính */
     });
-    /* Đã thu trong kỳ (phiếu thu) + công nợ hiện tại */
+    /* Đã thu trong kỳ (phiếu thu) + công nợ hiện tại + lợi nhuận */
     Object.values(rows).forEach(r => {
       r.paid = ledger.filter(e => e.custId === r.key && e.type === 'payment' && daySet.has(ledgerISO(e)))
         .reduce((s, e) => s + (+e.amount || 0), 0);
       r.remain = r.total - r.paid;
       r.debtNow = (custById[r.key] && +custById[r.key].debt) || 0;
+      r.profit = r.total - r.cost;
+      r.margin = r.total ? (r.profit / r.total) : 0;
     });
     const list = Object.values(rows).sort((a, b) => b.total - a.total);
     return { days, list };
   }
 
   let _last = null;   /* cache cho export */
+  let cnView = 'rev'; /* 'rev' = Doanh thu & Công nợ · 'cost' = Giá vốn & Lợi nhuận */
+
+  window.cnSetView = function (v) {
+    cnView = (v === 'cost') ? 'cost' : 'rev';
+    document.querySelectorAll('[data-cnview]').forEach(b => {
+      const on = b.getAttribute('data-cnview') === cnView;
+      b.style.background = on ? '#15803D' : '#fff';
+      b.style.color = on ? '#fff' : 'var(--navy)';
+    });
+    window.cnRender();
+  };
 
   window.cnRender = function () {
     const fromISO = document.getElementById('cnFrom').value;
@@ -76,47 +110,72 @@
     _last = { ...data, fromISO, toISO };
     const unit = +(document.getElementById('cnUnit').value) || 1;
     const fmt = v => { const n = v / unit; return n ? (unit === 1 ? Math.round(n).toLocaleString('vi-VN') : (Math.round(n * 10) / 10).toLocaleString('vi-VN')) : ''; };
+    const pct = m => (Math.round(m * 1000) / 10).toLocaleString('vi-VN') + '%';
 
     if (!data.list.length) {
       tbl.innerHTML = `<tbody><tr><td style="padding:30px;text-align:center;color:var(--muted)">Không có đơn nào trong khoảng ${ddmm(fromISO)}–${ddmm(toISO)}. (Đơn phải được nhập trong app + không phải nháp/huỷ.)</td></tr></tbody>`;
       document.getElementById('cnSummary').textContent = '';
       return;
     }
+    const isCost = cnView === 'cost';
+    const dailyOf = r => isCost ? r.dailyCost : r.daily;
+
     /* Tổng cột theo ngày + tổng chung */
     const colTot = {}; data.days.forEach(d => colTot[d] = 0);
-    let gT = 0, gPaid = 0, gRemain = 0, gDebt = 0;
-    data.list.forEach(r => { data.days.forEach(d => colTot[d] += (r.daily[d] || 0)); gT += r.total; gPaid += r.paid; gRemain += r.remain; gDebt += r.debtNow; });
+    let gT = 0, gCost = 0, gProfit = 0, gPaid = 0, gRemain = 0, gDebt = 0;
+    data.list.forEach(r => {
+      data.days.forEach(d => colTot[d] += (dailyOf(r)[d] || 0));
+      gT += r.total; gCost += r.cost; gProfit += r.profit; gPaid += r.paid; gRemain += r.remain; gDebt += r.debtNow;
+    });
+
+    let headRight, bodyRight, footRight;
+    if (!isCost) {
+      headRight = `<th class="num" style="background:#DCFCE7">TỔNG PS</th>
+        <th class="num" style="background:#DCFCE7">ĐÃ THU</th>
+        <th class="num" style="background:#FEF3C7">CHƯA THU</th>
+        <th class="num" style="background:#FEE2E2">CÔNG NỢ HT</th>
+        <th class="num" style="background:#EDE9FE">LỢI NHUẬN</th>`;
+      bodyRight = r => `<td class="num"><b>${fmt(r.total)}</b></td>
+        <td class="num cn-paid">${r.paid ? fmt(r.paid) : '·'}</td>
+        <td class="num cn-owe">${r.remain ? fmt(r.remain) : '·'}</td>
+        <td class="num">${r.debtNow ? fmt(r.debtNow) : '·'}</td>
+        <td class="num" style="font-weight:700;color:${r.profit >= 0 ? '#15803D' : '#B91C1C'}" title="Biên LN ${pct(r.margin)}${r.noCostOrders ? ' · có đơn thiếu giá vốn → ước tính' : ''}">${fmt(r.profit)}${r.noCostOrders ? ' *' : ''}</td>`;
+      footRight = `<td class="num">${fmt(gT)}</td><td class="num">${fmt(gPaid)}</td><td class="num">${fmt(gRemain)}</td><td class="num">${fmt(gDebt)}</td><td class="num">${fmt(gProfit)}</td>`;
+    } else {
+      headRight = `<th class="num" style="background:#FEF3C7">GIÁ VỐN</th>
+        <th class="num" style="background:#DCFCE7">DOANH THU</th>
+        <th class="num" style="background:#EDE9FE">LỢI NHUẬN</th>
+        <th class="num" style="background:#E0F2FE">BIÊN %</th>`;
+      bodyRight = r => `<td class="num"><b>${fmt(r.cost)}</b></td>
+        <td class="num">${fmt(r.total)}</td>
+        <td class="num" style="font-weight:700;color:${r.profit >= 0 ? '#15803D' : '#B91C1C'}">${fmt(r.profit)}${r.noCostOrders ? ' *' : ''}</td>
+        <td class="num" style="color:${r.margin >= 0 ? '#15803D' : '#B91C1C'}">${r.total ? pct(r.margin) : '·'}</td>`;
+      footRight = `<td class="num">${fmt(gCost)}</td><td class="num">${fmt(gT)}</td><td class="num">${fmt(gProfit)}</td><td class="num">${gT ? pct(gProfit / gT) : '·'}</td>`;
+    }
 
     const head = `<thead><tr>
       <th class="par">ĐỐI TÁC (${data.list.length})</th>
       ${data.days.map(d => `<th class="num">${ddmm(d)}</th>`).join('')}
-      <th class="num" style="background:#DCFCE7">TỔNG PS</th>
-      <th class="num" style="background:#DCFCE7">ĐÃ THU</th>
-      <th class="num" style="background:#FEF3C7">CHƯA THU</th>
-      <th class="num" style="background:#FEE2E2">CÔNG NỢ HT</th>
+      ${headRight}
     </tr></thead>`;
     const body = `<tbody>${data.list.map(r => `<tr>
       <td class="par" title="Bấm để xem Thông báo công nợ — in / copy gửi khách"><a href="javascript:void(0)" onclick="window.cnShowNotice('${(r.key || '').replace(/'/g, "\\'")}')" style="color:var(--navy);font-weight:700;text-decoration:none;border-bottom:1px dotted var(--navy)">${r.name}</a></td>
-      ${data.days.map(d => { const v = r.daily[d] || 0; return `<td class="num ${v ? '' : 'z'}">${v ? fmt(v) : '·'}</td>`; }).join('')}
-      <td class="num"><b>${fmt(r.total)}</b></td>
-      <td class="num cn-paid">${r.paid ? fmt(r.paid) : '·'}</td>
-      <td class="num cn-owe">${r.remain ? fmt(r.remain) : '·'}</td>
-      <td class="num">${r.debtNow ? fmt(r.debtNow) : '·'}</td>
+      ${data.days.map(d => { const v = dailyOf(r)[d] || 0; return `<td class="num ${v ? '' : 'z'}">${v ? fmt(v) : '·'}</td>`; }).join('')}
+      ${bodyRight(r)}
     </tr>`).join('')}</tbody>`;
     const foot = `<tfoot><tr>
       <td class="par">TỔNG CỘNG</td>
       ${data.days.map(d => `<td class="num">${colTot[d] ? fmt(colTot[d]) : '·'}</td>`).join('')}
-      <td class="num">${fmt(gT)}</td>
-      <td class="num">${fmt(gPaid)}</td>
-      <td class="num">${fmt(gRemain)}</td>
-      <td class="num">${fmt(gDebt)}</td>
+      ${footRight}
     </tr></tfoot>`;
     tbl.innerHTML = head + body + foot;
 
     const dvi = unit === 1 ? 'đồng' : 'nghìn đồng';
+    const anyEst = data.list.some(r => r.noCostOrders);
     document.getElementById('cnSummary').innerHTML =
-      `📅 <b>${ddmm(fromISO)} → ${ddmm(toISO)}</b> · ${data.days.length} ngày · ${data.list.length} đối tác · đơn vị: <b>${dvi}</b><br>` +
-      `💰 Tổng phát sinh <b>${(gT).toLocaleString('vi-VN')}đ</b> · đã thu <b style="color:#16A34A">${(gPaid).toLocaleString('vi-VN')}đ</b> · chưa thu <b style="color:#B91C1C">${(gRemain).toLocaleString('vi-VN')}đ</b>`;
+      `📅 <b>${ddmm(fromISO)} → ${ddmm(toISO)}</b> · ${data.days.length} ngày · ${data.list.length} đối tác · đơn vị: <b>${dvi}</b> · đang xem: <b>${isCost ? 'Giá vốn & Lợi nhuận' : 'Doanh thu & Công nợ'}</b><br>` +
+      `💰 Doanh thu <b>${gT.toLocaleString('vi-VN')}đ</b> · giá vốn <b>${gCost.toLocaleString('vi-VN')}đ</b> · lợi nhuận <b style="color:#15803D">${gProfit.toLocaleString('vi-VN')}đ</b> (biên ${gT ? pct(gProfit / gT) : '0%'}) · đã thu <b style="color:#16A34A">${gPaid.toLocaleString('vi-VN')}đ</b>` +
+      (anyEst ? `<br><span style="color:#B45309;font-size:11.5px">* Có đơn thiếu giá vốn (SP ngoài DM / SP chưa có giá nhập) → lợi nhuận là ƯỚC TÍNH (chỉ trừ phần có giá nhập).</span>` : '');
   };
 
   /* ===== Preset khoảng ngày ===== */
@@ -142,19 +201,22 @@
     const { days, list, fromISO, toISO } = _last;
     const aoa = [];
     aoa.push([`CÔNG NỢ TỔNG HỢP ĐỐI TÁC · ${ddmm(fromISO)} → ${ddmm(toISO)} · đơn vị: ${unit === 1 ? 'đồng' : 'nghìn đồng'}`]);
-    aoa.push(['ĐỐI TÁC', ...days.map(ddmm), 'TỔNG PHÁT SINH', 'ĐÃ THU', 'CHƯA THU', 'CÔNG NỢ HIỆN TẠI']);
+    aoa.push(['ĐỐI TÁC', ...days.map(ddmm), 'TỔNG PHÁT SINH', 'GIÁ VỐN', 'LỢI NHUẬN', 'BIÊN %', 'ĐÃ THU', 'CHƯA THU', 'CÔNG NỢ HIỆN TẠI']);
     const colTot = {}; days.forEach(d => colTot[d] = 0);
-    let gT = 0, gPaid = 0, gRemain = 0, gDebt = 0;
+    let gT = 0, gCost = 0, gProfit = 0, gPaid = 0, gRemain = 0, gDebt = 0;
     list.forEach(r => {
       const row = [r.name];
       days.forEach(d => { const v = r.daily[d] || 0; colTot[d] += v; row.push(v ? r1(v) : ''); });
-      row.push(r1(r.total), r1(r.paid), r1(r.remain), r1(r.debtNow));
-      gT += r.total; gPaid += r.paid; gRemain += r.remain; gDebt += r.debtNow;
+      const marginTxt = r.total ? (Math.round(r.margin * 1000) / 10) + '%' : '';
+      row.push(r1(r.total), r1(r.cost), r1(r.profit), marginTxt, r1(r.paid), r1(r.remain), r1(r.debtNow));
+      gT += r.total; gCost += r.cost; gProfit += r.profit; gPaid += r.paid; gRemain += r.remain; gDebt += r.debtNow;
       aoa.push(row);
     });
-    aoa.push(['TỔNG CỘNG', ...days.map(d => colTot[d] ? r1(colTot[d]) : ''), r1(gT), r1(gPaid), r1(gRemain), r1(gDebt)]);
+    const gMargin = gT ? (Math.round(gProfit / gT * 1000) / 10) + '%' : '';
+    aoa.push(['TỔNG CỘNG', ...days.map(d => colTot[d] ? r1(colTot[d]) : ''), r1(gT), r1(gCost), r1(gProfit), gMargin, r1(gPaid), r1(gRemain), r1(gDebt)]);
+    if (list.some(r => r.noCostOrders)) aoa.push(['* Có đơn thiếu giá nhập (SP ngoài DM / chưa có giá nhập) → lợi nhuận là ƯỚC TÍNH.']);
     const ws = window.XLSX.utils.aoa_to_sheet(aoa);
-    ws['!cols'] = [{ wch: 28 }, ...days.map(() => ({ wch: 9 })), { wch: 14 }, { wch: 12 }, { wch: 12 }, { wch: 14 }];
+    ws['!cols'] = [{ wch: 28 }, ...days.map(() => ({ wch: 9 })), { wch: 14 }, { wch: 13 }, { wch: 13 }, { wch: 8 }, { wch: 12 }, { wch: 12 }, { wch: 14 }];
     const wb = window.XLSX.utils.book_new();
     window.XLSX.utils.book_append_sheet(wb, ws, 'Công nợ');
     const fn = `CONG-NO-TONG-HOP_${fromISO}_${toISO}.xlsx`;

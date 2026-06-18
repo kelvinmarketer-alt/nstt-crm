@@ -64,8 +64,13 @@
       <div id="cnSummary" style="margin-top:10px;font-size:12.5px;color:var(--muted)"></div>
     </div>
 
+    <div style="display:flex;gap:8px;margin-bottom:10px">
+      <button data-cnview="rev" class="btn btn-sm" style="background:#15803D;color:#fff;border:1px solid var(--line)" onclick="window.cnSetView('rev')">📊 Doanh thu & Công nợ</button>
+      <button data-cnview="cost" class="btn btn-sm" style="background:#fff;color:var(--navy);border:1px solid var(--line)" onclick="window.cnSetView('cost')">💵 Giá vốn & Lợi nhuận</button>
+    </div>
+
     <div class="cn-wrap"><table class="cn-tbl" id="cnTable"><tbody><tr><td style="padding:30px;text-align:center;color:var(--muted)">Chọn khoảng ngày rồi bấm "Xem báo cáo".</td></tr></tbody></table></div>
-    <div style="font-size:11.5px;color:var(--muted);margin-top:8px">💡 Mỗi ô = tổng tiền các đơn của đối tác đó trong ngày. <b>Đã thu</b> lấy từ phiếu thu (sổ công nợ) trong kỳ · <b>Chưa thu</b> = phát sinh − đã thu · <b>Công nợ hiện tại</b> = tổng nợ còn lại của KH.</div>
+    <div style="font-size:11.5px;color:var(--muted);margin-top:8px">💡 Mỗi ô = tổng tiền các đơn của đối tác đó trong ngày. <b>Đã thu</b> lấy từ phiếu thu (sổ công nợ) trong kỳ · <b>Chưa thu</b> = phát sinh − đã thu · <b>Công nợ hiện tại</b> = tổng nợ còn lại của KH.<br>📊 Tab <b>Doanh thu & Công nợ</b>: thêm cột <b>Lợi nhuận</b> (= doanh thu − giá vốn) cho từng khách · 💵 Tab <b>Giá vốn & Lợi nhuận</b>: ma trận giá nhập theo ngày + biên LN. <b>Giá vốn</b> = Σ (SL × giá NHẬP của SP theo ngày đơn). SP ngoài DM / chưa có giá nhập → LN <b>ước tính</b> (đánh dấu *).</div>
   </main>
 </div>
 
