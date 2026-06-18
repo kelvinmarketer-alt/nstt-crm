@@ -834,6 +834,13 @@ window.attachBulkOps = function (opts) {
       setTimeout(updateToolbar, 50);
     }
   });
+  /* CAPTURE phase — bắt click checkbox NGAY CẢ KHI ô nằm trong
+     <td onclick="event.stopPropagation()"> (chặn mở đơn) → bubble bị chặn nên trước
+     đây tích TỪNG dòng không bật thanh thao tác (chỉ "chọn tất cả" mới bật).
+     Chỉ lên lịch cập nhật thanh, KHÔNG can thiệp sự kiện → checkbox vẫn toggle. */
+  tbl.addEventListener('click', (e) => {
+    if (e.target.closest('.checkbox, input[type="checkbox"]')) setTimeout(updateToolbar, 50);
+  }, true);
 
   /* Header "select all" checkbox — tìm ở nhiều vị trí:
      1. opts.selectAllSelector (custom)
