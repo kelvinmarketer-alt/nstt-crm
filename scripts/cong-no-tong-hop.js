@@ -238,10 +238,12 @@
       name: ci.name || 'CÔNG TY TNHH NÔNG SẢN TUẤN TÚ HÀ NỘI',
       tax: ci.tax || '0110302211',
       address: ci.address || '36/147A - Tân Mai - Hoàng Mai - Hà Nội',
-      bank: ci.bank || 'OCB 28019999',
-      bankOwner: ci.bankOwner || 'Giáp Quỳnh Anh',
+      bank: ci.bank || 'MB 228666669999',
+      bankOwner: ci.bankOwner || 'CTY TNHH NÔNG SẢN TUẤN TÚ HÀ NỘI',
       email: ci.email || 'nongsantuantuhanoi@gmail.com',
       director: ci.director || ci.hotline || '0836 676 086',
+      bankCode: ci.bankCode || 'MB',          /* mã NH cho VietQR (MB = MBBank) */
+      bankAcc: ci.bankAcc || '228666669999',  /* số TK cho VietQR */
     };
     /* các ngày phát sinh trong kỳ → dòng phiếu */
     const rows = Object.keys(r.daily).filter(d => r.daily[d] > 0).sort()
@@ -257,6 +259,13 @@
     for (let i = 0; i < half; i++) bodyRows += `<tr>${colCell(i)}${colCell(i + half)}</tr>`;
     const sumL = rows.slice(0, half).reduce((s, e) => s + e.amount, 0);
     const sumR = rows.slice(half).reduce((s, e) => s + e.amount, 0);
+
+    /* VietQR ĐỘNG — tự điền đúng SỐ TIỀN CÔNG NỢ + ghi chú "CONG NO <khách>" khi quét. */
+    const _noDia = s => (s || '').toString().normalize('NFD').replace(/[̀-ͯ]/g, '').replace(/đ/g, 'd').replace(/Đ/g, 'D').toUpperCase();
+    const qrAmt = Math.max(0, Math.round(remain || 0));
+    const qrNote = ('CONG NO ' + _noDia(c.name || custKey)).slice(0, 50);
+    const qrUrl = `https://img.vietqr.io/image/${encodeURIComponent(comp.bankCode)}-${encodeURIComponent(comp.bankAcc)}-qr_only.png`
+      + `?amount=${qrAmt}&addInfo=${encodeURIComponent(qrNote)}&accountName=${encodeURIComponent(_noDia(comp.name))}`;
 
     const html = `<!doctype html><html lang="vi"><head><meta charset="utf-8"><title>Thông báo công nợ — ${(c.name || '').replace(/</g, '')}</title>
     <style>
@@ -295,6 +304,11 @@
           Địa Chỉ: ${comp.address}<br>
           Số Tài Khoản: ${comp.bank} &nbsp;·&nbsp; Chủ TK: ${comp.bankOwner}<br>
           Email: ${comp.email} &nbsp;·&nbsp; GĐĐH: ${comp.director}
+        </div>
+        <div class="qrbox" style="flex:0 0 auto;text-align:center;min-width:138px">
+          <img src="${qrUrl}" alt="VietQR chuyển khoản" style="width:132px;height:132px;object-fit:contain;border:1px solid #1B5E20;border-radius:8px;padding:3px;background:#fff" onerror="this.style.opacity='0.15'">
+          <div style="font-size:10px;color:#1B5E20;font-weight:700;margin-top:2px">Quét QR để chuyển khoản</div>
+          <div style="font-size:9.5px;color:#555">${comp.bank}</div>
         </div>
       </div>
       <div class="greet"><div><b>Kính Gửi Quý Khách Hàng:</b> ${c.name || ''}<br><b>Địa Chỉ:</b> ${c.address || '—'}</div><div><b>Số Điện Thoại:</b> ${c.phone || '—'}</div></div>
