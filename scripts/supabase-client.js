@@ -318,6 +318,16 @@
       return data.map(r => mapFrom(table, r));
     },
 
+    /* Lấy mã đơn kế tiếp THEO CLOUD (chống trùng khi nhiều máy tạo đơn cùng lúc) */
+    async nextCloudOrderCode() {
+      try {
+        const { data } = await client.from('orders').select('code').order('code', { ascending: false }).limit(5);
+        let max = 526052;
+        (data || []).forEach(r => { const m = String(r.code || '').match(/NSTT-(\d+)/); if (m) max = Math.max(max, +m[1]); });
+        return 'NSTT-' + (max + 1);
+      } catch (e) { return null; }
+    },
+
     /* Insert 1 record — auto-strip cột lạ + retry (chống schema mismatch mọi bảng) */
     async insert(table, record) {
       const mapped = mapTo(table, record);
@@ -329,6 +339,16 @@
           delete mapped[badCol];
           console.warn(`[SB insert] ${table}: bỏ cột lạ '${badCol}' rồi thử lại`);
           continue;
+        }
+        /* MÃ ĐƠN TRÙNG (2 máy tạo cùng lúc) → cấp lại mã cao hơn cloud rồi thử lại.
+           Trả về record với mã MỚI để caller cập nhật lại cache + UI. */
+        if (table === 'orders' && (error.code === '23505' || /duplicate key|orders_pkey/i.test(error.message || ''))) {
+          const nc = await this.nextCloudOrderCode();
+          if (nc && nc !== mapped.code) {
+            console.warn(`[SB insert] orders: mã '${mapped.code}' trùng → đổi '${nc}' rồi thử lại`);
+            mapped.code = nc;
+            continue;
+          }
         }
         console.error('[SB insert]', table, error);
         window.toast?.('⚠ Lưu cloud lỗi ' + table + ': ' + (error.message||'unknown'), 'warn');

@@ -401,7 +401,13 @@
     if (neverSynced.length > 0 && neverSynced.length <= 200) {
       console.log(`[STORE] ${key}: tự đẩy ${neverSynced.length} record mới (chưa sync) lên cloud`);
       for (const it of neverSynced) {
-        await window.SB_DATA.insert(table, it).catch(() => {});
+        const saved = await window.SB_DATA.insert(table, it).catch(() => null);
+        /* Nếu insert cấp lại MÃ MỚI (vd đơn trùng mã được đổi) → cập nhật lại id cục bộ
+           để khớp cloud, tránh kẹt/đẩy lặp + giữ đúng record (không bị nuốt). */
+        if (saved && idCol && saved[idCol] && it[idCol] !== saved[idCol]) {
+          const old = it[idCol]; it[idCol] = saved[idCol];
+          console.log(`[STORE] ${key}: mã '${old}' đổi → '${saved[idCol]}' (chống trùng)`);
+        }
       }
     } else if (neverSynced.length > 200) {
       console.warn(`[STORE] ${key}: ${neverSynced.length} record chưa sync — BỎ QUA auto-push (quá nhiều)`);
@@ -554,7 +560,17 @@
       _save(key);
       /* Push to Supabase */
       if (isSupabaseMode() && TABLE_MAP[key]) {
+        const idCol = ID_COLUMN[key] || 'id';
         window.SB_DATA.insert(TABLE_MAP[key], item)
+          .then(saved => {
+            /* Insert đổi MÃ (vd đơn trùng mã → cấp mã mới) → cập nhật lại cache + UI + baseline */
+            if (saved && saved[idCol] && item[idCol] !== saved[idCol]) {
+              const old = item[idCol]; item[idCol] = saved[idCol];
+              _save(key);
+              if (Array.isArray(_data[key])) { _synced[key] = JSON.stringify(_data[key]); _persistSyncedIds(key, _data[key]); }
+              if (key === 'orders') window.toast?.(`Mã đơn ${old} trùng — đã tự đổi thành ${saved[idCol]} ✓`, 'info');
+            }
+          })
           .catch(e => console.warn(`[STORE add ${key} → SB]`, e));
       }
       if (TABLE_MAP[key] && Array.isArray(_data[key])) _synced[key] = JSON.stringify(_data[key]); if (TABLE_MAP[key] && Array.isArray(_data[key])) _persistSyncedIds(key, _data[key]);
