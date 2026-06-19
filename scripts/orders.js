@@ -572,19 +572,27 @@
     const breakdown = unitBreakdownOf(groups);   /* tách theo từng đơn vị (kg/bắp/hộp/thùng…) */
     const cnt = document.getElementById('iGoodsCount');
     if (cnt) cnt.textContent = `· ${groups.length} mã · ${breakdown}`;
+    const nfmt = n => n.toFixed(2).replace(/\.00$/, '').replace(/(\.\d)0$/, '$1');
     host.innerHTML = `
-      <div style="font-size:11.5px;color:var(--muted);margin-bottom:8px">✓ Tick để soạn hàng — số lượng đã <b>gộp theo từng sản phẩm</b>.</div>
+      <div style="display:flex;align-items:center;gap:8px;margin-bottom:8px;flex-wrap:wrap">
+        <span style="font-size:11.5px;color:var(--muted);flex:1">✓ Tick để soạn hàng · Bảng dưới có <b>đơn giá &amp; thành tiền</b> (chỉ xem nội bộ — phiếu in KHÔNG hiện giá).</span>
+        <button class="btn btn-primary btn-sm" onclick="window.editOrderItems('${(o.code || '').replace(/'/g, "\\'")}')" title="Sửa số lượng / đơn giá / thêm-bớt mặt hàng">✏️ Sửa mặt hàng &amp; giá</button>
+      </div>
       <table class="mini-table" style="margin:0">
-        <thead><tr><th style="width:34px"></th><th style="width:38px" class="num">STT</th><th>Sản phẩm</th><th class="num">Số lượng</th></tr></thead>
-        <tbody>${groups.map((g, i) => `<tr>
+        <thead><tr><th style="width:30px"></th><th style="width:34px" class="num">STT</th><th>Sản phẩm</th><th class="num">SL</th><th class="num">Đơn giá</th><th class="num">Thành tiền</th></tr></thead>
+        <tbody>${groups.map((g, i) => { const up = g.qty ? Math.round(g.total / g.qty) : 0; return `<tr>
           <td class="num"><input type="checkbox" class="bh-check" style="width:16px;height:16px;cursor:pointer" onchange="this.closest('tr').style.opacity=this.checked?'0.5':'1';this.closest('tr').style.textDecoration=this.checked?'line-through':'none'"></td>
           <td class="num" style="color:var(--muted);font-weight:600">${i + 1}</td>
           <td><b>${g.name}</b></td>
-          <td class="num"><b style="color:var(--navy)">${g.qty.toFixed(2).replace(/\.00$/,'').replace(/(\.\d)0$/,'$1')}</b> <span style="font-size:11px;color:var(--muted)">${g.unit}</span></td>
-        </tr>`).join('')}</tbody>
+          <td class="num"><b style="color:var(--navy)">${nfmt(g.qty)}</b> <span style="font-size:11px;color:var(--muted)">${g.unit}</span></td>
+          <td class="num" style="color:#15803D">${up ? window.fmt(up) : '—'}</td>
+          <td class="num"><b>${g.total ? window.fmt(g.total) : '—'}</b></td>
+        </tr>`; }).join('')}</tbody>
         <tfoot><tr style="background:#F0FDF4;border-top:2px solid #15803D">
           <td></td><td colspan="2" style="padding:8px"><b style="color:#15803D">📊 Tổng cộng</b></td>
           <td class="num"><b style="color:#15803D">${breakdown}</b></td>
+          <td class="num"></td>
+          <td class="num"><b style="color:var(--red)">${window.fmt(totalAmt)} ₫</b></td>
         </tr></tfoot>
       </table>
       <div style="text-align:right;font-size:12px;color:var(--muted);margin-top:6px">Thành tiền hàng: <b style="color:var(--red)">${window.fmt(totalAmt)} ₫</b></div>`;
@@ -1128,6 +1136,73 @@
   window.removeOrderItem = function (i) {
     orderItems.splice(i, 1);
     renderOrderItems();
+  };
+
+  /* === SỬA MẶT HÀNG & GIÁ của 1 đơn ĐÃ TẠO (khu vực quản trị) ===
+     Tái dùng bộ soạn item (renderOrderItems) — sửa SL/đơn giá/đơn vị, thêm/bớt SP.
+     Lưu lại order.items + freight + goods + weight. KHÔNG đụng phiếu in (vẫn giấu giá). */
+  let _editItemsCode = null;
+  window.editOrderItems = function (code) {
+    const o = orders.find(x => x.code === code);
+    if (!o) { window.toast && window.toast('Không tìm thấy đơn ' + code, 'warn'); return; }
+    _editItemsCode = code;
+    orderItems = (o.items || []).map(it => Object.assign({}, it));   /* clone — không sửa trực tiếp tới khi Lưu */
+    const custId = o.cust || o.custId || '';
+    orderTier = (typeof window.custPriceTier === 'function' && custId) ? (window.custPriceTier(custId) || '') : '';
+    window.openModal('✏️ Sửa mặt hàng & giá — ' + code, `
+      <div style="font-size:12px;color:var(--muted);margin-bottom:10px;line-height:1.55">
+        KH: <b>${(o.custName || '').replace(/</g, '')}</b> · Sửa <b>số lượng</b>, <b>đơn giá</b>, đơn vị, hoặc thêm/bớt mặt hàng.
+        <br>🔒 <b style="color:#15803D">Phiếu báo hàng vẫn KHÔNG hiện giá</b> — đây chỉ là khu vực quản trị nội bộ.
+      </div>
+      <div style="display:flex;gap:8px;align-items:flex-end;flex-wrap:wrap;margin-bottom:8px">
+        <div style="flex:2;min-width:200px"><label style="font-size:11px;color:var(--muted);display:block;margin-bottom:3px">Thêm sản phẩm</label>
+          <input class="prodpick" id="oProd" data-pid="" placeholder="Gõ tên/mã SP… (↑↓ chọn · Enter thêm)" style="width:100%;border:1px solid var(--line);border-radius:7px;padding:8px 11px;font-size:13px"></div>
+        <div><label style="font-size:11px;color:var(--muted);display:block;margin-bottom:3px">SL</label>
+          <input id="oProdQty" type="number" value="1" min="0" step="0.1" style="width:78px;border:1px solid var(--line);border-radius:7px;padding:8px"></div>
+        <button type="button" class="btn btn-primary btn-sm" onclick="window.addOrderItem()">+ Thêm</button>
+      </div>
+      <div id="orderItemsBox" style="margin:4px 0"></div>
+      <input type="hidden" id="oGoods"><input type="hidden" id="oWeight"><input type="hidden" id="oOtherUnits"><input type="hidden" id="oFreight">
+    `, {
+      footer: `<button class="btn btn-ghost" onclick="window.closeModal()">Hủy</button>
+               <button class="btn btn-primary" onclick="window.submitEditOrderItems('${(code || '').replace(/'/g, "\\'")}')">💾 Lưu mặt hàng & giá</button>`,
+      width: '780px', stack: true
+    });
+    renderOrderItems();
+    setTimeout(() => {
+      const oProdEl = document.getElementById('oProd');
+      const oQtyEl = document.getElementById('oProdQty');
+      const _focusQty = () => { if (oQtyEl) { oQtyEl.focus(); try { oQtyEl.select(); } catch (e) {} } };
+      if (oProdEl && window.wireProductSearch) {
+        window.wireProductSearch(oProdEl, {
+          priceFn: priceForOrder, onPick: _focusQty,
+          onEnterNoList: () => { if (!(oProdEl.value || '').trim()) return; oProdEl.dataset.pid = ''; oProdEl.style.background = '#FEF9C3'; oProdEl.style.fontWeight = '600'; _focusQty(); }
+        });
+      }
+      if (oQtyEl) oQtyEl.addEventListener('keydown', (e) => {
+        if (e.key !== 'Enter') return; e.preventDefault();
+        if (oProdEl && oProdEl.dataset.pid) { window.addOrderItem(); return; }
+        const nm = (oProdEl && oProdEl.value || '').trim();
+        if (nm) window._addOffItemFromForm(nm, parseFloat(oQtyEl.value) || 1);
+      });
+    }, 40);
+  };
+
+  window.submitEditOrderItems = function (code) {
+    const o = orders.find(x => x.code === code);
+    if (!o) return;
+    const blank = orderItems.filter(x => x.custom && !(x.name || '').trim());
+    if (blank.length) { window.toast && window.toast('Còn ' + blank.length + ' SP ngoài DM chưa gõ tên — nhập hoặc xoá dòng đó', 'warn'); return; }
+    if (!orderItems.length) { window.toast && window.toast('Đơn phải có ít nhất 1 mặt hàng', 'warn'); return; }
+    const freight = orderItems.reduce((s, x) => s + (+x.total || 0), 0);
+    const goods = ((document.getElementById('oGoods') || {}).value || '').trim() || orderItems.map(x => x.name).join(', ');
+    const weight = parseFloat((document.getElementById('oWeight') || {}).value) || 0;
+    window.STORE.update('orders', code, { items: orderItems.slice(), freight, goods, weight });
+    orderItems = []; orderTier = ''; _editItemsCode = null;
+    window.closeModal();
+    window.toast && window.toast('✓ Đã cập nhật mặt hàng & giá cho ' + code, 'success');
+    if (typeof renderOrders === 'function') { try { renderOrders(); } catch (e) {} }
+    setTimeout(() => { if (window.openOrder) window.openOrder(code); }, 60);
   };
 
   /* Xác nhận giá hàng loạt — tick hết các mã còn '!' */
