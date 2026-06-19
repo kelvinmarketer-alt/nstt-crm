@@ -79,6 +79,30 @@
       : window.priceOn(productId, window.todayISO());
   }
 
+  /* KH đang chọn (form tạo đơn đọc #oCust; modal sửa đơn dùng _curOrderCust). */
+  let _curOrderCust = '';
+  const _orderCustId = () => (window.formVal && window.formVal('#oCust')) || _curOrderCust || '';
+
+  /* GIÁ CỦA ĐỐI TÁC cho 1 SP theo ĐƠN VỊ — lấy từ LỊCH SỬ ĐƠN của chính KH đó
+     (đơn gần nhất có SP này + đúng đơn vị). KHÔNG đụng bảng giá danh mục.
+     Dùng để TỰ ĐIỀN giá khi đổi đơn vị (vd DM /kg nhưng KH này hay mua /mớ). */
+  function lastCustPrice(custId, productId, unit) {
+    if (!custId || !productId) return null;
+    const u = String(unit || '').toLowerCase();
+    let bestPrice = null, bestTime = '';
+    (orders || []).forEach(o => {
+      if ((o.cust || o.custId) !== custId) return;
+      if (o.status === 'draft' || o.status === 'cancelled') return;
+      (Array.isArray(o.items) ? o.items : []).forEach(it => {
+        if (it.id !== productId) return;
+        if (u && String(it.unit || '').toLowerCase() !== u) return;   /* khớp đúng đơn vị */
+        const t = o.createdAt || o.date || '';
+        if ((+it.price || 0) > 0 && (bestPrice == null || t > bestTime)) { bestPrice = +it.price; bestTime = t; }
+      });
+    });
+    return bestPrice;
+  }
+
   const STATUS = {
     confirmed:  { icon:'📝', label:'Mới',         sub:'chờ điều phối',     color:'#3B82F6' },
     pickup:     { icon:'📦', label:'Đang lấy',    sub:'shipper đến lấy',   color:'#F59E0B' },
@@ -1038,16 +1062,30 @@
           }
         });
       });
-      /* Wire đổi đơn vị — cho MỌI sản phẩm */
+      /* Wire đổi đơn vị — cho MỌI sản phẩm. Đổi đơn vị → TỰ ĐIỀN GIÁ CỦA ĐỐI TÁC cho đơn vị đó
+         (lấy từ lịch sử đơn của KH). KHÔNG đụng bảng giá danh mục. */
       box.querySelectorAll('.oi-unit').forEach(sel => {
         sel.addEventListener('change', (e) => {
           const it = orderItems[+e.target.dataset.idx];
           if (!it) return;
           it.unit = e.target.value;
-          /* SP trong DM đổi sang ĐVT KHÁC đơn vị gốc → giá/kg có thể không còn đúng → bắt xác nhận lại giá */
           if (it.id) {
+            const custId = _orderCustId();
             const p = window.productById(it.id);
-            if (p && String(p.unit || '').toLowerCase() !== String(it.unit || '').toLowerCase()) it.priceConfirmed = false;
+            const catUnit = p ? String(p.unit || '').toLowerCase() : '';
+            const newUnit = String(it.unit || '').toLowerCase();
+            const histPrice = lastCustPrice(custId, it.id, it.unit);   /* giá KH này từng trả cho SP+đơn vị này */
+            if (histPrice != null) {
+              /* Có giá đối tác cho đơn vị này → tự điền */
+              it.price = histPrice; it.basePrice = histPrice; it.total = Math.round((+it.qty || 0) * histPrice); it.priceConfirmed = true;
+            } else if (catUnit && newUnit === catUnit) {
+              /* Về đúng đơn vị gốc → khôi phục giá theo bảng giá ngày + nhóm giá KH */
+              const tp = priceForOrder(it.id) || 0;
+              it.price = tp; it.basePrice = tp; it.total = Math.round((+it.qty || 0) * tp); it.priceConfirmed = false;
+            } else {
+              /* Đơn vị khác gốc + chưa có giá đối tác → để sale nhập giá theo đơn vị này */
+              it.priceConfirmed = false;
+            }
           }
           renderOrderItems();
         });
@@ -1156,6 +1194,7 @@
     _editItemsCode = code;
     orderItems = (o.items || []).map(it => Object.assign({}, it));   /* clone — không sửa trực tiếp tới khi Lưu */
     const custId = o.cust || o.custId || '';
+    _curOrderCust = custId;   /* để lastCustPrice tra đúng giá đối tác khi đổi đơn vị */
     orderTier = (typeof window.custPriceTier === 'function' && custId) ? (window.custPriceTier(custId) || '') : '';
     window.openModal('✏️ Sửa mặt hàng & giá — ' + code, `
       <div style="font-size:12px;color:var(--muted);margin-bottom:10px;line-height:1.55">
