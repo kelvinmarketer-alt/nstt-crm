@@ -941,7 +941,8 @@
       /* Danh sách đơn vị (cho SP ngoài DM tự chọn) */
       let units = ((window.MD && window.MD.get && window.MD.get('units')) || []).map(u => (u.label || u)).filter(Boolean);
       if (!units.length) units = ['kg', 'quả', 'bó', 'hộp', 'cây', 'túi', 'gói', 'lạng', 'con', 'chai', 'mớ'];
-      const unitSelHtml = (cur, i) => `<select class="oi-unit" data-idx="${i}" style="width:64px;padding:3px 4px;border:1px solid #C4B5FD;border-radius:5px;font-size:11px;background:#F5F3FF;font-weight:600" title="Chọn đơn vị bán">${units.map(u => `<option ${String(u).toLowerCase() === String(cur || '').toLowerCase() ? 'selected' : ''}>${u}</option>`).join('')}</select>`;
+      /* ĐVT đổi được cho MỌI sản phẩm (khách đặt theo đơn vị khác đơn vị gốc trong DM) */
+      const unitSelHtml = (cur, i) => { const c = String(cur || '').toLowerCase(); const opts = units.slice(); if (cur && !opts.some(u => String(u).toLowerCase() === c)) opts.unshift(cur); return `<select class="oi-unit" data-idx="${i}" style="width:62px;padding:3px 4px;border:1px solid var(--line);border-radius:5px;font-size:11px;background:#fff;font-weight:600;cursor:pointer" title="Đổi đơn vị bán">${opts.map(u => `<option ${String(u).toLowerCase() === c ? 'selected' : ''}>${u}</option>`).join('')}</select>`; };
       /* Tổng số mã (count) + tổng trọng lượng (kg) */
       const totalSKU = orderItems.length;
       const totalKg = orderItems.reduce((s, x) => {
@@ -973,7 +974,7 @@
           <td><div style="display:flex;align-items:center;gap:8px">${it.img ? `<img src="${it.img}" alt="" style="width:30px;height:30px;object-fit:cover;border-radius:5px;flex:none" onerror="this.style.display='none'">` : ''}<div style="flex:1;min-width:0">${it.custom
               ? `<input value="${(it.name||'').replace(/"/g,'&quot;')}" data-idx="${i}" class="oi-name" placeholder="Gõ tên SP khách đặt..." style="width:100%;min-width:150px;padding:4px 7px;border:1px solid #C4B5FD;border-radius:5px;font-size:12.5px;font-weight:600;background:#F5F3FF"><div style="font-size:9px;color:#7C3AED;font-weight:700;margin-top:1px">✏️ NGOÀI DANH MỤC</div>`
               : `<b>${it.name}</b>`}${it.priceConfirmed===false?'<div style="font-size:10px;color:#A16207">⚠ chưa xác nhận giá</div>':''}</div></div></td>
-          <td class="num"><div style="display:flex;align-items:center;gap:4px;justify-content:flex-end"><input type="number" min="0" step="0.5" value="${it.qty}" data-idx="${i}" class="oi-qty" style="width:64px;padding:4px 6px;text-align:right;border:1px solid var(--line);border-radius:5px;font-size:12.5px;font-weight:600" title="Sửa số lượng">${it.custom ? unitSelHtml(it.unit, i) : `<span style="font-size:11px;color:var(--muted)">${it.unit}</span>`}</div></td>
+          <td class="num"><div style="display:flex;align-items:center;gap:4px;justify-content:flex-end"><input type="number" min="0" step="0.5" value="${it.qty}" data-idx="${i}" class="oi-qty" style="width:64px;padding:4px 6px;text-align:right;border:1px solid var(--line);border-radius:5px;font-size:12.5px;font-weight:600" title="Sửa số lượng">${unitSelHtml(it.unit, i)}</div></td>
           <td class="num">
             <input type="number" min="0" step="100" value="${it.price||0}" data-idx="${i}" class="oi-price" style="width:100px;padding:4px 6px;text-align:right;border:1px solid ${it.priceConfirmed===false?'#FCD34D':'var(--line)'};border-radius:5px;font-size:12.5px;font-weight:600;background:${it.priceConfirmed===false?'#FEF9C3':'#fff'}" title="Sale có quyền sửa giá theo đối tác">
             ${it.basePrice && it.price !== it.basePrice ? `<div style="font-size:10px;color:var(--muted);margin-top:2px">Gốc: ${window.fmt(it.basePrice)}</div>` : ''}
@@ -1037,11 +1038,18 @@
           }
         });
       });
-      /* Wire đổi đơn vị cho SP ngoài DM */
+      /* Wire đổi đơn vị — cho MỌI sản phẩm */
       box.querySelectorAll('.oi-unit').forEach(sel => {
         sel.addEventListener('change', (e) => {
           const it = orderItems[+e.target.dataset.idx];
-          if (it) { it.unit = e.target.value; renderOrderItems(); }
+          if (!it) return;
+          it.unit = e.target.value;
+          /* SP trong DM đổi sang ĐVT KHÁC đơn vị gốc → giá/kg có thể không còn đúng → bắt xác nhận lại giá */
+          if (it.id) {
+            const p = window.productById(it.id);
+            if (p && String(p.unit || '').toLowerCase() !== String(it.unit || '').toLowerCase()) it.priceConfirmed = false;
+          }
+          renderOrderItems();
         });
       });
     }
