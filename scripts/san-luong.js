@@ -230,6 +230,7 @@
   }
   function init() {
     if (!ctl('slFrom')) return;
+    if (window.renderAppShell) window.renderAppShell('san-luong', 'Sản lượng theo sản phẩm');
     const now = window.todayDate ? window.todayDate() : new Date();
     ctl('slFrom').value = isoOf(new Date(now.getFullYear(), now.getMonth(), 1));
     ctl('slTo').value = isoOf(new Date(now.getFullYear(), now.getMonth() + 1, 0));
