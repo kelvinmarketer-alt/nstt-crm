@@ -290,6 +290,7 @@
     'staff.html':      'staff.view',
     'payroll.html':    'payroll.viewSelf',
     'reports.html':    'reports.view',
+    'san-luong.html':  'reports.view',
     /* Modules mới */
     'inventory.html':  'inventory.view',
     'suppliers.html':  'suppliers.view',

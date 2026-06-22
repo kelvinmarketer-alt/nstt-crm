@@ -915,6 +915,7 @@ window.NAV = [
   { section: 'Quản trị', items: [
     { id: 'staff',      label: 'Nhân sự',     icon: '🧑‍💼', href: 'staff.html' },
     { id: 'reports',    label: 'Báo cáo',     icon: '📈', href: 'reports.html' },
+    { id: 'san-luong',  label: 'Sản lượng theo SP', icon: '📦', href: 'san-luong.html' },
     { id: 'marketing',  label: 'Email/Zalo blast', icon: '📨', href: 'marketing.html' },
     { id: 'audit',      label: 'Nhật ký',     icon: '📋', href: 'audit.html' },
     /* tg-bot.html ẩn — chỉ là simulator demo, chưa hoạt động thật.
