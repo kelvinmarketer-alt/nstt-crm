@@ -136,9 +136,66 @@
   const rowCount = document.getElementById('rowCount');
   const footCount = document.getElementById('footCount');
 
+  /* ============ STATS ĐỘNG: số đơn / doanh thu / công nợ tính TRỰC TIẾP từ module ĐƠN HÀNG ============
+     Field orders/revenue/debt lưu trên hồ sơ KH đã cũ (=0). Luôn tính lại từ orders + debtLedger
+     để trang KH KHỚP với Đơn hàng. KHÔNG ghi ngược về catalog/bảng giá. */
+  let _cstats = {};
+  function _ordDate(o) {
+    const raw = o.deliverDate || o.createdAt || o.date || '';
+    let m = String(raw).match(/^(\d{4})-(\d{2})-(\d{2})/);
+    if (m) return new Date(+m[1], +m[2] - 1, +m[3]);
+    m = String(raw).match(/(\d{1,2})\/(\d{1,2})\/(\d{4})/);
+    if (m) return new Date(+m[3], +m[2] - 1, +m[1]);
+    return null;
+  }
+  function _overdueFromCredits(id, credits, paid) {
+    if (!credits || !credits.length) return 0;
+    const days = (window.custCreditDays ? (+window.custCreditDays(id) || 0) : 0) || 7;
+    const now = (window.todayDate ? window.todayDate() : new Date());
+    const sorted = credits.slice().sort((a, b) => (a.date ? a.date.getTime() : 0) - (b.date ? b.date.getTime() : 0));
+    let remain = paid, overdue = 0;
+    sorted.forEach(cr => {
+      let amt = cr.amount;
+      if (remain > 0) { const used = Math.min(remain, amt); amt -= used; remain -= used; }
+      if (amt > 0 && cr.date) { const age = (now - cr.date) / 86400000; if (age > days) overdue += amt; }
+    });
+    return Math.round(overdue);
+  }
+  function rebuildCustStats() {
+    const orders = window.STORE.get('orders', window.ORDERS || []) || [];
+    const ledger = window.STORE.get('debtLedger', []) || [];
+    const m = {};
+    const g = id => m[id] || (m[id] = { orders: 0, revenue: 0, charge: 0, paid: 0, credits: [] });
+    orders.forEach(o => {
+      if (o.status === 'draft' || o.status === 'cancelled') return;
+      const id = o.cust || o.custId; if (!id) return;
+      const s = g(id);
+      s.orders++;
+      const amt = +o.freight || 0;
+      s.revenue += amt;
+      /* công nợ chỉ tính đơn trả bằng Công nợ (credit) */
+      if (/nợ|cong no|credit/i.test(o.payBy || o.pay_by || '')) { s.charge += amt; s.credits.push({ date: _ordDate(o), amount: amt }); }
+    });
+    ledger.forEach(e => { const id = e.custId; if (id && e.type === 'payment') g(id).paid += +e.amount || 0; });
+    Object.keys(m).forEach(id => { const s = m[id]; s.debt = Math.max(0, s.charge - s.paid); s.debtOverdue = _overdueFromCredits(id, s.credits, s.paid); });
+    _cstats = m;
+  }
+  /* Ghi đè (chỉ trong RAM, KHÔNG push cloud) số liệu hiển thị của KH = số tính từ đơn */
+  function enrichCustomerStats() {
+    rebuildCustStats();
+    (customers || []).forEach(c => {
+      const s = _cstats[c.id];
+      c.orders = s ? s.orders : 0;
+      c.revenue = s ? s.revenue : 0;
+      c.debt = s ? s.debt : 0;
+      c.debtOverdue = s ? s.debtOverdue : 0;
+    });
+  }
+
   /* ============ Helper: cập nhật số đếm chip ============ */
   function updateChipCounts() {
     customers = scopeCustomers(window.STORE.get('customers', initialData));
+    enrichCustomerStats();
     const counts = {
       all:   customers.length,
       b2b:   customers.filter(c => c.type !== 'ca-nhan').length,
@@ -379,6 +436,7 @@
 
   /* ============ DRAWER ============ */
   window.openCustomerDrawer = function (id) {
+    enrichCustomerStats();   /* số đơn/doanh thu/công nợ tươi từ module Đơn hàng */
     const c = customers.find(x => x.id === id);
     if (!c) return;
 
@@ -1104,6 +1162,10 @@
 
   /* Subscribe re-render when STORE.customers changes */
   window.STORE.subscribe('customers', render);
+  /* Đơn hàng / sổ công nợ đổi → tính lại số đơn·doanh thu·công nợ trên trang KH */
+  window.STORE.subscribe('orders', render);
+  window.STORE.subscribe('debtLedger', render);
+  window.STORE.subscribe('__preloaded__', k => { if (k === 'orders' || k === 'debtLedger') render(); });
 
   /* Init */
   window.renderAppShell('customers', 'Quản lý khách hàng');
