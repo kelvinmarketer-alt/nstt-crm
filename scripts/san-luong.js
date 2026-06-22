@@ -77,11 +77,24 @@
   const ubFmt = obj => Object.keys(obj).sort((a, b) => a === 'kg' ? -1 : b === 'kg' ? 1 : a.localeCompare(b, 'vi')).map(u => `${fmtNum(obj[u])} ${u}`).join(' · ');
 
   let _last = null;
+  let _view = 'product';   /* 'product' = SP × thời gian · 'cust' = danh sách đối tác (1 khách/dòng) */
   const ctl = id => document.getElementById(id);
+
+  function updateViewBtns() {
+    document.querySelectorAll('[data-slview]').forEach(b => {
+      const on = b.getAttribute('data-slview') === _view;
+      b.style.background = on ? '#15803D' : '#fff';
+      b.style.color = on ? '#fff' : 'var(--navy)';
+    });
+  }
+  window.slSetView = function (v) { _view = (v === 'cust') ? 'cust' : 'product'; updateViewBtns(); window.slRender(); };
 
   window.slRender = function () {
     const fromISO = ctl('slFrom').value, toISO = ctl('slTo').value;
     if (!fromISO || !toISO) { window.toast && window.toast('Chọn từ ngày → đến ngày', 'warn'); return; }
+    updateViewBtns();
+    if (_view === 'cust') { renderCustView(fromISO, toISO); return; }
+
     const gran = ctl('slGran').value || 'ngay';
     const custFilter = ctl('slCust').value || '';
     const custName = custFilter ? (ctl('slCust').selectedOptions[0] || {}).textContent : '';
@@ -94,11 +107,12 @@
       ctl('slSummary').textContent = '';
       return;
     }
-    /* tổng theo cột (theo đơn vị) + tổng chung */
-    const perUnit = {}, totUnit = {};
+    /* Tổng kg theo từng kỳ (gọn 1 dòng) + tổng theo mọi đơn vị (cho dòng tóm tắt) */
+    const kgPer = {}, totUnit = {};
+    let kgTot = 0;
     data.list.forEach(r => {
       totUnit[r.unit] = (totUnit[r.unit] || 0) + r.total;
-      data.periods.forEach(p => { const q = r.byPeriod[p] || 0; if (q) { (perUnit[p] = perUnit[p] || {})[r.unit] = (perUnit[p][r.unit] || 0) + q; } });
+      if (r.unit === 'kg') { data.periods.forEach(p => kgPer[p] = (kgPer[p] || 0) + (r.byPeriod[p] || 0)); kgTot += r.total; }
     });
 
     const head = `<thead><tr>
@@ -112,17 +126,65 @@
       <td class="num"><b>${fmtNum(r.total)}</b> <span style="color:#94A3B8;font-size:10px">${r.unit}</span></td>
     </tr>`).join('')}</tbody>`;
     const foot = `<tfoot><tr>
-      <td class="par">TỔNG (theo đơn vị)</td>
-      ${data.periods.map(p => `<td class="num" style="font-size:10.5px">${perUnit[p] ? ubFmt(perUnit[p]).replace(/ · /g, '<br>') : '·'}</td>`).join('')}
-      <td class="num" style="font-size:10.5px">${ubFmt(totUnit).replace(/ · /g, '<br>')}</td>
+      <td class="par" title="Tổng kg mỗi kỳ — đơn vị khác xem ở dòng Tổng sản lượng phía trên">TỔNG kg/kỳ</td>
+      ${data.periods.map(p => `<td class="num">${kgPer[p] ? fmtNum(kgPer[p]) : '·'}</td>`).join('')}
+      <td class="num"><b>${fmtNum(kgTot)} kg</b></td>
     </tr></tfoot>`;
     tbl.innerHTML = head + body + foot;
 
     const granLabel = gran === 'thang' ? 'tháng' : gran === 'quy' ? 'quý' : 'ngày';
+    const backLink = custFilter ? ` · <a href="javascript:void(0)" onclick="window.slSetView('cust')" style="color:var(--navy);font-weight:700">← Tất cả đối tác</a>` : '';
     ctl('slSummary').innerHTML =
       `📅 <b>${periodLabel(periodOf(fromISO, 'ngay'), 'ngay')} → ${periodLabel(periodOf(toISO, 'ngay'), 'ngay')}</b> · gộp theo <b>${granLabel}</b> · `
-      + `phạm vi: <b>${custFilter ? custName : 'TOÀN CÔNG TY'}</b> · ${data.list.length} mã SP · ${data.nOrders} đơn<br>`
+      + `phạm vi: <b>${custFilter ? custName : 'TOÀN CÔNG TY'}</b> · ${data.list.length} mã SP · ${data.nOrders} đơn${backLink}<br>`
       + `📦 Tổng sản lượng: <b style="color:#15803D">${ubFmt(totUnit)}</b>`;
+  };
+
+  /* === XEM THEO ĐỐI TÁC: 1 khách = 1 dòng → bấm để xem tổng SP của khách đó === */
+  function buildCustList(fromISO, toISO) {
+    const orders = S().get('orders', window.ORDERS || []) || [];
+    const customers = S().get('customers', window.CUSTOMERS || []) || [];
+    const cmap = {}; customers.forEach(c => cmap[c.id] = c);
+    const fromD = new Date(fromISO + 'T00:00:00'), toD = new Date(toISO + 'T23:59:59');
+    const m = {};
+    orders.forEach(o => {
+      if (o.status === 'draft' || o.status === 'cancelled') return;
+      const iso = orderISO(o); if (!iso) return;
+      const od = new Date(iso + 'T00:00:00'); if (isNaN(od) || od < fromD || od > toD) return;
+      const id = o.cust || o.custId; if (!id) return;
+      const r = m[id] || (m[id] = { id, name: o.custName || (cmap[id] && cmap[id].name) || id, orders: 0, units: {}, sku: new Set() });
+      r.orders++;
+      (Array.isArray(o.items) ? o.items : []).forEach(it => {
+        const q = +it.qty || 0; if (!q) return; const u = unitNorm(it.unit);
+        r.units[u] = (r.units[u] || 0) + q;
+        r.sku.add((it.id || it.name || '') + '|' + u);
+      });
+    });
+    return Object.values(m).map(r => ({ id: r.id, name: r.name, orders: r.orders, units: r.units, nSku: r.sku.size }))
+      .sort((a, b) => b.orders - a.orders || a.name.localeCompare(b.name, 'vi'));
+  }
+  function renderCustView(fromISO, toISO) {
+    const list = buildCustList(fromISO, toISO);
+    const tbl = ctl('slTable');
+    if (!list.length) { tbl.innerHTML = `<tbody><tr><td style="padding:30px;text-align:center;color:var(--muted)">Không có đơn nào trong khoảng đã chọn.</td></tr></tbody>`; ctl('slSummary').textContent = ''; return; }
+    tbl.innerHTML = `<thead><tr>
+        <th class="par">ĐỐI TÁC (${list.length})</th>
+        <th class="num">SỐ ĐƠN</th><th class="num">SỐ MÃ SP</th>
+        <th>TỔNG SẢN LƯỢNG (theo đơn vị)</th>
+      </tr></thead>
+      <tbody>${list.map(r => `<tr style="cursor:pointer" onclick="window.slDrillCust('${(r.id || '').replace(/'/g, "\\'")}')">
+        <td class="par"><a href="javascript:void(0)" title="Bấm xem chi tiết sản phẩm của ${(r.name || '').replace(/"/g, '&quot;')}" style="color:var(--navy);font-weight:700;text-decoration:none;border-bottom:1px dotted var(--navy)">${r.name}</a></td>
+        <td class="num"><b>${r.orders}</b></td>
+        <td class="num">${r.nSku}</td>
+        <td style="white-space:normal;font-size:11.5px;color:#15803D;font-weight:600">${ubFmt(r.units)}</td>
+      </tr>`).join('')}</tbody>`;
+    const totOrders = list.reduce((s, r) => s + r.orders, 0);
+    ctl('slSummary').innerHTML = `👥 <b>${list.length}</b> đối tác · ${totOrders} đơn · khoảng <b>${periodLabel(periodOf(fromISO, 'ngay'), 'ngay')} → ${periodLabel(periodOf(toISO, 'ngay'), 'ngay')}</b> — 👉 bấm 1 đối tác để xem <b>tổng sản phẩm</b> của họ.`;
+  }
+  window.slDrillCust = function (id) {
+    const sel = ctl('slCust'); if (sel) sel.value = id;
+    _view = 'product';
+    window.slRender();
   };
 
   /* === Preset === */
