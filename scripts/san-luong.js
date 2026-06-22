@@ -65,7 +65,7 @@
         const unit = unitNorm(it.unit);
         const name = (it.name || '').trim() || '(không tên)';
         const key = (it.id || ('x:' + name.toLowerCase())) + '|' + unit;
-        const r = rows[key] || (rows[key] = { name, unit, byPeriod: {}, total: 0 });
+        const r = rows[key] || (rows[key] = { name, unit, off: (it.id == null || it.custom === true), byPeriod: {}, total: 0 });
         r.byPeriod[per] = (r.byPeriod[per] || 0) + qty;
         r.total += qty;
       });
@@ -120,8 +120,8 @@
       ${data.periods.map(p => `<th class="num">${periodLabel(p, gran)}</th>`).join('')}
       <th class="num" style="background:#DCFCE7">TỔNG</th>
     </tr></thead>`;
-    const body = `<tbody>${data.list.map(r => `<tr>
-      <td class="par" title="${r.name} (${r.unit})">${r.name} <span style="color:#94A3B8;font-size:11px">/${r.unit}</span></td>
+    const body = `<tbody>${data.list.map(r => `<tr${r.off ? ' style="background:#FFFDF5"' : ''}>
+      <td class="par" title="${r.name} (${r.unit})${r.off ? ' · SẢN PHẨM NGOÀI DANH MỤC (khách gõ tay)' : ''}">${r.name} <span style="color:#94A3B8;font-size:11px">/${r.unit}</span>${r.off ? ' <span style="font-size:9px;background:#FEF3C7;color:#92400E;padding:1px 4px;border-radius:3px;font-weight:700">ngoài DM</span>' : ''}</td>
       ${data.periods.map(p => { const v = r.byPeriod[p] || 0; return `<td class="num ${v ? '' : 'z'}">${v ? fmtNum(v) : '·'}</td>`; }).join('')}
       <td class="num"><b>${fmtNum(r.total)}</b> <span style="color:#94A3B8;font-size:10px">${r.unit}</span></td>
     </tr>`).join('')}</tbody>`;
@@ -134,9 +134,10 @@
 
     const granLabel = gran === 'thang' ? 'tháng' : gran === 'quy' ? 'quý' : 'ngày';
     const backLink = custFilter ? ` · <a href="javascript:void(0)" onclick="window.slSetView('cust')" style="color:var(--navy);font-weight:700">← Tất cả đối tác</a>` : '';
+    const offN = data.list.filter(r => r.off).length;
     ctl('slSummary').innerHTML =
       `📅 <b>${periodLabel(periodOf(fromISO, 'ngay'), 'ngay')} → ${periodLabel(periodOf(toISO, 'ngay'), 'ngay')}</b> · gộp theo <b>${granLabel}</b> · `
-      + `phạm vi: <b>${custFilter ? custName : 'TOÀN CÔNG TY'}</b> · ${data.list.length} mã SP · ${data.nOrders} đơn${backLink}<br>`
+      + `phạm vi: <b>${custFilter ? custName : 'TOÀN CÔNG TY'}</b> · ${data.list.length} mã SP${offN ? ` (gồm <b style="color:#92400E">${offN} mã ngoài DM</b>)` : ''} · ${data.nOrders} đơn${backLink}<br>`
       + `📦 Tổng sản lượng: <b style="color:#15803D">${ubFmt(totUnit)}</b>`;
   };
 
@@ -152,15 +153,17 @@
       const iso = orderISO(o); if (!iso) return;
       const od = new Date(iso + 'T00:00:00'); if (isNaN(od) || od < fromD || od > toD) return;
       const id = o.cust || o.custId; if (!id) return;
-      const r = m[id] || (m[id] = { id, name: o.custName || (cmap[id] && cmap[id].name) || id, orders: 0, units: {}, sku: new Set() });
+      const r = m[id] || (m[id] = { id, name: o.custName || (cmap[id] && cmap[id].name) || id, orders: 0, units: {}, sku: new Set(), offSku: new Set() });
       r.orders++;
       (Array.isArray(o.items) ? o.items : []).forEach(it => {
         const q = +it.qty || 0; if (!q) return; const u = unitNorm(it.unit);
         r.units[u] = (r.units[u] || 0) + q;
-        r.sku.add((it.id || it.name || '') + '|' + u);
+        const k = (it.id || it.name || '') + '|' + u;
+        r.sku.add(k);
+        if (it.id == null || it.custom === true) r.offSku.add(k);
       });
     });
-    return Object.values(m).map(r => ({ id: r.id, name: r.name, orders: r.orders, units: r.units, nSku: r.sku.size }))
+    return Object.values(m).map(r => ({ id: r.id, name: r.name, orders: r.orders, units: r.units, nSku: r.sku.size, nOff: r.offSku.size }))
       .sort((a, b) => b.orders - a.orders || a.name.localeCompare(b.name, 'vi'));
   }
   function renderCustView(fromISO, toISO) {
@@ -175,7 +178,7 @@
       <tbody>${list.map(r => `<tr style="cursor:pointer" onclick="window.slDrillCust('${(r.id || '').replace(/'/g, "\\'")}')">
         <td class="par"><a href="javascript:void(0)" title="Bấm xem chi tiết sản phẩm của ${(r.name || '').replace(/"/g, '&quot;')}" style="color:var(--navy);font-weight:700;text-decoration:none;border-bottom:1px dotted var(--navy)">${r.name}</a></td>
         <td class="num"><b>${r.orders}</b></td>
-        <td class="num">${r.nSku}</td>
+        <td class="num">${r.nSku}${r.nOff ? ` <span style="font-size:9px;background:#FEF3C7;color:#92400E;padding:1px 4px;border-radius:3px;font-weight:700" title="${r.nOff} mã ngoài danh mục">${r.nOff} ngoài DM</span>` : ''}</td>
         <td style="white-space:normal;font-size:11.5px;color:#15803D;font-weight:600">${ubFmt(r.units)}</td>
       </tr>`).join('')}</tbody>`;
     const totOrders = list.reduce((s, r) => s + r.orders, 0);
