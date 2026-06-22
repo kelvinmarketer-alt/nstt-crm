@@ -204,7 +204,6 @@
               return o.weight ? `${o.weight} kg` : `${o.qty || 0} ${unitStr}`;
             })()}</td>
           <td class="num" data-field="freight" title="Click để sửa tiền hàng">${window.fmt(o.freight || 0)}</td>
-          <td class="num hide-md" data-field="cod" title="Click để sửa COD">${o.cod ? window.fmt(o.cod) : '—'}</td>
           <td class="hide-md" style="font-size:12px">
             <div><span data-field="driverName" title="Click để đổi shipper">${o.driverName || '—'}</span>${o.external?' <span class="alert-badge warn" style="font-size:9px">ĐT ngoài</span>':''}</div>
             <div style="color:var(--muted);font-size:11px">${o.vehicle || ''}${o.external && o.partnerCost?' · '+window.fmtShort(o.partnerCost)+'đ':''}</div>
@@ -2144,8 +2143,7 @@ CHỈ TRẢ JSON, không giải thích gì thêm.`;
     { idx: 4, key: 'drop',     label: 'Giao đến' },
     { idx: 5, key: 'goods',    label: 'Hàng' },
     { idx: 6, key: 'freight',  label: 'Tiền hàng' },
-    { idx: 7, key: 'cod',      label: 'COD' },
-    { idx: 8, key: 'shipper',  label: 'Shipper / Xe' },
+    { idx: 7, key: 'shipper',  label: 'Shipper / Xe' },
   ];
   function getOrdColPrefs() {
     const p = window.STORE.get('ordColPrefs', null);

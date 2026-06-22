@@ -304,7 +304,6 @@
       const groupTag = c.group === 'VIP' ? 'tag-vip'
                       : c.group === 'Mới' ? 'tag-moi'
                       : c.group === 'Inactive' ? 'tag-inact' : 'tag-thuong';
-      const tm = typeMeta(c.type);
       const debtCls = c.debtOverdue > 0 ? 'danger' : c.debt > 0 ? 'warn' : 'ok';
       const debtVal = c.debt > 0 ? window.fmt(c.debt) : '—';
       const overdueBadge = c.debtOverdue > 0
@@ -322,7 +321,6 @@
             </div>
           </div>
         </td>
-        <td class="hide-sm" data-field="type"><span class="tag" style="background:${tm.color}1f;color:${tm.color}">${tm.label}</span></td>
         <td class="hide-md" data-field="province">${c.province}</td>
         <td class="hide-md" data-field="orderFreq" style="font-size:12px;color:var(--muted)">${freqLabel(c.orderFreq)}</td>
         <td class="hide-md" data-field="staffOwner"><span class="staff-pill">${c.staffOwner}</span></td>
@@ -933,14 +931,13 @@
 
   /* ============ CỘT HIỂN THỊ ============ */
   const COL_DEFS = [
-    { idx: 2, key: 'type',      label: 'Loại hình' },
-    { idx: 3, key: 'province',  label: 'Tỉnh/TP' },
-    { idx: 4, key: 'freq',      label: 'Tần suất đặt' },
-    { idx: 5, key: 'staff',     label: 'NV phụ trách' },
-    { idx: 6, key: 'orders',    label: 'Số đơn' },
-    { idx: 7, key: 'revenue',   label: 'Doanh thu' },
-    { idx: 8, key: 'debt',      label: 'Công nợ' },
-    { idx: 9, key: 'lastContact', label: 'Liên hệ cuối' },
+    { idx: 2, key: 'province',  label: 'Tỉnh/TP' },
+    { idx: 3, key: 'freq',      label: 'Tần suất đặt' },
+    { idx: 4, key: 'staff',     label: 'NV phụ trách' },
+    { idx: 5, key: 'orders',    label: 'Số đơn' },
+    { idx: 6, key: 'revenue',   label: 'Doanh thu' },
+    { idx: 7, key: 'debt',      label: 'Công nợ' },
+    { idx: 8, key: 'lastContact', label: 'Liên hệ cuối' },
   ];
   function getColPrefs() {
     const p = window.STORE.get('custColPrefs', null);
