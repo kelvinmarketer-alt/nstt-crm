@@ -454,6 +454,13 @@
       return _data[key];
     },
 
+    /* Snapshot cloud gần nhất (JS-shape) của 1 bảng — KHÔNG bị RAM ghi đè tại chỗ.
+       Dùng để so sánh "giá trị đang lưu trên cloud" vs giá trị tính lại, tránh ghi thừa. */
+    cloudSnapshot(key) {
+      if (_synced[key] == null) return null;
+      try { return JSON.parse(_synced[key]); } catch (e) { return null; }
+    },
+
     /* Set toàn bộ — DIFF-SYNC: nếu là array và TABLE_MAP có key,
        sẽ so sánh cache cũ với value mới rồi push delta (insert/update/delete) lên Supabase. */
     set(key, value) {

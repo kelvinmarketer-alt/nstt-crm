@@ -180,7 +180,7 @@
     Object.keys(m).forEach(id => { const s = m[id]; s.debt = Math.max(0, s.charge - s.paid); s.debtOverdue = _overdueFromCredits(id, s.credits, s.paid); });
     _cstats = m;
   }
-  /* Ghi đè (chỉ trong RAM, KHÔNG push cloud) số liệu hiển thị của KH = số tính từ đơn */
+  /* Ghi đè (trong RAM) số liệu hiển thị của KH = số tính từ đơn, RỒI ghi ngược cloud nếu lệch */
   function enrichCustomerStats() {
     rebuildCustStats();
     (customers || []).forEach(c => {
@@ -190,6 +190,40 @@
       c.debt = s ? s.debt : 0;
       c.debtOverdue = s ? s.debtOverdue : 0;
     });
+    persistCustStatsToCloud();
+  }
+
+  /* Ghi số đã tính (đơn/doanh thu/công nợ/quá hạn) NGƯỢC lại bảng customers trên cloud,
+     CHỈ khi khác số đang lưu → bảng thô luôn đúng (web/export đọc trực tiếp không còn thấy 0).
+     Tự hội tụ: ghi xong snapshot khớp → lần sau bỏ qua, KHÔNG gây vòng lặp realtime.
+     So sánh với cloudSnapshot (số cloud thật), KHÔNG so với cache (đã bị RAM ghi đè). */
+  let _lastPersistAt = 0;
+  const _persistSig = {};   /* id -> chữ ký đã push trong phiên (chặn push trùng khi đang bay) */
+  function persistCustStatsToCloud() {
+    try {
+      if (!window.STORE || !window.STORE.cloudSnapshot) return;
+      if (!(window.SUPABASE_CONFIG && window.SUPABASE_CONFIG.mode === 'supabase' && window.SB_DATA)) return;
+      const now = Date.now();
+      if (now - _lastPersistAt < 4000) return;   /* throttle: tối đa ~1 lần / 4 giây */
+      const snap = window.STORE.cloudSnapshot('customers');
+      if (!Array.isArray(snap)) return;           /* chưa có snapshot cloud → chờ sync xong */
+      _lastPersistAt = now;
+      const byId = {}; snap.forEach(r => { if (r && r.id != null) byId[r.id] = r; });
+      let pushed = 0;
+      (customers || []).forEach(c => {
+        const cur = byId[c.id]; if (!cur) return;   /* chỉ cập nhật KH đã có trên cloud */
+        const o = +c.orders || 0, rev = +c.revenue || 0, d = +c.debt || 0, ov = +c.debtOverdue || 0;
+        const same = (+cur.orders || 0) === o && (+cur.revenue || 0) === rev
+                  && (+cur.debt || 0) === d && (+cur.debtOverdue || 0) === ov;
+        if (same) return;
+        const sig = o + '|' + rev + '|' + d + '|' + ov;
+        if (_persistSig[c.id] === sig) return;      /* đã push số này rồi, đang chờ realtime về */
+        _persistSig[c.id] = sig;
+        window.STORE.update('customers', c.id, { orders: o, revenue: rev, debt: d, debtOverdue: ov });
+        pushed++;
+      });
+      if (pushed) console.log('[custStats→cloud] đồng bộ', pushed, 'KH');
+    } catch (e) { console.warn('[persistCustStatsToCloud]', e); }
   }
 
   /* ============ Helper: cập nhật số đếm chip ============ */
