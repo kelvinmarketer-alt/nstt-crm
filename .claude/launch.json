@@ -4,7 +4,7 @@
     {
       "name": "tuantu",
       "runtimeExecutable": "python3",
-      "runtimeArgs": ["-m", "http.server", "8137", "--directory", "/Users/macos/Desktop/App - tuan-tu-farm"],
+      "runtimeArgs": ["-m", "http.server", "8137", "--directory", "/Users/macos/Desktop/Nông sản tuấn tú document/App - tuan-tu-farm"],
       "port": 8137
     }
   ]

@@ -323,7 +323,6 @@
           </div>
         </td>
         <td class="hide-sm" data-field="type"><span class="tag" style="background:${tm.color}1f;color:${tm.color}">${tm.label}</span></td>
-        <td class="hide-sm" data-field="group"><span class="tag ${groupTag}">${c.group}</span></td>
         <td class="hide-md" data-field="province">${c.province}</td>
         <td class="hide-md" data-field="orderFreq" style="font-size:12px;color:var(--muted)">${freqLabel(c.orderFreq)}</td>
         <td class="hide-md" data-field="staffOwner"><span class="staff-pill">${c.staffOwner}</span></td>
@@ -935,14 +934,13 @@
   /* ============ CỘT HIỂN THỊ ============ */
   const COL_DEFS = [
     { idx: 2, key: 'type',      label: 'Loại hình' },
-    { idx: 3, key: 'group',     label: 'Nhóm' },
-    { idx: 4, key: 'province',  label: 'Tỉnh/TP' },
-    { idx: 5, key: 'freq',      label: 'Tần suất đặt' },
-    { idx: 6, key: 'staff',     label: 'NV phụ trách' },
-    { idx: 7, key: 'orders',    label: 'Số đơn' },
-    { idx: 8, key: 'revenue',   label: 'Doanh thu' },
-    { idx: 9, key: 'debt',      label: 'Công nợ' },
-    { idx: 10, key: 'lastContact', label: 'Liên hệ cuối' },
+    { idx: 3, key: 'province',  label: 'Tỉnh/TP' },
+    { idx: 4, key: 'freq',      label: 'Tần suất đặt' },
+    { idx: 5, key: 'staff',     label: 'NV phụ trách' },
+    { idx: 6, key: 'orders',    label: 'Số đơn' },
+    { idx: 7, key: 'revenue',   label: 'Doanh thu' },
+    { idx: 8, key: 'debt',      label: 'Công nợ' },
+    { idx: 9, key: 'lastContact', label: 'Liên hệ cuối' },
   ];
   function getColPrefs() {
     const p = window.STORE.get('custColPrefs', null);
