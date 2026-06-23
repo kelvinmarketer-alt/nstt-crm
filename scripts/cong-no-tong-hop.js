@@ -291,16 +291,18 @@
       .sign{display:flex;justify-content:space-around;margin-top:14px;font-size:12px;text-align:center}
       .toolbar{position:sticky;top:0;background:#fff;padding:8px 0 12px;display:flex;gap:8px;justify-content:center}
       .toolbar button{padding:8px 16px;border:none;border-radius:7px;font-size:13px;font-weight:700;cursor:pointer}
-      .b1{background:#1B5E20;color:#fff}.b2{background:#E8A33D;color:#fff}
+      .b1{background:#1B5E20;color:#fff}.b2{background:#E8A33D;color:#fff}.b3{background:#2563EB;color:#fff}.b4{background:#fff;color:#1B5E20;border:1px solid #1B5E20 !important}
       @media print{.toolbar{display:none}body{padding:0}}
     </style></head><body>
     <div class="toolbar">
+      <button class="b3" onclick="copyImg()">📸 Copy ảnh gửi khách</button>
+      <button class="b4" onclick="downloadImg()">⬇ Tải ảnh</button>
       <button class="b1" onclick="window.print()">🖨 In phiếu</button>
       <button class="b2" onclick="copyTxt()">📋 Copy nội dung</button>
     </div>
     <div class="pg" id="pg">
       <div class="hd">
-        <img src="${location.origin}/assets/logo.png" onerror="this.style.display='none'">
+        <img src="${location.origin}/assets/logo.png" crossorigin="anonymous" onerror="this.style.display='none'">
         <div class="cinfo">
           <b>${comp.name}</b><br>
           Mã Số Thuế: ${comp.tax}<br>
@@ -309,7 +311,7 @@
           Email: ${comp.email} &nbsp;·&nbsp; GĐĐH: ${comp.director}
         </div>
         <div class="qrbox" style="flex:0 0 auto;text-align:center;min-width:138px">
-          <img src="${qrUrl}" alt="VietQR chuyển khoản" style="width:132px;height:132px;object-fit:contain;border:1px solid #1B5E20;border-radius:8px;padding:3px;background:#fff" onerror="this.style.opacity='0.15'">
+          <img src="${qrUrl}" alt="VietQR chuyển khoản" crossorigin="anonymous" style="width:132px;height:132px;object-fit:contain;border:1px solid #1B5E20;border-radius:8px;padding:3px;background:#fff" onerror="this.style.opacity='0.15'">
           <div style="font-size:10px;color:#1B5E20;font-weight:700;margin-top:2px">Quét QR để chuyển khoản</div>
           <div style="font-size:9.5px;color:#555">${comp.bank}</div>
         </div>
@@ -333,7 +335,37 @@
       </div>
       <div class="sign"><div><b>Đại Diện Bên Bán</b><br>(Ký, Đóng dấu)</div><div><b>Kế Toán Bên Bán</b><br>(Ký, Ghi Rõ Họ Tên)</div><div><b>Kế Toán Bên Mua</b><br>(Ký, Ghi Rõ Họ Tên)</div></div>
     </div>
+    <script src="https://cdn.jsdelivr.net/npm/html2canvas@1.4.1/dist/html2canvas.min.js"></script>
     <script>
+      var _imgName = ${JSON.stringify('cong-no-' + ((c.name || 'khach').normalize('NFD').replace(/[̀-ͯ]/g, '').replace(/đ/gi, 'd').replace(/[^a-zA-Z0-9]+/g, '-').replace(/^-+|-+$/g, '').toLowerCase() || 'khach') + '-' + ddmm(_last.toISO))};
+      async function _snap(){
+        if(!window.html2canvas){ alert('Thư viện ảnh đang tải, đợi 1-2 giây rồi bấm lại.'); return null; }
+        var el=document.getElementById('pg');
+        return await window.html2canvas(el,{scale:2,useCORS:true,backgroundColor:'#ffffff',logging:false});
+      }
+      function _dl(blob){
+        var a=document.createElement('a'); a.href=URL.createObjectURL(blob); a.download=_imgName+'.png';
+        document.body.appendChild(a); a.click(); a.remove();
+        setTimeout(function(){URL.revokeObjectURL(a.href);},3000);
+      }
+      async function copyImg(){
+        try{
+          var cv=await _snap(); if(!cv) return;
+          cv.toBlob(async function(blob){
+            try{
+              await navigator.clipboard.write([new ClipboardItem({'image/png':blob})]);
+              alert('✓ Đã copy ẢNH phiếu — dán thẳng vào Zalo/Messenger gửi khách (Ctrl+V / Cmd+V).');
+            }catch(err){
+              _dl(blob);
+              alert('Trình duyệt không cho copy ảnh trực tiếp → đã TẢI ảnh .png về máy. Anh gửi file ảnh đó cho khách.');
+            }
+          },'image/png');
+        }catch(e){ alert('Lỗi tạo ảnh: '+(e&&e.message||e)); }
+      }
+      async function downloadImg(){
+        try{ var cv=await _snap(); if(!cv) return; cv.toBlob(function(blob){ _dl(blob); },'image/png'); }
+        catch(e){ alert('Lỗi tạo ảnh: '+(e&&e.message||e)); }
+      }
       function copyTxt(){
         var lines=[${JSON.stringify(comp.name)},'MST: '+${JSON.stringify(comp.tax)},'',
           'THÔNG BÁO CÔNG NỢ – KIÊM ĐỀ NGHỊ THANH TOÁN',
