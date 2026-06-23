@@ -147,6 +147,7 @@
     const customers = window.STORE.get('customers', []) || [];
     const orders = window.STORE.get('orders', []) || [];
     _parsed = [];
+    const seenSig = new Set();   /* chống TRÙNG TRONG LÔ: cùng khách+ngày+tổng+số mã chỉ tính 1 lần */
     for (const f of files) {
       try {
         const buf = await f.arrayBuffer();
@@ -167,7 +168,10 @@
               && (o.deliverDate === d.iso || (o.date || '').slice(0, 10) === d.vn.split('/').reverse().join('-'))
               && Math.abs((+o.freight || 0) - p.total) < 1;
           });
-          _parsed.push({ file: f.name, sheet: sn, ...p, date: d, match, matchBy, dup, pick: !dup && !!d });
+          const sig = `${nkey(p.custName)}|${nkey(p.addr)}|${d ? d.iso : '?'}|${p.total}|${p.items.length}`;
+          const dupInBatch = seenSig.has(sig);
+          if (!dupInBatch) seenSig.add(sig);
+          _parsed.push({ file: f.name, sheet: sn, ...p, date: d, match, matchBy, dup, dupInBatch, pick: !dup && !dupInBatch && !!d });
         }
       } catch (e) { _parsed.push({ file: f.name, error: String(e.message || e), pick: false }); }
     }
@@ -198,12 +202,13 @@
         <thead><tr><th style="width:34px"></th><th>Khách (trên phiếu)</th><th>Địa chỉ</th><th>Ngày</th><th class="num">Số mã</th><th class="num">Tổng / Lãi</th><th>Khách trong app</th></tr></thead>
         <tbody>${_parsed.map((p, i) => {
       if (p.error) return `<tr><td></td><td colspan="6" style="color:#B91C1C">⚠ ${esc(p.file)}: ${esc(p.error)}</td></tr>`;
-      const canPick = !p.dup && !!p.date;
+      const canPick = !p.dup && !p.dupInBatch && !!p.date;
       const addrCell = p.addr
         ? `<span style="font-size:11px;color:var(--muted)">${esc(p.addr)}</span>`
         : `<span style="font-size:11px;color:#B45309" title="Phiếu không có địa chỉ → khớp khách theo tên">⚠ thiếu địa chỉ</span>`;
       let custCell;
-      if (p.dup) custCell = '<span style="color:#B45309">⏭ Đã có đơn này — bỏ qua</span>';
+      if (p.dupInBatch) custCell = '<span style="color:#B45309">⏭ Trùng trong lô — bỏ qua (phiếu y hệt đã có ở trên)</span>';
+      else if (p.dup) custCell = '<span style="color:#B45309">⏭ Đã có đơn này — bỏ qua</span>';
       else if (!p.date) custCell = '<span style="color:#B91C1C">⚠ Không đọc được ngày</span>';
       else {
         const r = resolveCust(p, customers);
@@ -239,11 +244,18 @@
     renderPreview();
   };
 
+  let _committing = false;   /* khóa chống bấm "Tạo đơn" 2 lần → tạo trùng */
   window._phieuCommit = function () {
+    if (_committing) return;                      /* đang ghi → bỏ qua click thứ 2 */
     const rows = _parsed.filter(p => p.pick && p.date && p.total);
     if (!rows.length) { window.toast('Không có phiếu nào để tạo', 'warn'); return; }
+    _committing = true;
+    const btn = document.getElementById('phieuCommitBtn'); if (btn) { btn.disabled = true; btn.textContent = 'Đang tạo…'; }
     const me = (window.AUTH && window.AUTH.currentUser && window.AUTH.currentUser()) || {};
-    const todayVN = new Date().toLocaleDateString('vi-VN');
+    const now = new Date();
+    const todayVN = now.toLocaleDateString('vi-VN');
+    const hhmm = String(now.getHours()).padStart(2, '0') + ':' + String(now.getMinutes()).padStart(2, '0');
+    const nowISO = now.toISOString();
     /* Danh sách khách "sống" (gồm KH mới tạo trong lượt này) để khớp ưu-tiên-địa-chỉ */
     const liveCustomers = (window.STORE.get('customers', []) || []).slice();
     let nCust = 0, nOrder = 0;
@@ -275,8 +287,10 @@
       const orderCustName = mm ? mm.c.name : p.custName;
       const order = {
         code: window.STORE.nextOrderCode(),
-        date: p.date.vn, createdAt: new Date(p.date.iso + 'T08:00:00').toISOString(),
-        deliverDate: p.date.iso, deliveredAt: p.date.vn,
+        /* NGÀY đơn = ngày trên phiếu (đúng kỳ) + GIỜ UP THẬT (hết hiện 00:00) ·
+           createdAt = thời điểm up thật để audit đúng */
+        date: p.date.vn + ' ' + hhmm, createdAt: nowISO,
+        deliverDate: p.date.iso, deliveredAt: p.date.vn + ' ' + hhmm,
         cust: custId, custName: orderCustName, custPhone: '',
         serviceType: '', transportMode: 'giao-ngay',
         pickup: 'Kho Tuấn Tú', drop: p.addr || '',
@@ -290,6 +304,8 @@
       window.STORE.add('orders', order);
       nOrder++;
     });
+    _parsed = [];          /* xóa lô đã ghi → click lần 2 KHÔNG tạo lại */
+    _committing = false;
     window.closeModal();
     window.toast(`✓ Đã tạo ${nOrder} đơn${nCust ? ' · ' + nCust + ' khách mới' : ''} — công nợ đã cập nhật.`, 'success');
     /* Refresh đúng ngữ cảnh: trang Công nợ CFO → cnRender; trang Đơn → renderOrders; còn lại reload */
