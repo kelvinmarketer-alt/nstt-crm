@@ -83,6 +83,15 @@
   function _getStaffAuth() {
     try { return (window.STORE && window.STORE.get('staffAuth', {})) || {}; } catch (e) { return {}; }
   }
+  /* Lấy staffAuth ĐÚNG NHẤT: ưu tiên CLOUD (tránh ghi đè local thiếu → mất mật khẩu NV khác,
+     và để login thấy mật khẩu vừa đặt ở máy khác). Offline → dùng local. */
+  async function _getStaffAuthCloud() {
+    let map = _getStaffAuth();
+    if (window.SB_DATA && window.SB_DATA.getKv) {
+      try { const cloud = await window.SB_DATA.getKv('staffAuth'); if (cloud && typeof cloud === 'object') map = cloud; } catch (e) { /* offline */ }
+    }
+    return map || {};
+  }
 
   /* Đăng nhập bằng bản ghi nhân viên: SĐT (hoặc email/mã NV) + mật khẩu mặc định.
      async vì trên máy mới (login page chưa cache staff) phải fetch từ Supabase. */
@@ -101,7 +110,8 @@
     if (!st) return null;
     if (st.status === 'inactive' || st.status === 'off' || st.status === 'nghỉ') return { _locked: true };
     const sid = st.id || st.code;
-    const custom = _getStaffAuth()[sid];
+    /* staffAuth ưu tiên cloud (mật khẩu vừa đặt / đặt ở máy khác chưa sync về local) */
+    const custom = (await _getStaffAuthCloud())[sid];
     if (custom && custom.hash) {
       /* NV đã đặt mật khẩu riêng → so hash (mặc định KHÔNG còn dùng được) */
       if ((await _hashPwd(sid, password)) !== custom.hash) return null;
@@ -368,7 +378,7 @@
       if (!newPwd || newPwd.length < 6) return { success: false, error: 'Mật khẩu mới tối thiểu 6 ký tự.' };
       if (confirmPwd != null && newPwd !== confirmPwd) return { success: false, error: 'Xác nhận mật khẩu không khớp.' };
       const sid = u.staffId;
-      const map = _getStaffAuth();
+      const map = await _getStaffAuthCloud();   /* gốc = cloud → không xóa mật khẩu NV khác */
       /* Xác minh mật khẩu hiện tại */
       let curOk = false;
       const cur = map[sid];
@@ -390,7 +400,7 @@
     async setStaffPassword(staffId, newPwd) {
       if (!staffId) return { success: false, error: 'Thiếu mã NV.' };
       if (!newPwd || newPwd.length < 6) return { success: false, error: 'Mật khẩu tối thiểu 6 ký tự.' };
-      const map = _getStaffAuth();
+      const map = await _getStaffAuthCloud();   /* gốc = cloud → không xóa mật khẩu NV khác */
       map[staffId] = { hash: await _hashPwd(staffId, newPwd), updatedAt: new Date().toISOString() };
       window.STORE.set('staffAuth', map);
       const me = this.currentUser();
@@ -398,8 +408,8 @@
       return { success: true };
     },
     /* Admin reset 1 NV về mật khẩu mặc định (Tuantu@2026) — xoá mật khẩu cá nhân */
-    resetStaffAuth(staffId) {
-      const map = _getStaffAuth();
+    async resetStaffAuth(staffId) {
+      const map = await _getStaffAuthCloud();   /* gốc = cloud → không xóa mật khẩu NV khác */
       if (map[staffId]) { delete map[staffId]; window.STORE.set('staffAuth', map); }
       const me = this.currentUser();
       this.logActivity(me && me.staffId, 'password.reset', 'Reset mật khẩu NV ' + staffId + ' về mặc định');

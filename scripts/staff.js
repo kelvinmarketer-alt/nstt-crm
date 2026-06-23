@@ -493,31 +493,19 @@
       address: window.formVal('#nAddress') || '',
     };
 
-    /* Step 1: Tạo Supabase Auth user (nếu chọn) */
-    let authUserId = null;
-    if (createAuth && window.AUTH?.signUp) {
-      const btn = document.querySelector('.modal-foot .btn-primary');
-      if (btn) { btn.disabled = true; btn.innerHTML = '⏳ Đang tạo tài khoản...'; }
-      const result = await window.AUTH.signUp(email, password, code);
-      if (!result.success) {
-        if (btn) { btn.disabled = false; btn.innerHTML = '💾 Lưu NV + Tạo tài khoản'; }
-        const errMsg = result.error.includes('already registered')
-          ? `❌ Email "${email}" đã tồn tại. Đổi email khác hoặc bỏ tick "Tạo tài khoản".`
-          : '❌ ' + result.error;
-        window.toast(errMsg, 'danger');
-        return;
-      }
-      authUserId = result.user?.id;
-    }
-
-    /* Step 2: Thêm staff record */
+    /* Tạo staff record */
     window.STORE.add('staff', newNV);
 
-    /* Step 3: Link user_id nếu có Supabase */
-    if (authUserId && window.SB) {
-      try {
-        await window.SB.from('staff').update({ user_id: authUserId }).eq('id', code);
-      } catch (e) { console.warn('[Staff] link user_id', e); }
+    /* Đặt MẬT KHẨU đăng nhập = hash 'staffAuth' (cái mà staffLogin THỰC SỰ kiểm) →
+       NV login được NGAY bằng SĐT/Email + mật khẩu này, không phụ thuộc Supabase Auth.
+       Supabase Auth (nếu có cấu hình) chỉ là phụ — lỗi KHÔNG chặn việc tạo NV. */
+    if (createAuth) {
+      const btn = document.querySelector('.modal-foot .btn-primary');
+      if (btn) { btn.disabled = true; btn.innerHTML = '⏳ Đang tạo tài khoản...'; }
+      if (window.AUTH?.setStaffPassword) {
+        try { await window.AUTH.setStaffPassword(code, password); } catch (e) { console.warn('[addStaff setPwd]', e); }
+      }
+      if (window.AUTH?.signUp) { try { await window.AUTH.signUp(email, password, code); } catch (e) { /* phụ, bỏ qua */ } }
     }
 
     window.closeModal();
@@ -533,7 +521,7 @@
           <div style="background:#FAFAFB;border:1px solid var(--line);border-radius:10px;padding:16px">
             <div style="font-size:11.5px;color:var(--muted);text-transform:uppercase;font-weight:700;margin-bottom:8px">📤 Gửi thông tin này cho NV:</div>
             <div style="font-family:ui-monospace,monospace;font-size:13.5px;line-height:1.8">
-              🌐 URL app:   <b style="color:var(--navy)">vty-logistics.onrender.com</b><br>
+              🌐 URL app:   <b style="color:var(--navy)">${location.host}</b><br>
               📧 Email:     <b style="color:var(--navy)">${email}</b><br>
               🔑 Mật khẩu:  <b style="color:var(--red);background:#FEF3C7;padding:1px 8px;border-radius:4px">${password}</b><br>
               👤 Vai trò:   <b style="color:var(--navy)">${newNV.role}</b><br>
