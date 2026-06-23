@@ -11,14 +11,32 @@
   const low = s => norm(s).toLowerCase();
   const nkey = s => low(s).normalize('NFD').replace(/[̀-ͯ]/g, '').replace(/đ/g, 'd').replace(/[^a-z0-9]+/g, ' ').trim();
   /* Khớp khách: ƯU TIÊN ĐỊA CHỈ (tên hay gõ sai, địa chỉ thường nhập đúng).
-     Địa chỉ trống → khớp theo TÊN. Trả {c, by:'addr'|'name'} hoặc null. */
+     Địa chỉ trống → khớp TÊN chính xác → cuối cùng khớp TÊN "chứa nhau"
+     (vd phiếu "Veteran" ↔ app "Hùng - NH Veteran"), yêu cầu phần khớp ≥4 ký tự để tránh nhầm.
+     Trả {c, by:'addr'|'name'|'name~'} hoặc null. */
   function matchCustomer(custList, name, addr) {
+    const list = custList || [];
     const a = nkey(addr);
-    if (a) { const hit = (custList || []).find(c => nkey(c.address) === a); if (hit) return { c: hit, by: 'addr' }; }
+    if (a) { const hit = list.find(c => nkey(c.address) === a); if (hit) return { c: hit, by: 'addr' }; }
     const n = nkey(name);
-    if (n) { const hit = (custList || []).find(c => nkey(c.name) === n); if (hit) return { c: hit, by: 'name' }; }
+    if (n) {
+      const exact = list.find(c => nkey(c.name) === n); if (exact) return { c: exact, by: 'name' };
+      const fuzzy = list.find(c => {
+        const cn = nkey(c.name); if (!cn) return false;
+        return (n.length >= 4 && cn.includes(n)) || (cn.length >= 4 && n.includes(cn));
+      });
+      if (fuzzy) return { c: fuzzy, by: 'name~' };
+    }
     return null;
   }
+  /* Quyết định khách của 1 phiếu = lựa chọn TAY (nếu có) → nếu không thì khớp tự động.
+     p.forceCustId: undefined = tự động · '' = ép tạo mới · '<id>' = gộp vào KH đó. */
+  function resolveCust(p, list) {
+    if (p.forceCustId === '') return null;                       /* user ép tạo mới */
+    if (p.forceCustId) { const c = (list || []).find(x => x.id === p.forceCustId); if (c) return { c, by: 'manual' }; }
+    return matchCustomer(list, p.custName, p.addr);              /* tự động */
+  }
+  const _byLabel = { addr: 'khớp địa chỉ', name: 'khớp tên', 'name~': 'khớp tên gần đúng', manual: 'gộp tay' };
 
   /* ===== Parser 1 phiếu từ lưới 2D (mảng các hàng) ===== */
   function parsePhieu(grid) {
@@ -160,43 +178,66 @@
     const prev = document.getElementById('phieuPreview');
     const btn = document.getElementById('phieuCommitBtn');
     if (!_parsed.length) { prev.innerHTML = '<div style="color:#B45309;font-size:12.5px;padding:8px">Không đọc được phiếu hợp lệ nào trong file đã chọn.</div>'; if (btn) btn.disabled = true; return; }
+    const esc = s => String(s == null ? '' : s).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/"/g, '&quot;');
+    const customers = (window.STORE.get('customers', []) || []).slice().sort((a, b) => (a.name || '').localeCompare(b.name || '', 'vi'));
     const picks = _parsed.filter(p => p.pick);
     const willCreate = picks.length;
-    const newCusts = new Set(picks.filter(p => !p.match).map(p => nkey(p.addr) || nkey(p.custName))).size;
+    const newKeys = new Set();
+    picks.forEach(p => { if (!resolveCust(p, customers)) newKeys.add(nkey(p.addr) || nkey(p.custName)); });
+    const newCusts = newKeys.size;
     const fmt = v => (+v || 0).toLocaleString('vi-VN');
     const gRev = picks.reduce((s, p) => s + (+p.total || 0), 0);
     const gCost = picks.reduce((s, p) => s + (+p.buyTotal || 0), 0);
     const gProfit = gRev - gCost;
     prev.innerHTML = `
       <div style="font-size:12.5px;margin-bottom:8px"><b>${_parsed.length}</b> phiếu đọc được · sẽ tạo <b style="color:#15803D">${willCreate}</b> đơn${newCusts ? ` · tạo mới <b>${newCusts}</b> khách` : ''}
-        ${gRev ? `<br>Doanh thu <b>${fmt(gRev)}</b>${gCost ? ` · giá vốn <b>${fmt(gCost)}</b> · lãi <b style="color:#15803D">${fmt(gProfit)}</b> (${gRev ? (Math.round(gProfit / gRev * 1000) / 10) : 0}%)` : ' · <span style="color:#B45309">phiếu không có cột giá nhập → lãi ước tính</span>'}` : ''}</div>
+        ${gRev ? `<br>Doanh thu <b>${fmt(gRev)}</b>${gCost ? ` · giá vốn <b>${fmt(gCost)}</b> · lãi <b style="color:#15803D">${fmt(gProfit)}</b> (${gRev ? (Math.round(gProfit / gRev * 1000) / 10) : 0}%)` : ' · <span style="color:#B45309">phiếu không có cột giá nhập → lãi ước tính</span>'}` : ''}
+        <br><span style="color:var(--muted);font-size:11px">💡 Cột "Khách trong app" sai? Bấm chọn lại: <b>Tự động</b> / <b>Tạo mới</b> / hoặc gộp vào khách có sẵn.</span></div>
       <div style="max-height:340px;overflow:auto;border:1px solid var(--line);border-radius:8px">
       <table class="mini-table" style="margin:0;font-size:12px">
-        <thead><tr><th style="width:34px"></th><th>Khách hàng</th><th>Địa chỉ</th><th>Ngày</th><th class="num">Số mã</th><th class="num">Tổng / Lãi</th><th>Trạng thái</th></tr></thead>
+        <thead><tr><th style="width:34px"></th><th>Khách (trên phiếu)</th><th>Địa chỉ</th><th>Ngày</th><th class="num">Số mã</th><th class="num">Tổng / Lãi</th><th>Khách trong app</th></tr></thead>
         <tbody>${_parsed.map((p, i) => {
-      if (p.error) return `<tr><td></td><td colspan="6" style="color:#B91C1C">⚠ ${p.file}: ${p.error}</td></tr>`;
-      const st = p.dup ? '<span style="color:#B45309">⏭ Đã có — bỏ qua</span>'
-        : !p.date ? '<span style="color:#B91C1C">⚠ Không đọc được ngày</span>'
-          : p.match ? `<span style="color:#15803D">✓ ${p.match.name} <span style="color:var(--muted);font-size:10px">(${p.match.code} · khớp ${p.matchBy === 'addr' ? 'địa chỉ' : 'tên'})</span></span>`
-            : '<span style="color:#2563EB">🆕 Sẽ tạo khách mới</span>';
-      const addrCell = p.addr
-        ? `<span style="font-size:11px;color:var(--muted)">${p.addr}</span>`
-        : `<span style="font-size:11px;color:#B45309" title="Phiếu không có địa chỉ → khớp khách theo tên">⚠ thiếu địa chỉ</span>`;
+      if (p.error) return `<tr><td></td><td colspan="6" style="color:#B91C1C">⚠ ${esc(p.file)}: ${esc(p.error)}</td></tr>`;
       const canPick = !p.dup && !!p.date;
+      const addrCell = p.addr
+        ? `<span style="font-size:11px;color:var(--muted)">${esc(p.addr)}</span>`
+        : `<span style="font-size:11px;color:#B45309" title="Phiếu không có địa chỉ → khớp khách theo tên">⚠ thiếu địa chỉ</span>`;
+      let custCell;
+      if (p.dup) custCell = '<span style="color:#B45309">⏭ Đã có đơn này — bỏ qua</span>';
+      else if (!p.date) custCell = '<span style="color:#B91C1C">⚠ Không đọc được ngày</span>';
+      else {
+        const r = resolveCust(p, customers);
+        const sel = p.forceCustId === undefined ? '__auto__' : (p.forceCustId === '' ? '__new__' : p.forceCustId);
+        const lbl = r ? `<span style="color:#15803D">→ ${esc(r.c.name)} <span style="color:var(--muted)">(${esc(r.c.code)} · ${_byLabel[r.by]})</span></span>`
+          : '<span style="color:#2563EB">🆕 Tạo khách mới</span>';
+        const opts = `<option value="__auto__" ${sel === '__auto__' ? 'selected' : ''}>↻ Tự động khớp</option>`
+          + `<option value="__new__" ${sel === '__new__' ? 'selected' : ''}>🆕 Tạo khách mới</option>`
+          + customers.map(c => `<option value="${esc(c.id)}" ${sel === c.id ? 'selected' : ''}>${esc(c.name)} (${esc(c.code)})</option>`).join('');
+        custCell = `<div style="font-size:10.5px;margin-bottom:3px">${lbl}</div>`
+          + `<select onchange="window._phieuMerge(${i}, this.value)" style="font-size:11px;max-width:210px;padding:3px;border:1px solid var(--line);border-radius:6px">${opts}</select>`;
+      }
       return `<tr style="${p.pick ? '' : 'opacity:.6'}">
             <td class="num"><input type="checkbox" ${p.pick ? 'checked' : ''} ${canPick ? '' : 'disabled'} onchange="window._phieuToggle(${i}, this.checked)"></td>
-            <td><b>${p.custName}</b></td>
-            <td style="max-width:220px;white-space:normal">${addrCell}</td>
+            <td><b>${esc(p.custName)}</b></td>
+            <td style="max-width:200px;white-space:normal">${addrCell}</td>
             <td>${p.date ? p.date.vn : '—'}</td>
             <td class="num">${p.items.length}</td>
             <td class="num"><b>${fmt(p.total)}</b>${p.buyTotal ? `<div style="font-size:10px;color:#15803D">vốn ${fmt(p.buyTotal)} · lãi ${fmt(p.total - p.buyTotal)}</div>` : ''}</td>
-            <td>${st}</td>
+            <td>${custCell}</td>
           </tr>`;
     }).join('')}</tbody>
       </table></div>`;
     if (btn) btn.disabled = willCreate === 0;
   }
   window._phieuToggle = function (i, on) { if (_parsed[i]) { _parsed[i].pick = on; renderPreview(); } };
+  /* Chọn lại khách cho 1 phiếu: __auto__ = tự động · __new__ = tạo mới · '<id>' = gộp vào KH đó */
+  window._phieuMerge = function (i, val) {
+    if (!_parsed[i]) return;
+    if (val === '__auto__') delete _parsed[i].forceCustId;
+    else if (val === '__new__') _parsed[i].forceCustId = '';
+    else _parsed[i].forceCustId = val;
+    renderPreview();
+  };
 
   window._phieuCommit = function () {
     const rows = _parsed.filter(p => p.pick && p.date && p.total);
@@ -208,7 +249,7 @@
     let nCust = 0, nOrder = 0;
 
     rows.forEach(p => {
-      const mm = matchCustomer(liveCustomers, p.custName, p.addr);
+      const mm = resolveCust(p, liveCustomers);   /* tôn trọng lựa chọn tay → tự động khớp */
       let custId = mm ? mm.c.id : null;
       if (!custId) {
         custId = window.STORE.nextId('customers', 'KH', 3);
