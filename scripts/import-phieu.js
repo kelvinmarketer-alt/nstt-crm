@@ -10,8 +10,15 @@
   const norm = s => String(s == null ? '' : s).trim();
   const low = s => norm(s).toLowerCase();
   const nkey = s => low(s).normalize('NFD').replace(/[̀-ͯ]/g, '').replace(/đ/g, 'd').replace(/[^a-z0-9]+/g, ' ').trim();
-  /* Khoá NHẬN DIỆN khách = TÊN + ĐỊA CHỈ → cùng tên nhưng KHÁC địa chỉ = khách khác (chi nhánh khác). */
-  const ckey = (name, addr) => nkey(name) + '||' + nkey(addr);
+  /* Khớp khách: ƯU TIÊN ĐỊA CHỈ (tên hay gõ sai, địa chỉ thường nhập đúng).
+     Địa chỉ trống → khớp theo TÊN. Trả {c, by:'addr'|'name'} hoặc null. */
+  function matchCustomer(custList, name, addr) {
+    const a = nkey(addr);
+    if (a) { const hit = (custList || []).find(c => nkey(c.address) === a); if (hit) return { c: hit, by: 'addr' }; }
+    const n = nkey(name);
+    if (n) { const hit = (custList || []).find(c => nkey(c.name) === n); if (hit) return { c: hit, by: 'name' }; }
+    return null;
+  }
 
   /* ===== Parser 1 phiếu từ lưới 2D (mảng các hàng) ===== */
   function parsePhieu(grid) {
@@ -50,14 +57,20 @@
         if (col.qty < 0) col.qty = lows.findIndex(x => x.includes('số lượng'));
         col.price = lows.findIndex(x => x.includes('giá bán'));
         col.stt = lows.findIndex(x => x === 'stt');
+        /* === Cột GIÁ VỐN (mua vào) — nằm cùng hàng tiêu đề, bên phải ===
+           'Giá nhập' + 'Thành tiền nhập' (file có thể gõ sai dấu "tiên"). */
+        col.buyPrice = lows.findIndex(x => x.includes('giá nhập') || x.includes('gia nhap'));
+        col.buyAmt = lows.findIndex(x => (x.includes('thành ti') || x.includes('thanh ti')) && x.includes('nhập'));
         break;
       }
     }
-    const items = []; let totalRow = 0;
+    const items = []; let totalRow = 0, totalBuyRow = 0;
     if (hr >= 0) for (let r = hr + 1; r < grid.length; r++) {
       const row = grid[r] || [];
       if (/^tổng cộng/.test(low(row[0])) || /^tổng cộng/.test(low(row[col.name]))) {
-        const t = +(row[col.amt]); if (!isNaN(t) && t) totalRow = t; break;
+        const t = +(row[col.amt]); if (!isNaN(t) && t) totalRow = t;
+        if (col.buyAmt >= 0) { const tb = +(row[col.buyAmt]); if (!isNaN(tb) && tb) totalBuyRow = tb; }
+        break;
       }
       const nm = norm(row[col.name]); if (!nm) continue;
       const qty = +(row[col.qty >= 0 ? col.qty : -1]) || 0;
@@ -65,11 +78,20 @@
       let amt = +(row[col.amt]) || 0;
       if (!amt && qty && price) amt = qty * price;
       if (!amt && !qty) continue;
-      items.push({ name: nm, unit: norm(row[col.unit] || 'kg').toLowerCase(), qty, price: Math.round(price * 1000), total: Math.round(amt * 1000) });
+      /* giá vốn từng dòng (nếu file có cột) — KHÔNG lưu vào SP, chỉ để tính lãi đơn này */
+      const buyPrice = col.buyPrice >= 0 ? (+(row[col.buyPrice]) || 0) : 0;
+      let buyAmt = col.buyAmt >= 0 ? (+(row[col.buyAmt]) || 0) : 0;
+      if (!buyAmt && qty && buyPrice) buyAmt = qty * buyPrice;
+      items.push({ name: nm, unit: norm(row[col.unit] || 'kg').toLowerCase(), qty,
+        price: Math.round(price * 1000), total: Math.round(amt * 1000),
+        buyPrice: Math.round(buyPrice * 1000), buyTotal: Math.round(buyAmt * 1000) });
     }
     const itemsTotal = items.reduce((s, it) => s + it.total, 0);
     const total = totalRow ? Math.round(totalRow * 1000) : itemsTotal;
-    return { custName, addr, dateRaw, items, total, valid: !!(custName && total && items.length) };
+    /* Tổng giá vốn = dòng "Tổng cộng" cột nhập (ưu tiên) hoặc Σ từng dòng */
+    const itemsBuyTotal = items.reduce((s, it) => s + (it.buyTotal || 0), 0);
+    const buyTotal = totalBuyRow ? Math.round(totalBuyRow * 1000) : itemsBuyTotal;
+    return { custName, addr, dateRaw, items, total, buyTotal, valid: !!(custName && total && items.length) };
   }
 
   /* Ngày "06.06.2026" / "6/6/2026" → {iso, vn} */
@@ -106,7 +128,6 @@
     prev.innerHTML = '<div style="color:var(--muted);font-size:12.5px;padding:8px">⏳ Đang đọc file…</div>';
     const customers = window.STORE.get('customers', []) || [];
     const orders = window.STORE.get('orders', []) || [];
-    const custByKey = {}; customers.forEach(c => { custByKey[ckey(c.name, c.address)] = c; });
     _parsed = [];
     for (const f of files) {
       try {
@@ -117,13 +138,18 @@
           const p = parsePhieu(grid);
           if (!p.valid) continue;            /* sheet không phải phiếu (vd "TÊN QC") → bỏ */
           const d = parseDate(p.dateRaw);
-          const match = custByKey[ckey(p.custName, p.addr)] || null;
-          /* trùng: cùng tên + ĐỊA CHỈ + ngày + tổng đã có đơn (địa chỉ đơn lưu ở o.drop) */
-          const dup = d && orders.some(o => nkey(o.custName) === nkey(p.custName)
-            && nkey(o.drop) === nkey(p.addr)
-            && (o.deliverDate === d.iso || (o.date || '').slice(0, 10) === d.vn.split('/').reverse().join('-'))
-            && Math.abs((+o.freight || 0) - p.total) < 1);
-          _parsed.push({ file: f.name, sheet: sn, ...p, date: d, match, dup, pick: !dup && !!d });
+          const mm = matchCustomer(customers, p.custName, p.addr);
+          const match = mm ? mm.c : null;
+          const matchBy = mm ? mm.by : null;
+          /* trùng: cùng KHÁCH (đã khớp) + ngày + tổng — nếu chưa khớp thì so tên+địa chỉ */
+          const dup = d && orders.some(o => {
+            const sameCust = match ? (o.cust === match.id)
+              : (nkey(o.custName) === nkey(p.custName) && nkey(o.drop) === nkey(p.addr));
+            return sameCust
+              && (o.deliverDate === d.iso || (o.date || '').slice(0, 10) === d.vn.split('/').reverse().join('-'))
+              && Math.abs((+o.freight || 0) - p.total) < 1;
+          });
+          _parsed.push({ file: f.name, sheet: sn, ...p, date: d, match, matchBy, dup, pick: !dup && !!d });
         }
       } catch (e) { _parsed.push({ file: f.name, error: String(e.message || e), pick: false }); }
     }
@@ -134,31 +160,36 @@
     const prev = document.getElementById('phieuPreview');
     const btn = document.getElementById('phieuCommitBtn');
     if (!_parsed.length) { prev.innerHTML = '<div style="color:#B45309;font-size:12.5px;padding:8px">Không đọc được phiếu hợp lệ nào trong file đã chọn.</div>'; if (btn) btn.disabled = true; return; }
-    const willCreate = _parsed.filter(p => p.pick).length;
-    const newCusts = new Set(_parsed.filter(p => p.pick && !p.match).map(p => ckey(p.custName, p.addr))).size;
+    const picks = _parsed.filter(p => p.pick);
+    const willCreate = picks.length;
+    const newCusts = new Set(picks.filter(p => !p.match).map(p => nkey(p.addr) || nkey(p.custName))).size;
     const fmt = v => (+v || 0).toLocaleString('vi-VN');
+    const gRev = picks.reduce((s, p) => s + (+p.total || 0), 0);
+    const gCost = picks.reduce((s, p) => s + (+p.buyTotal || 0), 0);
+    const gProfit = gRev - gCost;
     prev.innerHTML = `
-      <div style="font-size:12.5px;margin-bottom:8px"><b>${_parsed.length}</b> phiếu đọc được · sẽ tạo <b style="color:#15803D">${willCreate}</b> đơn${newCusts ? ` · tạo mới <b>${newCusts}</b> khách` : ''}</div>
+      <div style="font-size:12.5px;margin-bottom:8px"><b>${_parsed.length}</b> phiếu đọc được · sẽ tạo <b style="color:#15803D">${willCreate}</b> đơn${newCusts ? ` · tạo mới <b>${newCusts}</b> khách` : ''}
+        ${gRev ? `<br>Doanh thu <b>${fmt(gRev)}</b>${gCost ? ` · giá vốn <b>${fmt(gCost)}</b> · lãi <b style="color:#15803D">${fmt(gProfit)}</b> (${gRev ? (Math.round(gProfit / gRev * 1000) / 10) : 0}%)` : ' · <span style="color:#B45309">phiếu không có cột giá nhập → lãi ước tính</span>'}` : ''}</div>
       <div style="max-height:340px;overflow:auto;border:1px solid var(--line);border-radius:8px">
       <table class="mini-table" style="margin:0;font-size:12px">
-        <thead><tr><th style="width:34px"></th><th>Khách hàng</th><th>Địa chỉ</th><th>Ngày</th><th class="num">Số mã</th><th class="num">Tổng tiền</th><th>Trạng thái</th></tr></thead>
+        <thead><tr><th style="width:34px"></th><th>Khách hàng</th><th>Địa chỉ</th><th>Ngày</th><th class="num">Số mã</th><th class="num">Tổng / Lãi</th><th>Trạng thái</th></tr></thead>
         <tbody>${_parsed.map((p, i) => {
       if (p.error) return `<tr><td></td><td colspan="6" style="color:#B91C1C">⚠ ${p.file}: ${p.error}</td></tr>`;
       const st = p.dup ? '<span style="color:#B45309">⏭ Đã có — bỏ qua</span>'
         : !p.date ? '<span style="color:#B91C1C">⚠ Không đọc được ngày</span>'
-          : p.match ? '<span style="color:#15803D">✓ Khách đã có</span>'
+          : p.match ? `<span style="color:#15803D">✓ ${p.match.name} <span style="color:var(--muted);font-size:10px">(${p.match.code} · khớp ${p.matchBy === 'addr' ? 'địa chỉ' : 'tên'})</span></span>`
             : '<span style="color:#2563EB">🆕 Sẽ tạo khách mới</span>';
       const addrCell = p.addr
         ? `<span style="font-size:11px;color:var(--muted)">${p.addr}</span>`
-        : `<span style="font-size:11px;color:#B45309" title="Phiếu không có địa chỉ → khớp khách chỉ theo tên">⚠ thiếu địa chỉ</span>`;
+        : `<span style="font-size:11px;color:#B45309" title="Phiếu không có địa chỉ → khớp khách theo tên">⚠ thiếu địa chỉ</span>`;
       const canPick = !p.dup && !!p.date;
       return `<tr style="${p.pick ? '' : 'opacity:.6'}">
             <td class="num"><input type="checkbox" ${p.pick ? 'checked' : ''} ${canPick ? '' : 'disabled'} onchange="window._phieuToggle(${i}, this.checked)"></td>
-            <td><b>${p.custName}</b>${p.match ? ` <span style="color:var(--muted);font-size:10.5px">(${p.match.code})</span>` : ''}</td>
+            <td><b>${p.custName}</b></td>
             <td style="max-width:220px;white-space:normal">${addrCell}</td>
             <td>${p.date ? p.date.vn : '—'}</td>
             <td class="num">${p.items.length}</td>
-            <td class="num"><b>${fmt(p.total)}</b></td>
+            <td class="num"><b>${fmt(p.total)}</b>${p.buyTotal ? `<div style="font-size:10px;color:#15803D">vốn ${fmt(p.buyTotal)} · lãi ${fmt(p.total - p.buyTotal)}</div>` : ''}</td>
             <td>${st}</td>
           </tr>`;
     }).join('')}</tbody>
@@ -172,39 +203,45 @@
     if (!rows.length) { window.toast('Không có phiếu nào để tạo', 'warn'); return; }
     const me = (window.AUTH && window.AUTH.currentUser && window.AUTH.currentUser()) || {};
     const todayVN = new Date().toLocaleDateString('vi-VN');
-    /* map tên → id (gồm KH mới tạo trong lượt này) */
-    const customers = window.STORE.get('customers', []) || [];
-    const byKey = {}; customers.forEach(c => byKey[ckey(c.name, c.address)] = c.id);
+    /* Danh sách khách "sống" (gồm KH mới tạo trong lượt này) để khớp ưu-tiên-địa-chỉ */
+    const liveCustomers = (window.STORE.get('customers', []) || []).slice();
     let nCust = 0, nOrder = 0;
 
     rows.forEach(p => {
-      let custId = p.match ? p.match.id : byKey[ckey(p.custName, p.addr)];
+      const mm = matchCustomer(liveCustomers, p.custName, p.addr);
+      let custId = mm ? mm.c.id : null;
       if (!custId) {
         custId = window.STORE.nextId('customers', 'KH', 3);
-        window.STORE.add('customers', {
+        const newCust = {
           id: custId, code: custId, type: 'B2B', group: 'Mới',
           name: p.custName, contact: p.custName, phone: '', email: '',
           address: p.addr || '', province: 'Hà Nội',
           staffOwner: me.name || 'Tuấn Tú', source: 'import-phiếu',
           created: todayVN, lastContact: todayVN, lastOrder: p.date.vn, active: true,
           orders: 0, revenue: 0, debt: 0, debtOverdue: 0, mainCats: [], notes: [],
-        });
-        byKey[ckey(p.custName, p.addr)] = custId; nCust++;
+        };
+        window.STORE.add('customers', newCust);
+        liveCustomers.push(newCust); nCust++;
       }
       const items = p.items.map(it => ({
         id: null, custom: true, fromImport: true, name: it.name, unit: it.unit || 'kg',
         qty: it.qty, price: it.price, basePrice: it.price, priceConfirmed: true, total: it.total,
+        /* giá vốn SNAPSHOT lúc nhập — chỉ để tính lãi đơn, KHÔNG ghi vào giá nhập SP */
+        buyPrice: it.buyPrice || 0, buyTotal: it.buyTotal || 0,
       }));
+      /* Tên hiển thị đơn = tên khách ĐÃ KHỚP (nếu khớp địa chỉ, dùng tên chuẩn trong app
+         thay vì tên có thể gõ sai trên phiếu) */
+      const orderCustName = mm ? mm.c.name : p.custName;
       const order = {
         code: window.STORE.nextOrderCode(),
         date: p.date.vn, createdAt: new Date(p.date.iso + 'T08:00:00').toISOString(),
         deliverDate: p.date.iso, deliveredAt: p.date.vn,
-        cust: custId, custName: p.custName, custPhone: '',
+        cust: custId, custName: orderCustName, custPhone: '',
         serviceType: '', transportMode: 'giao-ngay',
         pickup: 'Kho Tuấn Tú', drop: p.addr || '',
         goods: p.items.map(it => it.name).join(', ').slice(0, 250),
         qty: 1, unit: 'kg', weight: 0,
-        items, freight: p.total, cod: 0, payBy: 'Công nợ',
+        items, freight: p.total, buyTotal: p.buyTotal || 0, cod: 0, payBy: 'Công nợ',
         status: 'delivered', whStatus: 'released',
         staff: me.name || '', source: 'import-phiếu',
         note: 'Nhập từ phiếu Excel: ' + p.file,

@@ -43,12 +43,15 @@
     const days = dayList(fromISO, toISO);
     const daySet = new Set(days);
 
-    /* GIÁ VỐN 1 đơn = Σ (số lượng × giá NHẬP của SP tại ngày đơn).
-       SP ngoài DM hoặc chưa có giá nhập → 0 (không tính được vốn). */
+    /* GIÁ VỐN 1 đơn = Σ giá vốn từng mặt hàng.
+       Ưu tiên giá vốn SNAPSHOT lưu trên mặt hàng (it.buyTotal — từ file nhập có cột giá nhập,
+       số THẬT tại thời điểm). Nếu không có → quy về giá nhập của SP trong danh mục theo ngày.
+       SP ngoài DM & không có snapshot → 0 (không tính được vốn → LN ước tính). */
     function orderCost(o, iso) {
       const items = Array.isArray(o.items) ? o.items : [];
       let c = 0, known = false;
       items.forEach(it => {
+        if (+it.buyTotal > 0) { c += +it.buyTotal; known = true; return; }   /* số thật từ phiếu */
         const p = it.id ? prodById[it.id] : null;
         const e = p ? window.priceEntryOn(p, iso) : null;
         const buy = e ? (+e.buy || 0) : 0;
