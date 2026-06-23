@@ -2,14 +2,16 @@
    Nông Sản Tuấn Tú — NHẬP PHIẾU KẾ TOÁN (Excel "phiếu 6/6") → ĐƠN HÀNG
    Mỗi file/sheet = 1 phiếu của 1 khách/ngày → tạo đơn (Công nợ, delivered)
    → hook tự cộng CÔNG NỢ khách + ghi sổ + lên báo cáo CFO.
-   - Khớp khách theo tên; chưa có → tạo mới (B2B).
-   - Chống trùng: cùng khách + ngày + tổng tiền → bỏ qua.
+   - Khớp khách theo TÊN + ĐỊA CHỈ; chưa có (hoặc khác địa chỉ) → tạo mới (B2B).
+   - Chống trùng: cùng khách + địa chỉ + ngày + tổng tiền → bỏ qua.
    - XEM TRƯỚC rồi mới ghi.
    ========================================================= */
 (function () {
   const norm = s => String(s == null ? '' : s).trim();
   const low = s => norm(s).toLowerCase();
   const nkey = s => low(s).normalize('NFD').replace(/[̀-ͯ]/g, '').replace(/đ/g, 'd').replace(/[^a-z0-9]+/g, ' ').trim();
+  /* Khoá NHẬN DIỆN khách = TÊN + ĐỊA CHỈ → cùng tên nhưng KHÁC địa chỉ = khách khác (chi nhánh khác). */
+  const ckey = (name, addr) => nkey(name) + '||' + nkey(addr);
 
   /* ===== Parser 1 phiếu từ lưới 2D (mảng các hàng) ===== */
   function parsePhieu(grid) {
@@ -86,7 +88,7 @@
     window.openModal('📥 Nhập phiếu kế toán (Excel) → đơn + công nợ', `
       <div style="background:#EFF6FF;color:#1E40AF;padding:10px 12px;border-radius:8px;font-size:12.5px;margin-bottom:12px;line-height:1.5">
         Chọn 1 hoặc <b>nhiều file phiếu</b> (mẫu "phiếu 6/6": có <i>Khách Hàng</i>, <i>Ngày</i>, bảng <i>STT/Tên sản phẩm/Thành tiền</i>, dòng <i>Tổng cộng</i>).
-        App đọc → tạo đơn (Công nợ) → <b>tự cộng công nợ khách</b>. Khách chưa có sẽ được tạo mới. <b>Xem trước rồi mới ghi.</b>
+        App đọc → tạo đơn (Công nợ) → <b>tự cộng công nợ khách</b>. Khớp khách theo <b>Tên + Địa chỉ</b> — cùng tên nhưng khác địa chỉ sẽ là <b>khách mới</b> (chi nhánh khác). <b>Xem trước rồi mới ghi.</b>
       </div>
       <input type="file" id="phieuFiles" accept=".xlsx,.xls" multiple onchange="window._phieuRead(this.files)"
         style="width:100%;border:1px dashed var(--line);border-radius:8px;padding:14px;font-size:13px;background:#FAFAFB">
@@ -104,7 +106,7 @@
     prev.innerHTML = '<div style="color:var(--muted);font-size:12.5px;padding:8px">⏳ Đang đọc file…</div>';
     const customers = window.STORE.get('customers', []) || [];
     const orders = window.STORE.get('orders', []) || [];
-    const custByName = {}; customers.forEach(c => { custByName[nkey(c.name)] = c; });
+    const custByKey = {}; customers.forEach(c => { custByKey[ckey(c.name, c.address)] = c; });
     _parsed = [];
     for (const f of files) {
       try {
@@ -115,9 +117,10 @@
           const p = parsePhieu(grid);
           if (!p.valid) continue;            /* sheet không phải phiếu (vd "TÊN QC") → bỏ */
           const d = parseDate(p.dateRaw);
-          const match = custByName[nkey(p.custName)] || null;
-          /* trùng: cùng tên + ngày + tổng đã có đơn */
+          const match = custByKey[ckey(p.custName, p.addr)] || null;
+          /* trùng: cùng tên + ĐỊA CHỈ + ngày + tổng đã có đơn (địa chỉ đơn lưu ở o.drop) */
           const dup = d && orders.some(o => nkey(o.custName) === nkey(p.custName)
+            && nkey(o.drop) === nkey(p.addr)
             && (o.deliverDate === d.iso || (o.date || '').slice(0, 10) === d.vn.split('/').reverse().join('-'))
             && Math.abs((+o.freight || 0) - p.total) < 1);
           _parsed.push({ file: f.name, sheet: sn, ...p, date: d, match, dup, pick: !dup && !!d });
@@ -132,23 +135,27 @@
     const btn = document.getElementById('phieuCommitBtn');
     if (!_parsed.length) { prev.innerHTML = '<div style="color:#B45309;font-size:12.5px;padding:8px">Không đọc được phiếu hợp lệ nào trong file đã chọn.</div>'; if (btn) btn.disabled = true; return; }
     const willCreate = _parsed.filter(p => p.pick).length;
-    const newCusts = new Set(_parsed.filter(p => p.pick && !p.match).map(p => nkey(p.custName))).size;
+    const newCusts = new Set(_parsed.filter(p => p.pick && !p.match).map(p => ckey(p.custName, p.addr))).size;
     const fmt = v => (+v || 0).toLocaleString('vi-VN');
     prev.innerHTML = `
       <div style="font-size:12.5px;margin-bottom:8px"><b>${_parsed.length}</b> phiếu đọc được · sẽ tạo <b style="color:#15803D">${willCreate}</b> đơn${newCusts ? ` · tạo mới <b>${newCusts}</b> khách` : ''}</div>
       <div style="max-height:340px;overflow:auto;border:1px solid var(--line);border-radius:8px">
       <table class="mini-table" style="margin:0;font-size:12px">
-        <thead><tr><th style="width:34px"></th><th>Khách hàng</th><th>Ngày</th><th class="num">Số mã</th><th class="num">Tổng tiền</th><th>Trạng thái</th></tr></thead>
+        <thead><tr><th style="width:34px"></th><th>Khách hàng</th><th>Địa chỉ</th><th>Ngày</th><th class="num">Số mã</th><th class="num">Tổng tiền</th><th>Trạng thái</th></tr></thead>
         <tbody>${_parsed.map((p, i) => {
-      if (p.error) return `<tr><td></td><td colspan="5" style="color:#B91C1C">⚠ ${p.file}: ${p.error}</td></tr>`;
+      if (p.error) return `<tr><td></td><td colspan="6" style="color:#B91C1C">⚠ ${p.file}: ${p.error}</td></tr>`;
       const st = p.dup ? '<span style="color:#B45309">⏭ Đã có — bỏ qua</span>'
         : !p.date ? '<span style="color:#B91C1C">⚠ Không đọc được ngày</span>'
           : p.match ? '<span style="color:#15803D">✓ Khách đã có</span>'
             : '<span style="color:#2563EB">🆕 Sẽ tạo khách mới</span>';
+      const addrCell = p.addr
+        ? `<span style="font-size:11px;color:var(--muted)">${p.addr}</span>`
+        : `<span style="font-size:11px;color:#B45309" title="Phiếu không có địa chỉ → khớp khách chỉ theo tên">⚠ thiếu địa chỉ</span>`;
       const canPick = !p.dup && !!p.date;
       return `<tr style="${p.pick ? '' : 'opacity:.6'}">
             <td class="num"><input type="checkbox" ${p.pick ? 'checked' : ''} ${canPick ? '' : 'disabled'} onchange="window._phieuToggle(${i}, this.checked)"></td>
             <td><b>${p.custName}</b>${p.match ? ` <span style="color:var(--muted);font-size:10.5px">(${p.match.code})</span>` : ''}</td>
+            <td style="max-width:220px;white-space:normal">${addrCell}</td>
             <td>${p.date ? p.date.vn : '—'}</td>
             <td class="num">${p.items.length}</td>
             <td class="num"><b>${fmt(p.total)}</b></td>
@@ -167,11 +174,11 @@
     const todayVN = new Date().toLocaleDateString('vi-VN');
     /* map tên → id (gồm KH mới tạo trong lượt này) */
     const customers = window.STORE.get('customers', []) || [];
-    const byName = {}; customers.forEach(c => byName[nkey(c.name)] = c.id);
+    const byKey = {}; customers.forEach(c => byKey[ckey(c.name, c.address)] = c.id);
     let nCust = 0, nOrder = 0;
 
     rows.forEach(p => {
-      let custId = p.match ? p.match.id : byName[nkey(p.custName)];
+      let custId = p.match ? p.match.id : byKey[ckey(p.custName, p.addr)];
       if (!custId) {
         custId = window.STORE.nextId('customers', 'KH', 3);
         window.STORE.add('customers', {
@@ -182,7 +189,7 @@
           created: todayVN, lastContact: todayVN, lastOrder: p.date.vn, active: true,
           orders: 0, revenue: 0, debt: 0, debtOverdue: 0, mainCats: [], notes: [],
         });
-        byName[nkey(p.custName)] = custId; nCust++;
+        byKey[ckey(p.custName, p.addr)] = custId; nCust++;
       }
       const items = p.items.map(it => ({
         id: null, custom: true, fromImport: true, name: it.name, unit: it.unit || 'kg',
