@@ -363,14 +363,14 @@ window.setCustPriceTier = function (custId, tierId) {
    Hạn nợ theo quy mô: ~50kg → 3 ngày · 50–100kg → 7 ngày · >200tr/tháng → 15 ngày.
    Mỗi KH có "hạn công nợ" (số ngày) — lưu KV 'custCreditDays' (sync đa máy). */
 window.DEBT_POLICY = [
-  { days: 3,  label: 'Đơn ~50kg → nợ 3 ngày' },
-  { days: 7,  label: 'Đơn 50–100kg → nợ 7 ngày' },
-  { days: 15, label: '>200 triệu/tháng → nợ 15 ngày' },
+  { days: 3,  label: '3 ngày — đơn ~50kg' },
+  { days: 7,  label: '7 ngày — đơn 50–100kg' },
+  { days: 15, label: '15 ngày — >200 triệu/tháng' },
 ];
 window.DEBT_TERM_DEFAULT = 7;
 window.creditDaysOptions = function (sel) {
   const cur = (sel == null || sel === '') ? window.DEBT_TERM_DEFAULT : +sel;
-  return [3, 7, 15].map(d => `<option value="${d}" ${cur === d ? 'selected' : ''}>${d} ngày</option>`).join('');
+  return window.DEBT_POLICY.map(p => `<option value="${p.days}" ${cur === p.days ? 'selected' : ''}>${p.label}</option>`).join('');
 };
 window.custCreditDays = function (custId) {
   const map = (window.STORE && window.STORE.get('custCreditDays', {})) || {};
