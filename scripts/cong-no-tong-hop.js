@@ -276,7 +276,7 @@
     const html = `<!doctype html><html lang="vi"><head><meta charset="utf-8"><title>Thông báo công nợ — ${(c.name || '').replace(/</g, '')}</title>
     <style>
       *{box-sizing:border-box} body{font-family:'Segoe UI',Arial,sans-serif;margin:0;padding:18px;color:#1a1a1a;background:#fff}
-      .pg{max-width:880px;margin:0 auto}
+      .pg{max-width:880px;margin:0 auto;padding:26px 32px 52px;background:#fff}
       .hd{display:flex;gap:14px;align-items:flex-start;border-bottom:2px solid #1B5E20;padding-bottom:8px}
       .hd img{width:74px;height:74px;object-fit:contain}
       .cinfo{flex:1;font-size:12.5px;line-height:1.5}
@@ -291,7 +291,8 @@
       .totrow td{font-weight:700;background:#FAFAFA}
       .grand{background:#FFF7C2;color:#C0392B;font-weight:800;font-size:14px}
       .ft{text-align:center;color:#C0392B;font-weight:700;font-size:12.5px;margin-top:10px;line-height:1.6}
-      .sign{display:flex;justify-content:space-around;margin-top:14px;font-size:12px;text-align:center}
+      .sign{display:flex;justify-content:space-around;margin-top:30px;font-size:12px;text-align:center}
+      .sign>div{min-height:78px}
       .toolbar{position:sticky;top:0;background:#fff;padding:8px 0 12px;display:flex;gap:8px;justify-content:center}
       .toolbar button{padding:8px 16px;border:none;border-radius:7px;font-size:13px;font-weight:700;cursor:pointer}
       .b1{background:#1B5E20;color:#fff}.b2{background:#E8A33D;color:#fff}.b3{background:#2563EB;color:#fff}.b4{background:#fff;color:#1B5E20;border:1px solid #1B5E20 !important}
