@@ -450,6 +450,10 @@
             </div>
           </div>
         </div>
+        <div class="form-row wide">
+          <label>Tên đăng nhập (tuỳ chọn)</label>
+          <input id="nUsername" placeholder="VD: quang.tx — NV có thể đăng nhập bằng Email / SĐT / username">
+        </div>
       </div>
 
       <div class="section-h" style="margin-top:18px">🔐 Phân quyền chi tiết (theo tính năng)</div>
@@ -504,6 +508,11 @@
       if (btn) { btn.disabled = true; btn.innerHTML = '⏳ Đang tạo tài khoản...'; }
       if (window.AUTH?.setStaffPassword) {
         try { await window.AUTH.setStaffPassword(code, password); } catch (e) { console.warn('[addStaff setPwd]', e); }
+      }
+      const uname = window.formVal('#nUsername');
+      if (uname && window.AUTH?.setStaffUsername) {
+        const ru = await window.AUTH.setStaffUsername(code, uname);
+        if (!ru.success) window.toast('⚠ Username: ' + ru.error, 'warn');
       }
       if (window.AUTH?.signUp) { try { await window.AUTH.signUp(email, password, code); } catch (e) { /* phụ, bỏ qua */ } }
     }

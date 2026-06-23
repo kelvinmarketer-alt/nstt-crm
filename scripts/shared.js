@@ -929,6 +929,7 @@ window.NAV = [
   ]},
   { section: 'Quản trị', items: [
     { id: 'staff',      label: 'Nhân sự',     icon: '🧑‍💼', href: 'staff.html' },
+    { id: 'tai-khoan',  label: 'Tài khoản đăng nhập', icon: '🔐', href: 'tai-khoan.html' },
     { id: 'reports',    label: 'Báo cáo',     icon: '📈', href: 'reports.html' },
     { id: 'san-luong',  label: 'Sản lượng theo SP', icon: '📦', href: 'san-luong.html' },
     { id: 'marketing',  label: 'Email/Zalo blast', icon: '📨', href: 'marketing.html' },

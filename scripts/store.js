@@ -137,6 +137,7 @@
     'payrollExtra',    /* Bảng lương chi tiết — CRITICAL */
     'latePolicy',      /* Khung phạt đi muộn — CRITICAL (admin cấu hình) */
     'staffAuth',       /* Mật khẩu cá nhân NV (HASH SHA-256, KHÔNG lưu thô) — CRITICAL */
+    'staffUsernames',  /* Tên đăng nhập tuỳ chọn {staffId: username} — login bằng email/SĐT/username */
     'mktPrices',       /* Bảng giá Marketing (chào hàng/ads) — KHÔNG ảnh hưởng đơn */
     'priceTiers',      /* Nhóm bảng giá theo nhóm KH (±% + override) — gửi báo giá riêng */
     'procurementRuns', /* Phiên gom hàng → đặt NCC (Kho) — CRITICAL */

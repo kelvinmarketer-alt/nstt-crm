@@ -83,15 +83,18 @@
   function _getStaffAuth() {
     try { return (window.STORE && window.STORE.get('staffAuth', {})) || {}; } catch (e) { return {}; }
   }
-  /* Lấy staffAuth ĐÚNG NHẤT: ưu tiên CLOUD (tránh ghi đè local thiếu → mất mật khẩu NV khác,
-     và để login thấy mật khẩu vừa đặt ở máy khác). Offline → dùng local. */
-  async function _getStaffAuthCloud() {
-    let map = _getStaffAuth();
+  /* Lấy 1 KV map ĐÚNG NHẤT: ưu tiên CLOUD (tránh ghi đè local thiếu, và để login thấy
+     thay đổi vừa làm ở máy khác). Offline → dùng local. Dùng cho staffAuth + staffUsernames. */
+  async function _getKvCloud(key) {
+    let map = (window.STORE && window.STORE.get(key, {})) || {};
     if (window.SB_DATA && window.SB_DATA.getKv) {
-      try { const cloud = await window.SB_DATA.getKv('staffAuth'); if (cloud && typeof cloud === 'object') map = cloud; } catch (e) { /* offline */ }
+      try { const cloud = await window.SB_DATA.getKv(key); if (cloud && typeof cloud === 'object') map = cloud; } catch (e) { /* offline */ }
     }
     return map || {};
   }
+  async function _getStaffAuthCloud() { return _getKvCloud('staffAuth'); }
+  /* Tên đăng nhập tuỳ chọn: {staffId: username}. Đăng nhập được bằng email / SĐT / username. */
+  function _getStaffUsernames() { try { return (window.STORE && window.STORE.get('staffUsernames', {})) || {}; } catch (e) { return {}; } }
 
   /* Đăng nhập bằng bản ghi nhân viên: SĐT (hoặc email/mã NV) + mật khẩu mặc định.
      async vì trên máy mới (login page chưa cache staff) phải fetch từ Supabase. */
@@ -103,10 +106,15 @@
     const norm = s => (s || '').toString().replace(/\s+/g, '').toLowerCase();
     const dig = s => (s || '').toString().replace(/\D/g, '');
     const uin = norm(username), ud = dig(username);
+    /* username tuỳ chọn → tra ra staffId (ưu tiên cloud) */
+    const unameMap = await _getKvCloud('staffUsernames');   /* {staffId: username} */
+    let unameSid = null;
+    for (const sid in unameMap) { if (norm(unameMap[sid]) === uin && uin) { unameSid = sid; break; } }
     const st = list.find(s =>
-      (ud && dig(s.phone) === ud) ||
-      (uin && norm(s.email) === uin) ||
-      (uin && (norm(s.code) === uin || norm(s.id) === uin)));
+      (ud && dig(s.phone) === ud) ||                                  /* SĐT */
+      (uin && norm(s.email) === uin) ||                               /* email */
+      (uin && (norm(s.code) === uin || norm(s.id) === uin)) ||        /* mã NV */
+      (unameSid && (s.id === unameSid || s.code === unameSid)));      /* username tuỳ chọn */
     if (!st) return null;
     if (st.status === 'inactive' || st.status === 'off' || st.status === 'nghỉ') return { _locked: true };
     const sid = st.id || st.code;
@@ -298,6 +306,7 @@
     'invoices.html':   'invoices.view',
     'adspend.html':    'adspend.view',
     'staff.html':      'staff.view',
+    'tai-khoan.html':  'staff.edit',
     'payroll.html':    'payroll.viewSelf',
     'reports.html':    'reports.view',
     'san-luong.html':  'reports.view',
@@ -419,6 +428,30 @@
     hasCustomPassword(staffId) {
       const c = _getStaffAuth()[staffId];
       return !!(c && c.hash);
+    },
+
+    /* === Tên đăng nhập (username) tuỳ chọn — login bằng email/SĐT/username === */
+    getStaffUsername(staffId) { return _getStaffUsernames()[staffId] || ''; },
+    /* Username đã có NV khác dùng chưa? (so không phân biệt hoa thường/khoảng trắng) */
+    usernameTaken(username, exceptId) {
+      const u = (username || '').toString().replace(/\s+/g, '').toLowerCase();
+      if (!u) return false;
+      const map = _getStaffUsernames();
+      return Object.keys(map).some(sid => sid !== exceptId && (map[sid] || '').toString().replace(/\s+/g, '').toLowerCase() === u);
+    },
+    async setStaffUsername(staffId, username) {
+      if (!staffId) return { success: false, error: 'Thiếu mã NV.' };
+      const u = (username || '').trim();
+      /* cho phép chữ/số/._- , tối thiểu 3 ký tự (hoặc rỗng = xoá username) */
+      if (u && !/^[a-zA-Z0-9._-]{3,30}$/.test(u)) return { success: false, error: 'Username 3–30 ký tự, chỉ chữ/số/. _ -' };
+      const map = await _getKvCloud('staffUsernames');   /* gốc = cloud → không xoá username NV khác */
+      const dup = Object.keys(map).some(sid => sid !== staffId && (map[sid] || '').toString().replace(/\s+/g, '').toLowerCase() === u.replace(/\s+/g, '').toLowerCase());
+      if (u && dup) return { success: false, error: 'Username này đã có NV khác dùng.' };
+      if (u) map[staffId] = u; else delete map[staffId];
+      window.STORE.set('staffUsernames', map);
+      const me = this.currentUser();
+      this.logActivity(me && me.staffId, 'username.set', 'Đặt username "' + u + '" cho ' + staffId);
+      return { success: true };
     },
 
     /* === Login === */
