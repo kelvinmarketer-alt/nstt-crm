@@ -50,10 +50,10 @@
 
     <!-- Aging (số động từ data thật) -->
     <section class="aging">
-      <div class="aging-card b1"><div class="lab">Trong hạn</div><div class="val" id="agB1">0 ₫</div><div class="sub" id="agB1s">0–30 ngày</div></div>
-      <div class="aging-card b2"><div class="lab">31–60 ngày</div><div class="val" id="agB2">0 ₫</div><div class="sub" id="agB2s">—</div></div>
-      <div class="aging-card b3"><div class="lab">61–90 ngày</div><div class="val" id="agB3">0 ₫</div><div class="sub" id="agB3s">—</div></div>
-      <div class="aging-card b4"><div class="lab">&gt; 90 ngày</div><div class="val" id="agB4">0 ₫</div><div class="sub" id="agB4s">An toàn 🎉</div></div>
+      <div class="aging-card b1"><div class="lab">Trong hạn</div><div class="val" id="agB1">0 ₫</div><div class="sub" id="agB1s">Chưa tới hạn</div></div>
+      <div class="aging-card b2"><div class="lab">1–7 ngày quá hạn</div><div class="val" id="agB2">0 ₫</div><div class="sub" id="agB2s">—</div></div>
+      <div class="aging-card b3"><div class="lab">8–15 ngày quá hạn</div><div class="val" id="agB3">0 ₫</div><div class="sub" id="agB3s">—</div></div>
+      <div class="aging-card b4"><div class="lab">&gt; 15 ngày quá hạn</div><div class="val" id="agB4">0 ₫</div><div class="sub" id="agB4s">An toàn 🎉</div></div>
       <div class="aging-card b5"><div class="lab">Khó đòi</div><div class="val" id="agB5">0 ₫</div><div class="sub">Chưa có</div></div>
     </section>
 
@@ -64,13 +64,13 @@
       </div>
       <div class="aging-bar" id="debtBar">
         <div style="background:var(--ok);width:0%" title="Trong hạn"></div>
-        <div style="background:#3B82F6;width:0%" title="31-60 ngày"></div>
-        <div style="background:var(--warn);width:0%" title="61-90 ngày"></div>
+        <div style="background:#3B82F6;width:0%" title="1–7 ngày quá hạn"></div>
+        <div style="background:var(--warn);width:0%" title="> 7 ngày quá hạn"></div>
       </div>
       <div style="display:flex;justify-content:space-between;font-size:11px;color:var(--muted)" id="debtBarLegend">
         <span>🟢 Trong hạn 0%</span>
-        <span>🔵 31–60d 0%</span>
-        <span>🟡 61–90d 0%</span>
+        <span>🔵 1–7d quá hạn 0%</span>
+        <span>🟡 >7d quá hạn 0%</span>
       </div>
     </div>
 
@@ -82,8 +82,8 @@
       <select id="fBucket">
         <option value="">Mức nợ (tất cả)</option>
         <option value="ok">Trong hạn</option>
-        <option value="warn">31–60 ngày</option>
-        <option value="danger">&gt; 60 ngày</option>
+        <option value="warn">1–15 ngày quá hạn</option>
+        <option value="danger">&gt; 15 ngày quá hạn</option>
       </select>
       <select id="fStaff">
         <option value="">NV phụ trách (tất cả)</option>

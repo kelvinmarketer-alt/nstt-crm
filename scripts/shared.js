@@ -389,14 +389,29 @@ window.debtOverdueInfo = function (custId) {
   const term = window.custCreditDays(custId);
   const led = (window.getDebtLedger ? window.getDebtLedger(custId) : []) || [];
   const empty = { days: 0, amount: 0, term: term, sinceDate: null };
-  if (!led.length) return empty;
   const toDate = e => {
     if (e.ts) { const d = new Date(e.ts); if (!isNaN(d)) return d; }
     const m = String(e.date || '').match(/(\d{1,2})\/(\d{1,2})\/(\d{4})/);
     return m ? new Date(+m[3], +m[2] - 1, +m[1]) : null;
   };
-  const charges = led.filter(e => e.type === 'charge').map(e => ({ amt: +e.amount || 0, t: toDate(e) }))
-    .filter(c => c.t && c.amt > 0).sort((a, b) => a.t - b.t);
+  /* PHÁT SINH NỢ (charge): ưu tiên sổ nợ; nếu sổ nợ KHÔNG có charge → lấy từ ĐƠN trả bằng Công nợ
+     (công nợ trong app tự sinh từ đơn hàng, sổ nợ thường trống). */
+  let charges = led.filter(e => e.type === 'charge').map(e => ({ amt: +e.amount || 0, t: toDate(e) }))
+    .filter(c => c.t && c.amt > 0);
+  if (!charges.length) {
+    const ordDate = o => {
+      const iso = o.deliverDate || o.deliver_date;
+      if (iso && /^\d{4}-\d{2}-\d{2}/.test(String(iso))) return new Date(String(iso).slice(0, 10) + 'T00:00:00');
+      const m = String(o.date || '').match(/(\d{1,2})\/(\d{1,2})\/(\d{4})/);
+      return m ? new Date(+m[3], +m[2] - 1, +m[1]) : null;
+    };
+    charges = ((window.STORE && window.STORE.get('orders', [])) || [])
+      .filter(o => (o.cust || o.custId) === custId && o.status !== 'cancelled' && o.status !== 'draft'
+        && /nợ|cong no|credit/i.test(o.payBy || o.pay_by || ''))
+      .map(o => ({ amt: +o.freight || 0, t: ordDate(o) }))
+      .filter(c => c.t && c.amt > 0);
+  }
+  charges.sort((a, b) => a.t - b.t);
   if (!charges.length) return empty;
   let pay = led.filter(e => e.type === 'payment' || e.type === 'reverse').reduce((s, e) => s + (+e.amount || 0), 0);
   for (const c of charges) { if (pay <= 0) break; const used = Math.min(pay, c.amt); c.amt -= used; pay -= used; }

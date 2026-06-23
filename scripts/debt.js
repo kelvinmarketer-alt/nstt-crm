@@ -39,20 +39,21 @@
       const d = +c.debt || 0; total += d;
       const ov = overdueDays(c);
       if (c.badDebt) { bucket.b5 += d; return; }
-      if (ov <= 30) { bucket.b1 += d; cnt.b1++; }
-      else if (ov <= 60) { bucket.b2 += d; cnt.b2++; }
-      else if (ov <= 90) { bucket.b3 += d; cnt.b3++; }
-      else { bucket.b4 += d; cnt.b4++; }
+      /* Mốc theo CHÍNH SÁCH công nợ (3/7/15 ngày). ov = số ngày QUÁ hạn (đã trừ hạn nợ KH). */
+      if (ov <= 0) { bucket.b1 += d; cnt.b1++; }       /* trong hạn */
+      else if (ov <= 7) { bucket.b2 += d; cnt.b2++; }  /* 1–7 ngày quá hạn */
+      else if (ov <= 15) { bucket.b3 += d; cnt.b3++; } /* 8–15 ngày quá hạn */
+      else { bucket.b4 += d; cnt.b4++; }                /* > 15 ngày quá hạn */
     });
-    setTxt('agB1', f(bucket.b1) + ' ₫'); setTxt('agB1s', `0–30 ngày · ${cnt.b1} KH`);
-    setTxt('agB2', f(bucket.b2) + ' ₫'); setTxt('agB2s', `${cnt.b2} KH`);
-    setTxt('agB3', f(bucket.b3) + ' ₫'); setTxt('agB3s', `${cnt.b3} KH`);
+    setTxt('agB1', f(bucket.b1) + ' ₫'); setTxt('agB1s', `Chưa tới hạn · ${cnt.b1} KH`);
+    setTxt('agB2', f(bucket.b2) + ' ₫'); setTxt('agB2s', cnt.b2 ? `${cnt.b2} KH` : '—');
+    setTxt('agB3', f(bucket.b3) + ' ₫'); setTxt('agB3s', cnt.b3 ? `${cnt.b3} KH` : '—');
     setTxt('agB4', f(bucket.b4) + ' ₫'); setTxt('agB4s', cnt.b4 ? `${cnt.b4} KH` : 'An toàn 🎉');
     setTxt('agB5', f(bucket.b5) + ' ₫');
     setTxt('debtTotal', (total).toLocaleString('vi-VN') + ' ₫');
-    const overdue30 = bucket.b2 + bucket.b3 + bucket.b4;
+    const overdueAll = bucket.b2 + bucket.b3 + bucket.b4;
     setTxt('debtSubHead', debtors.length
-      ? `${debtors.length} khách đang nợ · tổng ${f(total)} ₫ · trong đó ${f(overdue30)} ₫ quá hạn > 30 ngày`
+      ? `${debtors.length} khách đang nợ · tổng ${f(total)} ₫ · trong đó ${f(overdueAll)} ₫ QUÁ HẠN`
       : 'Chưa có công nợ');
     /* Bar widths */
     const bar = document.getElementById('debtBar');
@@ -66,8 +67,8 @@
     const legend = document.getElementById('debtBarLegend');
     if (legend) legend.innerHTML =
       `<span>🟢 Trong hạn ${pct(bucket.b1).toFixed(1)}%</span>` +
-      `<span>🔵 31–60d ${pct(bucket.b2).toFixed(1)}%</span>` +
-      `<span>🟡 >60d ${(pct(bucket.b3)+pct(bucket.b4)).toFixed(1)}%</span>`;
+      `<span>🔵 1–7d quá hạn ${pct(bucket.b2).toFixed(1)}%</span>` +
+      `<span>🟡 >7d quá hạn ${(pct(bucket.b3)+pct(bucket.b4)).toFixed(1)}%</span>`;
     /* Header count */
     const hc = document.querySelector('.table-card .table-head .count');
     if (hc) hc.textContent = debtors.length ? `${debtors.length} khách đang nợ · sắp xếp theo độ rủi ro giảm dần` : 'Chưa có công nợ';
@@ -90,17 +91,17 @@
       .filter(c => {
         if (q && ![c.name, c.code, c.staffOwner].some(x => x.toLowerCase().includes(q))) return false;
         if (b === 'ok' && c.overdue > 0) return false;
-        if (b === 'warn' && (c.overdue <= 30 || c.overdue > 60)) return false;
-        if (b === 'danger' && c.overdue <= 60) return false;
+        if (b === 'warn' && (c.overdue <= 0 || c.overdue > 15)) return false;
+        if (b === 'danger' && c.overdue <= 15) return false;
         return true;
       });
 
     document.getElementById('debtTbody').innerHTML = rows.map(c => {
       const col = window.avatarColor(c.id);
-      const ovCls = c.overdue > 60 ? 'danger' : c.overdue > 30 ? 'warn' : 'ok';
+      const ovCls = c.overdue > 15 ? 'danger' : c.overdue > 0 ? 'warn' : 'ok';
       const ovLab = c.overdue === 0 ? '✓ Trong hạn' : c.overdue + ' ngày quá hạn';
-      const ovBg = c.overdue > 60 ? 'var(--danger-bg)' : c.overdue > 30 ? 'var(--warn-bg)' : 'var(--ok-bg)';
-      const ovFg = c.overdue > 60 ? 'var(--danger)' : c.overdue > 30 ? 'var(--warn)' : 'var(--ok)';
+      const ovBg = c.overdue > 15 ? 'var(--danger-bg)' : c.overdue > 0 ? 'var(--warn-bg)' : 'var(--ok-bg)';
+      const ovFg = c.overdue > 15 ? 'var(--danger)' : c.overdue > 0 ? 'var(--warn)' : 'var(--ok)';
       return `<tr>
         <td>
           <div class="cust-cell">
