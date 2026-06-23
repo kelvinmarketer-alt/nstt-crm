@@ -258,7 +258,15 @@
     const nowISO = now.toISOString();
     /* Danh sách khách "sống" (gồm KH mới tạo trong lượt này) để khớp ưu-tiên-địa-chỉ */
     const liveCustomers = (window.STORE.get('customers', []) || []).slice();
-    let nCust = 0, nOrder = 0;
+    /* CHẶN TRÙNG NỘI DUNG: nếu đơn y hệt (khách+ngày+tổng+số mã) đã tồn tại → KHÔNG tạo lại.
+       seenOrders gồm đơn cũ + đơn vừa tạo trong lượt này → tự cộng dồn, không sót. */
+    const oSig = (cid, iso, total, n) => `${cid}|${iso}|${total}|${n}`;
+    const seenOrders = new Set(
+      (window.STORE.get('orders', []) || [])
+        .filter(o => o.status !== 'cancelled')
+        .map(o => oSig(o.cust || o.custId, (o.deliverDate || (o.date || '').slice(0, 10)), +o.freight || 0, (o.items || []).length))
+    );
+    let nCust = 0, nOrder = 0, nSkip = 0;
 
     rows.forEach(p => {
       const mm = resolveCust(p, liveCustomers);   /* tôn trọng lựa chọn tay → tự động khớp */
@@ -285,6 +293,10 @@
       /* Tên hiển thị đơn = tên khách ĐÃ KHỚP (nếu khớp địa chỉ, dùng tên chuẩn trong app
          thay vì tên có thể gõ sai trên phiếu) */
       const orderCustName = mm ? mm.c.name : p.custName;
+      /* Đơn y hệt đã tồn tại (cũ hoặc vừa tạo trong lượt) → BỎ QUA, không tạo trùng */
+      const osig = oSig(custId, p.date.iso, p.total, items.length);
+      if (seenOrders.has(osig)) { nSkip++; return; }
+      seenOrders.add(osig);
       const order = {
         code: window.STORE.nextOrderCode(),
         /* NGÀY đơn = ngày trên phiếu (đúng kỳ) + GIỜ UP THẬT (hết hiện 00:00) ·
@@ -307,7 +319,7 @@
     _parsed = [];          /* xóa lô đã ghi → click lần 2 KHÔNG tạo lại */
     _committing = false;
     window.closeModal();
-    window.toast(`✓ Đã tạo ${nOrder} đơn${nCust ? ' · ' + nCust + ' khách mới' : ''} — công nợ đã cập nhật.`, 'success');
+    window.toast(`✓ Đã tạo ${nOrder} đơn${nCust ? ' · ' + nCust + ' khách mới' : ''}${nSkip ? ' · bỏ ' + nSkip + ' đơn trùng' : ''} — công nợ đã cập nhật.`, 'success');
     /* Refresh đúng ngữ cảnh: trang Công nợ CFO → cnRender; trang Đơn → renderOrders; còn lại reload */
     setTimeout(() => {
       if (window.cnRender) window.cnRender();

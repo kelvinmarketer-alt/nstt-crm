@@ -343,9 +343,22 @@
         /* MÃ ĐƠN TRÙNG (2 máy tạo cùng lúc) → cấp lại mã cao hơn cloud rồi thử lại.
            Trả về record với mã MỚI để caller cập nhật lại cache + UI. */
         if (table === 'orders' && (error.code === '23505' || /duplicate key|orders_pkey/i.test(error.message || ''))) {
+          /* 23505 có thể vì: (a) lần thử/đồng bộ trước ĐÃ chèn đơn NÀY thành công →
+             mã này chính là đơn của ta → TRẢ VỀ, KHÔNG cấp mã mới (tránh nhân đôi);
+             (b) 2 máy trùng mã của 2 ĐƠN KHÁC → cấp mã mới rồi thử lại. */
+          try {
+            const ex = await client.from('orders').select('*').eq('code', mapped.code).maybeSingle();
+            const e = ex && ex.data;
+            if (e && e.customer_id === mapped.customer_id
+                && Math.abs((+e.freight || 0) - (+mapped.freight || 0)) < 1
+                && String(e.order_date || '').slice(0, 10) === String(mapped.order_date || '').slice(0, 10)) {
+              console.warn(`[SB insert] orders: mã '${mapped.code}' đã là ĐƠN NÀY trên cloud → không tạo trùng`);
+              return mapFrom(table, e);
+            }
+          } catch (e) { /* lỗi đọc → rơi xuống cấp mã mới */ }
           const nc = await this.nextCloudOrderCode();
           if (nc && nc !== mapped.code) {
-            console.warn(`[SB insert] orders: mã '${mapped.code}' trùng → đổi '${nc}' rồi thử lại`);
+            console.warn(`[SB insert] orders: mã '${mapped.code}' trùng (đơn khác) → đổi '${nc}' rồi thử lại`);
             mapped.code = nc;
             continue;
           }
