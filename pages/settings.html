@@ -338,10 +338,10 @@
             <div style="padding:10px 0;border-bottom:1px dashed var(--line)">
               <div style="font-weight:700;font-size:13.5px;color:var(--navy);margin-bottom:6px">📊 Báo cáo ngày</div>
               <div class="form-row" style="margin-bottom:4px">
-                <div><label style="font-size:12px">Giờ gửi (mỗi ngày)</label><input id="tgDailyHour" type="time" value="18:30"></div>
+                <div><label style="font-size:12px">Giờ gửi (mỗi ngày)</label><input id="tgDailyHour" type="time" value="18:30" onchange="window.tgSaveSchedule()"></div>
                 <div>
                   <label style="font-size:12px">Bật tự động</label>
-                  <select id="tgAutoEnabled">
+                  <select id="tgAutoEnabled" onchange="window.tgSaveSchedule()">
                     <option value="0">Tắt — chỉ gửi thủ công</option>
                     <option value="1">Bật — SERVER tự gửi mỗi ngày (kể cả khi không mở app)</option>
                   </select>
@@ -353,10 +353,10 @@
             <div style="padding:10px 0;border-bottom:1px dashed var(--line)">
               <div style="font-weight:700;font-size:13.5px;color:var(--navy);margin-bottom:6px">⚠️ Cảnh báo nội bộ (đơn quá hạn, công nợ, KH bỏ đặt)</div>
               <div class="form-row" style="margin-bottom:4px">
-                <div><label style="font-size:12px">Giờ gửi (mỗi ngày)</label><input id="tgAlertHour" type="time" value="09:00"></div>
+                <div><label style="font-size:12px">Giờ gửi (mỗi ngày)</label><input id="tgAlertHour" type="time" value="09:00" onchange="window.tgSaveSchedule()"></div>
                 <div>
                   <label style="font-size:12px">Bật tự động</label>
-                  <select id="tgAlertEnabled">
+                  <select id="tgAlertEnabled" onchange="window.tgSaveSchedule()">
                     <option value="0">Tắt — chỉ gửi thủ công</option>
                     <option value="1">Bật — SERVER tự gửi mỗi ngày (kể cả khi không mở app)</option>
                   </select>
@@ -370,10 +370,10 @@
               <div style="font-weight:700;font-size:13.5px;color:var(--navy);margin-bottom:6px">🧮 Báo cáo công nợ hàng ngày</div>
               <div style="font-size:12px;color:var(--muted);margin-bottom:6px">Tổng công nợ + quá hạn + top khách nợ → gửi vào kênh <b>Cảnh báo nội bộ</b>.</div>
               <div class="form-row" style="margin-bottom:4px">
-                <div><label style="font-size:12px">Giờ gửi (mỗi ngày)</label><input id="tgDebtHour" type="time" value="08:00"></div>
+                <div><label style="font-size:12px">Giờ gửi (mỗi ngày)</label><input id="tgDebtHour" type="time" value="08:00" onchange="window.tgSaveSchedule()"></div>
                 <div>
                   <label style="font-size:12px">Bật tự động</label>
-                  <select id="tgDebtEnabled">
+                  <select id="tgDebtEnabled" onchange="window.tgSaveSchedule()">
                     <option value="0">Tắt — chỉ gửi thủ công</option>
                     <option value="1">Bật — SERVER tự gửi mỗi ngày (kể cả khi không mở app)</option>
                   </select>
@@ -1676,6 +1676,20 @@
     window.STORE.set('int_telegram', cfg);
     window.toast('✓ Đã lưu cấu hình kênh + routing', 'success');
     tgLoadConfig();
+  };
+
+  /* TỰ LƯU cờ lịch ngay khi đổi (khỏi phụ thuộc bấm đúng nút Lưu) — chỉ đụng phần lịch */
+  window.tgSaveSchedule = function () {
+    const cfg = Object.assign({}, window.STORE.get('int_telegram', {}));
+    const v = id => (document.getElementById(id) || {}).value;
+    cfg.dailyHour = v('tgDailyHour') || '18:30';
+    cfg.autoEnabled = v('tgAutoEnabled') === '1';
+    cfg.alertHour = v('tgAlertHour') || '09:00';
+    cfg.alertEnabled = v('tgAlertEnabled') === '1';
+    cfg.debtReportHour = v('tgDebtHour') || '08:00';
+    cfg.debtReportEnabled = v('tgDebtEnabled') === '1';
+    window.STORE.set('int_telegram', cfg);
+    window.toast && window.toast('✓ Đã lưu lịch tự động', 'success');
   };
 
   /* Xem trước mẫu báo cáo công nợ (dựng từ dữ liệu thật, KHÔNG gửi) */
