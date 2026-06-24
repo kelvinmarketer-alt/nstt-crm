@@ -3,10 +3,10 @@
    ─────────────────────────────────────────────────────────
    Wire 2 trigger event-based + 1 scheduler:
 
-   1. SHIPPER_DISPATCH (event)
-      Trigger: STORE.subscribe('orders') phát hiện đơn mới
-              có status = 'confirmed' (đã xác nhận, chuẩn bị giao)
-      Action: gửi tin nhắn vào group shipper qua kênh routing 'shipper_dispatch'
+   1. SHIPPER_DISPATCH (gọi thủ công khi GIAO SHIPPER — KHÔNG bắn lúc tạo đơn)
+      window.sendShipperDispatch(o): procurement.js gọi khi gom xong + bấm
+      "giao shipper". Gửi tin nhắn vào group shipper qua kênh 'shipper_dispatch'.
+      → Tạo đơn chỉ là "Đơn mới" trong app, KHÔNG làm phiền group.
 
    2. PRICE_UPDATE (event)
       Đã có ở scripts/price-auto-send.js — subscribe 'products' price change.
@@ -32,6 +32,12 @@
      order object — vì field _ bị strip khi lưu cloud → mỗi lần sync về
      lại tưởng đơn mới → spam). Baseline lần đầu để không gửi lại đơn cũ.
      ========================================================= */
+  /* ─────────────────────────────────────────────────────────
+     QUAN TRỌNG: KHÔNG bắn Telegram khi MỚI TẠO đơn nữa.
+     Đơn mới chỉ "Đơn mới" trong app. Thông báo group + phân đơn cho shipper
+     CHỈ bắn khi gom xong → bấm "giao shipper" (procurement.js gọi
+     window.sendShipperDispatch). Tránh gửi trùng bằng TG_SENT_KEY.
+     ───────────────────────────────────────────────────────── */
   const TG_SENT_KEY = 'vty_tg_shipper_sent';
   function getSentSet() {
     try { return new Set(JSON.parse(localStorage.getItem(TG_SENT_KEY) || '[]')); }
@@ -40,38 +46,16 @@
   function saveSentSet(set) {
     try { localStorage.setItem(TG_SENT_KEY, JSON.stringify([...set].slice(-1000))); } catch (e) {}
   }
-  let _tgBaselined = false;
 
-  window.STORE.subscribe('orders', orders => {
-    if (!Array.isArray(orders)) return;
-    const sent = getSentSet();
-
-    /* Lần đầu nhận data (load/preload): đánh dấu mọi đơn confirmed hiện có
-       là "đã biết" → KHÔNG gửi lại đơn cũ. Chỉ gửi đơn confirmed MỚI sau đó. */
-    if (!_tgBaselined) {
-      _tgBaselined = true;
-      let added = false;
-      orders.forEach(o => {
-        if (o.status === 'confirmed' && o.code && !sent.has(o.code)) { sent.add(o.code); added = true; }
-      });
-      if (added) saveSentSet(sent);
-      return;
-    }
-
-    let added = false;
-    orders.forEach(o => {
-      if (o.status === 'confirmed' && o.code && !sent.has(o.code)) {
-        sent.add(o.code); added = true;
-        setTimeout(() => sendShipperDispatch(o), 0);
-      }
-    });
-    if (added) saveSentSet(sent);
-  });
-
+  /* Gửi đơn cho group shipper — gọi khi GIAO SHIPPER (không phải lúc tạo đơn).
+     Trả {ok, channel}. Chống gửi trùng theo mã đơn. */
   async function sendShipperDispatch(o) {
-    if (!window.getTgChannel || !window.sendTgMessage) return;
+    if (!o || !o.code) return { ok: false };
+    const sent = getSentSet();
+    if (sent.has(o.code)) return { ok: true, dup: true };   /* đã phân giao rồi → không gửi lại */
+    if (!window.getTgChannel) return { ok: false };
     const ch = window.getTgChannel('shipper_dispatch');
-    if (!ch || !ch.botToken || !ch.chatId) return;
+    if (!ch || !ch.botToken || !ch.chatId) return { ok: false };
 
     const cust = (window.STORE.get('customers', []) || []).find(c => c.id === (o.cust || o.customer_id)) || {};
     const items = (o.items || []).map(it =>
@@ -80,15 +64,16 @@
 
     const msg = `🚚 *ĐƠN MỚI CẦN GIAO* ${o.code}\n\n` +
       `👤 ${o.custName || cust.name || '?'}\n` +
-      `📞 ${cust.phone || '—'}\n` +
+      `📞 ${o.custPhone || cust.phone || '—'}\n` +
       `📍 ${o.drop || cust.address || '—'}\n` +
-      `📅 ${o.date} · ${o.deliveryTime || 'Sáng'}\n` +
+      `📅 ${o.deliverDate || o.date} · Ca ${o.shipShift || 'Sáng'}${o.shipTime ? ' · ' + o.shipTime : ''}\n` +
+      (o.driverName ? `🛵 Shipper: *${o.driverName}*\n` : '') +
       `\n📦 *Mặt hàng:*\n${items}\n` +
       `\n💰 Tổng: *${window.fmt(o.freight)}đ*\n` +
       `💵 Thanh toán: ${o.payBy || 'Công nợ'}\n` +
       (o.cod ? `🛒 COD: ${window.fmt(o.cod)}đ\n` : '') +
       (o.note ? `\n📝 Ghi chú: ${o.note}\n` : '') +
-      `\n_Đơn vừa được xác nhận lúc ${new Date().toLocaleTimeString('vi-VN')}_`;
+      `\n_Đơn vừa được phân giao lúc ${new Date().toLocaleTimeString('vi-VN')}_`;
 
     try {
       await fetch(`https://api.telegram.org/bot${ch.botToken}/sendMessage`, {
@@ -96,11 +81,15 @@
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ chat_id: ch.chatId, text: msg, parse_mode: 'Markdown' }),
       });
-      console.log(`[TG] ✓ Đã gửi đơn ${o.code} cho shipper`);
+      sent.add(o.code); saveSentSet(sent);
+      console.log(`[TG] ✓ Đã phân giao đơn ${o.code} cho shipper`);
+      return { ok: true, channel: ch.name || 'shipper' };
     } catch (e) {
       console.warn(`[TG shipper_dispatch]`, e.message);
+      return { ok: false, error: e.message };
     }
   }
+  window.sendShipperDispatch = sendShipperDispatch;
 
   /* =========================================================
      2. ALERT — scheduler tổng hợp cảnh báo hằng ngày

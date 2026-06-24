@@ -1023,12 +1023,11 @@ ${o.shortages && o.shortages.length ? `<div style="margin-top:10px;font-size:11.
     o.whStatus = 'released';
     o.status = 'pickup';   /* vào pipeline giao hàng */
     S().set('orders', orders);
-    /* gửi shipper qua kênh điều phối */
-    if (window.sendTgMessage) {
-      const items = (o.items || []).map(it => `   • ${it.name}: ${fmtQty(it.qty)} ${it.unit || 'kg'}`).join('\n');
-      const msg = `🛵 ĐIỀU PHỐI GIAO — ${o.code}\n👤 KH: ${o.custName || ''}\n📍 ${o.drop || ''}\n☎ ${o.custPhone || ''}\n🚚 Giao: ${o.deliverDate || ''} · Ca ${o.shipShift || ''}${o.shipTime ? ' · ' + o.shipTime : ''}\n────────\n${items}\n────────\n💵 ${money(o.freight)} ₫${o.cod ? '\n🟡 COD: ' + money(o.cod) + ' ₫' : ''}`;
-      window.sendTgMessage('shipper_dispatch', msg).then(r => {
-        window.toast?.(r.ok ? '🛵 Đã giao shipper ' + code + ' (gửi "' + r.channel + '")' : 'Đã chuyển ' + code + ' sang giao (chưa cấu hình TG shipper)', r.ok ? 'success' : 'info');
+    /* CHỈ TẠI ĐÂY (gom xong → giao shipper) mới bắn group + phân đơn shipper.
+       Dùng format chung "ĐƠN MỚI CẦN GIAO" (có shipper, chống gửi trùng). */
+    if (window.sendShipperDispatch) {
+      window.sendShipperDispatch(o).then(r => {
+        window.toast?.(r && r.ok ? (r.dup ? '🛵 ' + code + ' đã phân giao trước đó' : '🛵 Đã giao shipper ' + code + ' (đã báo group)') : 'Đã chuyển ' + code + ' sang giao (chưa cấu hình TG shipper)', r && r.ok ? 'success' : 'info');
       });
     } else {
       window.toast?.('Đã chuyển ' + code + ' sang Đang giao', 'success');
