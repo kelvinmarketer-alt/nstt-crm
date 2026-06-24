@@ -127,11 +127,20 @@
     const ch = window.getTgChannel('shipper_dispatch');
     if (!ch || !ch.botToken || !ch.chatId) return;
     const cust = (window.STORE.get('customers', []) || []).find(c => c.id === (o.cust || o.customer_id)) || {};
+    const items = (o.items || []).map(it => `• ${it.name} ${it.qty}${it.unit || 'kg'} = ${window.fmt(it.total)}đ`).join('\n');
     const nItems = (o.items || []).length;
-    const msg = `🆕 *CÓ ĐƠN MỚI* ${o.code}\n` +
+    /* "CÓ ĐƠN MỚI" — ĐẦY ĐỦ mặt hàng (chỉ khác tin "cần giao" ở tiêu đề + chưa có shipper) */
+    const msg = `🆕 *CÓ ĐƠN MỚI* ${o.code}\n\n` +
       `👤 ${o.custName || cust.name || '?'}\n` +
-      `💰 ${window.fmt(o.freight)}đ · ${o.payBy || 'Công nợ'}${nItems ? ' · ' + nItems + ' mã' : ''}\n` +
-      `🕒 ${new Date().toLocaleTimeString('vi-VN')}`;
+      `📞 ${o.custPhone || cust.phone || '—'}\n` +
+      `📍 ${o.drop || cust.address || '—'}\n` +
+      `📅 ${o.deliverDate || o.date} · Ca ${o.shipShift || 'Sáng'}${o.shipTime ? ' · ' + o.shipTime : ''}\n` +
+      `\n📦 *Mặt hàng${nItems ? ' (' + nItems + ' mã)' : ''}:*\n${items}\n` +
+      `\n💰 Tổng: *${window.fmt(o.freight)}đ*\n` +
+      `💵 Thanh toán: ${o.payBy || 'Công nợ'}\n` +
+      (o.cod ? `🛒 COD: ${window.fmt(o.cod)}đ\n` : '') +
+      (o.note ? `\n📝 Ghi chú: ${o.note}\n` : '') +
+      `\n_Đơn vừa được tạo lúc ${new Date().toLocaleTimeString('vi-VN')}_`;
     try {
       await fetch(`https://api.telegram.org/bot${ch.botToken}/sendMessage`, {
         method: 'POST', headers: { 'Content-Type': 'application/json' },
