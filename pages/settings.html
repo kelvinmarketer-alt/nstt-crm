@@ -365,6 +365,27 @@
               <button class="btn btn-ghost btn-sm" onclick="window.sendAlertNow && window.sendAlertNow().then(ok => window.toast(ok?'✓ Đã gửi cảnh báo':'❌ Chưa cấu hình kênh', ok?'success':'warn'))" style="margin-top:4px">📤 Gửi cảnh báo ngay (test)</button>
             </div>
 
+            <!-- 2b. Báo cáo công nợ hàng ngày -->
+            <div style="padding:10px 0;border-bottom:1px dashed var(--line)">
+              <div style="font-weight:700;font-size:13.5px;color:var(--navy);margin-bottom:6px">🧮 Báo cáo công nợ hàng ngày</div>
+              <div style="font-size:12px;color:var(--muted);margin-bottom:6px">Tổng công nợ + quá hạn + top khách nợ → gửi vào kênh <b>Cảnh báo nội bộ</b>.</div>
+              <div class="form-row" style="margin-bottom:4px">
+                <div><label style="font-size:12px">Giờ gửi (mỗi ngày)</label><input id="tgDebtHour" type="time" value="08:00"></div>
+                <div>
+                  <label style="font-size:12px">Bật tự động</label>
+                  <select id="tgDebtEnabled">
+                    <option value="0">Tắt — chỉ gửi thủ công</option>
+                    <option value="1">Bật — gửi mỗi ngày (khi tab mở)</option>
+                  </select>
+                </div>
+              </div>
+              <div style="display:flex;gap:6px;flex-wrap:wrap;margin-top:6px">
+                <button class="btn btn-ghost btn-sm" onclick="window.tgPreviewDebt()">👁 Xem mẫu báo cáo</button>
+                <button class="btn btn-primary btn-sm" onclick="window.sendDebtReportNow && window.sendDebtReportNow().then(ok => window.toast(ok?'✓ Đã gửi báo cáo công nợ':'❌ Chưa cấu hình kênh Cảnh báo', ok?'success':'warn'))">📤 Gửi thử ngay</button>
+              </div>
+              <pre id="tgDebtPreview" style="display:none;white-space:pre-wrap;font-family:ui-monospace,monospace;font-size:12px;background:#F0FDF4;border:1px solid var(--line);border-radius:8px;padding:12px;margin-top:8px;max-height:300px;overflow:auto"></pre>
+            </div>
+
             <!-- 3. Phân đơn shipper -->
             <div style="padding:10px 0;border-bottom:1px dashed var(--line)">
               <div style="font-weight:700;font-size:13.5px;color:var(--navy);margin-bottom:6px">🚚 Phân đơn cho Shipper</div>
@@ -1521,6 +1542,10 @@
     if (ae)  ae.value  = cfg.autoEnabled ? '1' : '0';
     if (ahr) ahr.value = cfg.alertHour || '09:00';
     if (aen) aen.value = cfg.alertEnabled ? '1' : '0';
+    const dhr = document.getElementById('tgDebtHour');
+    const den = document.getElementById('tgDebtEnabled');
+    if (dhr) dhr.value = cfg.debtReportHour || '08:00';
+    if (den) den.value = cfg.debtReportEnabled ? '1' : '0';
     const st = document.getElementById('tgStatus');
     if (st) {
       const ok = cfg.botToken && cfg.chatId;
@@ -1653,6 +1678,16 @@
     tgLoadConfig();
   };
 
+  /* Xem trước mẫu báo cáo công nợ (dựng từ dữ liệu thật, KHÔNG gửi) */
+  window.tgPreviewDebt = function () {
+    const box = document.getElementById('tgDebtPreview');
+    if (!box) return;
+    if (!window.buildDebtReport) { window.toast('Đang tải… thử lại sau 1-2 giây', 'warn'); return; }
+    /* bỏ *markdown* cho dễ đọc trong preview */
+    box.textContent = window.buildDebtReport().replace(/\*/g, '');
+    box.style.display = (box.style.display === 'none' || !box.style.display) ? 'block' : 'none';
+  };
+
   window.tgSaveConfig = function () {
     const cfg = window.STORE.get('int_telegram', {});
     cfg.botToken     = document.getElementById('tgBotToken').value.trim();
@@ -1661,6 +1696,8 @@
     cfg.autoEnabled  = document.getElementById('tgAutoEnabled').value === '1';
     cfg.alertHour    = (document.getElementById('tgAlertHour')||{}).value || '09:00';
     cfg.alertEnabled = (document.getElementById('tgAlertEnabled')||{}).value === '1';
+    cfg.debtReportHour    = (document.getElementById('tgDebtHour')||{}).value || '08:00';
+    cfg.debtReportEnabled = (document.getElementById('tgDebtEnabled')||{}).value === '1';
     if (!cfg.botToken || !cfg.chatId) { window.toast('Cần nhập đủ Bot Token + Chat ID', 'warn'); return; }
     window.STORE.set('int_telegram', cfg);
     window.toast('✓ Đã lưu cấu hình Telegram + lịch', 'success');

@@ -222,18 +222,72 @@
   window.sendAlertNow = sendAlertNow;
   window.buildAlertMessage = buildAlertMessage;
 
-  /* === Scheduler: kiểm tra mỗi phút xem đến giờ chưa === */
-  let _lastAlertDate = '';
+  /* =========================================================
+     BÁO CÁO CÔNG NỢ HÀNG NGÀY — riêng (preview + test + lịch)
+     Công nợ tính TRỰC TIẾP từ đơn trả bằng Công nợ − phiếu thu (sổ nợ),
+     quá hạn theo hạn nợ KH (window.debtOverdueInfo). Gửi kênh 'alert'.
+     ========================================================= */
+  function buildDebtReport() {
+    const fmt = window.fmt || (n => (n || 0).toLocaleString('vi-VN'));
+    const date = (window.todayDate ? window.todayDate() : new Date()).toLocaleDateString('vi-VN');
+    const customers = window.STORE.get('customers', []) || [];
+    const orders = window.STORE.get('orders', []) || [];
+    const ledger = window.STORE.get('debtLedger', []) || [];
+    const debtBy = {};
+    orders.forEach(o => {
+      if (o.status === 'draft' || o.status === 'cancelled') return;
+      if (!/nợ|cong no|credit/i.test(o.payBy || o.pay_by || '')) return;
+      const id = o.cust || o.customer_id; if (!id) return;
+      debtBy[id] = (debtBy[id] || 0) + (+o.freight || 0);
+    });
+    ledger.forEach(e => { if (e.type === 'payment' && e.custId) debtBy[e.custId] = (debtBy[e.custId] || 0) - (+e.amount || 0); });
+    const nameOf = {}; customers.forEach(c => nameOf[c.id] = c.name);
+    const rows = Object.keys(debtBy).map(id => {
+      const debt = Math.max(0, Math.round(debtBy[id]));
+      const ov = window.debtOverdueInfo ? (window.debtOverdueInfo(id).days || 0) : 0;
+      return { name: nameOf[id] || id, debt, overdue: ov };
+    }).filter(r => r.debt > 0).sort((a, b) => b.debt - a.debt);
+    const total = rows.reduce((s, r) => s + r.debt, 0);
+    const od = rows.filter(r => r.overdue > 0);
+    const odTotal = od.reduce((s, r) => s + r.debt, 0);
+    const out = [`🧮 *BÁO CÁO CÔNG NỢ — ${date}*`, ''];
+    out.push(`💰 Tổng công nợ: *${fmt(total)}đ* · ${rows.length} khách`);
+    out.push(`⏰ Quá hạn: *${fmt(odTotal)}đ* · ${od.length} khách`);
+    if (rows.length) {
+      out.push('\n*Top khách nợ:*');
+      rows.slice(0, 12).forEach(r => out.push(`• ${r.name} · ${fmt(r.debt)}đ${r.overdue > 0 ? ` ⏰ ${r.overdue} ngày` : ''}`));
+      if (rows.length > 12) out.push(`… và ${rows.length - 12} khách khác`);
+    } else { out.push('\n✅ Không có công nợ.'); }
+    return out.join('\n');
+  }
+  async function sendDebtReportNow() {
+    if (!window.getTgChannel) return false;
+    const ch = window.getTgChannel('alert');
+    if (!ch || !ch.botToken || !ch.chatId) { console.warn('[TG debt-report] chưa cấu hình kênh alert'); return false; }
+    try {
+      await fetch(`https://api.telegram.org/bot${ch.botToken}/sendMessage`, {
+        method: 'POST', headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ chat_id: ch.chatId, text: buildDebtReport(), parse_mode: 'Markdown' }),
+      });
+      console.log('[TG] ✓ Đã gửi báo cáo công nợ');
+      return true;
+    } catch (e) { console.warn('[TG debt-report]', e.message); return false; }
+  }
+  window.buildDebtReport = buildDebtReport;
+  window.sendDebtReportNow = sendDebtReportNow;
+
+  /* === Scheduler: kiểm tra mỗi 30s xem đến giờ chưa (cảnh báo + báo cáo công nợ) === */
+  let _lastAlertDate = '', _lastDebtDate = '';
   setInterval(() => {
     const cfg = window.STORE.get('int_telegram', {}) || {};
-    if (!cfg.alertEnabled) return;
-    const targetHour = cfg.alertHour || '09:00';   /* default 9:00 sáng */
     const now = new Date();
-    const hhmm = `${String(now.getHours()).padStart(2,'0')}:${String(now.getMinutes()).padStart(2,'0')}`;
+    const hhmm = `${String(now.getHours()).padStart(2, '0')}:${String(now.getMinutes()).padStart(2, '0')}`;
     const todayStr = now.toISOString().slice(0, 10);
-    if (hhmm === targetHour && _lastAlertDate !== todayStr) {
-      _lastAlertDate = todayStr;
-      sendAlertNow();
+    if (cfg.alertEnabled && hhmm === (cfg.alertHour || '09:00') && _lastAlertDate !== todayStr) {
+      _lastAlertDate = todayStr; sendAlertNow();
+    }
+    if (cfg.debtReportEnabled && hhmm === (cfg.debtReportHour || '08:00') && _lastDebtDate !== todayStr) {
+      _lastDebtDate = todayStr; sendDebtReportNow();
     }
   }, 30000); /* check mỗi 30s */
 
