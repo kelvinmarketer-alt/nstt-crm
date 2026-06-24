@@ -1,0 +1,28 @@
+name: Báo cáo Telegram theo lịch (NSTT)
+
+on:
+  schedule:
+    # Mỗi 30 phút. Script tự đối chiếu giờ VN == giờ admin cài + cờ bật rồi mới gửi.
+    - cron: '0,30 * * * *'
+  workflow_dispatch:
+    inputs:
+      force:
+        description: 'Gửi thử NGAY cả 2 báo cáo (bỏ qua giờ/cờ)'
+        type: boolean
+        default: true
+
+jobs:
+  send:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+      - name: Gửi báo cáo Telegram theo lịch
+        working-directory: cron
+        env:
+          SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
+          SUPABASE_KEY: ${{ secrets.SUPABASE_KEY }}
+          FORCE: ${{ (github.event_name == 'workflow_dispatch' && inputs.force) && '1' || '' }}
+        run: node tg-daily.mjs

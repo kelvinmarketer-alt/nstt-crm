@@ -276,20 +276,11 @@
   window.buildDebtReport = buildDebtReport;
   window.sendDebtReportNow = sendDebtReportNow;
 
-  /* === Scheduler: kiểm tra mỗi 30s xem đến giờ chưa (cảnh báo + báo cáo công nợ) === */
-  let _lastAlertDate = '', _lastDebtDate = '';
-  setInterval(() => {
-    const cfg = window.STORE.get('int_telegram', {}) || {};
-    const now = new Date();
-    const hhmm = `${String(now.getHours()).padStart(2, '0')}:${String(now.getMinutes()).padStart(2, '0')}`;
-    const todayStr = now.toISOString().slice(0, 10);
-    if (cfg.alertEnabled && hhmm === (cfg.alertHour || '09:00') && _lastAlertDate !== todayStr) {
-      _lastAlertDate = todayStr; sendAlertNow();
-    }
-    if (cfg.debtReportEnabled && hhmm === (cfg.debtReportHour || '08:00') && _lastDebtDate !== todayStr) {
-      _lastDebtDate = todayStr; sendDebtReportNow();
-    }
-  }, 30000); /* check mỗi 30s */
+  /* === LỊCH BÁO CÁO HÀNG NGÀY: chuyển sang SERVER (GitHub Actions cron/tg-daily.mjs) ===
+     KHÔNG còn setInterval gửi trong trình duyệt — vì chỉ chạy khi có tab mở.
+     Cron server gửi đúng giờ kể cả khi KHÔNG mở app. Ở đây chỉ giữ hàm cho nút
+     "Gửi thử" + "Xem mẫu" (sendAlertNow / sendDebtReportNow / buildDebtReport) và
+     các trigger theo SỰ KIỆN (đơn mới, giao shipper) vẫn chạy client-side. */
 
-  console.log('%c[NSTT] ✓ TG auto-trigger ready (shipper dispatch + daily alert)', 'color:#1B5E20;font-weight:bold');
+  console.log('%c[NSTT] ✓ TG triggers ready (event-based; lịch ngày do server cron)', 'color:#1B5E20;font-weight:bold');
 })();
