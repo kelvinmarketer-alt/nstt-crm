@@ -104,23 +104,10 @@
   function isNewOrder(o) { return o && o.code && o.status === 'confirmed'; }   /* đơn vừa tạo = "Mới" */
   let _newBaselined = false;
 
-  window.STORE.subscribe('orders', orders => {
-    if (!Array.isArray(orders)) return;
-    const set = getNewSet();
-    /* Lần đầu nhận data → đánh dấu đơn 'Mới' hiện có là đã biết (không báo lại) */
-    if (!_newBaselined) {
-      _newBaselined = true;
-      let add = false;
-      orders.forEach(o => { if (isNewOrder(o) && !set.has(o.code)) { set.add(o.code); add = true; } });
-      if (add) saveNewSet(set);
-      return;
-    }
-    let add = false;
-    orders.forEach(o => {
-      if (isNewOrder(o) && !set.has(o.code)) { set.add(o.code); add = true; setTimeout(() => sendNewOrderPing(o), 0); }
-    });
-    if (add) saveNewSet(set);
-  });
+  /* ĐÃ CHUYỂN sang SERVER (DB trigger trg_notify_new_order — supabase-nstt/21-orders-tg-notify.sql).
+     KHÔNG bắn từ trình duyệt nữa → hết phụ thuộc máy/cache/tab + hết gửi trùng nhiều máy.
+     (Giữ getNewSet/sendNewOrderPing làm tham chiếu, không gọi.) */
+  void getNewSet; void saveNewSet; void isNewOrder; void _newBaselined;
 
   async function sendNewOrderPing(o) {
     if (!window.getTgChannel) return;
