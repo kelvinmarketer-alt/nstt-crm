@@ -65,6 +65,46 @@ function alertMsg(orders, customers, debtRows, vnDate, nowMs) {
   return out.join('\n');
 }
 
+/* ===== BÁO CÁO NGÀY (doanh thu/đơn/lãi…) — bộ metric mặc định của app ===== */
+const fmtShort = n => { n = n || 0; if (Math.abs(n) >= 1e9) return (n / 1e9).toFixed(2) + ' tỷ'; if (Math.abs(n) >= 1e6) return Math.round(n / 1e6) + ' tr'; if (Math.abs(n) >= 1e3) return Math.round(n / 1e3) + 'k'; return String(n); };
+function buyAt(p, dISO) {
+  const ph = p && (p.price_history || p.priceHistory); if (!ph || !ph.length) return null;
+  const d = dISO ? new Date(dISO) : null; if (!d) return ph[ph.length - 1].buy;
+  let best = null; ph.forEach(h => { const hd = new Date(h.date); if (hd <= d && (!best || hd > new Date(best.date))) best = h; });
+  return (best || ph[0]).buy;
+}
+function dailyReportMsg(orders, customers, products, debtRows, todayISO, vnDate) {
+  const prodById = {}; products.forEach(p => prodById[p.id] = p);
+  const tos = orders.filter(o => String(o.order_date || '').slice(0, 10) === todayISO && o.status !== 'cancelled');
+  const rev = tos.reduce((s, o) => s + (+o.freight || 0), 0);
+  const codSum = tos.reduce((s, o) => s + (+o.cod || 0), 0);
+  let cogs = 0;
+  tos.forEach(o => (o.items || []).forEach(it => {
+    if (+it.buyTotal > 0) { cogs += +it.buyTotal; return; }
+    const p = it.id ? prodById[it.id] : null;
+    const bp = p ? (buyAt(p, (o.deliver_date || o.order_date || '').slice(0, 10)) || (+it.price || 0) * 0.8) : (+it.price || 0) * 0.8;
+    cogs += (bp || 0) * (+it.qty || 0);
+  }));
+  const gp = rev - cogs, margin = rev ? (gp / rev * 100).toFixed(1) : '0';
+  const newCs = customers.filter(c => { const m = String(c.created || '').match(/(\d{1,2})\/(\d{1,2})\/(\d{4})/); return m && `${m[3]}-${m[2].padStart(2, '0')}-${m[1].padStart(2, '0')}` === todayISO; });
+  const debtTotal = debtRows.reduce((s, r) => s + r.debt, 0);
+  const debtOd = debtRows.filter(r => r.overdue > 0).reduce((s, r) => s + r.debt, 0);
+  const byStaff = {}; tos.forEach(o => { if (o.staff) byStaff[o.staff] = (byStaff[o.staff] || 0) + (+o.freight || 0); });
+  const topStaff = Object.entries(byStaff).sort((a, b) => b[1] - a[1])[0];
+  const L = [`📊 *BÁO CÁO NGÀY ${vnDate} — NÔNG SẢN TUẤN TÚ*`, ''];
+  L.push(`💰 Doanh thu: ${fmt(rev)}đ (${tos.length} đơn)`);
+  L.push(`📦 Số đơn: ${tos.length}`);
+  L.push(`💵 COD thu hộ: ${fmt(codSum)}đ`);
+  L.push(`🆕 KH mới: ${newCs.length}${newCs.length ? ' (' + newCs.slice(0, 3).map(c => c.name).join(', ') + (newCs.length > 3 ? '…' : '') + ')' : ''}`);
+  L.push(`📉 Công nợ phải thu: ${fmt(debtTotal)}đ`);
+  L.push(`⏰ Công nợ QUÁ HẠN: ${fmt(debtOd)}đ`);
+  L.push(`🥕 Giá vốn (COGS): ${fmt(Math.round(cogs))}đ`);
+  L.push(`📈 Lãi gộp: ${fmt(Math.round(gp))}đ (biên ${margin}%)`);
+  L.push(`🥇 NV bán tốt nhất: ${topStaff ? topStaff[0] + ' (' + fmtShort(topStaff[1]) + ')' : '(chưa có)'}`);
+  L.push('\n— Gửi tự động từ CRM Nông Sản Tuấn Tú');
+  return L.join('\n');
+}
+
 async function sendTg(botToken, chatId, text) {
   if (DRY) { console.log(`\n--- [DRY] gửi tới ${chatId} ---\n${text}\n`); return true; }
   const r = await fetch(`https://api.telegram.org/bot${botToken}/sendMessage`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ chat_id: chatId, text, parse_mode: 'Markdown' }) });
@@ -83,28 +123,32 @@ async function sendTg(botToken, chatId, text) {
   console.log(`[VN ${t.vnDate} ${t.hhmm}] DRY=${DRY ? 1 : 0}`);
 
   /* dữ liệu dùng chung */
-  const [orders, customers, ledgerKv, creditKv] = await Promise.all([
-    rest('orders?select=code,cust_name,customer_id,deliver_date,order_date,freight,status,pay_by'),
-    rest('customers?select=id,name'),
+  const [orders, customers, products, ledgerKv, creditKv] = await Promise.all([
+    rest('orders?select=code,cust_name,customer_id,deliver_date,order_date,freight,cod,items,staff,status,pay_by'),
+    rest('customers?select=id,name,created'),
+    rest('products?select=id,price_history'),
     getKv('debtLedger'), getKv('custCreditDays'),
   ]);
   const debtRows = buildDebtData(orders, customers, ledgerKv || [], creditKv || {});
 
-  /* FORCE (chạy tay): GỬI ngay cả 2 báo cáo, bỏ qua giờ/cờ (DRY=1 → chỉ in) */
+  /* FORCE (chạy tay): GỬI ngay cả 3 báo cáo, bỏ qua giờ/cờ (DRY=1 → chỉ in) */
   if (process.env.FORCE === '1') {
-    const chat = chFor('alert');
-    if (!chat) { console.log('Chưa có kênh Cảnh báo nội bộ → không gửi.'); return; }
-    await sendTg(cfg.botToken, chat, debtReportMsg(debtRows, t.vnDate));
-    await sendTg(cfg.botToken, chat, alertMsg(orders, customers, debtRows, t.vnDate, Date.now()));
-    console.log('✓ FORCE: đã gửi thử cả 2 báo cáo.');
+    const chAlert = chFor('alert'), chDaily = chFor('daily_report');
+    if (chDaily) await sendTg(cfg.botToken, chDaily, dailyReportMsg(orders, customers, products, debtRows, t.date, t.vnDate));
+    if (chAlert) { await sendTg(cfg.botToken, chAlert, debtReportMsg(debtRows, t.vnDate)); await sendTg(cfg.botToken, chAlert, alertMsg(orders, customers, debtRows, t.vnDate, Date.now())); }
+    console.log('✓ FORCE: đã gửi thử các báo cáo.');
     return;
   }
 
-  /* 1) Báo cáo công nợ */
+  /* 1) Báo cáo NGÀY (doanh thu/lãi…) → kênh daily_report */
+  if (cfg.autoEnabled && inWindow(cfg.dailyHour || '18:30') && marker.daily !== t.date) {
+    const chat = chFor('daily_report'); if (chat) { if (await sendTg(cfg.botToken, chat, dailyReportMsg(orders, customers, products, debtRows, t.date, t.vnDate))) { marker.daily = t.date; changed = true; console.log('✓ Đã gửi báo cáo ngày'); } }
+  }
+  /* 2) Báo cáo công nợ → kênh alert */
   if (cfg.debtReportEnabled && inWindow(cfg.debtReportHour || '08:00') && marker.debt !== t.date) {
     const chat = chFor('alert'); if (chat) { if (await sendTg(cfg.botToken, chat, debtReportMsg(debtRows, t.vnDate))) { marker.debt = t.date; changed = true; console.log('✓ Đã gửi báo cáo công nợ'); } }
   }
-  /* 2) Cảnh báo nội bộ */
+  /* 3) Cảnh báo nội bộ → kênh alert */
   if (cfg.alertEnabled && inWindow(cfg.alertHour || '09:00') && marker.alert !== t.date) {
     const chat = chFor('alert'); if (chat) { if (await sendTg(cfg.botToken, chat, alertMsg(orders, customers, debtRows, t.vnDate, Date.now()))) { marker.alert = t.date; changed = true; console.log('✓ Đã gửi cảnh báo nội bộ'); } }
   }
