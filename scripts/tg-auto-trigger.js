@@ -3,10 +3,11 @@
    ─────────────────────────────────────────────────────────
    Wire 2 trigger event-based + 1 scheduler:
 
-   1. SHIPPER_DISPATCH (gọi thủ công khi GIAO SHIPPER — KHÔNG bắn lúc tạo đơn)
-      window.sendShipperDispatch(o): procurement.js gọi khi gom xong + bấm
-      "giao shipper". Gửi tin nhắn vào group shipper qua kênh 'shipper_dispatch'.
-      → Tạo đơn chỉ là "Đơn mới" trong app, KHÔNG làm phiền group.
+   1a. NEW_ORDER_PING (event): tạo đơn (status 'confirmed') → tin NGẮN
+       "🆕 Có đơn mới" vào group (chỉ mã + khách + tổng, KHÔNG chi tiết/shipper).
+   1b. SHIPPER_DISPATCH (window.sendShipperDispatch — gọi khi GIAO SHIPPER):
+       gom xong + bấm "giao shipper" → tin ĐẦY ĐỦ "ĐƠN MỚI CẦN GIAO" + phân
+       shipper. 2 tin khác nhau, dedup riêng.
 
    2. PRICE_UPDATE (event)
       Đã có ở scripts/price-auto-send.js — subscribe 'products' price change.
@@ -90,6 +91,55 @@
     }
   }
   window.sendShipperDispatch = sendShipperDispatch;
+
+  /* ─────────────────────────────────────────────────────────
+     TIN NGẮN "CÓ ĐƠN MỚI" — bắn khi vừa tạo đơn (status 'confirmed').
+     Chỉ báo cho biết CÓ đơn mới (mã + khách + tổng), KHÔNG kèm chi tiết/shipper.
+     Tin ĐẦY ĐỦ "ĐƠN MỚI CẦN GIAO" + phân shipper → chỉ khi giao shipper.
+     Dedup theo mã (per-máy). Baseline lần đầu để KHÔNG báo lại đơn cũ khi mở trang.
+     ───────────────────────────────────────────────────────── */
+  const TG_NEW_KEY = 'vty_tg_neworder_pinged';
+  function getNewSet() { try { return new Set(JSON.parse(localStorage.getItem(TG_NEW_KEY) || '[]')); } catch (e) { return new Set(); } }
+  function saveNewSet(s) { try { localStorage.setItem(TG_NEW_KEY, JSON.stringify([...s].slice(-1500))); } catch (e) {} }
+  function isNewOrder(o) { return o && o.code && o.status === 'confirmed'; }   /* đơn vừa tạo = "Mới" */
+  let _newBaselined = false;
+
+  window.STORE.subscribe('orders', orders => {
+    if (!Array.isArray(orders)) return;
+    const set = getNewSet();
+    /* Lần đầu nhận data → đánh dấu đơn 'Mới' hiện có là đã biết (không báo lại) */
+    if (!_newBaselined) {
+      _newBaselined = true;
+      let add = false;
+      orders.forEach(o => { if (isNewOrder(o) && !set.has(o.code)) { set.add(o.code); add = true; } });
+      if (add) saveNewSet(set);
+      return;
+    }
+    let add = false;
+    orders.forEach(o => {
+      if (isNewOrder(o) && !set.has(o.code)) { set.add(o.code); add = true; setTimeout(() => sendNewOrderPing(o), 0); }
+    });
+    if (add) saveNewSet(set);
+  });
+
+  async function sendNewOrderPing(o) {
+    if (!window.getTgChannel) return;
+    const ch = window.getTgChannel('shipper_dispatch');
+    if (!ch || !ch.botToken || !ch.chatId) return;
+    const cust = (window.STORE.get('customers', []) || []).find(c => c.id === (o.cust || o.customer_id)) || {};
+    const nItems = (o.items || []).length;
+    const msg = `🆕 *CÓ ĐƠN MỚI* ${o.code}\n` +
+      `👤 ${o.custName || cust.name || '?'}\n` +
+      `💰 ${window.fmt(o.freight)}đ · ${o.payBy || 'Công nợ'}${nItems ? ' · ' + nItems + ' mã' : ''}\n` +
+      `🕒 ${new Date().toLocaleTimeString('vi-VN')}`;
+    try {
+      await fetch(`https://api.telegram.org/bot${ch.botToken}/sendMessage`, {
+        method: 'POST', headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ chat_id: ch.chatId, text: msg, parse_mode: 'Markdown' }),
+      });
+      console.log(`[TG] ✓ Báo có đơn mới ${o.code}`);
+    } catch (e) { console.warn('[TG new-order ping]', e.message); }
+  }
 
   /* =========================================================
      2. ALERT — scheduler tổng hợp cảnh báo hằng ngày
