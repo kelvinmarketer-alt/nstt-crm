@@ -145,6 +145,7 @@
     'supplierMeta',    /* Loại NCC (sỉ/lẻ/cả hai) — cloud suppliers không có cột này */
     'custPriceTiers',  /* Nhóm giá gán cho từng KH {custId:tierId} — cloud customers không có cột price_tier */
     'custCreditDays',  /* Hạn công nợ (số ngày) theo từng KH {custId:days} — chính sách 3/7/15 */
+    'custBrands',      /* Nhãn THƯƠNG HIỆU gom nhiều cơ sở {custId:'BIA ƠI'} — cùng thương hiệu = gộp công nợ + in phiếu ma trận */
     'debtLedger',      /* Sổ công nợ theo ngày {custId,date,type,amount,ref} — phát sinh/trả nợ từng dòng */
     'autoRecurring',   /* Cấu hình tự tạo đơn định kỳ {enabled,time} — cron GitHub Actions đọc qua master_data */
     'audit_log',       /* Truy vết NV — HIGH */

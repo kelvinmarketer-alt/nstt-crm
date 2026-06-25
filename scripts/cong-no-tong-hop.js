@@ -31,6 +31,12 @@
     return out;
   }
   const ddmm = iso => { const m = iso.match(/(\d{4})-(\d{2})-(\d{2})/); return m ? `${m[3]}/${m[2]}` : iso; };
+  /* Ca giao → cột 'c' (Chiều/Tối) hoặc 's' (Sáng/Trưa/không ghi) cho phiếu ma trận */
+  const shiftKey = o => /chi[eề]u|t[oố]i/i.test(o.shipShift || o.ship_shift || '') ? 'c' : 's';
+  /* Nhãn thương hiệu (kv custBrands) → gom nhiều cơ sở. Chưa gán → mỗi cơ sở tự là 1 thương hiệu. */
+  const _nk = s => String(s == null ? '' : s).toLowerCase().normalize('NFD').replace(/[̀-ͯ]/g, '').replace(/đ/g, 'd').replace(/[^a-z0-9]+/g, ' ').trim();
+  function custBrandMap() { return S().get('custBrands', {}) || {}; }
+  function brandOf(custId, name) { const m = custBrandMap(); return (m[custId] && String(m[custId]).trim()) || name || custId; }
 
   /* ===== Build dữ liệu báo cáo ===== */
   function build(fromISO, toISO) {
@@ -70,8 +76,14 @@
       const name = o.custName || (custById[o.cust] && custById[o.cust].name) || key;
       const amt = +o.freight || 0;
       if (!amt) return;
-      const r = rows[key] || (rows[key] = { key, name, daily: {}, dailyCost: {}, total: 0, cost: 0, noCostOrders: 0 });
+      const cust = custById[o.cust] || {};
+      const r = rows[key] || (rows[key] = { key, name, addr: cust.address || o.drop || '', phone: cust.phone || '',
+        daily: {}, dailyShift: {}, dailyCost: {}, total: 0, cost: 0, noCostOrders: 0 });
       r.daily[iso] = (r.daily[iso] || 0) + amt;
+      /* tách ca cho phiếu ma trận: dailyShift[iso] = {s, c} */
+      const sk = shiftKey(o);
+      const ds = r.dailyShift[iso] || (r.dailyShift[iso] = { s: 0, c: 0 });
+      ds[sk] += amt;
       r.total += amt;
       const oc = orderCost(o, iso);
       r.dailyCost[iso] = (r.dailyCost[iso] || 0) + oc.cost;
@@ -91,8 +103,28 @@
     return { days, list };
   }
 
+  /* Gộp danh sách cơ sở → nhóm THƯƠNG HIỆU (mỗi nhóm có dòng cộng + các cơ sở con) */
+  function groupByBrand(list) {
+    const g = {};
+    list.forEach(r => {
+      const bn = brandOf(r.key, r.name);
+      const k = _nk(bn) || r.key;
+      const grp = g[k] || (g[k] = { brandKey: k, brand: bn, sites: [], daily: {}, dailyCost: {}, total: 0, cost: 0, paid: 0, remain: 0, debtNow: 0, profit: 0, noCostOrders: 0 });
+      grp.sites.push(r);
+      Object.keys(r.daily).forEach(d => grp.daily[d] = (grp.daily[d] || 0) + r.daily[d]);
+      Object.keys(r.dailyCost).forEach(d => grp.dailyCost[d] = (grp.dailyCost[d] || 0) + r.dailyCost[d]);
+      grp.total += r.total; grp.cost += r.cost; grp.paid += r.paid; grp.remain += r.remain;
+      grp.debtNow += r.debtNow; grp.profit += r.profit; grp.noCostOrders += r.noCostOrders;
+    });
+    const groups = Object.values(g);
+    groups.forEach(gr => { gr.margin = gr.total ? gr.profit / gr.total : 0; gr.sites.sort((a, b) => b.total - a.total); });
+    return groups.sort((a, b) => b.total - a.total);
+  }
+
   let _last = null;   /* cache cho export */
   let cnView = 'rev'; /* 'rev' = Doanh thu & Công nợ · 'cost' = Giá vốn & Lợi nhuận */
+  let cnGroupBrand = false;   /* gộp theo thương hiệu (nhiều cơ sở) */
+  window.cnToggleBrand = function () { cnGroupBrand = !cnGroupBrand; const b = document.getElementById('cnBrandBtn'); if (b) { b.style.background = cnGroupBrand ? '#15803D' : '#fff'; b.style.color = cnGroupBrand ? '#fff' : 'var(--navy)'; } window.cnRender(); };
 
   window.cnSetView = function (v) {
     cnView = (v === 'cost') ? 'cost' : 'rev';
@@ -161,11 +193,30 @@
       ${data.days.map(d => `<th class="num">${ddmm(d)}</th>`).join('')}
       ${headRight}
     </tr></thead>`;
-    const body = `<tbody>${data.list.map(r => `<tr>
-      <td class="par" title="Bấm để xem Thông báo công nợ — in / copy gửi khách"><a href="javascript:void(0)" onclick="window.cnShowNotice('${(r.key || '').replace(/'/g, "\\'")}')" style="color:var(--navy);font-weight:700;text-decoration:none;border-bottom:1px dotted var(--navy)">${r.name}</a></td>
-      ${data.days.map(d => { const v = dailyOf(r)[d] || 0; return `<td class="num ${v ? '' : 'z'}">${v ? fmt(v) : '·'}</td>`; }).join('')}
-      ${bodyRight(r)}
-    </tr>`).join('')}</tbody>`;
+    let body;
+    if (cnGroupBrand) {
+      const groups = groupByBrand(data.list);
+      body = `<tbody>${groups.map(g => {
+        const multi = g.sites.length > 1;
+        const brandRow = `<tr style="background:#F0FDF4">
+          <td class="par" style="background:#F0FDF4" title="Bấm xem phiếu công nợ ma trận (cơ sở × ngày × Sáng/Chiều)">
+            <a href="javascript:void(0)" onclick="window.cnShowBrandNotice('${(g.brandKey || '').replace(/'/g, "\\'")}')" style="color:#15803D;font-weight:800;text-decoration:none;border-bottom:1px dotted #15803D">${g.brand}</a>
+            ${multi ? `<span style="font-size:10px;color:#15803D"> ▾ ${g.sites.length} cơ sở</span>` : ''}</td>
+          ${data.days.map(d => { const v = dailyOf(g)[d] || 0; return `<td class="num ${v ? '' : 'z'}"><b>${v ? fmt(v) : '·'}</b></td>`; }).join('')}
+          ${bodyRight(g)}</tr>`;
+        const siteRows = multi ? g.sites.map(r => `<tr>
+          <td class="par" style="padding-left:18px;font-weight:400" title="${(r.addr || r.name).replace(/"/g, '&quot;')}"><a href="javascript:void(0)" onclick="window.cnShowNotice('${(r.key || '').replace(/'/g, "\\'")}')" style="color:#475569;text-decoration:none;border-bottom:1px dotted #94A3B8">↳ ${r.addr || r.name}</a></td>
+          ${data.days.map(d => { const v = dailyOf(r)[d] || 0; return `<td class="num ${v ? '' : 'z'}">${v ? fmt(v) : '·'}</td>`; }).join('')}
+          ${bodyRight(r)}</tr>`).join('') : '';
+        return brandRow + siteRows;
+      }).join('')}</tbody>`;
+    } else {
+      body = `<tbody>${data.list.map(r => `<tr>
+        <td class="par" title="Bấm để xem Thông báo công nợ — in / copy gửi khách"><a href="javascript:void(0)" onclick="window.cnShowNotice('${(r.key || '').replace(/'/g, "\\'")}')" style="color:var(--navy);font-weight:700;text-decoration:none;border-bottom:1px dotted var(--navy)">${r.name}</a></td>
+        ${data.days.map(d => { const v = dailyOf(r)[d] || 0; return `<td class="num ${v ? '' : 'z'}">${v ? fmt(v) : '·'}</td>`; }).join('')}
+        ${bodyRight(r)}
+      </tr>`).join('')}</tbody>`;
+    }
     const foot = `<tfoot><tr>
       <td class="par">TỔNG CỘNG</td>
       ${data.days.map(d => `<td class="num">${colTot[d] ? fmt(colTot[d]) : '·'}</td>`).join('')}
@@ -384,6 +435,170 @@
     <\/script>
     </body></html>`;
     const w = window.open('', '_blank', 'width=920,height=900');
+    if (!w) { window.toast && window.toast('Trình duyệt chặn popup — cho phép popup để mở phiếu', 'warn'); return; }
+    w.document.write(html); w.document.close();
+  };
+
+  /* ===== GÁN NHÃN THƯƠNG HIỆU (gom cơ sở) ===== */
+  let _brandWork = {};
+  window.cnManageBrands = function () {
+    const custs = (S().get('customers', []) || []).slice().sort((a, b) => (a.name || '').localeCompare(b.name || '', 'vi'));
+    _brandWork = { ...(custBrandMap()) };
+    const esc = s => String(s == null ? '' : s).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/"/g, '&quot;');
+    const rows = custs.map(c => `
+      <tr data-bk="${esc(_nk(c.name + ' ' + (c.address || '')))}">
+        <td style="font-weight:600">${esc(c.name)}<div style="font-size:10px;color:#94A3B8;font-weight:400">${esc(c.address || '—')}</div></td>
+        <td><input data-bid="${esc(c.id)}" value="${esc(_brandWork[c.id] || '')}" placeholder="(để trống = tự là 1 thương hiệu)"
+          oninput="window._cnBrandSet('${esc(c.id)}', this.value)" style="width:100%;padding:5px 7px;border:1px solid var(--line);border-radius:6px;font-size:12px"></td>
+      </tr>`).join('');
+    window.openModal('🏷 Gán thương hiệu cho cơ sở', `
+      <div style="background:#EFF6FF;color:#1E40AF;padding:9px 11px;border-radius:8px;font-size:12px;margin-bottom:10px;line-height:1.5">
+        1 thương hiệu có nhiều cơ sở → gõ <b>cùng một tên thương hiệu</b> (vd <b>BIA ƠI</b>) vào các cơ sở đó. Để trống = cơ sở tự là 1 thương hiệu riêng.<br>
+        💡 Lọc bên dưới rồi <b>gán hàng loạt</b> cho các dòng đang hiện.
+      </div>
+      <div style="display:flex;gap:6px;margin-bottom:8px">
+        <input id="cnBrandFilter" placeholder="🔎 Lọc theo tên/địa chỉ…" oninput="window._cnBrandFilter(this.value)" style="flex:1;padding:6px 9px;border:1px solid var(--line);border-radius:6px;font-size:12px">
+        <input id="cnBrandBulk" placeholder="Tên thương hiệu" style="width:160px;padding:6px 9px;border:1px solid var(--line);border-radius:6px;font-size:12px">
+        <button class="btn btn-ghost btn-sm" onclick="window._cnBrandBulk()">Gán cho dòng đang hiện</button>
+      </div>
+      <div style="max-height:340px;overflow:auto;border:1px solid var(--line);border-radius:8px">
+        <table class="mini-table" id="cnBrandTbl" style="margin:0;font-size:12px;width:100%">
+          <thead><tr><th>Cơ sở (tên · địa chỉ)</th><th style="width:200px">Thương hiệu</th></tr></thead>
+          <tbody>${rows || '<tr><td colspan=2 style="padding:14px;color:var(--muted)">Chưa có khách hàng.</td></tr>'}</tbody>
+        </table></div>
+    `, {
+      width: '680px',
+      footer: `<button class="btn btn-ghost" onclick="window.closeModal()">Huỷ</button>
+               <button class="btn btn-primary" onclick="window._cnBrandSave()">💾 Lưu nhãn thương hiệu</button>`,
+    });
+  };
+  window._cnBrandSet = function (id, val) { if (val && val.trim()) _brandWork[id] = val.trim(); else delete _brandWork[id]; };
+  window._cnBrandFilter = function (q) {
+    const k = _nk(q); document.querySelectorAll('#cnBrandTbl tbody tr').forEach(tr => {
+      tr.style.display = (!k || (tr.getAttribute('data-bk') || '').includes(k)) ? '' : 'none';
+    });
+  };
+  window._cnBrandBulk = function () {
+    const v = (document.getElementById('cnBrandBulk').value || '').trim(); if (!v) { window.toast && window.toast('Nhập tên thương hiệu trước', 'warn'); return; }
+    document.querySelectorAll('#cnBrandTbl tbody tr').forEach(tr => {
+      if (tr.style.display === 'none') return;
+      const inp = tr.querySelector('input[data-bid]'); if (inp) { inp.value = v; window._cnBrandSet(inp.getAttribute('data-bid'), v); }
+    });
+  };
+  window._cnBrandSave = function () {
+    S().set('custBrands', { ..._brandWork });
+    window.closeModal();
+    window.toast && window.toast('✓ Đã lưu nhãn thương hiệu — bật "Gộp theo thương hiệu" để xem.', 'success');
+    if (!cnGroupBrand) window.cnToggleBrand(); else window.cnRender();
+  };
+
+  /* ===== PHIẾU CÔNG NỢ MA TRẬN (thương hiệu nhiều cơ sở: cơ sở × ngày × Sáng/Chiều) ===== */
+  window.cnShowBrandNotice = function (brandKey) {
+    if (!_last || !_last.list) { window.toast && window.toast('Bấm "Xem báo cáo" trước', 'warn'); return; }
+    const grp = groupByBrand(_last.list).find(g => g.brandKey === brandKey);
+    if (!grp) { window.toast && window.toast('Không tìm thấy thương hiệu', 'warn'); return; }
+    if (grp.sites.length === 1) return window.cnShowNotice(grp.sites[0].key);   /* 1 cơ sở → phiếu thường */
+    const sites = grp.sites;
+    const days = _last.days.filter(d => (grp.daily[d] || 0) > 0);
+    const ci = S().get('companyInfo', {}) || {};
+    const comp = {
+      name: ci.name || 'CÔNG TY TNHH NÔNG SẢN TUẤN TÚ HÀ NỘI', tax: ci.tax || '0110302211',
+      address: ci.address || '36/147A - Tân Mai - Hoàng Mai - Hà Nội', bank: ci.bank || 'MB 228666669999',
+      bankOwner: ci.bankOwner || 'CTY TNHH NÔNG SẢN TUẤN TÚ HÀ NỘI', email: ci.email || 'nongsantuantuhanoi@gmail.com',
+      director: ci.director || ci.hotline || '0836 676 086',
+    };
+    const _bp = String(comp.bank || '').trim().match(/^(\S+)[\s:]+(\d[\d\s]*\d|\d)$/);
+    comp.bankCode = ci.bankCode || (_bp && _bp[1]) || 'MB';
+    comp.bankAcc = ci.bankAcc || (_bp && _bp[2].replace(/\s/g, '')) || '228666669999';
+    const totalPS = grp.total, paid = grp.paid || 0, remain = grp.remain != null ? grp.remain : totalPS;
+    const _noDia = s => (s || '').toString().normalize('NFD').replace(/[̀-ͯ]/g, '').replace(/đ/g, 'd').replace(/Đ/g, 'D').toUpperCase();
+    const qrAmt = Math.max(0, Math.round(remain || 0));
+    const qrNote = ('CONG NO ' + _noDia(grp.brand)).slice(0, 50);
+    const qrUrl = `https://img.vietqr.io/image/${encodeURIComponent(comp.bankCode)}-${encodeURIComponent(comp.bankAcc)}-qr_only.png?amount=${qrAmt}&addInfo=${encodeURIComponent(qrNote)}&accountName=${encodeURIComponent(_noDia(comp.name))}`;
+    const esc = s => String(s == null ? '' : s).replace(/&/g, '&amp;').replace(/</g, '&lt;');
+    /* tiêu đề: 2 hàng — cơ sở (gộp 2 cột) rồi Sáng/Chiều */
+    const h1 = sites.map(s => `<th colspan="2" style="text-align:center">${esc(s.addr || s.name)}</th>`).join('');
+    const h2 = sites.map(() => `<th style="text-align:center">Sáng</th><th style="text-align:center">Chiều</th>`).join('');
+    const bodyRows = days.map((d, i) => {
+      const cells = sites.map(s => {
+        const sh = s.dailyShift[d] || { s: 0, c: 0 };
+        return `<td style="text-align:right">${sh.s ? money(sh.s) : ''}</td><td style="text-align:right">${sh.c ? money(sh.c) : ''}</td>`;
+      }).join('');
+      return `<tr><td style="text-align:center">${i + 1}</td><td style="white-space:nowrap">${isoVN(d)}</td>${cells}</tr>`;
+    }).join('');
+    /* dòng Tổng theo từng cột (Sáng/Chiều mỗi cơ sở) */
+    const colTotCells = sites.map(s => {
+      let ts = 0, tc = 0; days.forEach(d => { const sh = s.dailyShift[d] || { s: 0, c: 0 }; ts += sh.s; tc += sh.c; });
+      return `<td style="text-align:right">${ts ? money(ts) : '-'}</td><td style="text-align:right">${tc ? money(tc) : '-'}</td>`;
+    }).join('');
+    /* dòng Tổng mỗi cơ sở (gộp 2 cột) */
+    const siteTotCells = sites.map(s => `<td colspan="2" style="text-align:right;font-weight:700">${money(s.total)}</td>`).join('');
+    const nCol = 2 + sites.length * 2;
+    const html = `<!doctype html><html lang="vi"><head><meta charset="utf-8"><title>Công nợ thương hiệu — ${esc(grp.brand)}</title>
+    <style>
+      *{box-sizing:border-box} body{font-family:'Segoe UI',Arial,sans-serif;margin:0;padding:18px;color:#1a1a1a;background:#fff}
+      .pg{max-width:1180px;margin:0 auto;padding:24px 28px 48px;background:#fff}
+      .hd{display:flex;gap:14px;align-items:flex-start;border-bottom:2px solid #1B5E20;padding-bottom:8px}
+      .hd img.logo{width:74px;height:74px;object-fit:contain}
+      .cinfo{flex:1;font-size:12.5px;line-height:1.5}.cinfo b{font-size:15px;color:#1B5E20}
+      .greet{display:flex;justify-content:space-between;margin-top:10px;font-size:13px}
+      h1{color:#C0392B;text-align:center;font-size:20px;margin:8px 0 2px}
+      .sub{text-align:center;font-style:italic;color:#C0392B;font-size:12.5px;margin-bottom:4px}
+      table{width:100%;border-collapse:collapse;font-size:11.5px}
+      th,td{border:1px solid #555;padding:3px 6px}
+      thead th{background:#EAF5EA;text-align:center;font-weight:700}
+      .totrow td{font-weight:700;background:#FAFAFA}
+      .grand{background:#FFF7C2;color:#C0392B;font-weight:800;font-size:14px}
+      .ft{text-align:center;color:#C0392B;font-weight:700;font-size:12.5px;margin-top:10px;line-height:1.6}
+      .sign{display:flex;justify-content:space-around;margin-top:26px;font-size:12px;text-align:center}.sign>div{min-height:74px}
+      .toolbar{position:sticky;top:0;background:#fff;padding:8px 0 12px;display:flex;gap:8px;justify-content:center}
+      .toolbar button{padding:8px 16px;border:none;border-radius:7px;font-size:13px;font-weight:700;cursor:pointer}
+      .b1{background:#1B5E20;color:#fff}.b3{background:#2563EB;color:#fff}.b4{background:#fff;color:#1B5E20;border:1px solid #1B5E20 !important}
+      @media print{.toolbar{display:none}body{padding:0}}
+    </style></head><body>
+    <div class="toolbar">
+      <button class="b3" onclick="copyImg()">📸 Copy ảnh gửi khách</button>
+      <button class="b4" onclick="downloadImg()">⬇ Tải ảnh</button>
+      <button class="b1" onclick="window.print()">🖨 In phiếu</button>
+    </div>
+    <div class="pg" id="pg">
+      <div class="hd">
+        <img class="logo" src="${location.origin}/assets/logo.png" crossorigin="anonymous" onerror="this.style.display='none'">
+        <div class="cinfo"><b>${comp.name}</b><br>Mã Số Thuế: ${comp.tax}<br>Địa Chỉ: ${comp.address}<br>
+          Số Tài Khoản: ${comp.bank} &nbsp;·&nbsp; Chủ TK: ${comp.bankOwner}<br>Email: ${comp.email} &nbsp;·&nbsp; GĐĐH: ${comp.director}</div>
+        <div style="flex:0 0 auto;text-align:center;min-width:132px">
+          <img src="${qrUrl}" crossorigin="anonymous" style="width:126px;height:126px;object-fit:contain;border:1px solid #1B5E20;border-radius:8px;padding:3px" onerror="this.style.opacity='0.15'">
+          <div style="font-size:10px;color:#1B5E20;font-weight:700;margin-top:2px">Quét QR chuyển khoản</div></div>
+      </div>
+      <div class="greet"><div><b>Kính Gửi:</b> ${esc(grp.brand)}<br><b>Số cơ sở:</b> ${sites.length} cơ sở</div><div><b>Kỳ:</b> ${ddmm(_last.fromISO)} – ${ddmm(_last.toISO)}</div></div>
+      <h1>THÔNG BÁO CÔNG NỢ – KIÊM ĐỀ NGHỊ THANH TOÁN</h1>
+      <div class="sub">từ ngày ${ddmm(_last.fromISO)}/${_last.fromISO.slice(0,4)} – ${ddmm(_last.toISO)}/${_last.toISO.slice(0,4)} · gộp ${sites.length} cơ sở</div>
+      <table>
+        <thead>
+          <tr><th rowspan="2" style="vertical-align:middle">STT</th><th rowspan="2" style="vertical-align:middle">Ngày Tháng</th>${h1}</tr>
+          <tr>${h2}</tr>
+        </thead>
+        <tbody>${bodyRows || `<tr><td colspan="${nCol}" style="text-align:center;padding:14px;color:#888">Không có phát sinh trong kỳ</td></tr>`}</tbody>
+        <tfoot>
+          <tr class="totrow"><td colspan="2" style="text-align:center">Tổng</td>${colTotCells}</tr>
+          <tr class="totrow"><td colspan="2" style="text-align:center">Tổng theo cơ sở</td>${siteTotCells}</tr>
+          <tr class="grand"><td colspan="${nCol - 1}" style="text-align:right">TỔNG SỐ TIỀN CÔNG NỢ${paid > 0 ? ' (đã thu ' + money(paid) + 'đ → còn phải thu)' : ''}</td><td style="text-align:right">${money(paid > 0 ? remain : totalPS)}</td></tr>
+        </tfoot>
+      </table>
+      <div class="ft">Xin Trân Trọng Quý Khách Hàng Đã Tin Tưởng Đồng Hành.<br>Mọi Phản Hồi Xin Liên Hệ Giám Đốc Điều Hành: ${comp.director}</div>
+      <div class="sign"><div><b>Đại Diện Bên Bán</b><br>(Ký, Đóng dấu)</div><div><b>Kế Toán Bên Bán</b><br>(Ký, Ghi Rõ Họ Tên)</div><div><b>Kế Toán Bên Mua</b><br>(Ký, Ghi Rõ Họ Tên)</div></div>
+    </div>
+    <script src="https://cdn.jsdelivr.net/npm/html2canvas@1.4.1/dist/html2canvas.min.js"><\/script>
+    <script>
+      var _imgName = ${JSON.stringify('cong-no-' + (_nk(grp.brand).replace(/\s+/g, '-') || 'thuong-hieu') + '-' + ddmm(_last.toISO).replace('/', '-'))};
+      async function _snap(){ if(!window.html2canvas){ alert('Thư viện ảnh đang tải, đợi 1-2 giây rồi bấm lại.'); return null; }
+        return await window.html2canvas(document.getElementById('pg'),{scale:2,useCORS:true,backgroundColor:'#ffffff',logging:false}); }
+      function _dl(blob){ var a=document.createElement('a'); a.href=URL.createObjectURL(blob); a.download=_imgName+'.png'; document.body.appendChild(a); a.click(); a.remove(); setTimeout(function(){URL.revokeObjectURL(a.href);},3000); }
+      async function copyImg(){ try{ var cv=await _snap(); if(!cv) return; cv.toBlob(async function(blob){ try{ await navigator.clipboard.write([new ClipboardItem({'image/png':blob})]); alert('✓ Đã copy ẢNH phiếu — dán vào Zalo/Messenger (Ctrl+V).'); }catch(err){ _dl(blob); alert('Không copy trực tiếp được → đã TẢI ảnh .png về máy.'); } },'image/png'); }catch(e){ alert('Lỗi tạo ảnh: '+(e&&e.message||e)); } }
+      async function downloadImg(){ try{ var cv=await _snap(); if(!cv) return; cv.toBlob(function(blob){ _dl(blob); },'image/png'); }catch(e){ alert('Lỗi tạo ảnh: '+(e&&e.message||e)); } }
+    <\/script>
+    </body></html>`;
+    const w = window.open('', '_blank', 'width=1200,height=900');
     if (!w) { window.toast && window.toast('Trình duyệt chặn popup — cho phép popup để mở phiếu', 'warn'); return; }
     w.document.write(html); w.document.close();
   };
