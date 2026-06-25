@@ -31,8 +31,8 @@
 
   <main class="main">
     <div style="margin-bottom:14px">
-      <h1 style="margin:0;font-size:22px;color:var(--navy);font-weight:800">📦 Sản lượng theo sản phẩm</h1>
-      <div style="font-size:13px;color:var(--muted);margin-top:2px">Ma trận <b>Sản phẩm × Thời gian</b> (ngày / tháng / quý) — theo <b>từng đối tác</b> hoặc <b>tổng toàn công ty</b>. Tự sinh từ đơn hàng.</div>
+      <h1 style="margin:0;font-size:22px;color:var(--navy);font-weight:800">📦 Sản lượng & doanh thu</h1>
+      <div style="font-size:13px;color:var(--muted);margin-top:2px">Sản lượng <b>SP × Thời gian</b> + <b>doanh thu/ngày theo từng đối tác</b> (1 thương hiệu nhiều cơ sở được gộp nhóm). Tự sinh từ đơn hàng.</div>
     </div>
 
     <div class="chart-card" style="margin-bottom:14px">
@@ -64,7 +64,8 @@
 
     <div style="display:flex;gap:8px;margin-bottom:10px">
       <button data-slview="product" class="btn btn-sm" style="background:#15803D;color:#fff;border:1px solid var(--line)" onclick="window.slSetView('product')">📦 Theo sản phẩm</button>
-      <button data-slview="cust" class="btn btn-sm" style="background:#fff;color:var(--navy);border:1px solid var(--line)" onclick="window.slSetView('cust')">👥 Theo đối tác (1 khách/dòng)</button>
+      <button data-slview="cust" class="btn btn-sm" style="background:#fff;color:var(--navy);border:1px solid var(--line)" onclick="window.slSetView('cust')">👥 Theo đối tác (sản lượng)</button>
+      <button data-slview="money" class="btn btn-sm" style="background:#fff;color:var(--navy);border:1px solid var(--line)" onclick="window.slSetView('money')">💰 Doanh thu/ngày theo đối tác</button>
     </div>
 
     <div class="cn-wrap"><table class="cn-tbl" id="slTable"><tbody><tr><td style="padding:30px;text-align:center;color:var(--muted)">Chọn khoảng ngày + đối tác rồi bấm "Xem báo cáo".</td></tr></tbody></table></div>

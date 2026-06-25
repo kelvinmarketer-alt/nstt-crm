@@ -10,14 +10,25 @@
   const norm = s => String(s == null ? '' : s).trim();
   const low = s => norm(s).toLowerCase();
   const nkey = s => low(s).normalize('NFD').replace(/[̀-ͯ]/g, '').replace(/đ/g, 'd').replace(/[^a-z0-9]+/g, ' ').trim();
-  /* Khớp khách: ƯU TIÊN ĐỊA CHỈ (tên hay gõ sai, địa chỉ thường nhập đúng).
-     Địa chỉ trống → khớp TÊN chính xác → cuối cùng khớp TÊN "chứa nhau"
-     (vd phiếu "Veteran" ↔ app "Hùng - NH Veteran"), yêu cầu phần khớp ≥4 ký tự để tránh nhầm.
-     Trả {c, by:'addr'|'name'|'name~'} hoặc null. */
+  /* Khớp khách — QUY TẮC B2B (1 thương hiệu có NHIỀU cơ sở/địa chỉ = nhiều khách riêng):
+     • CÓ địa chỉ trên phiếu → CHỈ khớp theo ĐỊA CHỈ (chính xác → "chứa nhau" ≥6 ký tự).
+       KHÔNG khớp được địa chỉ nào → KHÁCH MỚI, kể cả khi TRÙNG TÊN (chi nhánh khác).
+       → tránh gộp doanh thu/công nợ của các cơ sở cùng tên khác địa chỉ.
+     • Địa chỉ TRỐNG → mới khớp theo TÊN (chính xác → "chứa nhau" ≥4 ký tự,
+       vd phiếu "Veteran" ↔ app "Hùng - NH Veteran").
+     Trả {c, by:'addr'|'addr~'|'name'|'name~'} hoặc null (= khách mới). */
   function matchCustomer(custList, name, addr) {
     const list = custList || [];
     const a = nkey(addr);
-    if (a) { const hit = list.find(c => nkey(c.address) === a); if (hit) return { c: hit, by: 'addr' }; }
+    if (a) {
+      const exact = list.find(c => nkey(c.address) === a); if (exact) return { c: exact, by: 'addr' };
+      const fuzzy = list.find(c => {
+        const ca = nkey(c.address); if (ca.length < 6) return false;
+        return (a.length >= 6 && ca.includes(a)) || (ca.length >= 6 && a.includes(ca));
+      });
+      if (fuzzy) return { c: fuzzy, by: 'addr~' };
+      return null;   /* có địa chỉ nhưng không khớp → KHÁCH MỚI, không gộp theo tên */
+    }
     const n = nkey(name);
     if (n) {
       const exact = list.find(c => nkey(c.name) === n); if (exact) return { c: exact, by: 'name' };
@@ -36,7 +47,7 @@
     if (p.forceCustId) { const c = (list || []).find(x => x.id === p.forceCustId); if (c) return { c, by: 'manual' }; }
     return matchCustomer(list, p.custName, p.addr);              /* tự động */
   }
-  const _byLabel = { addr: 'khớp địa chỉ', name: 'khớp tên', 'name~': 'khớp tên gần đúng', manual: 'gộp tay' };
+  const _byLabel = { addr: 'khớp địa chỉ', 'addr~': 'khớp địa chỉ gần đúng', name: 'khớp tên', 'name~': 'khớp tên gần đúng', manual: 'gộp tay' };
 
   /* ===== Parser 1 phiếu từ lưới 2D (mảng các hàng) ===== */
   function parsePhieu(grid) {
@@ -202,13 +213,13 @@
         <thead><tr><th style="width:34px"></th><th>Khách (trên phiếu)</th><th>Địa chỉ</th><th>Ngày</th><th class="num">Số mã</th><th class="num">Tổng / Lãi</th><th>Khách trong app</th></tr></thead>
         <tbody>${_parsed.map((p, i) => {
       if (p.error) return `<tr><td></td><td colspan="6" style="color:#B91C1C">⚠ ${esc(p.file)}: ${esc(p.error)}</td></tr>`;
-      const canPick = !p.dup && !p.dupInBatch && !!p.date;
+      const canPick = !!p.date;   /* trùng vẫn cho TICK LẠI nếu là đơn khác ca/lần giao khác */
       const addrCell = p.addr
         ? `<span style="font-size:11px;color:var(--muted)">${esc(p.addr)}</span>`
         : `<span style="font-size:11px;color:#B45309" title="Phiếu không có địa chỉ → khớp khách theo tên">⚠ thiếu địa chỉ</span>`;
       let custCell;
-      if (p.dupInBatch) custCell = '<span style="color:#B45309">⏭ Trùng trong lô — bỏ qua (phiếu y hệt đã có ở trên)</span>';
-      else if (p.dup) custCell = '<span style="color:#B45309">⏭ Đã có đơn này — bỏ qua</span>';
+      if (p.dupInBatch) custCell = '<span style="color:#B45309">⏭ Trùng trong lô — bỏ qua.<br><span style="font-size:10px">Khác ca/lần giao? Tick lại ô vuông để vẫn tạo.</span></span>';
+      else if (p.dup) custCell = '<span style="color:#B45309">⏭ Đã có đơn y hệt — bỏ qua.<br><span style="font-size:10px">Khác ca/lần giao? Tick lại ô vuông để vẫn tạo.</span></span>';
       else if (!p.date) custCell = '<span style="color:#B91C1C">⚠ Không đọc được ngày</span>';
       else {
         const r = resolveCust(p, customers);
@@ -234,7 +245,13 @@
       </table></div>`;
     if (btn) btn.disabled = willCreate === 0;
   }
-  window._phieuToggle = function (i, on) { if (_parsed[i]) { _parsed[i].pick = on; renderPreview(); } };
+  window._phieuToggle = function (i, on) {
+    if (!_parsed[i]) return;
+    _parsed[i].pick = on;
+    /* Tick lại 1 phiếu đang bị gắn "trùng" = người dùng cố ý tạo đơn riêng (khác ca/lần giao) */
+    _parsed[i].forceCreate = !!(on && (_parsed[i].dup || _parsed[i].dupInBatch));
+    renderPreview();
+  };
   /* Chọn lại khách cho 1 phiếu: __auto__ = tự động · __new__ = tạo mới · '<id>' = gộp vào KH đó */
   window._phieuMerge = function (i, val) {
     if (!_parsed[i]) return;
@@ -295,7 +312,8 @@
       const orderCustName = mm ? mm.c.name : p.custName;
       /* Đơn y hệt đã tồn tại (cũ hoặc vừa tạo trong lượt) → BỎ QUA, không tạo trùng */
       const osig = oSig(custId, p.date.iso, p.total, items.length);
-      if (seenOrders.has(osig)) { nSkip++; return; }
+      /* Bỏ qua nếu đơn y hệt đã có — TRỪ khi user tick lại (forceCreate = đơn khác ca/lần giao) */
+      if (seenOrders.has(osig) && !p.forceCreate) { nSkip++; return; }
       seenOrders.add(osig);
       const order = {
         code: window.STORE.nextOrderCode(),

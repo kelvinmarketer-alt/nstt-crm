@@ -922,6 +922,7 @@ window.NAV = [
   { section: 'Tài chính', items: [
     { id: 'finance',    label: 'Tài chính',   icon: '💰', href: 'finance.html', badgeKey: 'debt' },
     { id: 'debt-summary', label: 'Công nợ tổng hợp (CFO)', icon: '🧮', href: 'cong-no-tong-hop.html' },
+    { id: 'san-luong',  label: 'Sản lượng & doanh thu', icon: '📦', href: 'san-luong.html' },
     { id: 'adspend',    label: 'Chi phí Ads', icon: '📣', href: 'adspend.html' },
     /* Ẩn theo yêu cầu: Loyalty (chiết khấu/tích điểm)
     { id: 'loyalty',    label: 'Loyalty (tích điểm)', icon: '⭐', href: 'loyalty.html' },
@@ -931,7 +932,6 @@ window.NAV = [
     { id: 'staff',      label: 'Nhân sự',     icon: '🧑‍💼', href: 'staff.html' },
     { id: 'tai-khoan',  label: 'Tài khoản đăng nhập', icon: '🔐', href: 'tai-khoan.html' },
     { id: 'reports',    label: 'Báo cáo',     icon: '📈', href: 'reports.html' },
-    { id: 'san-luong',  label: 'Sản lượng theo SP', icon: '📦', href: 'san-luong.html' },
     { id: 'marketing',  label: 'Email/Zalo blast', icon: '📨', href: 'marketing.html' },
     { id: 'audit',      label: 'Nhật ký',     icon: '📋', href: 'audit.html' },
     /* tg-bot.html ẩn — chỉ là simulator demo, chưa hoạt động thật.

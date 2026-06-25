@@ -76,9 +76,15 @@
 
   const ubFmt = obj => Object.keys(obj).sort((a, b) => a === 'kg' ? -1 : b === 'kg' ? 1 : a.localeCompare(b, 'vi')).map(u => `${fmtNum(obj[u])} ${u}`).join(' · ');
 
-  let _last = null;
-  let _view = 'product';   /* 'product' = SP × thời gian · 'cust' = danh sách đối tác (1 khách/dòng) */
+  let _last = null, _lastMoney = null;
+  let _view = 'product';   /* 'product' = SP × thời gian · 'cust' = đối tác (SL) · 'money' = doanh thu/ngày theo đối tác */
   const ctl = id => document.getElementById(id);
+  const fmtTien = n => (Math.round(+n || 0)).toLocaleString('vi-VN');
+  /* doanh thu 1 đơn = freight (tổng phiếu) hoặc Σ thành tiền mặt hàng */
+  const orderRev = o => (+o.freight || 0) || (Array.isArray(o.items) ? o.items.reduce((s, it) => s + (+it.total || 0), 0) : 0);
+  const _nkeyLocal = s => String(s == null ? '' : s).toLowerCase().normalize('NFD').replace(/[̀-ͯ]/g, '').replace(/đ/g, 'd').replace(/[^a-z0-9]+/g, ' ').trim();
+  /* thương hiệu (gộp nhiều cơ sở) = phần trước dấu "-" / "(" / "," đầu tiên */
+  const brandKey = nm => { const b = String(nm || '').split(/\s*[-–(,]/)[0].trim(); return _nkeyLocal(b || nm); };
 
   function updateViewBtns() {
     document.querySelectorAll('[data-slview]').forEach(b => {
@@ -87,13 +93,14 @@
       b.style.color = on ? '#fff' : 'var(--navy)';
     });
   }
-  window.slSetView = function (v) { _view = (v === 'cust') ? 'cust' : 'product'; updateViewBtns(); window.slRender(); };
+  window.slSetView = function (v) { _view = (v === 'cust' || v === 'money') ? v : 'product'; updateViewBtns(); window.slRender(); };
 
   window.slRender = function () {
     const fromISO = ctl('slFrom').value, toISO = ctl('slTo').value;
     if (!fromISO || !toISO) { window.toast && window.toast('Chọn từ ngày → đến ngày', 'warn'); return; }
     updateViewBtns();
     if (_view === 'cust') { renderCustView(fromISO, toISO); return; }
+    if (_view === 'money') { renderMoneyView(fromISO, toISO); return; }
 
     const gran = ctl('slGran').value || 'ngay';
     const custFilter = ctl('slCust').value || '';
@@ -190,6 +197,97 @@
     window.slRender();
   };
 
+  /* === DOANH THU THEO NGÀY × ĐỐI TÁC ===
+     Mỗi cơ sở/địa chỉ = 1 dòng (1 khách = nhiều cơ sở thì gộp dưới 1 thương hiệu, có dòng cộng).
+     Lọc theo đối tác (slCust) hoặc xem toàn bộ. */
+  function buildMoney(fromISO, toISO, gran, custFilter) {
+    const orders = S().get('orders', window.ORDERS || []) || [];
+    const customers = S().get('customers', window.CUSTOMERS || []) || [];
+    const cmap = {}; customers.forEach(c => cmap[c.id] = c);
+    const periods = periodList(fromISO, toISO, gran);
+    const fromD = new Date(fromISO + 'T00:00:00'), toD = new Date(toISO + 'T23:59:59');
+    const rows = {};
+    orders.forEach(o => {
+      if (o.status === 'draft' || o.status === 'cancelled') return;
+      const id = o.cust || o.custId; if (!id) return;
+      if (custFilter && id !== custFilter) return;
+      const iso = orderISO(o); if (!iso) return;
+      const od = new Date(iso + 'T00:00:00'); if (isNaN(od) || od < fromD || od > toD) return;
+      const c = cmap[id];
+      const name = (c && c.name) || o.custName || id;
+      const addr = (c && c.address) || o.drop || '';
+      const per = periodOf(iso, gran);
+      const r = rows[id] || (rows[id] = { id, name, addr, brand: brandKey(name), byPeriod: {}, total: 0, orders: 0 });
+      r.byPeriod[per] = (r.byPeriod[per] || 0) + orderRev(o);
+      r.total += orderRev(o); r.orders++;
+    });
+    /* gộp theo thương hiệu */
+    const brands = {};
+    Object.values(rows).forEach(r => {
+      const g = brands[r.brand] || (brands[r.brand] = { brand: r.brand, name: r.name, sites: [], byPeriod: {}, total: 0, orders: 0 });
+      g.sites.push(r);
+      periods.forEach(p => g.byPeriod[p] = (g.byPeriod[p] || 0) + (r.byPeriod[p] || 0));
+      g.total += r.total; g.orders += r.orders;
+      if (r.name.length < g.name.length) g.name = r.name;   /* tên thương hiệu = tên ngắn nhất */
+    });
+    const groups = Object.values(brands).sort((a, b) => b.total - a.total || a.name.localeCompare(b.name, 'vi'));
+    groups.forEach(g => g.sites.sort((a, b) => b.total - a.total));
+    return { periods, groups };
+  }
+
+  function renderMoneyView(fromISO, toISO) {
+    const gran = ctl('slGran').value || 'ngay';
+    const custFilter = ctl('slCust').value || '';
+    const custName = custFilter ? (ctl('slCust').selectedOptions[0] || {}).textContent : '';
+    const data = buildMoney(fromISO, toISO, gran, custFilter);
+    _lastMoney = { ...data, fromISO, toISO, gran, custFilter, custName };
+    const tbl = ctl('slTable');
+    if (!data.groups.length) {
+      tbl.innerHTML = `<tbody><tr><td style="padding:30px;text-align:center;color:var(--muted)">Không có doanh thu trong khoảng đã chọn${custFilter ? ' (đối tác này)' : ''}.</td></tr></tbody>`;
+      ctl('slSummary').textContent = ''; return;
+    }
+    const perTot = {}; let grand = 0, nSites = 0;
+    data.groups.forEach(g => { data.periods.forEach(p => perTot[p] = (perTot[p] || 0) + (g.byPeriod[p] || 0)); grand += g.total; nSites += g.sites.length; });
+
+    const head = `<thead><tr>
+      <th class="par">ĐỐI TÁC / CƠ SỞ (${data.groups.length} thương hiệu · ${nSites} cơ sở)</th>
+      ${data.periods.map(p => `<th class="num">${periodLabel(p, gran)}</th>`).join('')}
+      <th class="num" style="background:#DCFCE7">TỔNG TIỀN</th>
+    </tr></thead>`;
+    const esc = s => String(s == null ? '' : s).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/"/g, '&quot;');
+    const rowsHtml = data.groups.map(g => {
+      const multi = g.sites.length > 1;
+      /* thương hiệu nhiều cơ sở → dòng cộng (đậm) rồi từng cơ sở; 1 cơ sở → 1 dòng kèm địa chỉ */
+      if (!multi) {
+        const s = g.sites[0];
+        return `<tr>
+          <td class="par" title="${esc(s.name)}${s.addr ? ' · ' + esc(s.addr) : ''}"><b>${esc(s.name)}</b>${s.addr ? `<div style="font-size:10px;color:#94A3B8;font-weight:400">${esc(s.addr)}</div>` : ''}</td>
+          ${data.periods.map(p => { const v = s.byPeriod[p] || 0; return `<td class="num ${v ? '' : 'z'}">${v ? fmtTien(v) : '·'}</td>`; }).join('')}
+          <td class="num"><b>${fmtTien(s.total)}</b></td></tr>`;
+      }
+      const headRow = `<tr style="background:#F0FDF4">
+        <td class="par" style="background:#F0FDF4"><b>${esc(g.name)}</b> <span style="font-size:10px;color:#15803D">▾ ${g.sites.length} cơ sở</span></td>
+        ${data.periods.map(p => { const v = g.byPeriod[p] || 0; return `<td class="num ${v ? '' : 'z'}"><b>${v ? fmtTien(v) : '·'}</b></td>`; }).join('')}
+        <td class="num"><b>${fmtTien(g.total)}</b></td></tr>`;
+      const siteRows = g.sites.map(s => `<tr>
+        <td class="par" title="${esc(s.addr || s.name)}" style="padding-left:20px;font-weight:400;color:#475569">↳ ${esc(s.addr || s.name)}</td>
+        ${data.periods.map(p => { const v = s.byPeriod[p] || 0; return `<td class="num ${v ? '' : 'z'}">${v ? fmtTien(v) : '·'}</td>`; }).join('')}
+        <td class="num">${fmtTien(s.total)}</td></tr>`).join('');
+      return headRow + siteRows;
+    }).join('');
+    const foot = `<tfoot><tr>
+      <td class="par">TỔNG DOANH THU</td>
+      ${data.periods.map(p => `<td class="num">${perTot[p] ? fmtTien(perTot[p]) : '·'}</td>`).join('')}
+      <td class="num"><b>${fmtTien(grand)}</b></td></tr></tfoot>`;
+    tbl.innerHTML = head + `<tbody>${rowsHtml}</tbody>` + foot;
+
+    const granLabel = gran === 'thang' ? 'tháng' : gran === 'quy' ? 'quý' : 'ngày';
+    ctl('slSummary').innerHTML =
+      `💰 <b>${periodLabel(periodOf(fromISO, 'ngay'), 'ngay')} → ${periodLabel(periodOf(toISO, 'ngay'), 'ngay')}</b> · gộp theo <b>${granLabel}</b> · `
+      + `phạm vi: <b>${custFilter ? custName : 'TOÀN CÔNG TY'}</b> · <b>${data.groups.length}</b> thương hiệu / <b>${nSites}</b> cơ sở<br>`
+      + `📈 Tổng doanh thu: <b style="color:#15803D">${fmtTien(grand)} đ</b> <span style="color:var(--muted);font-size:11px">· 1 thương hiệu có nhiều cơ sở/địa chỉ được gộp thành 1 nhóm có dòng cộng</span>`;
+  }
+
   /* === Preset === */
   window.slPreset = function (kind) {
     const now = window.todayDate ? window.todayDate() : new Date();
@@ -207,6 +305,7 @@
   /* === Xuất Excel === */
   window.slExport = function () {
     if (!window.XLSX) { window.toast && window.toast('Chưa tải thư viện Excel — reload', 'warn'); return; }
+    if (_view === 'money') return slExportMoney();
     if (!_last || !_last.list.length) { window.toast && window.toast('Chưa có dữ liệu — bấm "Xem báo cáo" trước', 'warn'); return; }
     const { periods, list, gran, custFilter, custName, fromISO, toISO } = _last;
     const aoa = [];
@@ -223,6 +322,25 @@
     window.XLSX.writeFile(wb, fn);
     window.toast && window.toast('✓ Đã xuất ' + fn, 'success');
   };
+
+  function slExportMoney() {
+    if (!_lastMoney || !_lastMoney.groups.length) { window.toast && window.toast('Chưa có dữ liệu — bấm "Xem báo cáo" trước', 'warn'); return; }
+    const { periods, groups, gran, custFilter, custName, fromISO, toISO } = _lastMoney;
+    const aoa = [];
+    aoa.push([`DOANH THU THEO NGÀY × ĐỐI TÁC · ${custFilter ? custName : 'TOÀN CÔNG TY'} · ${fromISO} → ${toISO} · gộp theo ${gran}`]);
+    aoa.push(['ĐỐI TÁC / CƠ SỞ', 'ĐỊA CHỈ', ...periods.map(p => periodLabel(p, gran)), 'TỔNG TIỀN']);
+    groups.forEach(g => {
+      if (g.sites.length > 1) aoa.push([g.name + ' (TỔNG ' + g.sites.length + ' cơ sở)', '', ...periods.map(p => g.byPeriod[p] || ''), g.total]);
+      g.sites.forEach(s => aoa.push([g.sites.length > 1 ? '  ↳ ' + s.name : s.name, s.addr || '', ...periods.map(p => s.byPeriod[p] || ''), s.total]));
+    });
+    const ws = window.XLSX.utils.aoa_to_sheet(aoa);
+    ws['!cols'] = [{ wch: 28 }, { wch: 26 }, ...periods.map(() => ({ wch: 12 })), { wch: 14 }];
+    const wb = window.XLSX.utils.book_new();
+    window.XLSX.utils.book_append_sheet(wb, ws, 'Doanh thu');
+    const fn = `DOANH-THU_${custFilter || 'TOAN-CTY'}_${fromISO}_${toISO}.xlsx`;
+    window.XLSX.writeFile(wb, fn);
+    window.toast && window.toast('✓ Đã xuất ' + fn, 'success');
+  }
 
   /* === Init === */
   function populateCust() {
