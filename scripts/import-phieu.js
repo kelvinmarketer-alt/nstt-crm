@@ -22,9 +22,17 @@
     const a = nkey(addr);
     if (a) {
       const exact = list.find(c => nkey(c.address) === a); if (exact) return { c: exact, by: 'addr' };
+      /* Địa chỉ "chứa nhau" (1 phần) → PHẢI đòi tên cũng khớp.
+         Tránh gộp nhầm nhiều nhà hàng KHÁC tên dùng chung 1 địa điểm/chợ
+         (vd 3 NH cùng ghi "OCP Gia Lâm"). */
+      const nn = nkey(name);
       const fuzzy = list.find(c => {
         const ca = nkey(c.address); if (ca.length < 6) return false;
-        return (a.length >= 6 && ca.includes(a)) || (ca.length >= 6 && a.includes(ca));
+        const addrHit = (a.length >= 6 && ca.includes(a)) || (ca.length >= 6 && a.includes(ca));
+        if (!addrHit) return false;
+        const cn = nkey(c.name);
+        if (!nn || !cn) return true;   /* thiếu tên 1 phía → chấp nhận theo địa chỉ */
+        return cn === nn || (nn.length >= 4 && cn.includes(nn)) || (cn.length >= 4 && nn.includes(cn));
       });
       if (fuzzy) return { c: fuzzy, by: 'addr~' };
       return null;   /* có địa chỉ nhưng không khớp → KHÁCH MỚI, không gộp theo tên */
