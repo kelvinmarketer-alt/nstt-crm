@@ -74,6 +74,14 @@
         for (let cc = c + 1; cc < row.length; cc++) if (norm(row[cc]) !== '') { addr = norm(row[cc]); break; }
       }
     }
+    /* CA GIAO: ô "TG Nhận Hàng: Sáng/Chiều" (nhãn + giá trị cùng ô, hoặc giá trị ô bên phải) */
+    let shift = '';
+    const sp = findLabel(/tg\s*nh[aậ]n|th[oờ]i gian nh[aậ]n/);
+    if (sp) {
+      const raw = (norm(grid[sp.r][sp.c]) + ' ' + valRight(sp)).normalize('NFD').replace(/[̀-ͯ]/g, '').replace(/đ/gi, 'd').toLowerCase();
+      const m = raw.match(/\b(sang|chieu|trua|toi)\b/);
+      if (m) shift = { sang: 'Sáng', chieu: 'Chiều', trua: 'Trưa', toi: 'Tối' }[m[1]];
+    }
     let hr = -1, col = {};
     for (let r = 0; r < grid.length; r++) {
       const lows = (grid[r] || []).map(low);
@@ -120,7 +128,7 @@
     /* Tổng giá vốn = dòng "Tổng cộng" cột nhập (ưu tiên) hoặc Σ từng dòng */
     const itemsBuyTotal = items.reduce((s, it) => s + (it.buyTotal || 0), 0);
     const buyTotal = totalBuyRow ? Math.round(totalBuyRow * 1000) : itemsBuyTotal;
-    return { custName, addr, dateRaw, items, total, buyTotal, valid: !!(custName && total && items.length) };
+    return { custName, addr, dateRaw, shift, items, total, buyTotal, valid: !!(custName && total && items.length) };
   }
 
   /* Ngày "06.06.2026" / "6/6/2026" → {iso, vn} */
@@ -167,19 +175,26 @@
           const grid = window.XLSX.utils.sheet_to_json(wb.Sheets[sn], { header: 1, defval: '' });
           const p = parsePhieu(grid);
           if (!p.valid) continue;            /* sheet không phải phiếu (vd "TÊN QC") → bỏ */
+          /* Ca giao: ưu tiên đọc từ ô trong file; thiếu → suy từ TÊN FILE (SÁNG./CHIỀU.) */
+          if (!p.shift) {
+            const fnl = (f.name || '').normalize('NFD').replace(/[̀-ͯ]/g, '').toLowerCase();
+            if (/(^|[^a-z])sang([^a-z]|$)/.test(fnl)) p.shift = 'Sáng';
+            else if (/chieu/.test(fnl)) p.shift = 'Chiều';
+          }
           const d = parseDate(p.dateRaw);
           const mm = matchCustomer(customers, p.custName, p.addr);
           const match = mm ? mm.c : null;
           const matchBy = mm ? mm.by : null;
-          /* trùng: cùng KHÁCH (đã khớp) + ngày + tổng — nếu chưa khớp thì so tên+địa chỉ */
+          /* trùng: cùng KHÁCH + ngày + tổng + CA — sáng/chiều khác ca KHÔNG coi là trùng */
           const dup = d && orders.some(o => {
             const sameCust = match ? (o.cust === match.id)
               : (nkey(o.custName) === nkey(p.custName) && nkey(o.drop) === nkey(p.addr));
             return sameCust
               && (o.deliverDate === d.iso || (o.date || '').slice(0, 10) === d.vn.split('/').reverse().join('-'))
-              && Math.abs((+o.freight || 0) - p.total) < 1;
+              && Math.abs((+o.freight || 0) - p.total) < 1
+              && nkey(o.shipShift || '') === nkey(p.shift || '');
           });
-          const sig = `${nkey(p.custName)}|${nkey(p.addr)}|${d ? d.iso : '?'}|${p.total}|${p.items.length}`;
+          const sig = `${nkey(p.custName)}|${nkey(p.addr)}|${d ? d.iso : '?'}|${p.total}|${p.items.length}|${nkey(p.shift || '')}`;
           const dupInBatch = seenSig.has(sig);
           if (!dupInBatch) seenSig.add(sig);
           _parsed.push({ file: f.name, sheet: sn, ...p, date: d, match, matchBy, dup, dupInBatch, pick: !dup && !dupInBatch && !!d });
@@ -236,7 +251,7 @@
             <td class="num"><input type="checkbox" ${p.pick ? 'checked' : ''} ${canPick ? '' : 'disabled'} onchange="window._phieuToggle(${i}, this.checked)"></td>
             <td><b>${esc(p.custName)}</b></td>
             <td style="max-width:200px;white-space:normal">${addrCell}</td>
-            <td>${p.date ? p.date.vn : '—'}</td>
+            <td>${p.date ? p.date.vn : '—'}${p.shift ? `<div><span style="font-size:9px;font-weight:700;padding:1px 5px;border-radius:3px;background:${/Chi|Tối/.test(p.shift) ? '#FEF3C7;color:#92400E' : '#DBEAFE;color:#1E40AF'}">${p.shift}</span></div>` : ''}</td>
             <td class="num">${p.items.length}</td>
             <td class="num"><b>${fmt(p.total)}</b>${p.buyTotal ? `<div style="font-size:10px;color:#15803D">vốn ${fmt(p.buyTotal)} · lãi ${fmt(p.total - p.buyTotal)}</div>` : ''}</td>
             <td>${custCell}</td>
@@ -277,11 +292,11 @@
     const liveCustomers = (window.STORE.get('customers', []) || []).slice();
     /* CHẶN TRÙNG NỘI DUNG: nếu đơn y hệt (khách+ngày+tổng+số mã) đã tồn tại → KHÔNG tạo lại.
        seenOrders gồm đơn cũ + đơn vừa tạo trong lượt này → tự cộng dồn, không sót. */
-    const oSig = (cid, iso, total, n) => `${cid}|${iso}|${total}|${n}`;
+    const oSig = (cid, iso, total, n, shift) => `${cid}|${iso}|${total}|${n}|${(shift || '').toLowerCase()}`;
     const seenOrders = new Set(
       (window.STORE.get('orders', []) || [])
         .filter(o => o.status !== 'cancelled')
-        .map(o => oSig(o.cust || o.custId, (o.deliverDate || (o.date || '').slice(0, 10)), +o.freight || 0, (o.items || []).length))
+        .map(o => oSig(o.cust || o.custId, (o.deliverDate || (o.date || '').slice(0, 10)), +o.freight || 0, (o.items || []).length, o.shipShift))
     );
     let nCust = 0, nOrder = 0, nSkip = 0;
 
@@ -311,7 +326,7 @@
          thay vì tên có thể gõ sai trên phiếu) */
       const orderCustName = mm ? mm.c.name : p.custName;
       /* Đơn y hệt đã tồn tại (cũ hoặc vừa tạo trong lượt) → BỎ QUA, không tạo trùng */
-      const osig = oSig(custId, p.date.iso, p.total, items.length);
+      const osig = oSig(custId, p.date.iso, p.total, items.length, p.shift);
       /* Bỏ qua nếu đơn y hệt đã có — TRỪ khi user tick lại (forceCreate = đơn khác ca/lần giao) */
       if (seenOrders.has(osig) && !p.forceCreate) { nSkip++; return; }
       seenOrders.add(osig);
@@ -323,6 +338,7 @@
         deliverDate: p.date.iso, deliveredAt: p.date.vn + ' ' + hhmm,
         cust: custId, custName: orderCustName, custPhone: '',
         serviceType: '', transportMode: 'giao-ngay',
+        shipShift: p.shift || '',   /* ca giao đọc từ "TG Nhận Hàng" → phiếu ma trận tách Sáng/Chiều */
         pickup: 'Kho Tuấn Tú', drop: p.addr || '',
         goods: p.items.map(it => it.name).join(', ').slice(0, 250),
         qty: 1, unit: 'kg', weight: 0,
