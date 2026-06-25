@@ -302,20 +302,12 @@
     const _bp = String(comp.bank || '').trim().match(/^(\S+)[\s:]+(\d[\d\s]*\d|\d)$/);
     comp.bankCode = ci.bankCode || (_bp && _bp[1]) || 'MB';
     comp.bankAcc = ci.bankAcc || (_bp && _bp[2].replace(/\s/g, '')) || '228666669999';
-    /* các ngày phát sinh trong kỳ → dòng phiếu */
+    /* các ngày phát sinh → dòng phiếu, TÁCH Sáng/Chiều (ca giao của đơn).
+       Khách chỉ giao 1 buổi → buổi kia để trống. */
     const rows = Object.keys(r.daily).filter(d => r.daily[d] > 0).sort()
-      .map(d => ({ date: isoVN(d), amount: r.daily[d] }));
+      .map(d => { const sh = r.dailyShift[d] || { s: 0, c: 0 }; return { iso: d, date: isoVN(d), s: sh.s, c: sh.c, tot: r.daily[d] }; });
+    const sumS = rows.reduce((a, e) => a + e.s, 0), sumC = rows.reduce((a, e) => a + e.c, 0);
     const totalPS = r.total, paid = r.paid || 0, remain = r.remain != null ? r.remain : totalPS;
-    /* chia 2 cột (trái STT 1..n, phải tiếp theo) — CHỈ hiện đúng số dòng có dữ liệu */
-    const half = Math.max(1, Math.ceil(rows.length / 2));
-    const colCell = (i) => {
-      const e = rows[i];
-      return `<td style="text-align:center">${e ? (i + 1) : ''}</td><td>${e ? e.date : ''}</td><td style="text-align:right">${e ? money(e.amount) : ''}</td><td></td>`;
-    };
-    let bodyRows = '';
-    for (let i = 0; i < half; i++) bodyRows += `<tr>${colCell(i)}${colCell(i + half)}</tr>`;
-    const sumL = rows.slice(0, half).reduce((s, e) => s + e.amount, 0);
-    const sumR = rows.slice(half).reduce((s, e) => s + e.amount, 0);
 
     /* VietQR ĐỘNG — tự điền đúng SỐ TIỀN CÔNG NỢ + ghi chú "CONG NO <khách>" khi quét. */
     const _noDia = s => (s || '').toString().normalize('NFD').replace(/[̀-ͯ]/g, '').replace(/đ/g, 'd').replace(/Đ/g, 'D').toUpperCase();
@@ -376,11 +368,11 @@
       <div class="sub">từ ngày ${ddmm(_last.fromISO)}/${_last.fromISO.slice(0,4)} – ${ddmm(_last.toISO)}/${_last.toISO.slice(0,4)}</div>
       <div class="note0">Chuyên Sỉ Rau Củ Quả Đà Lạt Và Rau Vùng Miền.</div>
       <table>
-        <thead><tr><th>STT</th><th>Ngày Tháng</th><th>Số Tiền</th><th>Ghi Chú</th><th>STT</th><th>Ngày Tháng</th><th>Số Tiền</th><th>Ghi Chú</th></tr></thead>
-        <tbody>${bodyRows}</tbody>
+        <thead><tr><th>STT</th><th>Ngày Tháng</th><th>Sáng</th><th>Chiều</th><th>Cộng ngày</th><th>Ghi Chú</th></tr></thead>
+        <tbody>${rows.map((e, i) => `<tr><td style="text-align:center">${i + 1}</td><td style="text-align:center">${e.date}</td><td style="text-align:right">${e.s ? money(e.s) : ''}</td><td style="text-align:right">${e.c ? money(e.c) : ''}</td><td style="text-align:right"><b>${money(e.tot)}</b></td><td></td></tr>`).join('') || '<tr><td colspan="6" style="text-align:center;color:#888;padding:12px">Không có phát sinh trong kỳ</td></tr>'}</tbody>
         <tfoot>
-          <tr class="totrow"><td colspan="2" style="text-align:center">Tổng</td><td style="text-align:right">${money(sumL)}</td><td></td><td colspan="2" style="text-align:center">Tổng</td><td style="text-align:right">${sumR ? money(sumR) : ''}</td><td></td></tr>
-          <tr class="grand"><td colspan="6" style="text-align:right">TỔNG SỐ TIỀN CÔNG NỢ${paid > 0 ? ' (đã thu ' + money(paid) + 'đ → còn phải thu)' : ''}</td><td colspan="2" style="text-align:right">${money(paid > 0 ? remain : totalPS)}</td></tr>
+          <tr class="totrow"><td colspan="2" style="text-align:center">Tổng</td><td style="text-align:right">${sumS ? money(sumS) : '-'}</td><td style="text-align:right">${sumC ? money(sumC) : '-'}</td><td style="text-align:right">${money(totalPS)}</td><td></td></tr>
+          <tr class="grand"><td colspan="5" style="text-align:right">TỔNG SỐ TIỀN CÔNG NỢ${paid > 0 ? ' (đã thu ' + money(paid) + 'đ → còn phải thu)' : ''}</td><td style="text-align:right">${money(paid > 0 ? remain : totalPS)}</td></tr>
         </tfoot>
       </table>
       <div class="ft">
@@ -426,7 +418,7 @@
           'THÔNG BÁO CÔNG NỢ – KIÊM ĐỀ NGHỊ THANH TOÁN',
           'Kính gửi: '+${JSON.stringify(c.name || '')},
           'Kỳ: ${ddmm(_last.fromISO)}/${_last.fromISO.slice(0,4)} - ${ddmm(_last.toISO)}/${_last.toISO.slice(0,4)}',''];
-        ${JSON.stringify(rows.map((e, i) => `${i + 1}. ${e.date}: ${money(e.amount)}đ`))}.forEach(function(l){lines.push(l)});
+        ${JSON.stringify(rows.map((e, i) => `${i + 1}. ${e.date}: ${money(e.tot)}đ` + (e.s && e.c ? ` (Sáng ${money(e.s)} · Chiều ${money(e.c)})` : e.c ? ' (Chiều)' : '')))}.forEach(function(l){lines.push(l)});
         lines.push('');
         lines.push('TỔNG CÔNG NỢ PHẢI THANH TOÁN: '+${JSON.stringify(money(paid > 0 ? remain : totalPS))}+'đ');
         lines.push('STK: '+${JSON.stringify(comp.bank + ' · ' + comp.bankOwner)});
