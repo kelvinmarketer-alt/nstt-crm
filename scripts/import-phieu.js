@@ -237,10 +237,18 @@
     const orders = window.STORE.get('orders', []) || [];
     _parsed = [];
     const seenSig = new Set();   /* chống TRÙNG TRONG LÔ: cùng khách+ngày+tổng+số mã chỉ tính 1 lần */
-    for (const f of files) {
+    const fileArr = Array.from(files || []);
+    const N = fileArr.length;
+    let read = 0;
+    for (const f of fileArr) {
+      read++;
+      /* tiến trình + NHƯỜNG luồng giao diện mỗi file → không treo trình duyệt khi up nhiều file */
+      prev.innerHTML = `<div style="color:var(--muted);font-size:12.5px;padding:8px">⏳ Đang đọc <b>${read}/${N}</b> file… <span style="color:#94A3B8">(${Math.round(read / N * 100)}%)</span></div>`;
+      await new Promise(r => setTimeout(r, 0));
       try {
         const buf = await f.arrayBuffer();
-        const wb = window.XLSX.read(buf, { type: 'array' });
+        /* Tắt bớt phần nặng không cần (style/HTML/VBA) + chỉ đọc ~150 dòng đầu (phiếu nằm đầu sheet) → parse nhanh hơn nhiều */
+        const wb = window.XLSX.read(buf, { type: 'array', sheetRows: 150, cellHTML: false, cellNF: false, cellText: false, cellStyles: false, bookVBA: false });
         for (const sn of wb.SheetNames) {
           const grid = window.XLSX.utils.sheet_to_json(wb.Sheets[sn], { header: 1, defval: '' });
           const p = parsePhieu(grid);
@@ -289,6 +297,8 @@
     const gRev = picks.reduce((s, p) => s + (+p.total || 0), 0);
     const gCost = picks.reduce((s, p) => s + (+p.buyTotal || 0), 0);
     const gProfit = gRev - gCost;
+    /* Dựng danh sách option khách 1 LẦN (tái dùng cho mọi dòng) — tránh O(dòng×khách) mỗi lần render */
+    const custOptsBase = customers.map(c => `<option value="${esc(c.id)}">${esc(c.name)} (${esc(c.code)})</option>`).join('');
     prev.innerHTML = `
       <div style="font-size:12.5px;margin-bottom:8px"><b>${_parsed.length}</b> phiếu đọc được · sẽ tạo <b style="color:#15803D">${willCreate}</b> đơn${newCusts ? ` · tạo mới <b>${newCusts}</b> khách` : ''}
         ${gRev ? `<br>Doanh thu <b>${fmt(gRev)}</b>${gCost ? ` · giá vốn <b>${fmt(gCost)}</b> · lãi <b style="color:#15803D">${fmt(gProfit)}</b> (${gRev ? (Math.round(gProfit / gRev * 1000) / 10) : 0}%)` : ' · <span style="color:#B45309">phiếu không có cột giá nhập → lãi ước tính</span>'}` : ''}
@@ -311,11 +321,10 @@
         const sel = p.forceCustId === undefined ? '__auto__' : (p.forceCustId === '' ? '__new__' : p.forceCustId);
         const lbl = r ? `<span style="color:#15803D">→ ${esc(r.c.name)} <span style="color:var(--muted)">(${esc(r.c.code)} · ${_byLabel[r.by]})</span></span>`
           : '<span style="color:#2563EB">🆕 Tạo khách mới</span>';
-        const opts = `<option value="__auto__" ${sel === '__auto__' ? 'selected' : ''}>↻ Tự động khớp</option>`
-          + `<option value="__new__" ${sel === '__new__' ? 'selected' : ''}>🆕 Tạo khách mới</option>`
-          + customers.map(c => `<option value="${esc(c.id)}" ${sel === c.id ? 'selected' : ''}>${esc(c.name)} (${esc(c.code)})</option>`).join('');
+        /* option khách dùng chung (custOptsBase) — chọn đúng dòng set sau render qua data-sel */
+        const opts = `<option value="__auto__">↻ Tự động khớp</option><option value="__new__">🆕 Tạo khách mới</option>` + custOptsBase;
         custCell = `<div style="font-size:10.5px;margin-bottom:3px">${lbl}</div>`
-          + `<select onchange="window._phieuMerge(${i}, this.value)" style="font-size:11px;max-width:210px;padding:3px;border:1px solid var(--line);border-radius:6px">${opts}</select>`;
+          + `<select data-sel="${esc(sel)}" onchange="window._phieuMerge(${i}, this.value)" style="font-size:11px;max-width:210px;padding:3px;border:1px solid var(--line);border-radius:6px">${opts}</select>`;
       }
       return `<tr style="${p.pick ? '' : 'opacity:.6'}">
             <td class="num"><input type="checkbox" ${p.pick ? 'checked' : ''} ${canPick ? '' : 'disabled'} onchange="window._phieuToggle(${i}, this.checked)"></td>
@@ -328,6 +337,8 @@
           </tr>`;
     }).join('')}</tbody>
       </table></div>`;
+    /* set lại giá trị các <select> (option dùng chung không nhúng 'selected' → set sau render) */
+    prev.querySelectorAll('select[data-sel]').forEach(s => { s.value = s.getAttribute('data-sel'); });
     if (btn) btn.disabled = willCreate === 0;
   }
   window._phieuToggle = function (i, on) {
