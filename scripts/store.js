@@ -790,7 +790,10 @@
   /* Real-time CHÍNH = websocket (đã bật mọi bảng, ~0 egress, <1s).
      Poll chỉ là LƯỚI AN TOÀN khi websocket rớt mạng → để 60s là đủ nhanh + nhẹ egress
      (skip khi tab nền). Khi quay lại tab → đồng bộ NGAY (visibilitychange bên dưới). */
-  const DEFAULT_POLL_SEC = 60;
+  /* 180s: realtime (delta) đã cập nhật tức thì; poll chỉ là lưới tự-sửa-lệch.
+     Mỗi tick = SELECT * mọi bảng (orders kèm items JSONB nặng) × mỗi tab đang mở
+     → để 60s gây IO đọc dồn liên tục, dễ cháy Disk IO budget. 180s giảm ~3× tải. */
+  const DEFAULT_POLL_SEC = 180;
   let _pollIntervalId = null;
   let _pollSec = DEFAULT_POLL_SEC;
 
