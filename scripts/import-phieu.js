@@ -151,12 +151,82 @@
       </div>
       <input type="file" id="phieuFiles" accept=".xlsx,.xls" multiple onchange="window._phieuRead(this.files)"
         style="width:100%;border:1px dashed var(--line);border-radius:8px;padding:14px;font-size:13px;background:#FAFAFB">
-      <div id="phieuPreview" style="margin-top:12px"></div>
+      <div style="margin-top:8px;text-align:right">
+        <a href="javascript:void(0)" onclick="window.openImportBatches()" style="font-size:12px;color:#B91C1C;font-weight:600">🗑 Nhập nhầm? Xoá lô đã nhập…</a>
+      </div>
+      <div id="phieuPreview" style="margin-top:8px"></div>
     `, {
       width: '760px',
       footer: `<button class="btn btn-ghost" onclick="window.closeModal()">Đóng</button>
                <button class="btn btn-primary" id="phieuCommitBtn" onclick="window._phieuCommit()" disabled>Tạo đơn + cập nhật công nợ</button>`,
     });
+  };
+
+  /* ===== XOÁ LÔ NHẬP (undo hàng loạt khi NV up nhầm file) =====
+     Mỗi lần "Tạo đơn" = 1 lô: tất cả đơn cùng createdAt. Liệt kê các lô gần đây → xoá cả lô
+     (đơn + khách import mồ côi). CHỈ quản lý (leader/BGD) hoặc người có quyền xoá đơn. */
+  function _canBulkDelete() {
+    const u = (window.AUTH && window.AUTH.currentUser && window.AUTH.currentUser()) || null;
+    if (!u) return false;
+    const perms = u.perms || [];
+    return (window.AUTH.isLeaderRole && window.AUTH.isLeaderRole(u.role, u.dept))
+      || perms.includes('all') || perms.includes('orders.delete') || perms.includes('orders.edit');
+  }
+  function _importBatches() {
+    const orders = window.STORE.get('orders', []) || [];
+    const imp = orders.filter(o => /Nhập từ phiếu|Nh.p t. phi.u/i.test(o.note || o.notes || ''));
+    const map = {};
+    imp.forEach(o => {
+      const k = o.createdAt || (o.date || '') + '|' + (o.deliverDate || '');   /* lô = thời điểm up */
+      const b = map[k] || (map[k] = { key: k, createdAt: o.createdAt, n: 0, total: 0, custs: new Set(), names: new Set(), codes: [] });
+      b.n++; b.total += (+o.freight || 0); b.custs.add(o.cust || o.custId); b.names.add(o.custName || ''); b.codes.push(o.code);
+    });
+    return Object.values(map).sort((a, b) => String(b.createdAt || '').localeCompare(String(a.createdAt || '')));
+  }
+  window.openImportBatches = function () {
+    if (!_canBulkDelete()) { window.toast && window.toast('Chỉ quản lý mới được xoá lô nhập.', 'warn'); return; }
+    const batches = _importBatches();
+    const fmt = v => (+v || 0).toLocaleString('vi-VN');
+    const tISO = s => { if (!s) return '—'; const d = new Date(s); return isNaN(d) ? s : d.toLocaleString('vi-VN'); };
+    const esc = s => String(s == null ? '' : s).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/"/g, '&quot;');
+    const list = batches.length ? batches.map((b, i) => {
+      const names = Array.from(b.names).filter(Boolean).slice(0, 4).join(', ') + (b.names.size > 4 ? `… +${b.names.size - 4}` : '');
+      return `<tr>
+        <td style="white-space:nowrap">${tISO(b.createdAt)}</td>
+        <td class="num"><b>${b.n}</b></td>
+        <td class="num">${fmt(b.total)}</td>
+        <td style="font-size:11px;color:var(--muted);max-width:230px;white-space:normal">${esc(names)}</td>
+        <td><button class="btn btn-sm" style="background:#B91C1C;color:#fff" onclick="window._delImportBatch('${String(b.key).replace(/'/g, "\\'")}', ${i})">🗑 Xoá lô</button></td>
+      </tr>`;
+    }).join('') : '<tr><td colspan="5" style="padding:16px;text-align:center;color:var(--muted)">Chưa có lô nhập nào.</td></tr>';
+    window.openModal('🗑 Xoá lô nhập (undo file up nhầm)', `
+      <div style="background:#FEF2F2;color:#991B1B;padding:9px 11px;border-radius:8px;font-size:12px;margin-bottom:10px;line-height:1.5">
+        Mỗi dòng = <b>1 lần up</b> (các đơn tạo cùng lúc). Xoá lô sẽ <b>xoá tất cả đơn trong lô</b> + <b>khách mới tạo từ lô đó</b> (nếu không còn đơn nào). <b>Không hoàn tác được.</b>
+      </div>
+      <div style="max-height:380px;overflow:auto;border:1px solid var(--line);border-radius:8px">
+        <table class="mini-table" id="impBatchTbl" style="margin:0;font-size:12px;width:100%">
+          <thead><tr><th>Thời điểm up</th><th class="num">Số đơn</th><th class="num">Tổng tiền</th><th>Khách</th><th></th></tr></thead>
+          <tbody>${list}</tbody>
+        </table></div>
+    `, { width: '720px', footer: `<button class="btn btn-ghost" onclick="window.closeModal()">Đóng</button>` });
+  };
+  window._delImportBatch = function (key, i) {
+    if (!_canBulkDelete()) { window.toast && window.toast('Không có quyền xoá.', 'warn'); return; }
+    const b = _importBatches().find(x => String(x.key) === String(key));
+    if (!b) { window.toast && window.toast('Lô không còn tồn tại — reload.', 'warn'); return; }
+    if (!window.confirm(`Xoá LÔ NHẬP này?\n\n• ${b.n} đơn · tổng ${(+b.total).toLocaleString('vi-VN')}đ\n• Xoá cả khách mới tạo từ lô (nếu hết đơn)\n\nKHÔNG hoàn tác được.`)) return;
+    /* 1) xoá đơn trong lô */
+    b.codes.forEach(code => window.STORE.remove('orders', code));
+    /* 2) xoá khách import mồ côi (không còn đơn nào tham chiếu) */
+    const remain = (window.STORE.get('orders', []) || []);
+    const used = new Set(remain.map(o => o.cust || o.custId));
+    let delC = 0;
+    (window.STORE.get('customers', []) || [])
+      .filter(c => c.source === 'import-phiếu' && b.custs.has(c.id) && !used.has(c.id))
+      .forEach(c => { window.STORE.remove('customers', c.id); delC++; });
+    window.toast && window.toast(`✓ Đã xoá ${b.n} đơn${delC ? ' · ' + delC + ' khách' : ''} của lô. Công nợ sẽ tính lại.`, 'success');
+    /* refresh modal + báo cáo */
+    setTimeout(() => { window.openImportBatches(); if (window.cnRender) window.cnRender(); else if (window.renderOrders) window.renderOrders(); }, 400);
   };
 
   window._phieuRead = async function (files) {
