@@ -817,7 +817,7 @@
         <div style="display:flex;gap:10px;align-items:center;flex-wrap:wrap">
           <div style="font-size:12.5px;color:var(--muted);flex:1;min-width:180px">💡 <b>Chỉnh giá trực tiếp</b> ở ô bên dưới (lưu tự động vào bảng giá hôm nay), hoặc nhập hàng loạt / từ ảnh:</div>
           <button class="btn btn-ghost btn-sm" onclick="window.aiFillCatalog()">📷 Cập nhật giá bằng ảnh (AI)</button>
-          <button class="btn btn-ghost btn-sm" onclick="window.openBulkPriceImport()">📥 Nhập hàng loạt (paste Excel)</button>
+          <button class="btn btn-ghost btn-sm" onclick="window.openBulkPriceImport()">📋 Cập nhật giá hàng loạt (duyệt)</button>
         </div>
       </div>
       <div style="margin-bottom:10px;position:relative">
@@ -906,51 +906,103 @@
     window.toast('✓ Đã lưu giá: ' + p.name, 'success');
   }
 
-  /* ====== Nhập hàng loạt từ paste Excel ====== */
+  /* ====== Cập nhật giá bán HÀNG LOẠT — CÓ DUYỆT (khớp → soi/sửa → áp) ======
+     Mỗi dòng: "Tên SP <tab> Giá bán". Khớp tự động (matchProductSmart chặt + gợi ý gần đúng),
+     hiện bảng cho user sửa cột "SP trong app" rồi mới ghi. Giá ghi thành MỐC GIÁ HÔM NAY (giữ giá vốn cũ). */
+  const _bpEsc = s => String(s == null ? '' : s).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/"/g, '&quot;');
+  /* Mẫu sẵn = bảng giá ngày (giá/kg). User sửa/dán đè tuỳ ý. */
+  const BULK_SEED = `Dưa chuột ST\t14000\nCải dưa bẹ to\t14000\nCà chua đại\t15000\nCà rốt tỉa hoa\t13000\nKhoai tây\t14000\nHành tây trắng\t11000\nCủ cải MC\t12000\nBắp cải ĐL\t11000\nCải thảo MC\t11000\nLặc lè\t37000\nĐậu cove\t22000\nMướp đắng to\t15000\nCà tím dài\t14000\nCà tím tròn\t14000\nMướp hương ST\t15000\nSu hào\t17000\nBí xanh\t9000\nBí ngô tròn/ dài\t14000\nBầu\t12000\nNgô ngọt\t8000\nCà pháo trắng\t16000\nCà pháo xanh\t19000\nĐậu bắp\t31000\nChanh cốm vỏ mỏng\t23000\nQuất đà lạt quả to\t19000\nQuả su\t14000\nLơ xanh\t28000\nLơ trắng\t28000\nỚt chuông xanh\t30000\nỚt chuông đỏ\t32000\nỚt chuông vàng\t45000\nCà chua bi ST\t33000\nNấm hải sản\t42000\nNấm kim (gói 150g)\t7000\nNấm đùi gà (gói 1kg)\t42000\nNấm hương gói to\t20000\nNấm sò nâu\t60000\nNấm sò trắng\t50000\nNấm mỡ\t150000\nNgọn bò khai\t40000\nNgó xuân\t30000\nNụ bí\t65000\nMăng tây\t90000\nHoa lan vì (1 vỉ 12 cành)\t120000\nMùi tây\t65000\nXL xoăn\t24000\nHành lá NL\t27000\nHúng chó ta\t35000\nMùi ta ĐL\t43000\nMùi tàu to\t35000\nThì là\t50000\nBạc hà\t43000\nTía tô\t25000\nLá lốt to\t45000\nKinh giới lá to\t30000\nCần tỏi\t39000\nNgổ\t24000\nRăm\t25000\nNgải cứu\t22000\nDiếp cá\t27000\nNghệ củ cái\t30000\nỚt kim xanh\t32000\nỚt kim đỏ\t30000\nỚt sừng đỏ\t35000\nỚt sừng xanh\t35000\nHành indo bóc tay\t26000\nTỏi XK bóc tay\t45000\nHành ta bóc tay\t44000\nRiềng củ\t17000\nGừng ta mới\t25000\nGừng tàu\t59000\nSả to\t15000\nNgọn su non\t24000\nCải chíp Đà Lạt\t15000\nCải ngọt\t15000\nCải ngồng\t17000\nCải mơ\t17000\nCải xoăn\t19000\nCải bó xôi\t19000\nMồng tơi lá to (mớ)\t7000\nMuống giòn to\t9000\nRau lang (mớ)\t9000\nRau ngót (mớ)\t13000\nDọc mùng\t15000\nRau dền (mớ)\t8000\nNgọn su nhặt\t49000\nCải xanh NL\t15000\nĐậu mơ\t3000\nBún sợi/ lá\t13000\nPhở cuốn/ sợi\t15000\nTrứng gà\t2700\nHoa chuối thái\t35000\nGiá đỗ\t12000\nDứa to\t15000\nXoài xanh Tứ Quý\t16000\nBa chỉ tề gọn sạch\t155000\nSườn sụn non\t150000\nThịt nạc xay\t120000\nChân giò lọc sạch\t130000\nThịt vai xay\t130000\nSườn thăn bỏ cục\t155000\nGà mái ri sơn tây\t130000\nGà mái ta thịt sẵn\t110000\nGà mía\t108000\nThăn bò\t260000\nBắp bò\t270000\nMông bò\t250000\nMăng lá\t36000\nMăng củ\t36000\nLá nếp\t17000\nVịt làm sạch\t90000\nTrâu file\t265000\nLá chuối\t17000\nChuối xanh\t16000\nĐu đủ xanh\t16000\nBắp cải tím\t25000\nLá dong\t1200\nHoa cúc decor (bó)\t40000\nCải mầm xanh (hộp)\t8000\nCải mầm tím (hộp)\t10000\nLá nhíp\t90000\nNgồng cải bẹ\t24000`;
+
   window.openBulkPriceImport = function () {
-    window.openModal('📥 Nhập hàng loạt giá sản phẩm', `
-      <div style="font-size:12.5px;color:var(--muted);margin-bottom:10px">
-        Copy từ Excel/Google Sheets <b>3 cột</b>: <code>Tên SP</code> · <code>Giá nhập</code> · <code>Giá bán</code> → dán vào ô dưới.
-        Hệ thống tự khớp tên (bỏ dấu) → cập nhật giá hôm nay. Bỏ qua dòng không khớp.
+    const ps = products();
+    const dl = ps.map(p => `<option value="${_bpEsc(p.name)} (${p.id})"></option>`).join('');
+    window.openModal('📋 Cập nhật giá bán hàng loạt (có duyệt)', `
+      <div style="font-size:12px;color:var(--muted);margin-bottom:8px">
+        Mỗi dòng: <code>Tên SP &lt;tab&gt; Giá bán</code> (dán từ Excel, hoặc sửa danh sách mẫu). Bấm <b>Khớp & xem trước</b> → soi cột <b>"SP trong app"</b>, sửa dòng khớp sai (gõ tên / chọn gợi ý), bỏ tick dòng không muốn. Giá ghi thành <b>mốc giá hôm nay</b> — giữ nguyên giá cũ các ngày trước.
       </div>
-      <textarea id="bulkText" rows="10" style="width:100%;font-family:ui-monospace,monospace;font-size:12px;padding:10px;border:1px solid var(--line);border-radius:8px" placeholder="Cải thìa	15000	22000\nCà chua đại	18000	26000\nThịt ba chỉ	95000	125000"></textarea>
+      <textarea id="bpText" rows="5" style="width:100%;font-family:ui-monospace,monospace;font-size:11.5px;padding:8px;border:1px solid var(--line);border-radius:8px">${_bpEsc(BULK_SEED)}</textarea>
+      <div style="margin-top:6px"><button class="btn btn-ghost btn-sm" onclick="window.bulkPriceMatch()">🔎 Khớp & xem trước</button></div>
+      <div id="bpReview" style="margin-top:10px"></div>
+      <datalist id="bpProds">${dl}</datalist>
     `, {
-      footer: `<button class="btn btn-ghost" onclick="closeModal()">Hủy</button>
-               <button class="btn btn-primary" onclick="window.applyBulkPrice()">📥 Áp dụng</button>`,
-      width: '560px',
+      width: '820px',
+      footer: `<button class="btn btn-ghost" onclick="closeModal()">Đóng</button>
+               <button class="btn btn-primary" id="bpApplyBtn" onclick="window.applyBulkPrice()" disabled>✓ Áp dụng giá hôm nay</button>`,
     });
   };
 
-  window.applyBulkPrice = function () {
-    const txt = document.getElementById('bulkText').value || '';
+  window.bulkPriceMatch = function () {
+    const txt = (document.getElementById('bpText') || {}).value || '';
     const lines = txt.split(/\r?\n/).map(s => s.trim()).filter(Boolean);
     if (!lines.length) { window.toast('Chưa có dữ liệu', 'warn'); return; }
-    const ps = products(); let n = 0, created = 0; const today = window.todayISO();
-    lines.forEach(ln => {
-      const parts = ln.split(/\t|,|;|\|/).map(s => s.trim());
-      if (parts.length < 2) return;
-      const name = parts[0];
-      const buy = parseInt(String(parts[1]).replace(/[^0-9]/g, ''), 10) || 0;
-      const sell = parseInt(String(parts[2] || parts[1]).replace(/[^0-9]/g, ''), 10) || 0;
-      const nm = window.AI ? window.AI.norm(name) : name.toLowerCase();
-      const p = ps.find(x => (window.AI ? window.AI.norm(x.name) : x.name.toLowerCase()) === nm)
-        || ps.find(x => { const xn = window.AI ? window.AI.norm(x.name) : x.name.toLowerCase(); return xn.includes(nm) || nm.includes(xn); });
-      if (!p) {
-        /* Chưa khớp → TẠO SP MỚI (nhóm Khác, chưa ảnh) → hiện trong Danh mục để thêm ảnh */
-        window.STORE.add('products', { id: window.STORE.nextId('products', 'SP', 3), name, cat: 'khac', unit: 'kg', img: '', priceHistory: [{ date: today, buy, sell: sell || buy }] });
-        created++;
-        return;
-      }
+    const ps = products(); const today = window.todayISO();
+    const norm = window._matchNorm;
+    const toks = s => new Set(norm(s).split(' ').filter(t => t.length > 1));
+    function guess(name) {
+      const strict = window.matchProductSmart ? window.matchProductSmart(name, ps) : null;
+      if (strict) return { p: strict, conf: 'chắc' };
+      const at = toks(name); let bp = null, bs = 0;
+      ps.forEach(x => { const xt = toks(x.name); if (!xt.size) return; const inter = [...at].filter(t => xt.has(t)).length; const uni = new Set([...at, ...xt]).size; const j = uni ? inter / uni : 0; if (j > bs) { bs = j; bp = x; } });
+      return { p: bs >= 0.34 ? bp : null, conf: bs >= 0.6 ? 'gần' : 'yếu' };
+    }
+    const rows = lines.map(ln => {
+      const parts = ln.split(/\t|;|\|/).map(s => s.trim());   /* KHÔNG tách dấu phẩy (tên có thể chứa) */
+      const name = parts[0] || '';
+      const sell = parseInt(String(parts[parts.length - 1] || '').replace(/[^0-9]/g, ''), 10) || 0;
+      const g = guess(name);
+      const cur = g.p ? (window.priceEntryOn(g.p, today) || {}) : {};
+      return { name, sell, p: g.p, conf: g.conf, oldSell: cur.sell };
+    });
+    const fmt = v => v == null ? '—' : (+v).toLocaleString('vi-VN');
+    const nC = rows.filter(r => r.conf === 'chắc').length, nG = rows.filter(r => r.conf === 'gần').length, nN = rows.filter(r => !r.p).length;
+    const body = rows.map((r, i) => {
+      const checked = r.conf === 'chắc' ? 'checked' : '';
+      const badge = r.conf === 'chắc' ? '<span style="font-size:9px;background:#DCFCE7;color:#15803D;padding:1px 5px;border-radius:3px;font-weight:700">chắc</span>'
+        : r.p ? '<span style="font-size:9px;background:#FEF3C7;color:#92400E;padding:1px 5px;border-radius:3px;font-weight:700">gần đúng</span>'
+        : '<span style="font-size:9px;background:#FEE2E2;color:#B91C1C;padding:1px 5px;border-radius:3px;font-weight:700">chưa khớp</span>';
+      const pval = r.p ? `${_bpEsc(r.p.name)} (${r.p.id})` : '';
+      return `<tr data-i="${i}" data-name="${_bpEsc(r.name)}" style="${r.conf === 'chắc' ? '' : 'background:#FFFDF5'}">
+        <td class="num"><input type="checkbox" class="bp-ck" ${checked}></td>
+        <td><b>${_bpEsc(r.name)}</b><div>${badge}</div></td>
+        <td class="num"><input class="bp-sell" value="${r.sell || ''}" style="width:84px;text-align:right;padding:3px;border:1px solid var(--line);border-radius:5px;font-size:12px"></td>
+        <td><input class="bp-prod" list="bpProds" value="${pval}" placeholder="gõ tên SP…" style="width:230px;padding:3px 5px;border:1px solid var(--line);border-radius:5px;font-size:11.5px"></td>
+        <td class="num" style="color:var(--muted);font-size:11px">${fmt(r.oldSell)}</td>
+      </tr>`;
+    }).join('');
+    document.getElementById('bpReview').innerHTML = `
+      <div style="font-size:12px;margin-bottom:6px">Khớp: <b style="color:#15803D">${nC} chắc</b> · <b style="color:#92400E">${nG} gần đúng</b> · <b style="color:#B91C1C">${nN} chưa khớp</b>
+        <span style="color:var(--muted)">— dòng vàng cần soi cột "SP trong app". Sửa xong tick lại rồi Áp dụng.</span></div>
+      <div style="max-height:360px;overflow:auto;border:1px solid var(--line);border-radius:8px">
+        <table class="mini-table" style="margin:0;font-size:12px;width:100%">
+          <thead><tr><th style="width:30px">✓</th><th>Trên bảng giá</th><th class="num">Giá bán mới</th><th>SP trong app (sửa được)</th><th class="num">Giá cũ</th></tr></thead>
+          <tbody>${body}</tbody>
+        </table></div>`;
+    const btn = document.getElementById('bpApplyBtn'); if (btn) btn.disabled = false;
+  };
+
+  window.applyBulkPrice = function () {
+    const trs = [...document.querySelectorAll('#bpReview tr[data-i]')];
+    if (!trs.length) { window.toast('Bấm "Khớp & xem trước" trước', 'warn'); return; }
+    const ps = products(); const today = window.todayISO();
+    let upd = 0, skip = 0; const miss = [];
+    trs.forEach(tr => {
+      const ck = tr.querySelector('.bp-ck'); if (!ck || !ck.checked) { skip++; return; }
+      const sell = parseInt((tr.querySelector('.bp-sell').value || '').replace(/[^0-9]/g, ''), 10) || 0;
+      const pv = (tr.querySelector('.bp-prod').value || '').trim();
+      const m = pv.match(/\((SP\d+)\)\s*$/);
+      let p = m ? ps.find(x => x.id === m[1]) : null;
+      if (!p && pv) p = ps.find(x => window._matchNorm(x.name) === window._matchNorm(pv.replace(/\s*\(SP\d+\)\s*$/, '')));
+      if (!p || !sell) { skip++; if (!p) miss.push(tr.getAttribute('data-name')); return; }
       const hist = [...(p.priceHistory || [])];
       const ex = hist.find(h => h.date === today);
-      if (ex) { if (buy) ex.buy = buy; if (sell) ex.sell = sell; }
-      else { const last = window.priceEntryOn(p, today) || { buy: 0, sell: 0 }; hist.push({ date: today, buy: buy || last.buy, sell: sell || last.sell }); }
+      if (ex) ex.sell = sell;
+      else { const last = window.priceEntryOn(p, today) || { buy: 0, sell: 0 }; hist.push({ date: today, buy: last.buy || 0, sell }); }
       window.STORE.update('products', p.id, { priceHistory: hist });
-      n++;
+      upd++;
     });
     window.closeModal();
-    window.toast(`✓ Cập nhật ${n} SP${created ? ` · ➕ tạo mới ${created} SP (nhóm Khác — vào Danh mục thêm ảnh)` : ''}`, 'success');
-    renderCatalog();
+    window.toast(`✓ Cập nhật giá ${upd} SP (mốc ${today})${skip ? ` · bỏ qua ${skip}` : ''}${miss.length ? ` · ${miss.length} dòng chưa khớp SP` : ''}`, 'success');
+    if (window.renderCatalog) renderCatalog();
   };
 
   /* ====== AI điền giá vào catalog (cả buy + sell) ====== */
