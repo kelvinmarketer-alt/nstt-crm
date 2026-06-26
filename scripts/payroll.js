@@ -741,10 +741,24 @@
         </div>
       </div>
 
-      <div class="chart-card" style="overflow:auto">
-        <table class="mini-table" style="min-width:1320px">
+      <style>
+        .pay-wrap{overflow:auto;position:relative;border:1px solid var(--line);border-radius:10px;background:#fff}
+        .pay-table{min-width:1100px;border-collapse:separate;border-spacing:0}
+        .pay-table th,.pay-table td{white-space:nowrap}
+        /* Cột Nhân viên ghim TRÁI */
+        .pay-table th:first-child,.pay-table td:first-child{position:sticky;left:0;z-index:2;background:#fff;border-right:1px solid var(--line)}
+        .pay-table thead th:first-child{z-index:4}
+        /* Cột "Phiếu" (nút Lập) ghim PHẢI — luôn nhìn thấy, khỏi lướt */
+        .pay-table th:last-child,.pay-table td:last-child{position:sticky;right:0;z-index:2;background:#fff;border-left:1px solid var(--line);box-shadow:-6px 0 8px -6px rgba(0,0,0,.15);text-align:center}
+        .pay-table thead th:last-child{z-index:4}
+        .pay-table tfoot td:first-child,.pay-table tfoot td:last-child{background:#F9FAFB}
+        .pay-table tbody tr:hover td{background:#F8FAF8}
+        .pay-table tbody tr:hover td:first-child,.pay-table tbody tr:hover td:last-child{background:#F3FAF3}
+      </style>
+      <div class="pay-wrap">
+        <table class="mini-table pay-table">
           <thead><tr>
-            <th style="min-width:200px">Nhân viên</th>
+            <th style="min-width:190px">Nhân viên</th>
             <th class="num" title="Lương cơ bản hợp đồng">Lương CB</th>
             <th class="num" title="Công thực tế / NC chuẩn">Công</th>
             <th class="num" title="LCB ÷ NC × công × hệ số HĐ + phụ cấp">Lương theo công</th>
