@@ -64,9 +64,11 @@
       <div id="cnSummary" style="margin-top:10px;font-size:12.5px;color:var(--muted)"></div>
     </div>
 
-    <div style="display:flex;gap:8px;margin-bottom:10px">
+    <div style="display:flex;gap:8px;margin-bottom:10px;align-items:center;flex-wrap:wrap">
       <button data-cnview="rev" class="btn btn-sm" style="background:#15803D;color:#fff;border:1px solid var(--line)" onclick="window.cnSetView('rev')">📊 Doanh thu & Công nợ</button>
       <button data-cnview="cost" class="btn btn-sm" style="background:#fff;color:var(--navy);border:1px solid var(--line)" onclick="window.cnSetView('cost')">💵 Giá vốn & Lợi nhuận</button>
+      <input id="cnSearchBox" type="search" placeholder="🔎 Tìm đối tác…" oninput="window.cnSearch(this.value)"
+        style="padding:6px 10px;border:1px solid var(--line);border-radius:7px;font-size:12.5px;min-width:200px">
       <div style="flex:1"></div>
       <button id="cnBrandBtn" class="btn btn-sm" style="background:#fff;color:var(--navy);border:1px solid var(--line)" onclick="window.cnToggleBrand()" title="Gộp các cơ sở cùng thương hiệu thành 1 nhóm (có dòng cộng) — bấm tên thương hiệu để in phiếu công nợ ma trận">🏢 Gộp theo thương hiệu</button>
       <button class="btn btn-sm btn-ghost" onclick="window.cnManageBrands()" title="Gán nhãn thương hiệu cho từng cơ sở">🏷 Gán thương hiệu</button>

@@ -124,6 +124,13 @@
   let _last = null;   /* cache cho export */
   let cnView = 'rev'; /* 'rev' = Doanh thu & Công nợ · 'cost' = Giá vốn & Lợi nhuận */
   let cnGroupBrand = false;   /* gộp theo thương hiệu (nhiều cơ sở) */
+  let cnQuery = '';           /* lọc theo tên đối tác */
+  let _cnSearchT = null;
+  window.cnSearch = function (v) {
+    cnQuery = v || '';
+    clearTimeout(_cnSearchT);
+    _cnSearchT = setTimeout(() => window.cnRender(), 160);   /* debounce gõ phím */
+  };
   window.cnToggleBrand = function () { cnGroupBrand = !cnGroupBrand; const b = document.getElementById('cnBrandBtn'); if (b) { b.style.background = cnGroupBrand ? '#15803D' : '#fff'; b.style.color = cnGroupBrand ? '#fff' : 'var(--navy)'; } window.cnRender(); };
 
   window.cnSetView = function (v) {
@@ -142,6 +149,9 @@
     const tbl = document.getElementById('cnTable');
     if (!fromISO || !toISO) { window.toast && window.toast('Chọn từ ngày → đến ngày', 'warn'); return; }
     const data = build(fromISO, toISO);
+    /* lọc theo ô tìm kiếm (tên đối tác — bỏ dấu) */
+    const q = _nk(cnQuery);
+    if (q) data.list = data.list.filter(r => _nk(r.name).includes(q));
     _last = { ...data, fromISO, toISO };
     const unit = +(document.getElementById('cnUnit').value) || 1;
     const fmt = v => { const n = v / unit; return n ? (unit === 1 ? Math.round(n).toLocaleString('vi-VN') : (Math.round(n * 10) / 10).toLocaleString('vi-VN')) : ''; };

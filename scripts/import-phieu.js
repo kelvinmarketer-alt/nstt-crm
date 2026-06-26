@@ -283,7 +283,11 @@
           const sig = `${nkey(p.custName)}|${nkey(p.addr)}|${d ? d.iso : '?'}|${p.total}|${p.items.length}|${nkey(p.shift || '')}`;
           const dupInBatch = seenSig.has(sig);
           if (!dupInBatch) seenSig.add(sig);
-          _parsed.push({ file: f.name, sheet: sn, ...p, date: d, match, matchBy, dup, dupInBatch, pick: !dup && !dupInBatch && !!d });
+          /* CẢNH BÁO: ngày Ô trong file ≠ ngày trên TÊN FILE (vd file "...01.06..." nhưng ô Ngày ghi 30.04) */
+          let dateWarn = '';
+          const fm = (f.name || '').match(/(\d{1,2})[._-](\d{1,2})(?:[._-](\d{2,4}))?/);
+          if (fm && d) { const fdd = fm[1].padStart(2, '0'), fmm = fm[2].padStart(2, '0'); if (fdd !== d.vn.slice(0, 2) || fmm !== d.vn.slice(3, 5)) dateWarn = `${fdd}.${fmm}`; }
+          _parsed.push({ file: f.name, sheet: sn, ...p, date: d, match, matchBy, dup, dupInBatch, dateWarn, pick: !dup && !dupInBatch && !!d });
         }
       } catch (e) { _parsed.push({ file: f.name, error: String(e.message || e), pick: false }); }
     }
@@ -338,7 +342,7 @@
             <td class="num"><input type="checkbox" ${p.pick ? 'checked' : ''} ${canPick ? '' : 'disabled'} onchange="window._phieuToggle(${i}, this.checked)"></td>
             <td><b>${esc(p.custName)}</b></td>
             <td style="max-width:200px;white-space:normal">${addrCell}</td>
-            <td>${p.date ? p.date.vn : '—'}${p.shift ? `<div><span style="font-size:9px;font-weight:700;padding:1px 5px;border-radius:3px;background:${/Chi|Tối/.test(p.shift) ? '#FEF3C7;color:#92400E' : '#DBEAFE;color:#1E40AF'}">${p.shift}</span></div>` : ''}</td>
+            <td>${p.date ? p.date.vn : '—'}${p.shift ? `<div><span style="font-size:9px;font-weight:700;padding:1px 5px;border-radius:3px;background:${/Chi|Tối/.test(p.shift) ? '#FEF3C7;color:#92400E' : '#DBEAFE;color:#1E40AF'}">${p.shift}</span></div>` : ''}${p.dateWarn ? `<div title="Ô Ngày trong file khác ngày trên tên file — kiểm tra lại file" style="font-size:9px;font-weight:700;color:#B91C1C;margin-top:2px">⚠ tên file: ${p.dateWarn}</div>` : ''}</td>
             <td class="num">${p.items.length}</td>
             <td class="num"><b>${fmt(p.total)}</b>${p.buyTotal ? `<div style="font-size:10px;color:#15803D">vốn ${fmt(p.buyTotal)} · lãi ${fmt(p.total - p.buyTotal)}</div>` : ''}</td>
             <td>${custCell}</td>
