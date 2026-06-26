@@ -86,9 +86,14 @@
 
     <!-- ===== TAB CHẤM CÔNG & LƯƠNG ===== -->
     <div id="panePay" style="display:none">
-      <div style="display:flex;align-items:center;gap:10px;margin-bottom:12px">
+      <div style="display:flex;align-items:center;gap:10px;margin-bottom:12px;flex-wrap:wrap">
         <label style="font-size:13px;color:var(--muted)">Tháng:</label>
         <input type="month" id="payMonth" value="2026-05" onchange="window.setPayMonth(this.value)" style="padding:7px 10px;border:1px solid var(--line);border-radius:7px">
+        <div style="flex:1"></div>
+        <button class="btn btn-ghost" onclick="window.openLatePolicySettings && window.openLatePolicySettings()" title="Cấu hình mức phạt đi muộn (admin)">⚙ Khung phạt muộn</button>
+        <button class="btn btn-primary" onclick="window.openUploadTimesheet && window.openUploadTimesheet()" title="Up file Excel từ máy chấm công → tự cập nhật công + tính lương">📥 Upload Excel chấm công</button>
+        <button class="btn btn-navy" onclick="window.submitAllDrafts && window.submitAllDrafts(document.getElementById('payMonth').value)" title="HR gửi tất cả phiếu draft + tự lập phiếu cho NV chưa có">📤 Gửi tất cả CFO duyệt</button>
+        <button class="btn btn-ghost" onclick="window.openPayslipBatchReview && window.openPayslipBatchReview(document.getElementById('payMonth').value)" title="CFO xem hàng loạt + duyệt nhanh">📊 Bảng dự kiến CFO duyệt</button>
       </div>
       <div class="rpt-tabs" id="payTabs"></div>
       <div id="payView"></div>
