@@ -10,14 +10,13 @@
     const x = (d || '').toString().trim().toLowerCase().replace(/[-_]+/g, ' ').replace(/\s+/g, ' ');
     if (!x) return 'Khác';
     const M = {
-      'ban gd': 'Ban GĐ', 'ban giam doc': 'Ban GĐ', 'ban giám đốc': 'Ban GĐ', 'bgd': 'Ban GĐ', 'giam doc': 'Ban GĐ',
+      'ban gd': 'Ban giám đốc', 'ban giam doc': 'Ban giám đốc', 'ban giám đốc': 'Ban giám đốc', 'bgd': 'Ban giám đốc', 'giam doc': 'Ban giám đốc', 'giám đốc': 'Ban giám đốc', 'ceo': 'Ban giám đốc',
       'sale': 'Sale', 'sales': 'Sale', 'kinh doanh': 'Sale', 'cskh': 'Sale', 'cham soc khach hang': 'Sale', 'chăm sóc khách hàng': 'Sale',
-      'ke toan': 'Kế toán', 'kế toán': 'Kế toán', 'ketoan': 'Kế toán', 'ke-toan': 'Kế toán',
-      'kho': 'Kho', 'kho van': 'Kho',
+      'ke toan': 'Kế toán', 'kế toán': 'Kế toán', 'ketoan': 'Kế toán',
+      'kho': 'Kho & Ship', 'kho van': 'Kho & Ship', 'kho ship': 'Kho & Ship', 'kho & ship': 'Kho & Ship', 'van hanh': 'Kho & Ship', 'vận hành': 'Kho & Ship', 'giao hang': 'Kho & Ship', 'giao hàng': 'Kho & Ship', 'shipper': 'Kho & Ship', 'ship': 'Kho & Ship',
+      'thu mua': 'Thu Mua', 'mua hang': 'Thu Mua', 'mua hàng': 'Thu Mua', 'procurement': 'Thu Mua',
       'hcns': 'Nhân sự', 'nhan su': 'Nhân sự', 'nhân sự': 'Nhân sự', 'tuyen dung': 'Nhân sự', 'tuyển dụng': 'Nhân sự', 'hanh chinh': 'Nhân sự', 'hr': 'Nhân sự',
       'mkt': 'Marketing', 'marketing': 'Marketing', 'digital marketing': 'Marketing', 'truyen thong': 'Marketing',
-      'van hanh': 'Vận hành', 'vận hành': 'Vận hành', 'van phong': 'Văn phòng', 'văn phòng': 'Văn phòng',
-      'giao hang': 'Giao hàng', 'giao hàng': 'Giao hàng', 'shipper': 'Giao hàng',
     };
     return M[x] || ((d || '').toString().trim());
   }
@@ -271,7 +270,7 @@
         <div><label>Họ tên *</label><input id="sName" value="${s.name}"></div>
         <div><label>Phòng ban</label>
           <select id="sDept">
-            ${['Ban giám đốc','Sales','CSKH','Kế toán','Vận hành'].map(d=>`<option ${s.dept===d?'selected':''}>${d}</option>`).join('')}
+            ${['Ban giám đốc','Kế toán','Marketing','Kho & Ship','Nhân sự','Sale','Thu Mua'].map(d=>`<option ${s.dept===d?'selected':''}>${d}</option>`).join('')}
           </select></div>
       </div>
       <div class="form-row">
@@ -413,8 +412,8 @@
       <div class="form-row">
         <div><label>Phòng ban</label>
           <select id="nDept">
-            <option>Sales</option><option>CSKH</option>
-            <option>Kế toán</option><option>Vận hành</option>
+            <option>Ban giám đốc</option><option>Kế toán</option><option>Marketing</option>
+            <option>Kho &amp; Ship</option><option>Nhân sự</option><option>Sale</option><option>Thu Mua</option>
           </select></div>
         <div><label>Vị trí</label><input id="nRole" placeholder="VD: Nhân viên sales"></div>
       </div>
@@ -595,7 +594,7 @@
       [''],
       ['1. Cột "Mã NV": Để trống → app tự sinh (NV001, NV002...). Nếu nhập, phải duy nhất.'],
       ['2. Cột "Họ tên *" và "SĐT *": BẮT BUỘC. Thiếu sẽ bị bỏ qua.'],
-      ['3. Cột "Phòng ban": Ban giám đốc / Sales / CSKH / Kế toán / Vận hành.'],
+      ['3. Cột "Phòng ban": Ban giám đốc / Kế toán / Marketing / Kho & Ship / Nhân sự / Sale / Thu Mua.'],
       ['4. Cột "Lương cơ bản": Số nguyên VNĐ (vd: 10000000 = 10 triệu).'],
       ['5. Cột "Vào làm": Định dạng dd/mm/yyyy (vd: 01/06/2026).'],
       ['6. Cột "Quyền": Danh sách quyền cách nhau dấu chấm phẩy ;'],

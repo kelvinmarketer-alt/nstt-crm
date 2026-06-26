@@ -55,8 +55,10 @@
       return ['dashboard.view', 'customers.view', 'staff.view', 'staff.edit', 'payroll.viewSelf', 'payroll.viewAll', 'payroll.edit', 'payroll.upload', 'payroll.calc', 'payroll.submit', 'reports.view'];
     if (has('marketing', 'mkt', 'digital', 'ads', 'content', 'truyền thông'))
       return ['dashboard.view', 'marketing.send', 'adspend.view', 'adspend.edit', 'customers.view', 'products.view', 'reports.view', 'reports.sales', 'payroll.viewSelf'];
-    if (has('kho'))
-      return ['dashboard.view', 'inventory.view', 'inventory.adjust', 'suppliers.view', 'suppliers.edit', 'purchases.view', 'purchases.create', 'returns.view', 'returns.process', 'products.view', 'orders.view', 'payroll.viewSelf'];
+    if (has('thu mua', 'mua hàng', 'procurement'))
+      return ['dashboard.view', 'suppliers.view', 'suppliers.edit', 'purchases.view', 'purchases.create', 'inventory.view', 'products.view', 'reports.view', 'payroll.viewSelf'];
+    if (has('kho', 'ship'))   /* Kho & Ship — gộp kho + giao hàng */
+      return ['dashboard.view', 'inventory.view', 'inventory.adjust', 'suppliers.view', 'suppliers.edit', 'purchases.view', 'purchases.create', 'returns.view', 'returns.process', 'products.view', 'orders.view', 'shippers.view', 'shippers.edit', 'payroll.viewSelf'];
     if (has('shipper', 'giao hàng', 'tài xế'))
       return ['dashboard.view', 'orders.view', 'shippers.view', 'payroll.viewSelf'];
     if (has('sale', 'kinh doanh', 'cskh', 'bán hàng', 'chăm sóc'))
