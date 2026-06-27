@@ -48,6 +48,20 @@
       .replace(/[^a-z0-9 ]/g, ' ').replace(/\s+/g, ' ').trim();
   }
 
+  /* Cập nhật 1 prefs object từ 1 đơn (KHÔNG ghi) — dùng chung cho recordOrder + batch sync */
+  function _applyOrder(p, items) {
+    p.aliases = p.aliases || {}; p.defaultQty = p.defaultQty || {}; p.favorites = p.favorites || []; p.history = p.history || [];
+    p.lastOrderItems = items.map(it => ({ id: it.id, name: it.name, qty: it.qty, price: it.price, unit: it.unit }));
+    p.history.unshift({ date: new Date().toISOString().slice(0, 10), items: items.map(it => ({ id: it.id, qty: it.qty })) });
+    if (p.history.length > 20) p.history.length = 20;
+    const count = {};
+    p.history.forEach(h => h.items.forEach(it => { count[it.id] = (count[it.id] || 0) + 1; }));
+    p.favorites = Object.entries(count).sort((a, b) => b[1] - a[1]).slice(0, 8).map(x => x[0]);
+    const qtyAcc = {};
+    p.history.forEach(h => h.items.forEach(it => { qtyAcc[it.id] = qtyAcc[it.id] || { sum: 0, n: 0 }; qtyAcc[it.id].sum += it.qty; qtyAcc[it.id].n++; }));
+    Object.keys(qtyAcc).forEach(pid => { p.defaultQty[pid] = Math.round(qtyAcc[pid].sum / qtyAcc[pid].n * 10) / 10; });
+  }
+
   const CustPrefs = {
 
     get(custId) {
@@ -77,33 +91,11 @@
       this.save(custId, p);
     },
 
-    /* Gọi mỗi khi 1 đơn được tạo / lưu — update favorites + history + lastOrderItems */
+    /* Gọi mỗi khi 1 đơn được tạo / lưu — update favorites + history + lastOrderItems (ghi ngay 1 KH) */
     recordOrder(custId, items) {
       if (!custId || !items || !items.length) return;
       const p = this.get(custId);
-      /* lastOrderItems */
-      p.lastOrderItems = items.map(it => ({
-        id: it.id, name: it.name, qty: it.qty, price: it.price, unit: it.unit
-      }));
-      /* history (giữ 20 đơn gần nhất) */
-      p.history.unshift({
-        date: new Date().toISOString().slice(0,10),
-        items: items.map(it => ({ id: it.id, qty: it.qty })),
-      });
-      if (p.history.length > 20) p.history.length = 20;
-      /* favorites — đếm tần suất mỗi SP trong history → top 8 */
-      const count = {};
-      p.history.forEach(h => h.items.forEach(it => { count[it.id] = (count[it.id]||0) + 1; }));
-      p.favorites = Object.entries(count).sort((a,b) => b[1]-a[1]).slice(0, 8).map(x => x[0]);
-      /* defaultQty — trung bình SL các lần đặt SP này */
-      const qtyAcc = {};
-      p.history.forEach(h => h.items.forEach(it => {
-        qtyAcc[it.id] = qtyAcc[it.id] || { sum:0, n:0 };
-        qtyAcc[it.id].sum += it.qty; qtyAcc[it.id].n++;
-      }));
-      Object.keys(qtyAcc).forEach(pid => {
-        p.defaultQty[pid] = Math.round(qtyAcc[pid].sum / qtyAcc[pid].n * 10) / 10;
-      });
+      _applyOrder(p, items);
       this.save(custId, p);
     },
 
@@ -187,22 +179,28 @@
 
   window.CustPrefs = CustPrefs;
 
-  /* Subscribe orders → khi 1 đơn mới được lưu (status confirmed/delivered/...)
-     thì tự gọi recordOrder. Tránh duplicate bằng cờ _prefRecorded */
+  /* Subscribe orders → ghi thói quen mua. GỘP + DEBOUNCE + dedupe theo mã đơn.
+     Trước đây ghi TỪNG đơn mỗi lần orders sync (cờ _prefRecorded chỉ ở RAM, mất sau mỗi
+     lần kéo cloud) → 45 đơn = 45 lần setKv('cust_prefs') dồn dập → trên 4G/5G fetch "Load failed"
+     → spam toast. Nay: gom mọi đơn MỚI vào 1 lần ghi, hoãn 1.5s, đơn đã ghi không ghi lại. */
   if (window.STORE) {
-    window.STORE.subscribe('orders', (orders) => {
-      let changed = false;
-      (orders || []).forEach(o => {
-        if (!o._prefRecorded && o.custId && o.items && o.items.length) {
-          CustPrefs.recordOrder(o.custId, o.items);
-          o._prefRecorded = true;
-          changed = true;
-        }
+    const _recorded = new Set();   /* mã đơn đã ghi trong phiên — không ghi lại khi re-sync */
+    let _t = null, _snap = null;
+    function _flush() {
+      const orders = _snap || [];
+      const all = getAll(); let changed = false;
+      orders.forEach(o => {
+        const oid = o.code || o.id; const cid = o.custId || o.cust;
+        if (!oid || _recorded.has(oid) || !cid || !o.items || !o.items.length) return;
+        _recorded.add(oid);
+        const p = all[cid] || (all[cid] = { aliases: {}, defaultQty: {}, favorites: [], history: [], lastOrderItems: [] });
+        _applyOrder(p, o.items);
+        changed = true;
       });
-      if (changed) {
-        try { window.STORE._raw && window.STORE._raw('orders', orders); }
-        catch(e) { /* không set lại để tránh loop */ }
-      }
+      if (changed) setAll(all);   /* CHỈ 1 lần ghi cho cả lô */
+    }
+    window.STORE.subscribe('orders', (orders) => {
+      _snap = orders; clearTimeout(_t); _t = setTimeout(_flush, 1500);
     });
   }
 

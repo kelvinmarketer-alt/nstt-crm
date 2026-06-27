@@ -477,7 +477,10 @@
       });
       if (error) {
         console.warn('[SB setKv]', key, error.message);
-        window.toast?.('⚠ Sync ' + key + ' lỗi: ' + error.message, 'warn');
+        /* CHỐNG SPAM: tối đa 1 toast / key / 30s (tránh hàng chục toast khi mạng chập chờn) */
+        const W = (window.__kvWarnAt = window.__kvWarnAt || {});
+        const now = Date.now();
+        if (!W[key] || now - W[key] > 30000) { W[key] = now; window.toast?.('⚠ Chưa đồng bộ được ' + key + ' — sẽ tự thử lại', 'warn'); }
       }
       return !error;
     },
