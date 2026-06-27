@@ -311,7 +311,7 @@
         : '';
       const phoneClean = (c.phone || '').replace(/\s/g,'');
       return `<tr data-id="${c.id}">
-        <td onclick="event.stopPropagation()"><div class="checkbox" onclick="this.classList.toggle('on')"></div></td>
+        <td class="hide-xs" onclick="event.stopPropagation()"><div class="checkbox" onclick="this.classList.toggle('on')"></div></td>
         <td data-field="name" title="Click để sửa tên KH">
           <div class="cust-cell">
             <div class="cust-ava" style="background:${col}">${ava}</div>
@@ -326,9 +326,9 @@
         <td class="hide-md" data-field="staffOwner"><span class="staff-pill">${c.staffOwner}</span></td>
         <td class="num">${c.orders}</td>
         <td class="num">${window.fmt(c.revenue)}</td>
-        <td class="num debt-cell ${debtCls}">${debtVal}${overdueBadge}</td>
+        <td class="num debt-cell hide-xs ${debtCls}">${debtVal}${overdueBadge}</td>
         <td class="hide-md" style="font-size:12px;color:var(--muted)">${c.lastContact}</td>
-        <td onclick="event.stopPropagation()">
+        <td class="hide-xs" onclick="event.stopPropagation()">
           <div class="row-actions">
             <button class="ra-zalo" title="Nhắn Zalo: ${c.phone}" data-act="zalo" data-id="${c.id}"><span style="font-size:13px;font-weight:700">Z</span></button>
             <button class="ra-call" title="Gọi: ${c.phone}" data-act="call" data-id="${c.id}">📞</button>
