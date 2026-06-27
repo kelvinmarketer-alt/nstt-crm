@@ -611,11 +611,17 @@ select.status-select[title]:hover::before {
   .hide-sm{display:none}
   .quick-chips{overflow-x:auto;flex-wrap:nowrap;padding-bottom:4px;-webkit-overflow-scrolling:touch}
   .quick-chips .chip{flex-shrink:0;white-space:nowrap}
-  .head-actions .btn{flex:1 1 100%}
+  /* Nút thao tác: 2 nút/hàng cho GỌN (nút chính giữ full-width nổi bật) */
+  .head-actions .btn{flex:1 1 calc(50% - 4px);min-width:128px}
+  .head-actions .btn-primary,.head-actions .btn-success,.head-actions .btn-navy{flex:1 1 100%}
 }
 
 @media (max-width:480px){
-  .kpis{grid-template-columns:1fr}
+  /* KPI 2 thẻ/hàng (thay vì 1) — gọn, đỡ phải cuộn dài */
+  .kpis{grid-template-columns:repeat(2,1fr);gap:8px}
+  .kpi{padding:9px 11px}
+  .kpi-value{font-size:17px}
+  .kpi-label{font-size:10.5px}
   .pager button{min-width:28px;height:28px;font-size:11px;padding:0 6px}
 }
 
