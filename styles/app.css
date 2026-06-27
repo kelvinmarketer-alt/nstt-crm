@@ -728,9 +728,13 @@ td.num, td.hide-md {
   /* Bảng đặt trong .chart-card (vd Shipper) — cho cuộn ngang TRONG khung thẻ,
      không để bảng rộng đẩy lệch cả trang. (.chart-card vốn là div trần.) */
   .chart-card { overflow-x: auto; -webkit-overflow-scrolling: touch; }
-  /* GỐC RẾ: mọi bảng (trừ bảng sticky cn-tbl/pay-table/att-table đã có wrapper riêng)
-     tự cuộn ngang trong khung → bảng rộng KHÔNG đẩy lệch cả trang, vẫn xem đủ cột. */
-  .main table:not(.cn-tbl):not(.pay-table):not(.att-table),
+  /* Bảng trong .main: GIỮ width:100% (table chuẩn) → tự khít màn, cột co lại, KHÔNG cuộn ngang/kéo trắng.
+     (Bảng quá rộng chưa tinh giản cột sẽ cuộn trong .table-wrap/.chart-card đã có overflow riêng.)
+     KHÔNG ép display:block cho bảng .main — vì display:block làm bảng dài theo nội dung → cuộn + trắng thừa. */
+  .table-card table { table-layout: fixed; }
+  .table-card td, .table-card th { overflow: hidden; text-overflow: ellipsis; }
+  .table-card td .name-clamp, .table-card td .cust-info { min-width: 0; }
+  /* Bảng trong DRAWER/MODAL (vd sửa mặt hàng đơn) — cho cuộn trong khung để không lệch */
   .drawer table:not(.cn-tbl):not(.pay-table):not(.att-table),
   .modal table:not(.cn-tbl):not(.pay-table):not(.att-table) {
     display: block; max-width: 100%; overflow-x: auto; -webkit-overflow-scrolling: touch;
