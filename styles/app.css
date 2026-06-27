@@ -707,10 +707,27 @@ td.num, td.hide-md {
 /* Heatmap 31 ngày cho cuộn ngang */
 #ovHeatmap { overflow-x: auto; -webkit-overflow-scrolling: touch; }
 
+/* Cho item trong lưới CO LẠI được — tránh "grid blowout": cột 1fr nhưng chữ nowrap
+   bên trong dài hơn → cột phình → cả lưới rộng hơn màn → đẩy lệch trang (cụt nội dung). */
+.kpis > *, [id$="Kpis"] > *, #funnel > *, .aging > * { min-width: 0; }
+
 @media (max-width: 980px) {
+  /* CHẶN TRÀN NGANG TOÀN TRANG (mobile): không 1 element nào đẩy lệch cả trang.
+     Bảng dữ liệu vẫn cuộn ngang bình thường vì có wrapper overflow:auto riêng. */
+  .main { overflow-x: hidden; }
+  /* Bảng đặt trong .chart-card (vd Shipper) — cho cuộn ngang TRONG khung thẻ,
+     không để bảng rộng đẩy lệch cả trang. (.chart-card vốn là div trần.) */
+  .chart-card { overflow-x: auto; -webkit-overflow-scrolling: touch; }
+  /* GỐC RẾ: mọi bảng (trừ bảng sticky cn-tbl/pay-table/att-table đã có wrapper riêng)
+     tự cuộn ngang trong khung → bảng rộng KHÔNG đẩy lệch cả trang, vẫn xem đủ cột. */
+  .main table:not(.cn-tbl):not(.pay-table):not(.att-table) {
+    display: block; max-width: 100%; overflow-x: auto; -webkit-overflow-scrolling: touch;
+  }
   #supKpis, #purKpis, #ldKpis, #qtKpis, #funnel, .aging {
     grid-template-columns: repeat(auto-fit, minmax(120px, 1fr)) !important;
   }
+  /* Mọi lưới KPI dạng id…Kpis ép cứng cột inline → bắt co theo màn */
+  [id$="Kpis"] { grid-template-columns: repeat(auto-fit, minmax(130px, 1fr)) !important; }
   /* Heatmap: ô tối thiểu 14px (không dí 31 cột vào 360px) */
   #ovHeatmap { grid-template-columns: repeat(31, minmax(14px, 1fr)) !important; }
 }
