@@ -692,3 +692,25 @@ td.num, td.hide-md {
   .drawer-stats .s .val { font-size: 14px }
   .drawer-stats .s .lab, .drawer-stats .s .sub { font-size: 10px }
 }
+
+/* ============================================================
+   MOBILE FIX PACK — lưới KPI/funnel/aging nhiều cột + tab-bar + heatmap
+   (thủ phạm chính gây "lộn xộn" trên màn hẹp: các grid repeat(N,1fr) cố định)
+   ============================================================ */
+/* Mọi lưới KPI/funnel/aging → auto-fit, không ép N cột trên mobile */
+#supKpis, #purKpis, #ldKpis, #qtKpis, #funnel, .aging, #invKpis, #roKpis {
+  grid-template-columns: repeat(auto-fit, minmax(140px, 1fr)) !important;
+}
+/* Tab-bar phụ (.tabs2) cuộn ngang thay vì tràn */
+.tabs2 { overflow-x: auto; -webkit-overflow-scrolling: touch; }
+.tabs2 .t2 { flex-shrink: 0; white-space: nowrap; }
+/* Heatmap 31 ngày cho cuộn ngang */
+#ovHeatmap { overflow-x: auto; -webkit-overflow-scrolling: touch; }
+
+@media (max-width: 980px) {
+  #supKpis, #purKpis, #ldKpis, #qtKpis, #funnel, .aging {
+    grid-template-columns: repeat(auto-fit, minmax(120px, 1fr)) !important;
+  }
+  /* Heatmap: ô tối thiểu 14px (không dí 31 cột vào 360px) */
+  #ovHeatmap { grid-template-columns: repeat(31, minmax(14px, 1fr)) !important; }
+}
