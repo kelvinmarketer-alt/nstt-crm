@@ -26,13 +26,19 @@
   const faviconDataUrl = 'data:image/svg+xml;utf8,' + encodeURIComponent(FAVICON_SVG);
   /* Xóa các favicon mặc định cũ (nếu có) để tránh trùng */
   document.querySelectorAll('link[rel="icon"], link[rel="shortcut icon"], link[rel="apple-touch-icon"]').forEach(el => el.remove());
-  ['icon', 'shortcut icon', 'apple-touch-icon'].forEach(rel => {
+  /* Favicon tab trình duyệt = SVG (gọn, nét ở size nhỏ) */
+  ['icon', 'shortcut icon'].forEach(rel => {
     const l = document.createElement('link');
     l.rel = rel;
     l.type = 'image/svg+xml';
     l.href = faviconDataUrl;
     document.head.appendChild(l);
   });
+  /* apple-touch-icon (icon màn hình chính iOS) = LOGO THẬT (PNG) — iOS KHÔNG nhận SVG → trước đây hiện icon đơn giản */
+  const _appleIcon = document.createElement('link');
+  _appleIcon.rel = 'apple-touch-icon';
+  _appleIcon.href = '/assets/apple-touch-icon.png';
+  document.head.appendChild(_appleIcon);
   /* Phơi ra global để các popup PDF (delivery-note, price-catalogue, pdf-templates, accounting print)
      có thể tái sử dụng cùng 1 favicon */
   window.NSTT_FAVICON_DATAURL = faviconDataUrl;
