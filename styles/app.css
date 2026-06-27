@@ -726,7 +726,9 @@ td.num, td.hide-md {
   .chart-card { overflow-x: auto; -webkit-overflow-scrolling: touch; }
   /* GỐC RẾ: mọi bảng (trừ bảng sticky cn-tbl/pay-table/att-table đã có wrapper riêng)
      tự cuộn ngang trong khung → bảng rộng KHÔNG đẩy lệch cả trang, vẫn xem đủ cột. */
-  .main table:not(.cn-tbl):not(.pay-table):not(.att-table) {
+  .main table:not(.cn-tbl):not(.pay-table):not(.att-table),
+  .drawer table:not(.cn-tbl):not(.pay-table):not(.att-table),
+  .modal table:not(.cn-tbl):not(.pay-table):not(.att-table) {
     display: block; max-width: 100%; overflow-x: auto; -webkit-overflow-scrolling: touch;
   }
   #supKpis, #purKpis, #ldKpis, #qtKpis, #funnel, .aging {

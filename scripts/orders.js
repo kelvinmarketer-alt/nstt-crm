@@ -185,7 +185,7 @@
         const src = isWeb ? { icon: '🛒', label: 'Đơn web', color: '#7C3AED' }
                           : { icon: '✍️', label: 'Tự tạo', color: '#0EA5E9' };
         return `<tr data-code="${o.code}">
-          <td onclick="event.stopPropagation()"><div class="checkbox" onclick="this.classList.toggle('on')"></div></td>
+          <td class="ocol-x" onclick="event.stopPropagation()"><div class="checkbox" onclick="this.classList.toggle('on')"></div></td>
           <td><b style="color:var(--navy)">${o.code || '—'}</b>
               <div style="margin-top:2px">
                 <span class="tag" style="background:${src.color}1a;color:${src.color};font-weight:600;font-size:10.5px">${src.icon} ${src.label}</span>
@@ -208,14 +208,14 @@
             <div><span data-field="driverName" title="Click để đổi shipper">${o.driverName || '—'}</span>${o.external?' <span class="alert-badge warn" style="font-size:9px">ĐT ngoài</span>':''}</div>
             <div style="color:var(--muted);font-size:11px">${o.vehicle || ''}${o.external && o.partnerCost?' · '+window.fmtShort(o.partnerCost)+'đ':''}</div>
           </td>
-          <td onclick="event.stopPropagation()">
+          <td class="ocol-x" onclick="event.stopPropagation()">
             <select class="status-select status-select-${statusKey}" data-code="${o.code}" data-act="status"
               title="Đổi trạng thái đơn"
               style="border:1px solid var(--line);border-radius:7px;padding:5px 8px;font-size:11.5px;font-weight:700;cursor:pointer;background:${st.color}15;color:${st.color};min-width:130px">
               ${ALL_STATUSES.map(k => `<option value="${k}" ${statusKey===k?'selected':''}>${STATUS[k].icon} ${STATUS[k].label}</option>`).join('')}
             </select>
           </td>
-          <td onclick="event.stopPropagation()">
+          <td class="ocol-x" onclick="event.stopPropagation()">
             <div class="row-actions">
               <button title="In phiếu giao hàng / xác nhận / xuất kho" data-act="print" data-code="${o.code}">🖨</button>
               ${(o.status === 'delivered' || o.status === 'settled') ? `<button title="🧾 Phiếu xuất kho" data-act="deliveryNote" data-code="${o.code}" style="color:#C00000">🧾</button>` : ''}

@@ -10,7 +10,28 @@
   /* Status pipeline */
   .pipeline{display:grid;grid-template-columns:repeat(7,1fr);gap:8px;margin-bottom:14px}
   @media (max-width:980px){.pipeline{grid-template-columns:repeat(4,1fr)}}
-  @media (max-width:560px){.pipeline{grid-template-columns:repeat(2,1fr)}}
+  /* MOBILE: thu nhỏ thẻ trạng thái cho gọn (4 thẻ/hàng, ẩn dòng phụ) */
+  @media (max-width:560px){
+    .pipeline{grid-template-columns:repeat(4,1fr);gap:6px;margin-bottom:10px}
+    .pipe-card{padding:6px 6px;border-radius:7px;border-left-width:3px}
+    .pipe-card .lab{font-size:9px;font-weight:700;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+    .pipe-card .val{font-size:15px;font-weight:800;margin:1px 0}
+    .pipe-card .sub{display:none}
+    /* Bảng đơn TÓM TẮT: chỉ mã đơn · tên KH · tiền (ẩn ô chọn / trạng thái / hành động) */
+    .ocol-x{display:none!important}
+  }
+  /* Gộp nút phụ (Xuất Excel / In phiếu / Nhập phiếu) vào dropdown trên mobile */
+  .acts-flat{display:contents}
+  .acts-dd{position:relative;display:none}
+  .acts-dd>summary{list-style:none;cursor:pointer}
+  .acts-dd>summary::-webkit-details-marker{display:none}
+  .acts-dd-menu{position:absolute;right:0;top:calc(100% + 4px);z-index:30;background:#fff;border:1px solid var(--line);border-radius:10px;box-shadow:0 8px 24px rgba(0,0,0,.15);padding:6px;min-width:210px;display:flex;flex-direction:column;gap:4px}
+  .acts-dd-menu .btn{width:100%;justify-content:flex-start}
+  @media (max-width:980px){
+    .acts-flat{display:none}
+    .acts-dd{display:block;flex:1 1 calc(50% - 4px)}
+    .acts-dd>summary{width:100%}
+  }
   .pipe-card{background:#fff;border:1px solid var(--line);border-radius:9px;padding:10px 12px;cursor:pointer;border-left:4px solid transparent;transition:all 0.15s}
   .pipe-card:hover{transform:translateY(-1px);box-shadow:var(--shadow-sm)}
   .pipe-card.active{box-shadow:0 0 0 2px var(--navy)}
@@ -81,10 +102,22 @@
       </div>
       <div class="head-actions">
         <button class="btn btn-ghost" id="btnWebOrders" onclick="window.location.href='web-orders.html'" style="border-color:#E8A33D;color:#B45309;font-weight:700;display:inline-flex;align-items:center;gap:7px">🛒 Đơn web chờ duyệt<span id="webPendBadge" style="display:none;min-width:20px;height:20px;padding:0 6px;border-radius:10px;background:#DC2626;color:#fff;font-size:12px;font-weight:700;line-height:20px;text-align:center"></span></button>
-        <button class="btn btn-ghost" onclick="window.exportOrdersCsv()">⬇ Xuất Excel</button>
-        <button class="btn btn-ghost" onclick="window.printFilteredOrders()">🖨 In phiếu hàng loạt</button>
         <button class="btn btn-ghost" onclick="window.aiCreateOrder()">📷 Tạo đơn từ ảnh</button>
-        <button class="btn btn-ghost" onclick="window.openPhieuImport()" title="Nhập file phiếu kế toán (Excel 6/6) → tạo đơn + cập nhật công nợ">📥 Nhập phiếu kế toán</button>
+        <!-- Desktop: 3 nút phẳng -->
+        <span class="acts-flat">
+          <button class="btn btn-ghost" onclick="window.exportOrdersCsv()">⬇ Xuất Excel</button>
+          <button class="btn btn-ghost" onclick="window.printFilteredOrders()">🖨 In phiếu hàng loạt</button>
+          <button class="btn btn-ghost" onclick="window.openPhieuImport()" title="Nhập file phiếu kế toán (Excel 6/6) → tạo đơn + cập nhật công nợ">📥 Nhập phiếu kế toán</button>
+        </span>
+        <!-- Mobile: gộp 3 nút trên vào dropdown -->
+        <details class="acts-dd">
+          <summary class="btn btn-ghost">⋯ Khác ▾</summary>
+          <div class="acts-dd-menu">
+            <button class="btn btn-ghost" onclick="this.closest('details').open=false;window.exportOrdersCsv()">⬇ Xuất Excel</button>
+            <button class="btn btn-ghost" onclick="this.closest('details').open=false;window.printFilteredOrders()">🖨 In phiếu hàng loạt</button>
+            <button class="btn btn-ghost" onclick="this.closest('details').open=false;window.openPhieuImport()">📥 Nhập phiếu kế toán</button>
+          </div>
+        </details>
         <button class="btn btn-primary" onclick="window.openCreateOrder()">+ Tạo đơn mới</button>
       </div>
     </div>
@@ -138,7 +171,7 @@
         <table>
           <thead>
             <tr>
-              <th style="width:30px"></th>
+              <th style="width:30px" class="ocol-x"></th>
               <th>Mã đơn / Nguồn</th>
               <th class="hide-sm">Thời gian</th>
               <th>Khách hàng</th>
@@ -146,8 +179,8 @@
               <th class="hide-md">Hàng</th>
               <th class="num">Tiền hàng (₫)</th>
               <th class="hide-md">Shipper / Xe</th>
-              <th>Trạng thái</th>
-              <th class="num">Hành động</th>
+              <th class="ocol-x">Trạng thái</th>
+              <th class="num ocol-x">Hành động</th>
             </tr>
           </thead>
           <tbody id="tbody"></tbody>
