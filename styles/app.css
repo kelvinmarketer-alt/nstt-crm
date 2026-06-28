@@ -721,6 +721,16 @@ td.num, td.hide-md {
    để bảng vừa khít màn, KHÔNG phải kéo ngang. (Web vẫn hiện đầy đủ.) */
 @media (max-width: 560px) { .hide-xs { display: none !important; } }
 
+/* === FIX cuộn ngang ở DANH SÁCH DẠNG THẺ (card) trên điện thoại ===
+   scripts/ux-improvements.js ép MỌI bảng trong .table-wrap = min-width:600px + overflow-x:auto
+   (chiến lược bảng-cuộn-ngang CŨ). Với danh sách đã chuyển sang THẺ (.table-card) thì điều này
+   làm thẻ rộng 600px → phải vuốt ngang mới thấy tiền/công nợ. Vô hiệu hoá cho .table-card. */
+@media (max-width: 720px) {
+  .table-card .table-wrap { overflow-x: hidden !important; }
+  .table-card .table-wrap table,
+  .table-card table.t-responsive { min-width: 0 !important; width: 100% !important; }
+}
+
 @media (max-width: 980px) {
   /* CHẶN TRÀN NGANG TOÀN TRANG (mobile): không 1 element nào đẩy lệch cả trang.
      Bảng dữ liệu vẫn cuộn ngang bình thường vì có wrapper overflow:auto riêng. */
