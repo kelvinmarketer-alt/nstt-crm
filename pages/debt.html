@@ -41,6 +41,21 @@
     .table-card tbody td[data-field="overdue"]::before{content:"⏰ Quá hạn: "}
     .table-card tbody td[data-field="staffOwner"]{display:block!important;margin-top:5px;white-space:normal!important;overflow:visible!important}
     .table-card tbody td[data-field="staffOwner"]::before{content:"👤 NV: "}
+
+    /* AGING KPI: 2 ô / hàng, nén chữ cho khỏi tràn */
+    .aging{grid-template-columns:repeat(2,1fr)!important;gap:8px}
+    .aging-card{padding:10px 11px}
+    .aging-card .lab{font-size:10px;letter-spacing:0.2px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+    .aging-card .val{font-size:18px}
+    .aging-card .sub{font-size:10px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+
+    /* Ẩn nút Xuất Excel trên ĐT */
+    .head-actions .act-export{display:none!important}
+
+    /* 2 nút còn lại CÙNG 1 HÀNG, mỗi nút 50%, full-width */
+    .head-actions{display:flex;flex-wrap:nowrap;gap:8px;width:100%}
+    .head-actions .act-remind,
+    .head-actions .act-receipt{flex:1 1 50%;min-width:0;justify-content:center;text-align:center;white-space:nowrap}
   }
 </style>
 </head>
@@ -63,9 +78,9 @@
         <div class="sub" id="debtSubHead">Theo dõi công nợ phải thu</div>
       </div>
       <div class="head-actions">
-        <button class="btn btn-ghost" onclick="window.openBulkReminder()">📧 Nhắc nợ hàng loạt</button>
-        <button class="btn btn-ghost" onclick="window.exportDebtCSV()">⬇ Xuất Excel</button>
-        <button class="btn btn-primary" onclick="window.openSelectDebtor()">+ Phiếu thu nợ</button>
+        <button class="btn btn-ghost act-remind" onclick="window.openBulkReminder()">📧 Nhắc nợ hàng loạt</button>
+        <button class="btn btn-ghost act-export" onclick="window.exportDebtCSV()">⬇ Xuất Excel</button>
+        <button class="btn btn-primary act-receipt" onclick="window.openSelectDebtor()">+ Phiếu thu nợ</button>
       </div>
     </div>
 

@@ -28,8 +28,7 @@
     /* Gợi ý vuốt ngang để xem hết cột ngày + tổng */
     .cn-swipe-hint{display:block;font-size:11px;color:var(--muted);margin:0 0 6px}
 
-    /* (1) Ẩn dòng TỔNG ở đáy + dòng chú thích dưới bảng + note ước tính — thừa trên ĐT */
-    table.cn-tbl tfoot{display:none}
+    /* (1) GIỮ dòng TỔNG ở đáy bảng; chỉ ẩn dòng chú thích + note ước tính thừa */
     .cn-note{display:none}
     .cn-est-note{display:none}
 
@@ -38,8 +37,8 @@
     .cn-head h1{font-size:18px}
     .cn-head-sub{display:none}
 
-    /* (2) "Nhập hoá đơn ngày" full hàng (ở header), "Xem báo cáo" full hàng (ở thẻ lọc) */
-    .cn-btn-import{width:100%;white-space:nowrap;font-size:13px;padding-left:8px;padding-right:8px}
+    /* (2) Ẩn nút "Nhập hoá đơn ngày (Excel)" trên ĐT (không dùng); "Xem báo cáo" full hàng */
+    .cn-btn-import{display:none!important}
 
     /* Cụm điều khiển trong thẻ lọc: xếp dọc, mỗi nhóm 1 hàng gọn gàng */
     .cn-ctrl{gap:8px;align-items:stretch}

@@ -45,6 +45,21 @@
     .table-card tbody td[data-field="typ"]{display:block!important;margin-top:5px;white-space:normal!important;overflow:visible!important}
     .table-card tbody td[data-field="acct"]{display:block!important;margin-top:5px;white-space:normal!important;overflow:visible!important}
     .table-card tbody td[data-field="acct"]::before{content:"🏦 "}
+
+    /* 1. Ẩn nút Xuất Excel trên ĐT */
+    .acc-actions .acc-export{display:none!important}
+    /* 2. 3 nút còn lại CÙNG 1 HÀNG, chia đều, chữ nowrap */
+    .acc-actions{display:flex;flex-wrap:nowrap;gap:6px;width:100%}
+    .acc-actions>.btn{flex:1 1 33.33%;min-width:0;white-space:nowrap;
+      padding-left:6px;padding-right:6px;font-size:12.5px;text-align:center;justify-content:center}
+    /* 3. 2 ô NGÀY dàn đều 2 cột full-width (slack tránh wrap) */
+    .filter-bar .acc-date{flex:1 1 calc(50% - 10px);min-width:0}
+    /* 4. Thẻ "Tài khoản ngân hàng" (& Quỹ tiền mặt): tiêu đề 1 dòng full-width,
+       các nút (Quản lý TK / Đối soát) xuống hàng dưới chia đều */
+    .acc-card .h{flex-wrap:wrap}
+    .acc-card .h h3{flex:1 1 100%;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+    .acc-card .h .spc{display:none}
+    .acc-card .h>.btn{flex:1 1 calc(50% - 10px);min-width:0;white-space:nowrap;justify-content:center}
   }
 </style>
 </head>
@@ -66,9 +81,9 @@
         <h1>Kế toán</h1>
         <div class="sub">Sổ quỹ tiền mặt + ngân hàng · phiếu thu / chi · tháng 05/2026</div>
       </div>
-      <div class="head-actions">
+      <div class="head-actions acc-actions">
         <button class="btn btn-ghost" onclick="window.openAccountSettings()">⚙ Cài đặt TK</button>
-        <button class="btn btn-ghost" onclick="window.exportCashbookCsv()">⬇ Xuất Excel</button>
+        <button class="btn btn-ghost acc-export" onclick="window.exportCashbookCsv()">⬇ Xuất Excel</button>
         <button class="btn btn-ghost" onclick="window.openModal('+ Phiếu chi',formChi(),{footer:footChi(),width:'520px'})">- Phiếu chi</button>
         <button class="btn btn-primary" onclick="window.openModal('+ Phiếu thu',formThu(),{footer:footThu(),width:'520px'})">+ Phiếu thu</button>
       </div>
@@ -127,8 +142,8 @@
         <option>Vietcombank</option>
         <option>MB Bank</option>
       </select>
-      <input type="date" id="fFrom" style="border:1px solid var(--line);border-radius:7px;padding:8px;font-size:13px">
-      <input type="date" id="fTo" style="border:1px solid var(--line);border-radius:7px;padding:8px;font-size:13px">
+      <input type="date" id="fFrom" class="acc-date" style="border:1px solid var(--line);border-radius:7px;padding:8px;font-size:13px">
+      <input type="date" id="fTo" class="acc-date" style="border:1px solid var(--line);border-radius:7px;padding:8px;font-size:13px">
     </div>
 
     <div class="table-card">

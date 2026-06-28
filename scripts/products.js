@@ -314,7 +314,7 @@
         <div style="display:flex;gap:12px;align-items:center;flex-wrap:wrap">
           <div style="font-size:22px">${tgOn ? '📨' : '🔔'}</div>
           <div style="flex:1;min-width:200px">
-            <div style="font-weight:700;color:${tgOn ? 'var(--ok)' : 'var(--warn)'}">${tgOn ? 'Thông báo giá qua Telegram: ĐÃ KẾT NỐI' : 'Thông báo giá qua Telegram: CHƯA KẾT NỐI'}</div>
+            <div class="tg-title" style="font-weight:700;color:${tgOn ? 'var(--ok)' : 'var(--warn)'}">${tgOn ? 'Thông báo giá qua Telegram: ĐÃ KẾT NỐI' : 'Thông báo giá qua Telegram: CHƯA KẾT NỐI'}</div>
             <div class="hide-xs" style="font-size:12.5px;color:var(--muted);margin-top:2px">${tgOn
               ? 'Bấm "Tạo & gửi" → app dựng <b>file báo giá đẹp (đúng mẫu, kèm ảnh)</b>, tải về máy <b>VÀ tự gửi Telegram</b> dạng file đính kèm.' + (lastSent ? ' · Gần nhất: <b>' + lastSent + '</b>' : ' · Chưa gửi lần nào.')
               : '⚠️ Telegram chưa cấu hình → app vẫn tạo <b>file báo giá (đúng mẫu)</b> để bạn tải về & gửi Zalo. Bấm "Cấu hình Telegram" để điền Bot Token + Chat ID, app sẽ tự gửi lần sau.'}</div>

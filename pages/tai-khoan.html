@@ -16,6 +16,24 @@
   .id-mono{font-family:ui-monospace,monospace;font-size:12px;color:var(--navy)}
   .acc-act button{font-size:12px;padding:5px 9px;border:1px solid var(--line);border-radius:7px;background:#fff;cursor:pointer;margin-right:4px}
   .acc-act button:hover{background:#F0FDF4}
+
+  /* ĐIỆN THOẠI (≤560): tiêu đề 1 dòng, nút thao tác xuống hàng riêng full-width. Desktop giữ nguyên. */
+  @media (max-width:560px){
+    /* 1) HEADER: tiêu đề chiếm trọn 1 hàng, nút xuống hàng dưới */
+    .ak-head{flex-wrap:wrap!important;align-items:flex-start!important;gap:10px!important}
+    .ak-head-title{flex:1 1 100%!important;min-width:0!important}
+    .ak-head-title h1{font-size:18px!important;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+    .ak-head-sub{display:none!important}
+    .ak-head-spacer{display:none!important}
+    /* Mỗi nút full-width; nếu có nhiều nút thì chia đều cùng 1 hàng (~50%/nút) */
+    .ak-head-btn{flex:1 1 0!important;min-width:0!important;white-space:nowrap;text-align:center;padding-left:8px!important;padding-right:8px!important}
+
+    /* 2) Hàng lọc: input + select + chip xuống hàng gọn, không tràn ngang */
+    .ak-filters{flex-wrap:wrap!important}
+    .ak-filters .search-in{flex:1 1 100%!important;min-width:0!important}
+    .ak-filters select{flex:1 1 calc(50% - 6px)!important;min-width:0!important}
+    .ak-filters #akSummary{flex:1 1 100%!important}
+  }
 </style>
 </head>
 <body>
@@ -28,16 +46,16 @@
   </header>
 
   <main class="main">
-    <div style="display:flex;align-items:center;gap:12px;margin-bottom:14px;flex-wrap:wrap">
-      <div>
+    <div class="ak-head" style="display:flex;align-items:center;gap:12px;margin-bottom:14px;flex-wrap:wrap">
+      <div class="ak-head-title">
         <h1 style="margin:0;font-size:22px;color:var(--navy);font-weight:800">🔐 Tài khoản đăng nhập</h1>
-        <div style="font-size:13px;color:var(--muted);margin-top:2px">Quản lý đăng nhập của nhân viên. Mỗi NV login bằng <b>Email / SĐT / Tên đăng nhập</b> + mật khẩu.</div>
+        <div class="ak-head-sub" style="font-size:13px;color:var(--muted);margin-top:2px">Quản lý đăng nhập của nhân viên. Mỗi NV login bằng <b>Email / SĐT / Tên đăng nhập</b> + mật khẩu.</div>
       </div>
-      <div style="flex:1"></div>
-      <button class="btn btn-ghost" onclick="window.akBulkReset()" title="Đặt lại mật khẩu mặc định Tuantu@2026 cho NV đã chọn">↩ Reset MK hàng loạt</button>
+      <div class="ak-head-spacer" style="flex:1"></div>
+      <button class="btn btn-ghost ak-head-btn" onclick="window.akBulkReset()" title="Đặt lại mật khẩu mặc định Tuantu@2026 cho NV đã chọn">↩ Reset MK hàng loạt</button>
     </div>
 
-    <div class="chart-card" style="margin-bottom:12px;display:flex;gap:12px;align-items:center;flex-wrap:wrap">
+    <div class="chart-card ak-filters" style="margin-bottom:12px;display:flex;gap:12px;align-items:center;flex-wrap:wrap">
       <div class="search-in" style="flex:1.5;min-width:220px">
         <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="7"/><path d="m21 21-4.3-4.3"/></svg>
         <input id="akSearch" placeholder="Tìm tên / mã NV / username..." oninput="window.akRender()">

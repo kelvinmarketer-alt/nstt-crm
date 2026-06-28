@@ -95,6 +95,9 @@
     .main > div:first-child h1{white-space:nowrap;overflow:hidden;text-overflow:ellipsis;font-size:18px}
     /* ── TAB NHÀ CUNG CẤP ── */
     .sup-btn-csv, .sup-btn-excel{display:none!important}          /* ẩn Xuất CSV + Excel */
+    /* 2 nút còn lại (Từ ảnh AI + Thêm NCC) dàn đều full-width 50/50 */
+    .sup-ncc-actions{justify-content:stretch!important;gap:8px!important;flex-wrap:nowrap!important}
+    .sup-ncc-actions > .btn:not(.sup-btn-csv):not(.sup-btn-excel){flex:1 1 0!important;min-width:0!important;justify-content:center;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
     #paneNcc .help-banner{display:none!important}                  /* ẩn banner "Module Nhà cung cấp làm gì?" */
     #supKpis{grid-template-columns:1fr!important}                  /* 3 ô KPI xếp dọc full-width */
     #supKpis .sup-kpi-top{display:none!important}                  /* ẩn ô "⭐ NCC TOP" */
@@ -137,7 +140,7 @@
 
     <!-- ===== TAB NHÀ CUNG CẤP ===== -->
     <div id="paneNcc">
-      <div style="display:flex;justify-content:flex-end;gap:8px;margin-bottom:12px;flex-wrap:wrap">
+      <div class="sup-ncc-actions" style="display:flex;justify-content:flex-end;gap:8px;margin-bottom:12px;flex-wrap:wrap">
         <button class="btn btn-ghost sup-btn-csv" onclick="window.exportSupCsv()">⬇ Xuất CSV</button>
         <button class="btn btn-ghost sup-btn-excel" onclick="window.supImportExcel()" title="Import NCC hàng loạt từ Excel">📥 Excel</button>
         <button class="btn btn-ghost" onclick="window.supImportAI()" title="Đọc ảnh AI: danh thiếp / list NCC">📷 Từ ảnh AI</button>
