@@ -730,6 +730,13 @@ td.num, td.hide-md {
   .table-card .table-wrap table,
   .table-card table.t-responsive { min-width: 0 !important; width: 100% !important; }
 }
+/* === ĐIỆN THOẠI (≤560, chế độ THẺ): bỏ scrollbox lồng của .table-wrap ===
+   .table-wrap có max-height:calc(100vh-360px)+overflow:auto → nhốt cả danh sách thẻ
+   trong 1 khung cao ~465px (cuộn lồng, "không kéo đến hết"). Ở chế độ thẻ cho list
+   TRÔI theo trang để cuộn 1 mạch đến hết; topbar vẫn ghim sẵn (.app height:100vh + .main cuộn). */
+@media (max-width: 560px) {
+  .table-card .table-wrap { max-height: none !important; min-height: 0 !important; overflow: visible !important; }
+}
 
 @media (max-width: 980px) {
   /* CHẶN TRÀN NGANG TOÀN TRANG (mobile): không 1 element nào đẩy lệch cả trang.
