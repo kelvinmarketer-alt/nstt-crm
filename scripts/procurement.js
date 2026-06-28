@@ -112,11 +112,13 @@
     });
   }
 
-  /* ============ SCROLL TO SECTION (trang cuộn dọc, không còn tab) ============ */
+  /* ============ SUB-TAB (tab-trong-tab): chỉ hiện 1 pane ============ */
   window.pcSwitch = function (tab) {
-    const map = { gather: 'stepGather', runs: 'stepRuns', release: 'stepRelease' };
-    const el = document.getElementById(map[tab] || 'stepGather');
-    if (el) el.scrollIntoView({ behavior: 'smooth', block: 'start' });
+    const valid = ['gather', 'runs', 'release', 'history'];
+    if (valid.indexOf(tab) < 0) tab = 'gather';
+    document.querySelectorAll('.pc-subtab').forEach(b => b.classList.toggle('active', b.dataset.pst === tab));
+    document.querySelectorAll('.pc-pane').forEach(p => p.classList.toggle('active', p.dataset.pane === tab));
+    try { window.scrollTo({ top: 0, behavior: 'smooth' }); } catch (e) {}
   };
   function renderAll() { renderGather(); renderRuns(); renderRunHistory(); renderRelease(); }
 
@@ -272,11 +274,13 @@
 
   function renderRunHistory() {
     const host = document.getElementById('pcRunHistory');
-    const sec = document.getElementById('stepHistory');
     if (!host) return;
     const hist = getRuns().filter(_isDoneRun);
-    if (sec) sec.style.display = hist.length ? '' : 'none';
-    if (!hist.length) { host.innerHTML = ''; return; }
+    /* sub-tab điều khiển ẩn/hiện section; ở đây chỉ lo nội dung + empty-state */
+    if (!hist.length) {
+      host.innerHTML = '<div class="pc-detail-empty" style="border:1px dashed var(--line);border-radius:12px">Chưa có phiên gom nào được chốt &amp; phân bổ.</div>';
+      return;
+    }
     /* mới chốt lên đầu */
     hist.sort((a, b) => (a.confirmedAt || '') < (b.confirmedAt || '') ? 1 : -1);
     host.innerHTML = _bulkBar() + hist.map(r => {

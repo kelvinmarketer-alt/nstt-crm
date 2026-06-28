@@ -31,6 +31,22 @@
     .pn-table tbody td[data-field="date"]::before{content:"📅 "}
     .pn-table tbody td[data-field="status"]{display:block!important;margin-top:5px}
   }
+  /* MOBILE ≤560: tinh gọn header + KPI Phiếu nhập */
+  @media (max-width:560px){
+    /* header: tiêu đề KHÔNG wrap; mô tả nằm full-width 1 dòng ngang dưới tiêu đề (không dồn ô hẹp) */
+    .pn-pagehd{flex-wrap:wrap}
+    .pn-pagehd-txt{flex:0 0 100%;width:100%;min-width:0}
+    .pn-pagehd-txt h1{white-space:nowrap;overflow:hidden;text-overflow:ellipsis;font-size:18px}
+    .pn-pagehd-sub{white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+    .pn-pagehd-spacer{display:none}
+    .pur-btn-csv{display:none!important}                          /* ẩn Xuất CSV */
+    .help-banner{display:none!important}                          /* ẩn banner "Phiếu nhập làm gì?" */
+    #purKpis{grid-template-columns:1fr 1fr!important;gap:8px!important}   /* 4 ô KPI: 2/hàng */
+    #purKpis > div{padding:10px 11px!important}
+    #purKpis > div > div:first-child{white-space:nowrap;overflow:hidden;text-overflow:ellipsis;font-size:10px!important}
+    #purKpis > div > div:nth-child(2){font-size:18px!important;white-space:nowrap}
+    #purKpis > div > div:nth-child(3){white-space:nowrap;overflow:hidden;text-overflow:ellipsis;font-size:10.5px!important}
+  }
 </style>
 </head>
 <body>
@@ -44,13 +60,13 @@
   </header>
 
   <main class="main">
-    <div style="display:flex;align-items:center;gap:12px;margin-bottom:14px">
-      <div>
+    <div class="pn-pagehd" style="display:flex;align-items:center;gap:12px;margin-bottom:14px">
+      <div class="pn-pagehd-txt">
         <h1 style="margin:0;font-size:22px;color:var(--navy);font-weight:800">📦 Phiếu nhập <span id="hbT"></span></h1>
-        <div style="font-size:13px;color:var(--muted);margin-top:2px">Ghi nhận lấy hàng từ NCC — tự cộng kho — tạo công nợ NCC</div>
+        <div class="pn-pagehd-sub" style="font-size:13px;color:var(--muted);margin-top:2px">Ghi nhận lấy hàng từ NCC — tự cộng kho — tạo công nợ NCC</div>
       </div>
-      <div style="flex:1"></div>
-      <button class="btn btn-ghost" onclick="window.exportPurCsv()">⬇ Xuất CSV</button>
+      <div class="pn-pagehd-spacer" style="flex:1"></div>
+      <button class="btn btn-ghost pur-btn-csv" onclick="window.exportPurCsv()">⬇ Xuất CSV</button>
       <button class="btn btn-ghost" style="border-color:#FDE68A;background:#FFFBEB;color:#92400E" onclick="window.openPurModal('EXT-MARKET')" title="Nhập phiếu thu mua chợ/vãng lai kèm giá thật → vào sổ quỹ kế toán">🛒 Thu mua ngoài</button>
       <button class="btn btn-primary" onclick="window.openPurModal()">+ Tạo phiếu nhập</button>
     </div>

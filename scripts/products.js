@@ -315,15 +315,15 @@
           <div style="font-size:22px">${tgOn ? '📨' : '🔔'}</div>
           <div style="flex:1;min-width:200px">
             <div style="font-weight:700;color:${tgOn ? 'var(--ok)' : 'var(--warn)'}">${tgOn ? 'Thông báo giá qua Telegram: ĐÃ KẾT NỐI' : 'Thông báo giá qua Telegram: CHƯA KẾT NỐI'}</div>
-            <div style="font-size:12.5px;color:var(--muted);margin-top:2px">${tgOn
+            <div class="hide-xs" style="font-size:12.5px;color:var(--muted);margin-top:2px">${tgOn
               ? 'Bấm "Tạo & gửi" → app dựng <b>file báo giá đẹp (đúng mẫu, kèm ảnh)</b>, tải về máy <b>VÀ tự gửi Telegram</b> dạng file đính kèm.' + (lastSent ? ' · Gần nhất: <b>' + lastSent + '</b>' : ' · Chưa gửi lần nào.')
               : '⚠️ Telegram chưa cấu hình → app vẫn tạo <b>file báo giá (đúng mẫu)</b> để bạn tải về & gửi Zalo. Bấm "Cấu hình Telegram" để điền Bot Token + Chat ID, app sẽ tự gửi lần sau.'}</div>
           </div>
           ${tgOn ? `
-          <button class="btn btn-sm btn-ghost" onclick="window.PriceAutoSend && window.PriceAutoSend.openConfig()" title="Bật/tắt tự động gửi mỗi sáng + cấu hình giờ. Chỉ gửi khi giá đổi so hôm qua.">🤖 Auto hằng ngày</button>
-          <button class="btn btn-sm btn-ghost" onclick="window.PriceAutoSend && window.PriceAutoSend.sendNowIfChanged()" title="Kiểm tra giá đổi và gửi ngay (skip nếu không đổi để tránh spam)">📤 Gửi ngay (nếu đổi)</button>
+          <button class="btn btn-sm btn-ghost hide-xs" onclick="window.PriceAutoSend && window.PriceAutoSend.openConfig()" title="Bật/tắt tự động gửi mỗi sáng + cấu hình giờ. Chỉ gửi khi giá đổi so hôm qua.">🤖 Auto hằng ngày</button>
+          <button class="btn btn-sm btn-ghost hide-xs" onclick="window.PriceAutoSend && window.PriceAutoSend.sendNowIfChanged()" title="Kiểm tra giá đổi và gửi ngay (skip nếu không đổi để tránh spam)">📤 Gửi ngay (nếu đổi)</button>
           <button class="btn btn-sm btn-ghost" onclick="window.openExportTierPicker('pdf')" title="Mở cửa sổ in → chọn Save as PDF để lưu file PDF">🖨 Xuất PDF</button>
-          <button class="btn btn-sm btn-primary" onclick="window.openExportTierPicker('html')" title="Tải file HTML (có ảnh embed) + tự gửi Telegram">📥 Tải HTML + gửi TG</button>
+          <button class="btn btn-sm btn-primary hide-xs" onclick="window.openExportTierPicker('html')" title="Tải file HTML (có ảnh embed) + tự gửi Telegram">📥 Tải HTML + gửi TG</button>
           ` : `
           <button class="btn btn-sm btn-ghost" onclick="window.location.href='settings.html'">⚙️ Cấu hình Telegram</button>
           <button class="btn btn-sm btn-ghost" onclick="window.openExportTierPicker('pdf')" title="Mở cửa sổ in → Save as PDF">🖨 Xuất PDF</button>
@@ -339,10 +339,10 @@
           <div class="bt-spacer" style="flex:1"></div>
           <button class="btn btn-ghost btn-sm" onclick="window.aiFillPrices()">📷 Cập nhật giá bằng ảnh (AI)</button>
           <button class="btn btn-ghost btn-sm" onclick="window.copyYesterday()">📋 Sao chép giá hôm qua</button>
-          <button class="btn btn-ghost btn-sm" onclick="window.copyPriceText()" title="Copy text gọn dán Zalo">📋 Copy text</button>
+          <button class="btn btn-ghost btn-sm hide-xs" onclick="window.copyPriceText()" title="Copy text gọn dán Zalo">📋 Copy text</button>
           <button class="btn btn-ghost btn-sm" onclick="window.PriceAutoSend && window.PriceAutoSend.previewDiff()" title="Xem nhanh SP nào đổi giá so hôm qua">🔍 So sánh giá</button>
           <button class="btn btn-ghost btn-sm" onclick="window.openExportTierPicker('pdf')" title="Mở popup print → Save as PDF">🖨 Xuất PDF</button>
-          <button class="btn btn-ghost btn-sm" onclick="window.openExportTierPicker('html')" title="Tải HTML có ảnh embed + auto gửi Telegram">📥 Xuất HTML</button>
+          <button class="btn btn-ghost btn-sm hide-xs" onclick="window.openExportTierPicker('html')" title="Tải HTML có ảnh embed + auto gửi Telegram">📥 Xuất HTML</button>
           <button class="btn btn-primary btn-sm" onclick="window.savePriceBoard()">💾 Lưu bảng giá ${fmtD(boardDate)}</button>
         </div>
       </div>

@@ -21,6 +21,21 @@
     .ret-card tbody td[data-field="cust"]::before{content:"👤 "}
     .ret-card tbody td[data-field="meta"]{display:block!important;margin-top:6px;padding-top:6px;border-top:1px dashed var(--line)!important;color:var(--muted);white-space:normal!important;overflow:visible!important}
     .ret-xs{display:inline-block!important}
+
+    /* 1) HEADER: tiêu đề full-width 1 dòng, 2 nút xuống hàng riêng bên dưới */
+    .ret-head{flex-wrap:wrap!important;align-items:flex-start!important;gap:10px!important}
+    .ret-head-title{flex:1 1 100%!important;min-width:0!important}
+    .ret-head-title h1{font-size:19px!important;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+    .ret-head-spacer{display:none!important}
+    .ret-head-btn{flex:1 1 0!important;min-width:0!important;white-space:nowrap;text-align:center;padding-left:8px!important;padding-right:8px!important}
+
+    /* 2) Ẩn banner "Quy trình trả hàng" trên mobile — thừa */
+    .ret-procbanner{display:none!important}
+
+    /* 3) POD / tìm đơn: cho input + nút xuống 2 hàng, không tràn ngang */
+    .pod-search{flex-wrap:wrap!important}
+    .pod-search-sel{flex:1 1 100%!important;width:100%!important;min-width:0!important}
+    .pod-search-btn{flex:1 1 100%!important;width:100%!important;white-space:nowrap;text-align:center}
   }
   .ret-xs{display:none}
 </style>
@@ -36,16 +51,16 @@
   </header>
 
   <main class="main">
-    <div style="display:flex;align-items:center;gap:12px;margin-bottom:14px">
-      <div>
+    <div class="ret-head" style="display:flex;align-items:center;gap:12px;margin-bottom:14px">
+      <div class="ret-head-title">
         <h1 style="margin:0;font-size:22px;color:var(--navy);font-weight:800">↩️ Trả hàng & POD <span id="hbT"></span></h1>
         <div style="font-size:13px;color:var(--muted);margin-top:2px">Quản lý đơn trả + ảnh chứng minh giao (Proof of Delivery)</div>
       </div>
-      <div style="flex:1"></div>
-      <button class="btn btn-ghost" onclick="document.getElementById('podSection').scrollIntoView()">📷 Đến POD</button>
-      <button class="btn btn-primary" onclick="window.openReturnModal()">+ Ghi nhận trả hàng</button>
+      <div class="ret-head-spacer" style="flex:1"></div>
+      <button class="btn btn-ghost ret-head-btn" onclick="document.getElementById('podSection').scrollIntoView()">📷 Đến POD</button>
+      <button class="btn btn-primary ret-head-btn" onclick="window.openReturnModal()">+ Ghi nhận trả hàng</button>
     </div>
-    <div id="hbHost"></div>
+    <div id="hbHost" class="ret-procbanner"></div>
 
     <h3 style="margin:16px 0 8px;font-size:13px;color:var(--navy);text-transform:uppercase;font-weight:700">↩️ Danh sách đơn trả hàng <span id="hb1"></span></h3>
     <div class="ret-card" style="background:#fff;border:1px solid var(--line);border-radius:10px;overflow:hidden">
@@ -68,10 +83,10 @@
     <div id="podHelpHost"></div>
     <div style="background:#fff;border:1px solid var(--line);border-radius:10px;padding:14px">
       <p style="font-size:13px;margin:0 0 10px;color:var(--muted)">Chọn 1 đơn đã giao để upload ảnh POD (chữ ký KH / ảnh giao hàng tại bếp / hoá đơn ký nhận).</p>
-      <div style="display:flex;gap:8px;margin-bottom:14px">
-        <select id="podOrder" style="flex:1;border:1px solid var(--line);border-radius:7px;padding:7px 10px;font-size:13px"></select>
+      <div class="pod-search" style="display:flex;gap:8px;margin-bottom:14px">
+        <select id="podOrder" class="pod-search-sel" style="flex:1;border:1px solid var(--line);border-radius:7px;padding:7px 10px;font-size:13px"></select>
         <input type="file" id="podFile" accept="image/*" capture="environment" style="display:none">
-        <button class="btn btn-primary" onclick="document.getElementById('podFile').click()">📷 Chụp / Chọn ảnh</button>
+        <button class="btn btn-primary pod-search-btn" onclick="document.getElementById('podFile').click()">📷 Chụp / Chọn ảnh</button>
       </div>
       <div id="podPreview" style="font-size:12px;color:var(--muted)">Chưa chọn ảnh</div>
       <div id="podGallery" style="display:grid;grid-template-columns:repeat(auto-fill,minmax(140px,1fr));gap:10px;margin-top:14px"></div>

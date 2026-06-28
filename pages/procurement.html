@@ -40,7 +40,19 @@
     #pcRunList .run-card{padding:11px 12px}
     #pcRunDetail{min-width:0;overflow-x:auto}
     table.pc-mini{display:block;overflow-x:auto;white-space:nowrap}
+    /* sub-tab gom hàng = thanh chuyển nhỏ cuộn ngang, dính trên */
+    .pc-subtabs{position:sticky;top:0;z-index:15;background:#fff;gap:4px;overflow-x:auto;flex-wrap:nowrap;-webkit-overflow-scrolling:touch}
+    .pc-subtab{padding:8px 11px;font-size:12.5px;gap:5px}
+    .pc-subtab .pst-ic{font-size:15px}
   }
+  /* Sub-tabs Gom hàng (tab-trong-tab) — áp cả desktop cho gọn */
+  .pc-subtabs{display:flex;gap:6px;flex-wrap:wrap;border-bottom:1px solid var(--line);margin-bottom:18px}
+  .pc-subtab{padding:9px 16px;font-size:13.5px;font-weight:600;color:var(--muted);cursor:pointer;border-bottom:2px solid transparent;margin-bottom:-1px;display:flex;align-items:center;gap:7px;white-space:nowrap}
+  .pc-subtab .pst-ic{font-size:16px;line-height:1}
+  .pc-subtab.active{color:var(--navy);border-bottom-color:var(--navy)}
+  .pc-pane{display:none}
+  .pc-pane.active{display:block}
+  .pc-pane .pc-step{margin-bottom:0}
 </style>
 </head>
 <body>
@@ -63,32 +75,48 @@
       <div style="flex:1"></div>
     </div>
 
-    <section class="pc-step" id="stepGather">
-      <div class="pc-step-hd"><span class="pc-step-n">1</span> Chọn đơn → Gom
-        <span class="pc-step-sub">Tick các đơn cùng đợt giao rồi bấm <b>Tạo phiên gom</b></span></div>
-      <div id="pcGather"></div>
-    </section>
+    <!-- Sub-tabs (tab-trong-tab) cho Gom hàng -->
+    <div class="pc-subtabs" id="pcSubtabs">
+      <div class="pc-subtab active" data-pst="gather" onclick="window.pcSwitch('gather')"><span class="pst-ic">📋</span>Chọn đơn để gom</div>
+      <div class="pc-subtab" data-pst="runs" onclick="window.pcSwitch('runs')"><span class="pst-ic">🧺</span>Phiên gom</div>
+      <div class="pc-subtab" data-pst="release" onclick="window.pcSwitch('release')"><span class="pst-ic">🚚</span>Xuất kho</div>
+      <div class="pc-subtab" data-pst="history" onclick="window.pcSwitch('history')"><span class="pst-ic">✓</span>Lịch sử đã gom</div>
+    </div>
 
-    <section class="pc-step" id="stepRuns">
-      <div class="pc-step-hd"><span class="pc-step-n">2</span> Phiên gom &amp; Đặt NCC
-        <span class="pc-step-sub">Chọn phiên bên trái → <b>gán NCC cho từng mặt hàng</b> → xác nhận đủ/thiếu</span></div>
-      <div class="pc-runs-wrap">
-        <div id="pcRunList" class="pc-run-list"></div>
-        <div id="pcRunDetail" class="pc-run-detail"><div class="pc-detail-empty">← Chọn một phiên gom bên trái để gán NCC &amp; xác nhận hàng.</div></div>
-      </div>
-    </section>
+    <div class="pc-pane active" data-pane="gather">
+      <section class="pc-step" id="stepGather">
+        <div class="pc-step-hd"><span class="pc-step-n">1</span> Chọn đơn → Gom
+          <span class="pc-step-sub">Tick các đơn cùng đợt giao rồi bấm <b>Tạo phiên gom</b></span></div>
+        <div id="pcGather"></div>
+      </section>
+    </div>
 
-    <section class="pc-step" id="stepRelease">
-      <div class="pc-step-hd"><span class="pc-step-n">3</span> Xuất kho → Ship
-        <span class="pc-step-sub">Phiên đã xác nhận → xuất kho, bàn giao cho shipper</span></div>
-      <div id="pcRelease"></div>
-    </section>
+    <div class="pc-pane" data-pane="runs">
+      <section class="pc-step" id="stepRuns">
+        <div class="pc-step-hd"><span class="pc-step-n">2</span> Phiên gom &amp; Đặt NCC
+          <span class="pc-step-sub">Chọn phiên bên trái → <b>gán NCC cho từng mặt hàng</b> → xác nhận đủ/thiếu</span></div>
+        <div class="pc-runs-wrap">
+          <div id="pcRunList" class="pc-run-list"></div>
+          <div id="pcRunDetail" class="pc-run-detail"><div class="pc-detail-empty">← Chọn một phiên gom bên trái để gán NCC &amp; xác nhận hàng.</div></div>
+        </div>
+      </section>
+    </div>
 
-    <section class="pc-step" id="stepHistory" style="display:none">
-      <div class="pc-step-hd"><span class="pc-step-n" style="background:#15803D">✓</span> Lịch sử đã gom
-        <span class="pc-step-sub">Phiên đã <b>chốt &amp; phân bổ</b> — rà soát lại khi cần</span></div>
-      <div id="pcRunHistory"></div>
-    </section>
+    <div class="pc-pane" data-pane="release">
+      <section class="pc-step" id="stepRelease">
+        <div class="pc-step-hd"><span class="pc-step-n">3</span> Xuất kho → Ship
+          <span class="pc-step-sub">Phiên đã xác nhận → xuất kho, bàn giao cho shipper</span></div>
+        <div id="pcRelease"></div>
+      </section>
+    </div>
+
+    <div class="pc-pane" data-pane="history">
+      <section class="pc-step" id="stepHistory">
+        <div class="pc-step-hd"><span class="pc-step-n" style="background:#15803D">✓</span> Lịch sử đã gom
+          <span class="pc-step-sub">Phiên đã <b>chốt &amp; phân bổ</b> — rà soát lại khi cần</span></div>
+        <div id="pcRunHistory"></div>
+      </section>
+    </div>
   </main>
 </div>
 

@@ -27,6 +27,46 @@
     table.cn-tbl td.par, table.cn-tbl th.par{max-width:120px;font-size:11px}
     /* Gợi ý vuốt ngang để xem hết cột ngày + tổng */
     .cn-swipe-hint{display:block;font-size:11px;color:var(--muted);margin:0 0 6px}
+
+    /* (1) Ẩn dòng TỔNG ở đáy + dòng chú thích dưới bảng + note ước tính — thừa trên ĐT */
+    table.cn-tbl tfoot{display:none}
+    .cn-note{display:none}
+    .cn-est-note{display:none}
+
+    /* Tiêu đề + mô tả gọn lại; ẩn dòng mô tả phụ cho thoáng */
+    .cn-head{gap:8px;margin-bottom:10px}
+    .cn-head h1{font-size:18px}
+    .cn-head-sub{display:none}
+
+    /* (2) "Nhập hoá đơn ngày" full hàng (ở header), "Xem báo cáo" full hàng (ở thẻ lọc) */
+    .cn-btn-import{width:100%;white-space:nowrap;font-size:13px;padding-left:8px;padding-right:8px}
+
+    /* Cụm điều khiển trong thẻ lọc: xếp dọc, mỗi nhóm 1 hàng gọn gàng */
+    .cn-ctrl{gap:8px;align-items:stretch}
+    .cn-ctrl .cn-spacer{display:none}
+    /* (3) Từ ngày / Đến ngày: 2 cột cân nhau, mỗi ô 50% */
+    .cn-ctrl .cn-date{flex:1 1 calc(50% - 10px);min-width:0}
+    .cn-ctrl .cn-date input{width:100%;box-sizing:border-box}
+    /* (2) "Xem báo cáo" full hàng riêng */
+    .cn-btn-render{order:3;flex:1 1 100%;white-space:nowrap}
+    /* (4) Nút kỳ: 1 hàng chia đều 4 nút, chữ nowrap */
+    .cn-presets{order:4;flex:1 1 100%;flex-wrap:nowrap;gap:5px}
+    .cn-presets .btn{flex:1 1 0;min-width:0;white-space:nowrap;padding-left:4px;padding-right:4px;font-size:12px}
+    /* (5) Bỏ "Xuất Excel"; đơn vị full-width */
+    .cn-btn-export{display:none}
+    .cn-unit{order:5;flex:1 1 100%}
+    .cn-unit select{width:100%;box-sizing:border-box}
+
+    /* (6) Dòng tổng hợp: thu nhỏ font cho gọn */
+    #cnSummary{font-size:11px;line-height:1.35;margin-top:8px}
+    #cnSummary .cn-est-note{font-size:10.5px}
+
+    /* (7) Cụm chế độ xem + thương hiệu + tìm: sắp gọn, mỗi nút nowrap, không thò thụt */
+    .cn-toolbar{gap:6px}
+    .cn-toolbar .cn-spacer{display:none}
+    .cn-view-btn{flex:1 1 calc(50% - 10px);min-width:0;white-space:nowrap;font-size:11.5px;padding-left:6px;padding-right:6px;overflow:hidden;text-overflow:ellipsis}
+    .cn-search{order:5;flex:1 1 100%;min-width:0;width:100%;box-sizing:border-box}
+    .cn-brand-btn{flex:1 1 calc(50% - 10px);min-width:0;white-space:nowrap;font-size:11.5px;padding-left:6px;padding-right:6px;overflow:hidden;text-overflow:ellipsis}
   }
   .cn-swipe-hint{display:none}
 </style>
@@ -42,52 +82,53 @@
   </header>
 
   <main class="main">
-    <div style="display:flex;align-items:center;gap:12px;margin-bottom:14px;flex-wrap:wrap">
-      <div>
+    <div class="cn-head" style="display:flex;align-items:center;gap:12px;margin-bottom:14px;flex-wrap:wrap">
+      <div class="cn-head-title">
         <h1 style="margin:0;font-size:22px;color:var(--navy);font-weight:800">🧮 Công nợ tổng hợp đối tác</h1>
-        <div style="font-size:13px;color:var(--muted);margin-top:2px">Ma trận đối tác × ngày — tự sinh từ đơn hàng. Theo dõi <b>đã thu / chưa thu</b> · xuất Excel cho CFO.</div>
+        <div class="cn-head-sub" style="font-size:13px;color:var(--muted);margin-top:2px">Ma trận đối tác × ngày — tự sinh từ đơn hàng. Theo dõi <b>đã thu / chưa thu</b> · xuất Excel cho CFO.</div>
       </div>
       <div style="flex:1"></div>
-      <button class="btn btn-primary" onclick="window.openPhieuImport && window.openPhieuImport()" title="Up file hoá đơn/phiếu bán hàng từng ngày (Excel) → tự tạo đơn + cập nhật công nợ">📥 Nhập hoá đơn ngày (Excel)</button>
+      <button class="btn btn-primary cn-btn-import" onclick="window.openPhieuImport && window.openPhieuImport()" title="Up file hoá đơn/phiếu bán hàng từng ngày (Excel) → tự tạo đơn + cập nhật công nợ">📥 Nhập hoá đơn ngày (Excel)</button>
     </div>
 
     <div class="chart-card" style="margin-bottom:14px">
-      <div style="display:flex;gap:12px;align-items:flex-end;flex-wrap:wrap">
-        <div><label style="font-size:12px;color:var(--muted);display:block;margin-bottom:4px">Từ ngày</label>
+      <div class="cn-ctrl" style="display:flex;gap:12px;align-items:flex-end;flex-wrap:wrap">
+        <div class="cn-date"><label style="font-size:12px;color:var(--muted);display:block;margin-bottom:4px">Từ ngày</label>
           <input type="date" id="cnFrom" style="padding:7px 10px;border:1px solid var(--line);border-radius:7px"></div>
-        <div><label style="font-size:12px;color:var(--muted);display:block;margin-bottom:4px">Đến ngày</label>
+        <div class="cn-date"><label style="font-size:12px;color:var(--muted);display:block;margin-bottom:4px">Đến ngày</label>
           <input type="date" id="cnTo" style="padding:7px 10px;border:1px solid var(--line);border-radius:7px"></div>
-        <button class="btn btn-primary" onclick="window.cnRender()">🔄 Xem báo cáo</button>
-        <div style="display:flex;gap:5px;flex-wrap:wrap">
+        <button class="btn btn-primary cn-btn-render" onclick="window.cnRender()">🔄 Xem báo cáo</button>
+        <div class="cn-presets" style="display:flex;gap:5px;flex-wrap:wrap">
           <button class="btn btn-ghost btn-sm" onclick="window.cnPreset('k1')" title="Ngày 1–15 tháng này">Kỳ 1</button>
           <button class="btn btn-ghost btn-sm" onclick="window.cnPreset('k2')" title="Ngày 16–cuối tháng này">Kỳ 2</button>
           <button class="btn btn-ghost btn-sm" onclick="window.cnPreset('month')" title="Cả tháng này">Tháng này</button>
           <button class="btn btn-ghost btn-sm" onclick="window.cnPreset('prev')" title="Tháng trước">Tháng trước</button>
         </div>
-        <div style="flex:1"></div>
-        <div><label style="font-size:12px;color:var(--muted);display:block;margin-bottom:4px">Đơn vị</label>
+        <div class="cn-spacer" style="flex:1"></div>
+        <div class="cn-unit"><label style="font-size:12px;color:var(--muted);display:block;margin-bottom:4px">Đơn vị</label>
           <select id="cnUnit" onchange="window.cnRender()" style="padding:7px 10px;border:1px solid var(--line);border-radius:7px">
             <option value="1000">Nghìn đồng (như Book1)</option>
             <option value="1">Đồng (đầy đủ)</option>
           </select></div>
-        <button class="btn btn-ghost" onclick="window.cnExport()" title="Xuất file Excel gửi CFO">📥 Xuất Excel</button>
+        <button class="btn btn-ghost cn-btn-export" onclick="window.cnExport()" title="Xuất file Excel gửi CFO">📥 Xuất Excel</button>
       </div>
       <div id="cnSummary" style="margin-top:10px;font-size:12.5px;color:var(--muted)"></div>
     </div>
 
-    <div style="display:flex;gap:8px;margin-bottom:10px;align-items:center;flex-wrap:wrap">
-      <button data-cnview="rev" class="btn btn-sm" style="background:#15803D;color:#fff;border:1px solid var(--line)" onclick="window.cnSetView('rev')">📊 Doanh thu & Công nợ</button>
-      <button data-cnview="cost" class="btn btn-sm" style="background:#fff;color:var(--navy);border:1px solid var(--line)" onclick="window.cnSetView('cost')">💵 Giá vốn & Lợi nhuận</button>
+    <div class="cn-toolbar" style="display:flex;gap:8px;margin-bottom:10px;align-items:center;flex-wrap:wrap">
+      <button data-cnview="rev" class="btn btn-sm cn-view-btn" style="background:#15803D;color:#fff;border:1px solid var(--line)" onclick="window.cnSetView('rev')">📊 Doanh thu & Công nợ</button>
+      <button data-cnview="cost" class="btn btn-sm cn-view-btn" style="background:#fff;color:var(--navy);border:1px solid var(--line)" onclick="window.cnSetView('cost')">💵 Giá vốn & Lợi nhuận</button>
       <input id="cnSearchBox" type="search" placeholder="🔎 Tìm đối tác…" oninput="window.cnSearch(this.value)"
+        class="cn-search"
         style="padding:6px 10px;border:1px solid var(--line);border-radius:7px;font-size:12.5px;min-width:200px">
-      <div style="flex:1"></div>
-      <button id="cnBrandBtn" class="btn btn-sm" style="background:#fff;color:var(--navy);border:1px solid var(--line)" onclick="window.cnToggleBrand()" title="Gộp các cơ sở cùng thương hiệu thành 1 nhóm (có dòng cộng) — bấm tên thương hiệu để in phiếu công nợ ma trận">🏢 Gộp theo thương hiệu</button>
-      <button class="btn btn-sm btn-ghost" onclick="window.cnManageBrands()" title="Gán nhãn thương hiệu cho từng cơ sở">🏷 Gán thương hiệu</button>
+      <div class="cn-spacer" style="flex:1"></div>
+      <button id="cnBrandBtn" class="btn btn-sm cn-brand-btn" style="background:#fff;color:var(--navy);border:1px solid var(--line)" onclick="window.cnToggleBrand()" title="Gộp các cơ sở cùng thương hiệu thành 1 nhóm (có dòng cộng) — bấm tên thương hiệu để in phiếu công nợ ma trận">🏢 Gộp theo thương hiệu</button>
+      <button class="btn btn-sm btn-ghost cn-brand-btn" onclick="window.cnManageBrands()" title="Gán nhãn thương hiệu cho từng cơ sở">🏷 Gán thương hiệu</button>
     </div>
 
     <div class="cn-swipe-hint">↔ Vuốt ngang bảng để xem hết các cột ngày &amp; tổng. Cột đối tác luôn ghim bên trái.</div>
     <div class="cn-wrap"><table class="cn-tbl" id="cnTable"><tbody><tr><td style="padding:30px;text-align:center;color:var(--muted)">Chọn khoảng ngày rồi bấm "Xem báo cáo".</td></tr></tbody></table></div>
-    <div style="font-size:11.5px;color:var(--muted);margin-top:8px">💡 Mỗi ô = tổng tiền các đơn của đối tác đó trong ngày. <b>Đã thu</b> lấy từ phiếu thu (sổ công nợ) trong kỳ · <b>Chưa thu</b> = phát sinh − đã thu · <b>Công nợ hiện tại</b> = tổng nợ còn lại của KH.<br>📊 Tab <b>Doanh thu & Công nợ</b>: thêm cột <b>Lợi nhuận</b> (= doanh thu − giá vốn) cho từng khách · 💵 Tab <b>Giá vốn & Lợi nhuận</b>: ma trận giá nhập theo ngày + biên LN. <b>Giá vốn</b> = Σ (SL × giá NHẬP của SP theo ngày đơn). SP ngoài DM / chưa có giá nhập → LN <b>ước tính</b> (đánh dấu *).</div>
+    <div class="cn-note" style="font-size:11.5px;color:var(--muted);margin-top:8px">💡 Mỗi ô = tổng tiền các đơn của đối tác đó trong ngày. <b>Đã thu</b> lấy từ phiếu thu (sổ công nợ) trong kỳ · <b>Chưa thu</b> = phát sinh − đã thu · <b>Công nợ hiện tại</b> = tổng nợ còn lại của KH.<br>📊 Tab <b>Doanh thu & Công nợ</b>: thêm cột <b>Lợi nhuận</b> (= doanh thu − giá vốn) cho từng khách · 💵 Tab <b>Giá vốn & Lợi nhuận</b>: ma trận giá nhập theo ngày + biên LN. <b>Giá vốn</b> = Σ (SL × giá NHẬP của SP theo ngày đơn). SP ngoài DM / chưa có giá nhập → LN <b>ước tính</b> (đánh dấu *).</div>
   </main>
 </div>
 

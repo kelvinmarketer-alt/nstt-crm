@@ -4,6 +4,27 @@
 <meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
 <title>Mẫu đơn AI · Nông Sản Tuấn Tú</title>
 <link rel="stylesheet" href="../styles/tokens.css"><link rel="stylesheet" href="../styles/app.css">
+<style>
+  /* ĐIỆN THOẠI (≤560): co gọn header/banner/stats. Desktop giữ nguyên 100%. */
+  @media (max-width:560px){
+    /* HEADER: tiêu đề không xuống dòng giữa chữ, thu nhỏ font; filter full hàng */
+    .os-page-head{flex-wrap:wrap;gap:8px!important;margin-bottom:10px!important}
+    .os-page-head h1{font-size:16px!important;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+    .os-page-head .os-sub{display:none}
+    .os-page-head>div:nth-child(2){display:none}
+    #osFilter{width:100%;flex:1 1 100%;min-width:0}
+    /* BANNER hướng dẫn: thu nhỏ font/padding, không chiếm cả màn */
+    .os-banner{padding:9px 11px!important;font-size:11.5px!important;line-height:1.45!important;margin-bottom:10px!important}
+    /* STATS 2 ô/hàng nén gọn, chữ nowrap */
+    #osStats{gap:8px!important;margin-bottom:10px!important}
+    #osStats>div{flex:1 1 calc(50% - 4px);min-width:0!important;padding:9px 11px!important}
+    #osStats>div>div:first-child{font-size:18px!important}
+    #osStats>div>div:last-child{white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+    /* lưới mẫu: 1 cột vừa khít, ảnh thấp lại cho lướt nhanh */
+    #osHost>div>div[style*="grid"]{grid-template-columns:1fr!important}
+    #osHost img{height:150px!important}
+  }
+</style>
 </head>
 <body>
 <div class="app">
@@ -15,16 +36,16 @@
   </header>
 
   <main class="main">
-    <div style="display:flex;align-items:center;gap:12px;margin-bottom:14px">
+    <div class="os-page-head" style="display:flex;align-items:center;gap:12px;margin-bottom:14px">
       <div>
         <h1 style="margin:0;font-size:22px;color:var(--navy);font-weight:800">🧠 Mẫu đơn AI — nhớ nét chữ KH</h1>
-        <div style="font-size:13px;color:var(--muted);margin-top:2px">Kho ảnh đơn KH từng viết + kết quả đúng → AI học nét chữ để đọc đơn lần sau chính xác hơn</div>
+        <div class="os-sub" style="font-size:13px;color:var(--muted);margin-top:2px">Kho ảnh đơn KH từng viết + kết quả đúng → AI học nét chữ để đọc đơn lần sau chính xác hơn</div>
       </div>
       <div style="flex:1"></div>
       <select id="osFilter" style="border:1px solid var(--line);border-radius:7px;padding:7px 10px;font-size:13px"></select>
     </div>
 
-    <div style="background:#EFF6FF;color:#1E40AF;padding:11px 14px;border-radius:9px;font-size:12.5px;margin-bottom:14px;line-height:1.55">
+    <div class="os-banner" style="background:#EFF6FF;color:#1E40AF;padding:11px 14px;border-radius:9px;font-size:12.5px;margin-bottom:14px;line-height:1.55">
       💡 <b>Tự động:</b> mỗi khi anh bấm <b>📷 Từ ảnh</b> trong Tạo đơn (đã chọn KH) rồi <b>lưu đơn</b> → hệ thống tự lưu ảnh + kết quả cuối (đã sửa tay) thành 1 mẫu.
       Lần sau đọc ảnh của KH đó, AI <b>đính kèm 1–2 mẫu cũ</b> làm ví dụ → suy ra nét chữ / từ viết tắt của khách.
       <br>🔒 Ảnh lưu <b>ngay trên máy này</b> (IndexedDB), không tải lên cloud — nhẹ & riêng tư.

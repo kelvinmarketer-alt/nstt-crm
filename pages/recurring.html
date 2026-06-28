@@ -15,6 +15,12 @@
   .day-chip{display:inline-block;width:22px;height:22px;border-radius:50%;font-size:10px;font-weight:700;line-height:22px;text-align:center;margin-right:2px}
   .day-chip.on{background:#16A34A;color:#fff}
   .day-chip.off{background:#E5E7EB;color:#9CA3AF}
+  /* Dropdown "⋯ Khác" — ẩn ở desktop, chỉ hiện ở điện thoại */
+  .ro-acts-dd{position:relative;display:none}
+  .ro-acts-dd>summary{list-style:none;cursor:pointer}
+  .ro-acts-dd>summary::-webkit-details-marker{display:none}
+  .ro-acts-dd-menu{position:absolute;right:0;top:calc(100% + 4px);z-index:30;background:#fff;border:1px solid var(--line);border-radius:10px;box-shadow:0 8px 24px rgba(0,0,0,.15);padding:6px;min-width:200px;display:flex;flex-direction:column;gap:4px}
+  .ro-acts-dd-menu .btn{width:100%;justify-content:flex-start}
   /* ĐIỆN THOẠI (≤560): thẻ mẫu định kỳ 1 cột, vừa khít, ẩn phần thừa. Desktop giữ nguyên. */
   @media (max-width:560px){
     #roList{min-width:0}
@@ -23,12 +29,30 @@
     .ro-av{width:36px;height:36px;font-size:13px}
     /* khối "lần kế tiếp" bên phải: thu nhỏ, không đẩy vỡ layout */
     .ro-head > div:last-child{font-size:11px!important}
-    /* KPI 4 ô → 2 ô/hàng cho gọn */
-    #roKpis{grid-template-columns:repeat(2,1fr)!important}
+    /* KPI 4 ô → 2 ô/hàng cho gọn, nén padding + số nhỏ lại */
+    #roKpis{grid-template-columns:repeat(2,1fr)!important;gap:8px!important}
+    #roKpis>div{padding:9px 10px!important}
+    #roKpis>div>div:first-child{font-size:10px!important}
+    #roKpis>div>div:last-child{font-size:19px!important;margin-top:2px!important}
     /* ô tìm + lọc xuống hàng, không cuộn ngang */
     #roQ{min-width:0!important}
     /* ẩn dòng inline đổi shipper (thao tác PC) — sửa ở drawer khi cần */
     .ro-ship-row.hide-xs{display:none!important}
+    /* HEADER: tiêu đề không xuống dòng giữa chữ, thu nhỏ font */
+    .ro-page-head{gap:8px!important;margin-bottom:10px!important}
+    .ro-page-head h1{font-size:17px!important;white-space:nowrap}
+    .ro-page-head h1 #hbT{font-size:12px}
+    .ro-page-head .ro-sub{display:none}
+    /* chỉ giữ nút chính (+ Tạo mẫu) nổi bật; nút phụ gộp vào ⋯ */
+    .ro-acts-flat{display:none!important}
+    .ro-acts-dd{display:block}
+    .ro-acts-dd>summary{padding:7px 10px;font-size:13px}
+    .ro-page-head .btn-primary{padding:7px 11px;font-size:13px;white-space:nowrap}
+    /* BANNER tự tạo đơn: thu gọn, bỏ dòng mô tả dài, không chiếm cả màn */
+    #roAutoCfg{padding:9px 11px!important;gap:8px!important;margin-bottom:10px!important}
+    #roAutoCfg>div:first-child{font-size:12px!important}
+    #roAutoCfg label{font-size:11.5px!important}
+    #roAutoCfg .ro-auto-hint{display:none!important}
   }
 </style>
 </head>
@@ -43,13 +67,21 @@
   </header>
 
   <main class="main">
-    <div style="display:flex;align-items:center;gap:12px;margin-bottom:14px">
+    <div class="ro-page-head" style="display:flex;align-items:center;gap:12px;margin-bottom:14px">
       <div>
         <h1 style="margin:0;font-size:22px;color:var(--navy);font-weight:800">🔁 Đơn định kỳ <span id="hbT"></span></h1>
-        <div style="font-size:13px;color:var(--muted);margin-top:2px">Mẫu đơn lặp lại theo ngày/tuần cho KH B2B — tự sinh đơn theo lịch</div>
+        <div class="ro-sub" style="font-size:13px;color:var(--muted);margin-top:2px">Mẫu đơn lặp lại theo ngày/tuần cho KH B2B — tự sinh đơn theo lịch</div>
       </div>
       <div style="flex:1"></div>
-      <button class="btn btn-ghost" onclick="window.roRunNow()">▶ Chạy ngay (test)</button>
+      <!-- Desktop: nút phẳng -->
+      <span class="ro-acts-flat"><button class="btn btn-ghost" onclick="window.roRunNow()">▶ Chạy ngay (test)</button></span>
+      <!-- Điện thoại: gộp nút phụ vào dropdown ⋯ -->
+      <details class="ro-acts-dd">
+        <summary class="btn btn-ghost">⋯ Khác ▾</summary>
+        <div class="ro-acts-dd-menu">
+          <button class="btn btn-ghost" onclick="this.closest('details').open=false;window.roRunNow()">▶ Chạy ngay (test)</button>
+        </div>
+      </details>
       <button class="btn btn-primary" onclick="window.openRoModal()">+ Tạo mẫu định kỳ</button>
     </div>
     <div id="hbHost"></div>
@@ -62,7 +94,7 @@
       <label style="display:flex;align-items:center;gap:6px;font-size:12.5px">⏰ Khung giờ:
         <input type="time" id="auto_time" value="21:00" onchange="window.saveAutoCfg()" style="border:1px solid var(--line);border-radius:6px;padding:5px 8px;font-size:13px">
       </label>
-      <span style="font-size:11.5px;color:var(--muted)">Mỗi ngày đúng giờ này, hệ thống tự tạo đơn ngày mai cho các mẫu đang chạy + báo Sale (Telegram). Khách báo dừng → bấm ⏸ Tạm dừng mẫu đó.</span>
+      <span class="ro-auto-hint" style="font-size:11.5px;color:var(--muted)">Mỗi ngày đúng giờ này, hệ thống tự tạo đơn ngày mai cho các mẫu đang chạy + báo Sale (Telegram). Khách báo dừng → bấm ⏸ Tạm dừng mẫu đó.</span>
     </div>
 
     <div style="display:grid;grid-template-columns:repeat(4,1fr);gap:10px;margin-bottom:14px" id="roKpis"></div>

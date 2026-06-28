@@ -89,6 +89,27 @@
     .t2.active .t2cnt{background:#fff;color:var(--navy)}
     .t2{position:relative}
   }
+  /* MOBILE ≤560: tinh gọn 2 tab NCC + Phiếu nhập */
+  @media (max-width:560px){
+    /* tiêu đề trang KHÔNG xuống dòng giữa chữ */
+    .main > div:first-child h1{white-space:nowrap;overflow:hidden;text-overflow:ellipsis;font-size:18px}
+    /* ── TAB NHÀ CUNG CẤP ── */
+    .sup-btn-csv, .sup-btn-excel{display:none!important}          /* ẩn Xuất CSV + Excel */
+    #paneNcc .help-banner{display:none!important}                  /* ẩn banner "Module Nhà cung cấp làm gì?" */
+    #supKpis{grid-template-columns:1fr!important}                  /* 3 ô KPI xếp dọc full-width */
+    #supKpis .sup-kpi-top{display:none!important}                  /* ẩn ô "⭐ NCC TOP" */
+    #supKpis .ik-kpi{display:flex;align-items:center;justify-content:space-between;gap:10px;padding:11px 14px!important}
+    #supKpis .ik-kpi > div:first-child{white-space:nowrap;overflow:hidden;text-overflow:ellipsis;font-size:11px!important}
+    #supKpis .ik-kpi > div:nth-child(2){font-size:18px!important;margin-top:0!important;flex-shrink:0}
+    /* ── TAB PHIẾU NHẬP ── */
+    #panePur .pur-banner{display:none!important}                   /* ẩn banner xanh quy trình */
+    #panePur .pur-btn-csv{display:none!important}                  /* ẩn Xuất CSV */
+    #purKpis{grid-template-columns:1fr 1fr!important;gap:8px!important}  /* 4 ô KPI: 2/hàng */
+    #purKpis > div{padding:10px 11px!important}
+    #purKpis > div > div:first-child{white-space:nowrap;overflow:hidden;text-overflow:ellipsis;font-size:10px!important}
+    #purKpis > div > div:nth-child(2){font-size:18px!important;white-space:nowrap}
+    #purKpis > div > div:nth-child(3){white-space:nowrap;overflow:hidden;text-overflow:ellipsis;font-size:10.5px!important}
+  }
 </style>
 </head>
 <body>
@@ -117,8 +138,8 @@
     <!-- ===== TAB NHÀ CUNG CẤP ===== -->
     <div id="paneNcc">
       <div style="display:flex;justify-content:flex-end;gap:8px;margin-bottom:12px;flex-wrap:wrap">
-        <button class="btn btn-ghost" onclick="window.exportSupCsv()">⬇ Xuất CSV</button>
-        <button class="btn btn-ghost" onclick="window.supImportExcel()" title="Import NCC hàng loạt từ Excel">📥 Excel</button>
+        <button class="btn btn-ghost sup-btn-csv" onclick="window.exportSupCsv()">⬇ Xuất CSV</button>
+        <button class="btn btn-ghost sup-btn-excel" onclick="window.supImportExcel()" title="Import NCC hàng loạt từ Excel">📥 Excel</button>
         <button class="btn btn-ghost" onclick="window.supImportAI()" title="Đọc ảnh AI: danh thiếp / list NCC">📷 Từ ảnh AI</button>
         <button class="btn btn-primary" onclick="window.openSupModal()">+ Thêm NCC</button>
       </div>
@@ -147,11 +168,11 @@
 
     <!-- ===== TAB PHIẾU NHẬP ===== -->
     <div id="panePur" style="display:none">
-      <div style="background:#EFF6FF;color:#1E40AF;padding:9px 12px;border-radius:8px;font-size:12.5px;margin-bottom:12px">
+      <div class="pur-banner" style="background:#EFF6FF;color:#1E40AF;padding:9px 12px;border-radius:8px;font-size:12.5px;margin-bottom:12px">
         💡 Quy trình: có đơn KH → bấm <b>Gom hàng → NCC</b> để gom, hoặc tạo phiếu nhập tay tại đây. Khi hàng về bấm <b>"✓ Nhận"</b> để cộng kho + ghi công nợ NCC. <b>Hạn chế tồn kho</b> — chỉ nhập đủ đơn.
       </div>
       <div style="display:flex;justify-content:flex-end;gap:8px;margin-bottom:12px;flex-wrap:wrap">
-        <button class="btn btn-ghost" onclick="window.exportPurCsv()">⬇ Xuất CSV</button>
+        <button class="btn btn-ghost pur-btn-csv" onclick="window.exportPurCsv()">⬇ Xuất CSV</button>
         <button class="btn btn-primary" onclick="window.openPurModal()">+ Tạo phiếu nhập</button>
       </div>
       <div style="display:grid;grid-template-columns:repeat(4,1fr);gap:10px;margin-bottom:14px" id="purKpis"></div>
