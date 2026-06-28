@@ -59,8 +59,9 @@
     /* ===== NÚT HEADER: ẩn Excel + Nhập CSV, dồn 2 nút còn lại 50/50 ===== */
     .head-actions .btn[onclick*="exportCustomersCsv"],
     .head-actions .btn[onclick*="importCustomersCsv"]{display:none}
+    .head-actions{width:100%;flex-wrap:nowrap}
     .head-actions .btn[onclick*="aiAddCustomer"],
-    .head-actions .btn[onclick*="openAddCustomerModal"]{flex:1 1 calc(50% - 4px);min-width:0}
+    .head-actions .btn[onclick*="openAddCustomerModal"]{flex:1 1 0;min-width:0;white-space:nowrap;justify-content:center}
 
     /* ===== HÀNG "Đang hiển thị…" + Cột hiển thị + Sắp xếp: 1 dòng thoáng ===== */
     .table-head{gap:6px;flex-wrap:nowrap}

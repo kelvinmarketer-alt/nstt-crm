@@ -10,6 +10,7 @@
   .pv-tabs{display:flex;gap:0;background:#fff;border:1px solid var(--line);border-radius:10px;padding:4px;margin-bottom:14px;width:fit-content;flex-wrap:wrap}
   .pv-tab{padding:8px 16px;font-size:13px;font-weight:600;color:var(--muted);cursor:pointer;border-radius:7px;white-space:nowrap}
   .pv-tab.active{background:var(--red);color:#fff}
+  .pv-tab .t-short{display:none}  /* desktop dùng nhãn đầy đủ */
   /* Dropdown chọn nhóm bảng giá — ẩn trên desktop (dùng hàng nút) */
   .tier-select{display:none;padding:8px 11px;border:1px solid var(--line);border-radius:8px;font-size:13px;background:#fff;font-weight:600;color:var(--navy)}
 
@@ -21,8 +22,11 @@
     /* Banner Telegram: tiêu đề nhỏ gọn 1 dòng (mô tả đã ẩn) */
     .tg-title{font-size:12.5px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
     /* Tab xem: co gọn để 3 tab vừa 1-2 hàng, KHÔNG để 1 tab xuống dòng giữa chữ */
-    .pv-tabs{width:100%;gap:4px;padding:3px;justify-content:flex-start}
-    .pv-tab{padding:6px 10px;font-size:11.5px;white-space:nowrap;flex:0 0 auto}
+    /* 3 tab chia đều 1 hàng, dùng nhãn NGẮN để không xuống 2 dòng */
+    .pv-tabs{width:100%;gap:4px;padding:3px;flex-wrap:nowrap}
+    .pv-tab{flex:1 1 0;min-width:0;padding:7px 4px;font-size:12px;white-space:nowrap;text-align:center;overflow:hidden;text-overflow:ellipsis}
+    .pv-tab .t-full{display:none}
+    .pv-tab .t-short{display:inline}
     /* Nhóm bảng giá: hàng nút → dropdown + nút Quản lý CÙNG 1 HÀNG (dropdown ~68%, nút ~30%) */
     .tier-btns{display:none!important}
     /* label xuống dòng riêng → dropdown + Quản lý nhóm chung 1 hàng */
@@ -115,9 +119,9 @@
     </div>
 
     <div class="pv-tabs">
-      <div class="pv-tab active" onclick="window.switchPView(event,'board')">📋 Bảng giá</div>
-      <div class="pv-tab" onclick="window.switchPView(event,'mkt')">📣 Bảng giá Marketing</div>
-      <div class="pv-tab" onclick="window.switchPView(event,'catalog')">🥬 Danh mục sản phẩm</div>
+      <div class="pv-tab active" onclick="window.switchPView(event,'board')">📋 <span class="t-full">Bảng giá</span><span class="t-short">Bảng giá</span></div>
+      <div class="pv-tab" onclick="window.switchPView(event,'mkt')">📣 <span class="t-full">Bảng giá Marketing</span><span class="t-short">Marketing</span></div>
+      <div class="pv-tab" onclick="window.switchPView(event,'catalog')">🥬 <span class="t-full">Danh mục sản phẩm</span><span class="t-short">Danh mục</span></div>
     </div>
 
     <div id="boardView"></div>
