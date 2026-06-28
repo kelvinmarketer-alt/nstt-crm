@@ -33,8 +33,12 @@
     document.getElementById('objTabs').innerHTML = OBJS.map(o =>
       `<div class="rpt-tab ${o.id === objective ? 'active' : ''}" onclick="window.setObjective('${o.id}')">${o.icon} ${o.label}</div>`).join('');
 
-    /* filter kênh */
+    /* filter kênh — chip (desktop) + dropdown (điện thoại, ẩn/hiện qua CSS) */
     document.getElementById('chanFilter').innerHTML =
+      `<select id="chanSelect" class="chan-select" onchange="window.setChan(this.value)">` +
+        `<option value="all" ${channel === 'all' ? 'selected' : ''}>Tất cả kênh</option>` +
+        CHANS.map(c => `<option value="${c.id}" ${channel === c.id ? 'selected' : ''}>${c.icon} ${c.label}</option>`).join('') +
+      `</select>` +
       `<button class="chip ${channel === 'all' ? 'active' : ''}" onclick="window.setChan('all')">Tất cả kênh</button>` +
       CHANS.map(c => `<button class="chip ${channel === c.id ? 'active' : ''}" onclick="window.setChan('${c.id}')" style="${channel === c.id ? 'background:' + c.color + ';color:#fff;border-color:' + c.color : ''}">${c.icon} ${c.label}</button>`).join('');
 

@@ -25,9 +25,18 @@
   /* Mặc định ẩn dropdown phòng ban (chỉ hiện trên mobile) */
   #staffDeptSelect{display:none;width:100%;padding:9px 12px;border:1px solid var(--line);border-radius:8px;font-size:13px;margin:6px 0 12px;background:#fff;font-weight:600;color:var(--navy)}
   @media (max-width:560px){
-    /* chip phòng ban → dropdown */
-    #staffChips{display:none}
+    /* chip phòng ban → dropdown (JS set inline display:flex nên cần !important để ẩn) */
+    #staffChips{display:none!important}
     #staffDeptSelect{display:block}
+    /* Thanh tab full-width: 2 tab chia đều 50/50 */
+    .tabs2{gap:0}
+    .tabs2 .t2{flex:1;justify-content:center;padding:10px 6px;text-align:center}
+    /* Cụm nút tab Nhân viên: ẩn Xuất tài khoản + Nhập Excel, 2 nút còn lại full-width 50/50 */
+    #paneStaff > div:first-child{gap:8px}
+    #paneStaff > div:first-child > button[onclick*="exportAllUsers"],
+    #paneStaff > div:first-child > button[onclick*="openImportStaffExcel"]{display:none!important}
+    #paneStaff > div:first-child > button[onclick*="aiAddStaff"],
+    #paneStaff > div:first-child > button[onclick*="openModal"]{flex:1 1 0;min-width:0}
     /* MỖI NHÂN VIÊN = 1 THẺ (card) — block layout, SĐT ghim góc phải, đủ thông tin cốt lõi */
     .table-card thead{display:none}
     .table-card table,.table-card tbody{display:block;width:100%}

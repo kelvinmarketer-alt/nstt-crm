@@ -12,6 +12,12 @@
   .rpt-tab.active{background:var(--red);color:#fff}
   .attend-cell:hover{outline:2px solid var(--red);outline-offset:-2px;position:relative;z-index:1}
   #payMonth{padding:7px 10px;border:1px solid var(--line);border-radius:7px;font-size:13px;font-weight:600;color:var(--navy);cursor:pointer}
+  /* ĐT (≤560): 2 nút CFO (navy + primary) cùng 1 hàng 50/50.
+     Ghi đè rule app.css .head-actions .btn-navy/.btn-primary{flex:1 1 100%} bằng specificity bằng + load sau. */
+  @media (max-width:560px){
+    .head-actions{flex-wrap:wrap}
+    .head-actions .cfo-act{flex:1 1 calc(50% - 4px);min-width:0}
+  }
 </style>
 </head>
 <body>
@@ -37,9 +43,9 @@
       <div class="head-actions">
         <input type="month" id="payMonth" value="2026-05" onchange="window.setPayMonth(this.value)">
         <button class="btn btn-ghost" onclick="window.openLatePolicySettings && window.openLatePolicySettings()" title="Cấu hình mức phạt đi muộn (admin)">⚙ Khung phạt muộn</button>
-        <button class="btn btn-ghost" onclick="window.openUploadTimesheet()">📥 Upload Excel chấm công</button>
-        <button class="btn btn-navy" onclick="window.submitAllDrafts && window.submitAllDrafts(document.getElementById('payMonth').value)" title="HR gửi tất cả phiếu draft + tự lập phiếu cho NV chưa có">📤 Gửi tất cả CFO duyệt</button>
-        <button class="btn btn-primary" onclick="window.openPayslipBatchReview && window.openPayslipBatchReview(document.getElementById('payMonth').value)" title="CFO xem hàng loạt + duyệt nhanh">📊 Bảng dự kiến CFO duyệt</button>
+        <button class="btn btn-ghost hide-xs" onclick="window.openUploadTimesheet()">📥 Upload Excel chấm công</button>
+        <button class="btn btn-navy cfo-act" onclick="window.submitAllDrafts && window.submitAllDrafts(document.getElementById('payMonth').value)" title="HR gửi tất cả phiếu draft + tự lập phiếu cho NV chưa có">📤 Gửi tất cả CFO duyệt</button>
+        <button class="btn btn-primary cfo-act" onclick="window.openPayslipBatchReview && window.openPayslipBatchReview(document.getElementById('payMonth').value)" title="CFO xem hàng loạt + duyệt nhanh">📊 Bảng dự kiến CFO duyệt</button>
       </div>
     </div>
 

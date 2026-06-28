@@ -281,7 +281,7 @@
       const isToday = y === today.getFullYear() && m - 1 === today.getMonth() && d === today.getDate();
       const headBg = isToday ? '#E0F2FE' : isSun ? '#FEE2E2' : isSat ? '#FEF3C7' : '#FAFAFB';
       const headCol = isToday ? '#0369A1' : isSun ? 'var(--danger)' : isSat ? '#A16207' : 'var(--navy)';
-      return `<th class="att-dh" style="background:${headBg};color:${headCol}" title="${isSun ? 'Chủ nhật — nghỉ' : isSat ? 'Thứ 7 — chỉ ca sáng 08:00-12:00 (0.5 công)' : 'T' + (dow + 1) + ' — full ngày'}">
+      return `<th class="att-dh hide-xs" style="background:${headBg};color:${headCol}" title="${isSun ? 'Chủ nhật — nghỉ' : isSat ? 'Thứ 7 — chỉ ca sáng 08:00-12:00 (0.5 công)' : 'T' + (dow + 1) + ' — full ngày'}">
         <div class="dh-d">${d}</div>
         <div class="dh-w">${dayNames[dow]}${isSat ? '<sup style="font-size:8px">½</sup>' : ''}</div>
       </th>`;
@@ -313,7 +313,7 @@
           v === 'V' ? '<span class="achip s-v">V</span>' : '';
         const tip = isOff ? 'Chủ nhật — nghỉ' : isSat ? `T7 — chỉ ca sáng 08:00-12:00 (0.5 công). Click để chọn trạng thái.` : 'Click để chọn trạng thái';
         const satMark = isSat && !isOff ? '<span class="sat-mark" title="½ công">½</span>' : '';
-        return `<td class="${cellClass}${isSat?' is-sat':''}" data-sid="${s.id}" data-day="${dayN}" title="${tip}">${chip}${satMark}</td>`;
+        return `<td class="${cellClass}${isSat?' is-sat':''} hide-xs" data-sid="${s.id}" data-day="${dayN}" title="${tip}">${chip}${satMark}</td>`;
       }).join('');
       return `<tr class="att-row">
         <td class="att-staff">
@@ -326,11 +326,11 @@
           </div>
         </td>
         ${cells}
-        <td class="att-stat s-x" title="Có mặt full"><b>${c.X}</b></td>
-        <td class="att-stat s-l" title="Đi muộn"><b>${c.L}</b>${c.lateMin?'<div class="sub">'+c.lateMin+'p</div>':''}</td>
-        <td class="att-stat s-h" title="½ phép"><b>${c.H}</b></td>
-        <td class="att-stat s-p" title="Phép cả ngày"><b>${c.P}</b></td>
-        <td class="att-stat s-v" title="Vắng"><b>${c.V}</b></td>
+        <td class="att-stat s-x hide-xs" title="Có mặt full"><b>${c.X}</b></td>
+        <td class="att-stat s-l hide-xs" title="Đi muộn"><b>${c.L}</b>${c.lateMin?'<div class="sub">'+c.lateMin+'p</div>':''}</td>
+        <td class="att-stat s-h hide-xs" title="½ phép"><b>${c.H}</b></td>
+        <td class="att-stat s-p hide-xs" title="Phép cả ngày"><b>${c.P}</b></td>
+        <td class="att-stat s-v hide-xs" title="Vắng"><b>${c.V}</b></td>
         <td class="att-stat sum" title="Công tính lương (H=0.5)"><b>${paid % 1 === 0 ? paid : paid.toFixed(1)}</b></td>
       </tr>`;
     }).join('');
@@ -458,11 +458,11 @@
             <tr>
               <th class="att-staff">Nhân viên (${staffs.length})</th>
               ${dayHead}
-              <th class="att-stat s-x" title="Có mặt full">X</th>
-              <th class="att-stat s-l" title="Muộn">L</th>
-              <th class="att-stat s-h" title="½ phép">½</th>
-              <th class="att-stat s-p" title="Phép cả">P</th>
-              <th class="att-stat s-v" title="Vắng">V</th>
+              <th class="att-stat s-x hide-xs" title="Có mặt full">X</th>
+              <th class="att-stat s-l hide-xs" title="Muộn">L</th>
+              <th class="att-stat s-h hide-xs" title="½ phép">½</th>
+              <th class="att-stat s-p hide-xs" title="Phép cả">P</th>
+              <th class="att-stat s-v hide-xs" title="Vắng">V</th>
               <th class="att-stat sum" title="Công tính lương">Công</th>
             </tr>
           </thead>

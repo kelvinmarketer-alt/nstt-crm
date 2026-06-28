@@ -10,6 +10,41 @@
   .rpt-tabs{display:flex;gap:0;background:#fff;border:1px solid var(--line);border-radius:10px;padding:4px;margin-bottom:14px;width:fit-content;flex-wrap:wrap}
   .rpt-tab{padding:8px 16px;font-size:13px;font-weight:600;color:var(--muted);cursor:pointer;border-radius:7px;white-space:nowrap}
   .rpt-tab.active{background:var(--red);color:#fff}
+  /* dropdown lọc kênh: chỉ hiện trên điện thoại (mặc định ẩn, desktop dùng chip) */
+  .chan-select{display:none}
+
+  /* ============================================================
+     ĐIỆN THOẠI (≤560px) — chỉ điều chỉnh layout mobile, desktop giữ nguyên
+     ============================================================ */
+  @media (max-width:560px){
+    /* 1. Ẩn nút "Nhập Excel" trên ĐT */
+    #adsExcelBtn{display:none !important}
+
+    /* 2. Bộ chọn tháng + 2 nút (Nhập từ ảnh / Nhập chi phí ngày) gọn trên cùng cụm.
+       Tháng 1 hàng full; 2 nút chia đôi hàng dưới — không thò thụt. */
+    .head-actions{flex-wrap:wrap;gap:8px}
+    .head-actions #adsMonth{flex:1 1 100%;width:100%;box-sizing:border-box}
+    .head-actions .btn,
+    .head-actions .btn-primary,
+    .head-actions .btn-ghost{flex:1 1 calc(50% - 4px);min-width:0;justify-content:center;font-size:12.5px;padding:9px 8px}
+
+    /* 3. Tab "Bán hàng"/"Tuyển dụng" full-width, 2 tab chia đều 50/50 */
+    .rpt-tabs{width:100%;box-sizing:border-box}
+    .rpt-tabs .rpt-tab{flex:1 1 0;text-align:center;padding:9px 8px}
+
+    /* 4. Lọc "Tất cả các kênh" → dropdown full-width, ẩn cụm chip */
+    #chanFilter{display:block;overflow:visible}
+    #chanFilter .chip{display:none}
+    .chan-select{display:block;width:100%;box-sizing:border-box;padding:9px 12px;
+      border:1px solid var(--line);border-radius:8px;font-size:13px;font-weight:600;
+      color:var(--navy);background:#fff}
+
+    /* 5. Bảng chi phí: GIỮ cột; chỉ chống lỗi khi cuộn.
+       - .chart-card cuộn ngang riêng, không đẩy lệch trang.
+       - thead nền trắng ĐẶC (không trong suốt lòi chữ khi cuộn). */
+    .chart-card{overflow-x:auto;-webkit-overflow-scrolling:touch}
+    #adTable thead th{background:#fff;position:sticky;top:0;z-index:2}
+  }
 </style>
 </head>
 <body>
@@ -34,7 +69,7 @@
       </div>
       <div class="head-actions">
         <input type="month" id="adsMonth" onchange="window.setAdsMonth && window.setAdsMonth(this.value)" style="padding:7px 10px;border:1px solid var(--line);border-radius:7px;font-size:13px;font-weight:600;color:var(--navy);cursor:pointer">
-        <button class="btn btn-ghost" onclick="window.openAdsExcelImport()">📥 Nhập Excel</button>
+        <button class="btn btn-ghost" id="adsExcelBtn" onclick="window.openAdsExcelImport()">📥 Nhập Excel</button>
         <button class="btn btn-ghost" onclick="window.aiFillAds()">📷 Nhập từ ảnh</button>
         <button class="btn btn-primary" onclick="window.openAddAd()">+ Nhập chi phí ngày</button>
       </div>
