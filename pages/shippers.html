@@ -17,6 +17,25 @@
   }
   .table-wrap table tbody tr:hover { background:#FAFAFB; }
   .table-wrap table tbody tr:last-child td { border-bottom:0; }
+  /* ĐIỆN THOẠI (≤560): mini-table shipper CHÍNH (trong .chart-card) → THẺ.
+     Scope .chart-card .mini-table để KHÔNG đụng mini-table lịch trong modal sửa. Desktop giữ nguyên. */
+  @media (max-width:560px){
+    .chart-card{overflow:visible!important}
+    .chart-card .mini-table{display:block;min-width:0!important}
+    .chart-card .mini-table thead{display:none}
+    .chart-card .mini-table tbody{display:block;width:100%}
+    .chart-card .mini-table tbody tr{display:block;position:relative;border:1px solid var(--line);border-radius:12px;margin:0 0 10px;padding:11px 13px;background:#fff}
+    .chart-card .mini-table tbody td{display:block;border:none!important;padding:0!important;white-space:normal;font-size:12.5px;line-height:1.45;text-align:left!important;min-width:0!important}
+    /* DÒNG ĐẦU: tên shipper (đậm) — chừa chỗ ô số góc phải */
+    .chart-card .mini-table tbody td[data-col="name"]{padding-right:84px!important}
+    /* Ô SỐ CHÍNH: Σ đã nhận — ghim góc trên phải, navy */
+    .chart-card .mini-table tbody td[data-col="total"]{position:absolute!important;top:11px;right:13px;width:auto;text-align:right!important}
+    /* Dòng phụ: sản lượng 4 chỉ số + trạng thái */
+    .chart-card .mini-table tbody td[data-col="today"]{display:block!important;margin-top:8px;padding-top:7px;border-top:1px dashed var(--line)!important;white-space:normal!important;overflow:visible!important;min-width:0!important}
+    .chart-card .mini-table tbody td[data-col="status"]{display:block!important;margin-top:7px;white-space:normal!important;overflow:visible!important}
+    /* ép grid 4 ô KPI ngày co vừa khít */
+    .chart-card .mini-table tbody td[data-col="today"] > div{min-width:0}
+  }
 </style>
 </head>
 <body>
@@ -51,14 +70,14 @@
     <div class="chart-card">
       <table class="mini-table">
         <thead><tr>
-          <th style="width:32px"><div class="checkbox" onclick="this.classList.toggle('on')" title="Chọn tất cả"></div></th>
-          <th>Mã</th>
+          <th class="hide-xs" style="width:32px"><div class="checkbox" onclick="this.classList.toggle('on')" title="Chọn tất cả"></div></th>
+          <th class="hide-xs">Mã</th>
           <th>Shipper</th>
           <th>Sản lượng HÔM NAY · 4 chỉ số</th>
-          <th class="num">Đơn T5</th>
+          <th class="num hide-xs">Đơn T5</th>
           <th class="num">Σ đã nhận</th>
           <th>Trạng thái</th>
-          <th></th>
+          <th class="hide-xs"></th>
         </tr></thead>
         <tbody id="shipBody"></tbody>
       </table>

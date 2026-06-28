@@ -56,8 +56,8 @@
       const perms = (s.permissions||[]).slice(0,2).map(p => `<span class="perm-pill">${p}</span>`).join('')
                   + ((s.permissions||[]).length > 2 ? `<span class="perm-pill">+${s.permissions.length-2}</span>` : '');
       return `<tr data-id="${s.id}">
-        <td><b>${s.code || s.id || '—'}</b></td>
-        <td>
+        <td class="hide-xs"><b>${s.code || s.id || '—'}</b></td>
+        <td data-field="name">
           <div class="cust-cell">
             <div class="cust-ava" style="background:${col}">${s.avatar || window.initials(s.name)}</div>
             <div class="cust-info">
@@ -66,13 +66,13 @@
             </div>
           </div>
         </td>
-        <td class="hide-sm"><span class="staff-pill">${s.dept}</span></td>
-        <td class="hide-md" style="font-size:12px">${s.phone || '—'}</td>
-        <td style="font-size:11.5px">${perms}</td>
+        <td class="hide-sm" data-field="dept"><span class="staff-pill">${s.dept}</span></td>
+        <td class="hide-md" data-field="phone" style="font-size:12px">${s.phone || '—'}</td>
+        <td class="hide-xs" style="font-size:11.5px">${perms}</td>
         <td class="hide-sm">${kpiNum ? `<div style="display:flex;align-items:center;gap:4px"><div class="kpi-bar ${kpiCls}"><div style="width:${kpiNum}%"></div></div><b style="font-size:11px;color:var(--${kpiCls==='warn'?'warn':'ok'})">${s.kpi}</b></div>` : '—'}</td>
         <td class="num hide-md">${s.salary ? window.fmt(s.salary) : '—'}</td>
-        <td><span class="status-pill ${s.status==='active'?'st-delivered':'st-cancelled'}">${s.status==='active'?'✓ Đi làm':'⏸ Nghỉ'}</span></td>
-        <td onclick="event.stopPropagation()">
+        <td data-field="status"><span class="status-pill ${s.status==='active'?'st-delivered':'st-cancelled'}">${s.status==='active'?'✓ Đi làm':'⏸ Nghỉ'}</span></td>
+        <td class="hide-xs" onclick="event.stopPropagation()">
           <div class="row-actions">
             <button class="ra-zalo" data-act="zalo" data-id="${s.id}" title="Nhắn Zalo cho NV">Z</button>
             <button class="ra-call" data-act="call" data-id="${s.id}" title="Gọi điện cho NV">📞</button>
@@ -397,8 +397,22 @@
         render();
       });
     });
+    /* MOBILE: đổ cùng dữ liệu vào dropdown phòng ban (song song với chip) */
+    const sel = document.getElementById('staffDeptSelect');
+    if (sel) {
+      sel.innerHTML =
+        `<option value="all">Tất cả phòng ban (${staffs.length})</option>` +
+        depts.map(d => `<option value="${(d||'').replace(/"/g,'&quot;')}">${d} (${counts[d]})</option>`).join('');
+      sel.value = curDept;
+    }
     _chipsBuilt = true;
   }
+
+  /* Lọc phòng ban từ dropdown (mobile) — dùng chung state với chip */
+  window.setStaffDept = function (v) {
+    curDept = v;
+    render();
+  };
 
   window.formNv = function() {
     const nextCode = window.STORE.nextId('staff', 'NV');

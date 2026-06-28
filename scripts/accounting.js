@@ -55,16 +55,15 @@
     );
     document.getElementById('cashTbody').innerHTML = rows.map(e => `
       <tr style="cursor:pointer" data-no="${e.no}">
-        <td><b>${e.no}</b></td>
-        <td style="font-size:12px;color:var(--muted)">${e.date}</td>
-        <td><span class="status-pill ${e.type==='in'?'st-delivered':'st-cancelled'}">${e.type==='in'?'+ Thu':'- Chi'}</span></td>
-        <td>${e.party}</td>
-        <td style="font-size:12px">${e.desc}</td>
-        <td><span class="staff-pill">${e.account}</span></td>
-        <td class="num type-${e.type}"><b>${e.type==='in'?'+':'-'}${window.fmt(e.amount)}</b></td>
-        <td style="font-size:12px;color:var(--muted)">${e.staff}</td>
+        <td class="hide-xs"><b>${e.no}</b></td>
+        <td data-field="date" style="font-size:12px;color:var(--muted)">${e.date}</td>
+        <td data-field="typ"><span class="status-pill ${e.type==='in'?'st-delivered':'st-cancelled'}">${e.type==='in'?'+ Thu':'- Chi'}</span></td>
+        <td data-field="title">${e.party}<div style="font-weight:400;font-size:12px;color:var(--muted)">${e.desc}</div></td>
+        <td data-field="acct"><span class="staff-pill">${e.account}</span></td>
+        <td class="num type-${e.type}" data-field="money"><b>${e.type==='in'?'+':'-'}${window.fmt(e.amount)}</b></td>
+        <td class="hide-xs" style="font-size:12px;color:var(--muted)">${e.staff}</td>
       </tr>
-    `).join('') || `<tr><td colspan="8" style="padding:40px;text-align:center;color:var(--muted)">Không có phiếu nào.</td></tr>`;
+    `).join('') || `<tr><td colspan="7" style="padding:40px;text-align:center;color:var(--muted)">Không có phiếu nào.</td></tr>`;
 
     document.querySelectorAll('#cashTbody tr[data-no]').forEach(tr => {
       tr.onclick = () => window.openCashEntryDetail(tr.dataset.no);

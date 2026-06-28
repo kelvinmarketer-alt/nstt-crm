@@ -58,16 +58,16 @@
       const s = findSup(p.supplierId);
       const due = (p.total||0) - (p.paid||0);
       return `<tr data-id="${p.id}">
-        <td><div class="checkbox" onclick="this.classList.toggle('on')"></div></td>
-        <td><b style="font-family:monospace">${p.id}</b></td>
-        <td>${s ? s.name : p.supplierId}<div style="font-size:11px;color:var(--muted)">${s?.paymentTerm || ''}</div></td>
-        <td>${p.date}</td>
-        <td>${(p.items||[]).length} mặt hàng</td>
-        <td class="num"><b>${window.fmt(p.total)}</b></td>
-        <td class="num">${window.fmt(p.paid||0)}</td>
-        <td class="num" style="color:${due>0?'#DC2626':'var(--ok)'}">${due>0?window.fmt(due):'—'}</td>
-        <td><span class="st-pill st-${p.status}">${p.status==='ordered'?'⏳ Đã đặt':p.status==='received'?'✓ Đã nhận':'✕ Hủy'}</span></td>
-        <td>
+        <td class="hide-xs"><div class="checkbox" onclick="this.classList.toggle('on')"></div></td>
+        <td data-field="code"><b style="font-family:monospace">${p.id}</b></td>
+        <td data-field="sup">${s ? s.name : p.supplierId}<div style="font-size:11px;color:var(--muted)">${s?.paymentTerm || ''}</div></td>
+        <td data-field="date">${p.date}</td>
+        <td class="hide-xs">${(p.items||[]).length} mặt hàng</td>
+        <td class="num" data-field="total"><b>${window.fmt(p.total)}</b></td>
+        <td class="num hide-xs">${window.fmt(p.paid||0)}</td>
+        <td class="num hide-xs" style="color:${due>0?'#DC2626':'var(--ok)'}">${due>0?window.fmt(due):'—'}</td>
+        <td data-field="status"><span class="st-pill st-${p.status}">${p.status==='ordered'?'⏳ Đã đặt':p.status==='received'?'✓ Đã nhận':'✕ Hủy'}</span></td>
+        <td class="hide-xs">
           <button class="btn btn-ghost btn-sm" onclick="window.openPurDrawer('${p.id}')" title="Xem chi tiết">👁</button>
           <button class="btn btn-ghost btn-sm" onclick="window.printPur('${p.id}')" title="In phiếu nhập">🖨</button>
           ${p.status==='ordered' ? `<button class="btn btn-ghost btn-sm" style="color:var(--ok)" onclick="window.markReceived('${p.id}')" title="Đánh dấu đã nhận → cộng kho">✓ Nhận</button>` : ''}

@@ -10,6 +10,48 @@
   .pv-tabs{display:flex;gap:0;background:#fff;border:1px solid var(--line);border-radius:10px;padding:4px;margin-bottom:14px;width:fit-content;flex-wrap:wrap}
   .pv-tab{padding:8px 16px;font-size:13px;font-weight:600;color:var(--muted);cursor:pointer;border-radius:7px;white-space:nowrap}
   .pv-tab.active{background:var(--red);color:#fff}
+
+  /* ===== MOBILE (≤560px): bảng giá → THẺ; lưới danh mục → 1 cột ===== */
+  @media (max-width:560px){
+    /* --- Bảng giá hôm nay (#boardView) & Bảng giá Marketing (#mktView) → thẻ --- */
+    #boardView .mini-table thead, #mktView .mini-table thead{display:none}
+    #boardView .mini-table, #boardView .mini-table tbody,
+    #mktView .mini-table, #mktView .mini-table tbody{display:block;width:100%;min-width:0!important}
+    #boardView .mini-table tbody tr, #mktView .mini-table tbody tr{
+      display:block;position:relative;border:1px solid var(--line);border-radius:12px;
+      margin:0 0 10px;padding:11px 13px;background:#fff}
+    #boardView .mini-table tbody td, #mktView .mini-table tbody td{
+      display:block;border:none!important;padding:0;white-space:normal;
+      font-size:12.5px;line-height:1.45;text-align:left!important}
+    /* DÒNG ĐẦU: tên SP đậm, chừa chỗ ô giá góc phải */
+    #boardView .mini-table tbody td[data-field="name"],
+    #mktView .mini-table tbody td[data-field="name"]{
+      font-size:14px;font-weight:700;color:var(--navy);padding-right:120px}
+    /* Ô GIÁ chính (input giá bán / giá MKT): ghim góc trên phải */
+    #boardView .mini-table tbody td[data-field="price"],
+    #mktView .mini-table tbody td[data-field="price"]{
+      position:absolute!important;top:9px;right:11px;width:auto;text-align:right!important}
+    #boardView .mini-table tbody td[data-field="price"] input,
+    #mktView .mini-table tbody td[data-field="price"] input{width:104px}
+    /* Dòng phụ: nhóm + ĐVT + giá tham chiếu (hiện lại, căn trái, không cắt) */
+    #boardView .mini-table tbody td[data-field="cat"],
+    #mktView .mini-table tbody td[data-field="cat"]{
+      display:block!important;margin-top:6px;padding-top:6px;
+      border-top:1px dashed var(--line)!important;white-space:normal!important;overflow:visible!important}
+    #boardView .mini-table tbody td[data-field="unit"],
+    #mktView .mini-table tbody td[data-field="unit"]{
+      display:inline-block!important;margin-top:4px;color:var(--muted);white-space:normal!important;overflow:visible!important}
+    #boardView .mini-table tbody td[data-field="ref"],
+    #mktView .mini-table tbody td[data-field="ref"]{
+      display:inline-block!important;margin-top:4px;margin-left:8px;color:var(--muted);
+      white-space:normal!important;overflow:visible!important}
+    #boardView .mini-table tbody td[data-field="ref"]::before{content:"Tham chiếu: "}
+    /* Ẩn ô thừa trên thẻ: checkbox chọn, cột thay đổi/chênh phụ */
+    #boardView .mini-table tbody td.hide-xs, #mktView .mini-table tbody td.hide-xs{display:none!important}
+
+    /* --- Danh mục sản phẩm: lưới 2 cột → 1 cột, vừa khít --- */
+    #catalogGrid{grid-template-columns:1fr!important}
+  }
 </style>
 </head>
 <body>

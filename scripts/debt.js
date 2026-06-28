@@ -103,7 +103,7 @@
       const ovBg = c.overdue > 15 ? 'var(--danger-bg)' : c.overdue > 0 ? 'var(--warn-bg)' : 'var(--ok-bg)';
       const ovFg = c.overdue > 15 ? 'var(--danger)' : c.overdue > 0 ? 'var(--warn)' : 'var(--ok)';
       return `<tr>
-        <td>
+        <td data-field="name">
           <div class="cust-cell">
             <div class="cust-ava" style="background:${col}">${window.initials(c.name)}</div>
             <div class="cust-info">
@@ -112,13 +112,13 @@
             </div>
           </div>
         </td>
-        <td><span class="staff-pill">${c.staffOwner}</span></td>
-        <td class="num"><b>${window.fmt(c.debt)}</b></td>
-        <td class="num debt-cell ${ovCls}">${c.debtOverdue ? window.fmt(c.debtOverdue) : '—'}</td>
-        <td><span class="status-pill" style="background:${ovBg};color:${ovFg}">${ovLab}</span></td>
-        <td style="font-size:12px;color:var(--muted)">${Math.max(1, Math.ceil(c.debt / 10_000_000))} HĐ</td>
-        <td style="font-size:12px;color:var(--muted)">${c.lastContact || '—'}</td>
-        <td>
+        <td data-field="staffOwner"><span class="staff-pill">${c.staffOwner}</span></td>
+        <td class="num" data-field="debt"><b>${window.fmt(c.debt)}</b></td>
+        <td class="num debt-cell ${ovCls}" data-field="overdue">${c.debtOverdue ? window.fmt(c.debtOverdue) : '—'}</td>
+        <td class="hide-xs"><span class="status-pill" style="background:${ovBg};color:${ovFg}">${ovLab}</span></td>
+        <td data-field="bills" style="font-size:12px;color:var(--muted)">${Math.max(1, Math.ceil(c.debt / 10_000_000))} HĐ</td>
+        <td class="hide-xs" style="font-size:12px;color:var(--muted)">${c.lastContact || '—'}</td>
+        <td class="hide-xs">
           <div class="row-actions">
             <button class="ra-call" title="Gọi nhắc nợ" data-action="call" data-id="${c.id}">📞</button>
             <button class="ra-zalo" title="Nhắc Zalo" data-action="zalo" data-id="${c.id}">Z</button>

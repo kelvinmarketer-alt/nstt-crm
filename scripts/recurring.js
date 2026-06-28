@@ -165,7 +165,7 @@
         </div>
 
         <!-- Inline shipper dropdown — đổi nhanh không cần mở modal -->
-        <div style="display:flex;align-items:center;gap:8px;margin-top:10px;padding:8px 10px;background:${r.driver?'#F0FDF4':'#FEF3C7'};border-radius:7px;border-left:3px solid ${r.driver?'#16A34A':'#D97706'}" onclick="event.stopPropagation()">
+        <div class="ro-ship-row hide-xs" style="display:flex;align-items:center;gap:8px;margin-top:10px;padding:8px 10px;background:${r.driver?'#F0FDF4':'#FEF3C7'};border-radius:7px;border-left:3px solid ${r.driver?'#16A34A':'#D97706'}" onclick="event.stopPropagation()">
           <span style="font-size:11px;color:var(--muted);text-transform:uppercase;font-weight:700;letter-spacing:0.3px">🛵 Shipper:</span>
           <select onchange="window.roInlineChangeDriver('${r.id}', this.value, this.options[this.selectedIndex].dataset.name||'')"
             style="flex:1;border:1px solid ${r.driver?'#16A34A':'#D97706'};background:#fff;color:${r.driver?'#15803D':'#92400E'};font-weight:600;font-size:12px;padding:4px 10px;border-radius:5px;cursor:pointer">

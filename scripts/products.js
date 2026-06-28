@@ -270,22 +270,22 @@
       let priceCell, lastCell;
       if (!tier) {
         priceCell = `<input class="bprice" data-id="${p.id}" type="number" value="${todaySell}" style="width:110px;text-align:right;padding:6px 8px;border:1px solid var(--line);border-radius:6px">`;
-        lastCell = `<td class="num">${delta}</td>`;
+        lastCell = `<td class="num hide-xs">${delta}</td>`;
       } else {
         const hasOv = tier.overrides && tier.overrides[p.id] != null;
         const tp = tierPriceOf(tier, p.id, todaySell);
         priceCell = `<input class="tprice" data-id="${p.id}" type="number" value="${tp}" title="${hasOv ? 'Giá ghi đè riêng' : 'Giá gốc ' + (tier.markup >= 0 ? '+' : '') + tier.markup + '%'}" style="width:110px;text-align:right;padding:6px 8px;border:1px solid ${hasOv ? '#F59E0B' : 'var(--line)'};border-radius:6px;${hasOv ? 'background:#FEF9C3;font-weight:700' : ''}">`;
-        lastCell = `<td class="num">${hasOv ? `<button class="btn btn-ghost btn-sm" title="Bỏ ghi đè, về giá gốc ±%" onclick="window.tierResetOverride('${p.id}')">↺</button>` : `<span style="color:var(--muted);font-size:11px">theo %</span>`}</td>`;
+        lastCell = `<td class="num hide-xs">${hasOv ? `<button class="btn btn-ghost btn-sm" title="Bỏ ghi đè, về giá gốc ±%" onclick="window.tierResetOverride('${p.id}')">↺</button>` : `<span style="color:var(--muted);font-size:11px">theo %</span>`}</td>`;
       }
       return `<tr data-id="${p.id}">
-        <td><div class="checkbox" onclick="this.classList.toggle('on')"></div></td>
-        <td><div style="display:flex;align-items:center;gap:8px">
+        <td class="hide-xs"><div class="checkbox" onclick="this.classList.toggle('on')"></div></td>
+        <td data-field="name"><div style="display:flex;align-items:center;gap:8px">
           ${p.img ? `<img class="lazy-prodimg" data-pid="${p.id}" alt="" style="width:34px;height:34px;object-fit:cover;border-radius:6px;background:#eef3ee;flex:none" onerror="this.style.visibility='hidden'">` : ''}
           <b>${p.name}</b></div></td>
-        <td><span class="tag" style="background:${cat.color}20;color:${cat.color}">${cat.icon} ${cat.label}</span></td>
-        <td style="color:var(--muted)">/${p.unit}</td>
-        <td class="num" style="color:var(--muted)">${tier ? window.fmt(todaySell) : (prevSell != null ? window.fmt(prevSell) : '—')}</td>
-        <td class="num">${priceCell}</td>
+        <td data-field="cat"><span class="tag" style="background:${cat.color}20;color:${cat.color}">${cat.icon} ${cat.label}</span></td>
+        <td data-field="unit" style="color:var(--muted)">/${p.unit}</td>
+        <td data-field="ref" class="num" style="color:var(--muted)">${tier ? window.fmt(todaySell) : (prevSell != null ? window.fmt(prevSell) : '—')}</td>
+        <td data-field="price" class="num">${priceCell}</td>
         ${lastCell}
       </tr>`;
     }).join('');
@@ -335,10 +335,10 @@
         ${boardToolbarHTML()}
         <table class="mini-table">
           <thead><tr>
-            <th style="width:32px"><div id="boardSelectAll" class="checkbox" onclick="this.classList.toggle('on')" title="Chọn tất cả"></div></th>
+            <th class="hide-xs" style="width:32px"><div id="boardSelectAll" class="checkbox" onclick="this.classList.toggle('on')" title="Chọn tất cả"></div></th>
             <th onclick="window.boardSortBy('name')" style="cursor:pointer;user-select:none" title="Bấm để sắp xếp theo tên">Sản phẩm${_sortArrow('name')}</th>
             <th onclick="window.boardSortBy('cat')" style="cursor:pointer;user-select:none" title="Bấm để sắp xếp theo nhóm">Nhóm${_sortArrow('cat')}</th><th>ĐVT</th>
-            <th class="num">${tier ? 'Giá gốc' : 'Giá bán hôm qua'}</th><th class="num">${tier ? (tierIcon(tier) + ' ' + tier.name) : ('Giá bán ' + fmtD(boardDate))}</th><th class="num">${tier ? '' : 'Thay đổi'}</th>
+            <th class="num">${tier ? 'Giá gốc' : 'Giá bán hôm qua'}</th><th class="num">${tier ? (tierIcon(tier) + ' ' + tier.name) : ('Giá bán ' + fmtD(boardDate))}</th><th class="num hide-xs">${tier ? '' : 'Thay đổi'}</th>
           </tr></thead>
           <tbody>${rows || '<tr><td colspan="7" style="text-align:center;color:var(--muted);padding:24px">Không có SP nào khớp bộ lọc</td></tr>'}</tbody>
         </table>
@@ -413,17 +413,17 @@
       const diffTxt = diff === 0 ? '<span style="color:var(--muted)">=</span>'
         : `<span style="color:${diff>0?'#DC2626':'#15803D'};font-weight:600">${diff>0?'+':''}${window.fmt(diff)}</span>`;
       return `<tr>
-        <td><div style="display:flex;align-items:center;gap:8px">
+        <td data-field="name"><div style="display:flex;align-items:center;gap:8px">
           ${p.img ? `<img class="lazy-prodimg" data-pid="${p.id}" alt="" style="width:32px;height:32px;object-fit:cover;border-radius:6px;background:#eef3ee;flex:none" onerror="this.style.visibility='hidden'">` : ''}
           <b>${p.name}</b></div></td>
-        <td><span class="tag" style="background:${cat.color}20;color:${cat.color}">${cat.icon} ${cat.label}</span></td>
-        <td style="color:var(--muted)">/${p.unit}</td>
-        <td class="num" style="color:var(--muted)">${window.fmt(real)}</td>
-        <td class="num">
+        <td data-field="cat"><span class="tag" style="background:${cat.color}20;color:${cat.color}">${cat.icon} ${cat.label}</span></td>
+        <td data-field="unit" style="color:var(--muted)">/${p.unit}</td>
+        <td data-field="ref" class="num" style="color:var(--muted)">${window.fmt(real)}</td>
+        <td data-field="price" class="num">
           <input class="mktprice" data-id="${p.id}" type="number" value="${mkt}" style="width:110px;text-align:right;padding:6px 8px;border:1px solid ${isOverride?'#A16207':'var(--line)'};border-radius:6px;background:${isOverride?'#FEF9C3':'#fff'}" title="${isOverride?'Đã sửa tay':'Tự tính = giá thật + offset'}">
           ${isOverride ? `<button onclick="window._mktClearOne('${p.id}')" title="Bỏ sửa tay, về công thức" style="background:none;border:none;color:#A16207;cursor:pointer;font-size:11px">↺</button>` : ''}
         </td>
-        <td class="num">${diffTxt}</td>
+        <td class="num hide-xs">${diffTxt}</td>
       </tr>`;
     }).join('');
 
@@ -466,7 +466,7 @@
           <thead><tr>
             <th onclick="window.boardSortBy('name')" style="cursor:pointer;user-select:none" title="Sắp xếp theo tên">Sản phẩm${_sortArrow('name')}</th>
             <th onclick="window.boardSortBy('cat')" style="cursor:pointer;user-select:none" title="Sắp xếp theo nhóm">Nhóm${_sortArrow('cat')}</th><th>ĐVT</th>
-            <th class="num">Giá bán thật</th><th class="num" style="background:#F5F3FF">Giá Marketing</th><th class="num">Chênh</th>
+            <th class="num">Giá bán thật</th><th class="num" style="background:#F5F3FF">Giá Marketing</th><th class="num hide-xs">Chênh</th>
           </tr></thead>
           <tbody>${rows || '<tr><td colspan="6" style="text-align:center;color:var(--muted);padding:24px">Không có SP nào khớp bộ lọc</td></tr>'}</tbody>
         </table>

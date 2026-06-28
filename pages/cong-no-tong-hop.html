@@ -18,6 +18,17 @@
   table.cn-tbl tfoot td{position:sticky;bottom:0;background:#1B5E20;color:#fff;font-weight:700;border-top:2px solid #15803D}
   table.cn-tbl tfoot td.par{background:#1B5E20;color:#fff}
   .cn-paid{color:#16A34A;font-weight:700}.cn-owe{color:#B91C1C;font-weight:700}
+  /* ===== ĐIỆN THOẠI (≤560px): bảng MA TRẬN — KHÔNG ép thẻ, cuộn TRONG khung, không đẩy lệch trang ===== */
+  @media (max-width:560px){
+    .cn-wrap{max-width:100%;max-height:64vh;-webkit-overflow-scrolling:touch;border-radius:8px}
+    table.cn-tbl{font-size:11px}
+    table.cn-tbl th, table.cn-tbl td{padding:5px 6px}
+    /* Cột đối tác (ghim trái) hẹp lại để chừa chỗ cho các cột số */
+    table.cn-tbl td.par, table.cn-tbl th.par{max-width:120px;font-size:11px}
+    /* Gợi ý vuốt ngang để xem hết cột ngày + tổng */
+    .cn-swipe-hint{display:block;font-size:11px;color:var(--muted);margin:0 0 6px}
+  }
+  .cn-swipe-hint{display:none}
 </style>
 </head>
 <body>
@@ -74,6 +85,7 @@
       <button class="btn btn-sm btn-ghost" onclick="window.cnManageBrands()" title="Gán nhãn thương hiệu cho từng cơ sở">🏷 Gán thương hiệu</button>
     </div>
 
+    <div class="cn-swipe-hint">↔ Vuốt ngang bảng để xem hết các cột ngày &amp; tổng. Cột đối tác luôn ghim bên trái.</div>
     <div class="cn-wrap"><table class="cn-tbl" id="cnTable"><tbody><tr><td style="padding:30px;text-align:center;color:var(--muted)">Chọn khoảng ngày rồi bấm "Xem báo cáo".</td></tr></tbody></table></div>
     <div style="font-size:11.5px;color:var(--muted);margin-top:8px">💡 Mỗi ô = tổng tiền các đơn của đối tác đó trong ngày. <b>Đã thu</b> lấy từ phiếu thu (sổ công nợ) trong kỳ · <b>Chưa thu</b> = phát sinh − đã thu · <b>Công nợ hiện tại</b> = tổng nợ còn lại của KH.<br>📊 Tab <b>Doanh thu & Công nợ</b>: thêm cột <b>Lợi nhuận</b> (= doanh thu − giá vốn) cho từng khách · 💵 Tab <b>Giá vốn & Lợi nhuận</b>: ma trận giá nhập theo ngày + biên LN. <b>Giá vốn</b> = Σ (SL × giá NHẬP của SP theo ngày đơn). SP ngoài DM / chưa có giá nhập → LN <b>ước tính</b> (đánh dấu *).</div>
   </main>

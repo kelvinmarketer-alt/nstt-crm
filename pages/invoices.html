@@ -6,6 +6,29 @@
 <title>Hóa đơn · Nông Sản Tuấn Tú Hà Nội</title>
 <link rel="stylesheet" href="../styles/tokens.css">
 <link rel="stylesheet" href="../styles/app.css">
+<style>
+  /* Mặc định ẩn dropdown lọc HĐ (chỉ hiện trên mobile) */
+  #invSelect{display:none;width:100%;padding:9px 12px;border:1px solid var(--line);border-radius:8px;font-size:13px;margin-bottom:10px;background:#fff;font-weight:600;color:var(--navy)}
+  @media (max-width:560px){
+    /* chip lọc → dropdown */
+    #invChips{display:none}
+    #invSelect{display:block}
+    /* MỖI HĐ = 1 THẺ (card) */
+    .table-card thead{display:none}
+    .table-card table,.table-card tbody{display:block;width:100%}
+    .table-card tbody tr{display:block;position:relative;border:1px solid var(--line);border-radius:12px;margin:0 0 10px;padding:11px 13px;background:#fff;cursor:pointer}
+    .table-card tbody td{display:block;border:none!important;padding:0;white-space:normal;font-size:12.5px;line-height:1.45;text-align:left!important}
+    /* DÒNG ĐẦU: số HĐ + KH — đậm, chừa chỗ ô tổng góc phải */
+    .table-card tbody td[data-field="cust"]{font-size:14px;font-weight:700;color:var(--navy);padding-right:108px}
+    .table-card tbody td[data-field="cust"]::before{content:"🧾 "}
+    /* Ô TỔNG TIỀN: ghim góc trên phải */
+    .table-card tbody td[data-field="total"]{position:absolute!important;top:11px;right:13px;width:auto;text-align:right!important;font-weight:800;color:var(--navy);font-size:15px}
+    /* Dòng phụ */
+    .table-card tbody td[data-field="date"]{display:block!important;margin-top:7px;padding-top:7px;border-top:1px dashed var(--line)!important;color:var(--muted);white-space:normal!important;overflow:visible!important}
+    .table-card tbody td[data-field="date"]::before{content:"🗓 "}
+    .table-card tbody td[data-field="status"]{display:block!important;margin-top:6px;white-space:normal!important;overflow:visible!important}
+  }
+</style>
 </head>
 <body>
 <div class="app">
@@ -38,13 +61,21 @@
       <div class="kpi k-5"><div class="kpi-label">Tổng VAT</div><div class="kpi-value" id="kpiInvVat">0</div><div class="kpi-trend">trên các HĐ</div><div class="kpi-icon">📋</div></div>
     </section>
 
-    <div class="quick-chips">
+    <div class="quick-chips" id="invChips">
       <button class="chip active" data-q="all">Tất cả <span class="cnt">42</span></button>
       <button class="chip" data-q="paid">Đã TT <span class="cnt">35</span></button>
       <button class="chip" data-q="pending">Chờ TT <span class="cnt">5</span></button>
       <button class="chip" data-q="overdue">Quá hạn <span class="cnt">2</span></button>
       <button class="chip" data-q="draft">Nháp <span class="cnt">3</span></button>
     </div>
+    <!-- MOBILE: lọc trạng thái HĐ dạng dropdown (thay cụm chip cuộn ngang) -->
+    <select id="invSelect" onchange="window.setInvFilter(this.value)">
+      <option value="all">Tất cả</option>
+      <option value="paid">Đã TT</option>
+      <option value="pending">Chờ TT</option>
+      <option value="overdue">Quá hạn</option>
+      <option value="draft">Nháp</option>
+    </select>
 
     <div class="filter-bar">
       <div class="search-in" style="flex:1.5">
@@ -60,10 +91,10 @@
       <div class="table-wrap">
         <table>
           <thead><tr>
-            <th style="width:32px"><div class="checkbox" onclick="this.classList.toggle('on')" title="Chọn tất cả"></div></th>
-            <th>Số HĐ</th><th>Ngày</th><th>Khách hàng</th><th class="hide-md">MST</th>
-            <th class="num">Tiền hàng</th><th class="num">VAT 10%</th><th class="num">Tổng</th>
-            <th>Trạng thái</th><th class="num">Hành động</th>
+            <th style="width:32px" class="hide-xs"><div class="checkbox" onclick="this.classList.toggle('on')" title="Chọn tất cả"></div></th>
+            <th class="hide-xs">Số HĐ</th><th>Ngày</th><th>Khách hàng</th><th class="hide-md">MST</th>
+            <th class="num hide-xs">Tiền hàng</th><th class="num hide-xs">VAT 10%</th><th class="num">Tổng</th>
+            <th>Trạng thái</th><th class="num hide-xs">Hành động</th>
           </tr></thead>
           <tbody id="invTbody"></tbody>
         </table>

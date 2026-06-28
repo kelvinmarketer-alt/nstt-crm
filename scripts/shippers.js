@@ -211,9 +211,9 @@
         .reduce((sum, o) => sum + (o.freight||0), 0);
 
       return `<tr data-id="${s.id}">
-        <td onclick="event.stopPropagation()"><div class="checkbox" onclick="this.classList.toggle('on')"></div></td>
-        <td style="font-size:12.5px;font-weight:600;color:var(--navy)" title="${codeTip}">${s.code || s.id}</td>
-        <td>
+        <td class="hide-xs" onclick="event.stopPropagation()"><div class="checkbox" onclick="this.classList.toggle('on')"></div></td>
+        <td class="hide-xs" style="font-size:12.5px;font-weight:600;color:var(--navy)" title="${codeTip}">${s.code || s.id}</td>
+        <td data-col="name">
           <div style="display:flex;align-items:center;gap:10px">
             <div class="av" style="width:36px;height:36px;border-radius:50%;display:grid;place-items:center;color:#fff;font-size:12.5px;font-weight:700;background:${window.avatarColor(s.name)};position:relative;flex-shrink:0">
               ${window.initials(s.name)}
@@ -225,7 +225,7 @@
             </div>
           </div>
         </td>
-        <td style="min-width:200px">
+        <td data-col="today" style="min-width:200px">
           <!-- KPI ngày: 4 con số nhận / chưa / đang / xong -->
           <div style="display:grid;grid-template-columns:repeat(4,1fr);gap:4px;font-size:11px">
             <div style="background:#F1F5F9;padding:5px 6px;border-radius:5px;text-align:center" title="Tổng đơn được phân công hôm nay">
@@ -247,18 +247,18 @@
           </div>
           ${myKgToday > 0 ? `<div style="font-size:10.5px;color:var(--muted);margin-top:4px;text-align:center">📦 <b style="color:#1B5E20">${window.fmt(myKgToday)}kg</b> · 💰 <b style="color:#1B5E20">${window.fmtShort(myRevToday)}</b></div>` : ''}
         </td>
-        <td class="num">
+        <td class="num hide-xs">
           <b style="font-size:15px;color:var(--navy)">${window.fmt(monthCount)}</b>
           <div style="font-size:10px;color:var(--muted);margin-top:1px">đơn / T5</div>
         </td>
-        <td class="num">
+        <td class="num" data-col="total">
           <b style="font-size:15px;color:#15803D">${window.fmt(totalReceived)}</b>
           <div style="font-size:10px;color:var(--muted);margin-top:1px">tổng đã nhận</div>
         </td>
-        <td>
+        <td data-col="status">
           <span style="font-weight:700;color:${live.color};background:${live.bg};padding:6px 12px;border-radius:7px;display:inline-block;font-size:12.5px;white-space:nowrap" title="${attTip}">${live.label}</span>
         </td>
-        <td class="num" style="white-space:nowrap">
+        <td class="num hide-xs" style="white-space:nowrap">
           <button class="icon-btn" title="Sửa" onclick="window.editShipper('${s.id}')">✏️</button>
           <button class="icon-btn" title="Xóa" style="color:var(--danger)" onclick="window.deleteShipper('${s.id}')">🗑</button>
         </td>

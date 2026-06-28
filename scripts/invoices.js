@@ -38,6 +38,15 @@
         const span = btn.querySelector('.cnt');
         if (span && chipCounts[btn.dataset.q] != null) span.textContent = chipCounts[btn.dataset.q];
       });
+      /* Đồng bộ count vào dropdown lọc (mobile) */
+      const invSel = document.getElementById('invSelect');
+      if (invSel) {
+        const labels = { all:'Tất cả', paid:'Đã TT', pending:'Chờ TT', overdue:'Quá hạn', draft:'Nháp' };
+        invSel.querySelectorAll('option').forEach(o => {
+          const k = o.value;
+          if (labels[k] != null) o.textContent = `${labels[k]} (${chipCounts[k] != null ? chipCounts[k] : 0})`;
+        });
+      }
       const hdr = document.querySelector('.table-head .count');
       if (hdr) hdr.textContent = `${invoices.length} hóa đơn`;
     })();
@@ -57,15 +66,15 @@
         `<option value="${o.id}" ${o.id===i.status?'selected':''}>${o.lab}</option>`
       ).join('');
       return `<tr data-no="${i.no}">
-        <td onclick="event.stopPropagation()"><div class="checkbox" onclick="this.classList.toggle('on')"></div></td>
-        <td><b style="font-family:ui-monospace,monospace">${i.no}</b></td>
+        <td class="hide-xs" onclick="event.stopPropagation()"><div class="checkbox" onclick="this.classList.toggle('on')"></div></td>
+        <td class="hide-xs"><b style="font-family:ui-monospace,monospace">${i.no}</b></td>
         <td data-field="date" title="Click để sửa ngày" style="font-size:12px;color:var(--muted)">${i.date}</td>
-        <td data-field="cust" title="Click để sửa tên KH">${i.cust}</td>
+        <td data-field="cust" title="Click để sửa tên KH"><span style="font-family:ui-monospace,monospace;font-weight:700">${i.no}</span> · ${i.cust}</td>
         <td class="hide-md" data-field="tax" title="Click để sửa MST" style="font-family:ui-monospace,monospace;font-size:12px">${i.tax}</td>
-        <td class="num" data-field="net" title="Click để sửa tiền hàng">${window.fmt(i.net)}</td>
-        <td class="num" data-field="vat" title="Click để sửa VAT">${window.fmt(i.vat)}</td>
-        <td class="num"><b>${window.fmt(total)}</b></td>
-        <td onclick="event.stopPropagation()">
+        <td class="num hide-xs" data-field="net" title="Click để sửa tiền hàng">${window.fmt(i.net)}</td>
+        <td class="num hide-xs" data-field="vat" title="Click để sửa VAT">${window.fmt(i.vat)}</td>
+        <td class="num" data-field="total"><b>${window.fmt(total)}</b></td>
+        <td data-field="status" onclick="event.stopPropagation()">
           <select class="status-select" data-no="${i.no}"
             title="Đổi trạng thái HĐ"
             style="background:${st.bg};color:${st.fg};border:1px solid ${st.fg}33;
@@ -76,7 +85,7 @@
             ${opts}
           </select>
         </td>
-        <td onclick="event.stopPropagation()">
+        <td class="hide-xs" onclick="event.stopPropagation()">
           <div class="row-actions">
             ${i.status==='draft'   ? `<button title="Phát hành lên Cơ quan thuế (CQT)" data-act="issue" data-no="${i.no}" style="color:var(--ok)">🚀</button>` : ''}
             ${i.status==='pending' ? `<button title="Đánh dấu đã thanh toán" data-act="paid" data-no="${i.no}" style="color:var(--ok)">✓</button>` : ''}
@@ -189,13 +198,16 @@
     });
   }
 
+  /* Lọc HĐ — dùng chung cho chip (desktop) lẫn dropdown (mobile) */
+  window.setInvFilter = function (v) {
+    cur = v;
+    document.querySelectorAll('.chip').forEach(x => x.classList.toggle('active', x.dataset.q === v));
+    const sel = document.getElementById('invSelect');
+    if (sel) sel.value = v;
+    render();
+  };
   document.querySelectorAll('.chip').forEach(c => {
-    c.addEventListener('click', () => {
-      document.querySelectorAll('.chip').forEach(x => x.classList.remove('active'));
-      c.classList.add('active');
-      cur = c.dataset.q;
-      render();
-    });
+    c.addEventListener('click', () => window.setInvFilter(c.dataset.q));
   });
 
   /* === Form tạo HĐ === */

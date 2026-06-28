@@ -15,6 +15,21 @@
   .day-chip{display:inline-block;width:22px;height:22px;border-radius:50%;font-size:10px;font-weight:700;line-height:22px;text-align:center;margin-right:2px}
   .day-chip.on{background:#16A34A;color:#fff}
   .day-chip.off{background:#E5E7EB;color:#9CA3AF}
+  /* ĐIỆN THOẠI (≤560): thẻ mẫu định kỳ 1 cột, vừa khít, ẩn phần thừa. Desktop giữ nguyên. */
+  @media (max-width:560px){
+    #roList{min-width:0}
+    .ro-card{padding:11px 13px;margin-bottom:10px}
+    .ro-card .ro-head{gap:9px}
+    .ro-av{width:36px;height:36px;font-size:13px}
+    /* khối "lần kế tiếp" bên phải: thu nhỏ, không đẩy vỡ layout */
+    .ro-head > div:last-child{font-size:11px!important}
+    /* KPI 4 ô → 2 ô/hàng cho gọn */
+    #roKpis{grid-template-columns:repeat(2,1fr)!important}
+    /* ô tìm + lọc xuống hàng, không cuộn ngang */
+    #roQ{min-width:0!important}
+    /* ẩn dòng inline đổi shipper (thao tác PC) — sửa ở drawer khi cần */
+    .ro-ship-row.hide-xs{display:none!important}
+  }
 </style>
 </head>
 <body>

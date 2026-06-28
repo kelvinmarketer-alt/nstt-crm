@@ -154,7 +154,7 @@
     rows.sort((a, b) => order[a.level] - order[b.level] || (a.prod?.name||'').localeCompare(b.prod?.name||''));
 
     if (!rows.length) {
-      tb.innerHTML = `<tr><td colspan="10" style="padding:36px;text-align:center;color:var(--muted)">Không có SP nào khớp bộ lọc.</td></tr>`;
+      tb.innerHTML = `<tr><td colspan="11" style="padding:36px;text-align:center;color:var(--muted)">Không có SP nào khớp bộ lọc.</td></tr>`;
       return;
     }
 
@@ -164,22 +164,23 @@
       const lvlLabels = { out:'⛔ Hết hàng', low:'🔴 Dưới ngưỡng', warn:'🟠 Sắp hết', ok:'🟢 Đủ' };
       const cls = 'lvl-' + r.level;
       return `<tr data-id="${r.id}">
-        <td><div class="checkbox" onclick="this.classList.toggle('on')"></div></td>
-        <td><b>${r.prod?.name || r.productId}</b><div style="font-size:11px;color:var(--muted)">${r.prod?.cat || ''}</div></td>
-        <td><code style="font-size:11.5px;color:var(--muted)">${r.productId}</code></td>
-        <td><span class="tag" style="background:#F1F5F9;color:#475569">${r.location}</span></td>
-        <td class="num"><b class="${cls}">${fmtQty(r.stock)} ${r.prod?.unit || ''}</b></td>
-        <td>
+        <td class="hide-xs"><div class="checkbox" onclick="this.classList.toggle('on')"></div></td>
+        <td data-field="title"><b>${r.prod?.name || r.productId}</b><div style="font-size:11px;color:var(--muted)">${r.prod?.cat || ''}</div></td>
+        <td data-field="code"><code style="font-size:11.5px;color:var(--muted)">${r.productId}</code></td>
+        <td class="hide-xs"><span class="tag" style="background:#F1F5F9;color:#475569">${r.location}</span></td>
+        <td class="num" data-field="stock"><b class="${cls}">${fmtQty(r.stock)} ${r.prod?.unit || ''}</b></td>
+        <td class="hide-xs">
           <div class="stock-bar">
             <div class="bar"><div class="fill" style="width:${pct}%;background:${colors[r.level]}"></div></div>
             <div class="pct">${Math.round(pct)}%</div>
           </div>
           <div style="font-size:10.5px;color:var(--muted);margin-top:2px">Min ${r.minStock} · Max ${r.maxStock}</div>
         </td>
-        <td class="num">${fmtQty(r.avgDaily)} / ngày</td>
-        <td class="num"><span class="${cls}">${r.days === '∞' ? '∞' : r.days + ' ngày'}</span></td>
-        <td style="font-size:12px">${r.lastIn || '—'}</td>
-        <td>
+        <td class="num hide-xs">${fmtQty(r.avgDaily)} / ngày</td>
+        <td class="num hide-xs"><span class="${cls}">${r.days === '∞' ? '∞' : r.days + ' ngày'}</span></td>
+        <td class="hide-xs" style="font-size:12px">${r.lastIn || '—'}</td>
+        <td data-field="level" class="inv-lvl-cell"><span class="${cls}" style="font-size:12px">${lvlLabels[r.level] || ''}</span></td>
+        <td class="hide-xs">
           <button class="btn btn-ghost btn-sm" onclick="window.openInvAdjust('${r.productId}')" title="Điều chỉnh thủ công">⚖️ KK</button>
           <button class="btn btn-ghost btn-sm" onclick="window.location.href='purchases.html?createFor=${r.productId}'" title="Tạo phiếu nhập">+ Nhập</button>
         </td>

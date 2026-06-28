@@ -33,6 +33,14 @@
   table.pc-mini th,table.pc-mini td{border:1px solid #E2E8F0;padding:6px 8px}
   table.pc-mini th{background:#F0FDF4;color:#15803D;font-size:11px;text-transform:uppercase}
   table.pc-mini td.num{text-align:right}
+  /* MOBILE ≤560: danh sách phiên gom 1 cột, vừa khít, không cuộn ngang */
+  @media (max-width:560px){
+    .pc-runs-wrap{grid-template-columns:1fr;gap:10px}
+    #pcRunList{min-width:0;max-height:none}
+    #pcRunList .run-card{padding:11px 12px}
+    #pcRunDetail{min-width:0;overflow-x:auto}
+    table.pc-mini{display:block;overflow-x:auto;white-space:nowrap}
+  }
 </style>
 </head>
 <body>

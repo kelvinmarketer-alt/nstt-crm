@@ -4,6 +4,26 @@
 <meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
 <title>Trả hàng & POD · Nông Sản Tuấn Tú</title>
 <link rel="stylesheet" href="../styles/tokens.css"><link rel="stylesheet" href="../styles/app.css">
+<style>
+  /* ĐIỆN THOẠI (≤560): danh sách đơn trả → THẺ (card). Desktop giữ nguyên. */
+  @media (max-width:560px){
+    .ret-card{overflow:visible!important}
+    .ret-card thead{display:none}
+    .ret-card table,.ret-card tbody{display:block;width:100%;min-width:0!important}
+    .ret-card tbody tr{display:block;position:relative;border:1px solid var(--line);border-radius:12px;margin:0 0 10px;padding:11px 13px;background:#fff;cursor:pointer}
+    .ret-card tbody td{display:block;border:none!important;padding:0!important;white-space:normal;font-size:12.5px;line-height:1.45;text-align:left!important}
+    /* DÒNG ĐẦU: mã đơn trả (đậm), chừa chỗ ô tiền góc phải */
+    .ret-card tbody td[data-field="title"]{font-size:14px;font-weight:700;color:var(--navy);padding-right:104px!important}
+    /* Ô TIỀN HOÀN: ghim góc trên phải, đỏ */
+    .ret-card tbody td[data-field="money"]{position:absolute!important;top:11px;right:13px;width:auto;text-align:right!important}
+    /* Dòng phụ */
+    .ret-card tbody td[data-field="cust"]{display:block!important;margin-top:4px;color:var(--text);white-space:normal!important;overflow:visible!important}
+    .ret-card tbody td[data-field="cust"]::before{content:"👤 "}
+    .ret-card tbody td[data-field="meta"]{display:block!important;margin-top:6px;padding-top:6px;border-top:1px dashed var(--line)!important;color:var(--muted);white-space:normal!important;overflow:visible!important}
+    .ret-xs{display:inline-block!important}
+  }
+  .ret-xs{display:none}
+</style>
 </head>
 <body>
 <div class="app">
@@ -28,17 +48,17 @@
     <div id="hbHost"></div>
 
     <h3 style="margin:16px 0 8px;font-size:13px;color:var(--navy);text-transform:uppercase;font-weight:700">↩️ Danh sách đơn trả hàng <span id="hb1"></span></h3>
-    <div style="background:#fff;border:1px solid var(--line);border-radius:10px;overflow:hidden">
+    <div class="ret-card" style="background:#fff;border:1px solid var(--line);border-radius:10px;overflow:hidden">
       <table style="width:100%;border-collapse:collapse;font-size:13px">
         <thead><tr style="background:#FAFBFC">
           <th style="text-align:left;padding:10px;font-size:11px;color:var(--muted);text-transform:uppercase">Mã</th>
-          <th style="text-align:left;padding:10px;font-size:11px;color:var(--muted);text-transform:uppercase">Đơn gốc</th>
+          <th class="hide-xs" style="text-align:left;padding:10px;font-size:11px;color:var(--muted);text-transform:uppercase">Đơn gốc</th>
           <th style="text-align:left;padding:10px;font-size:11px;color:var(--muted);text-transform:uppercase">KH</th>
-          <th style="text-align:left;padding:10px;font-size:11px;color:var(--muted);text-transform:uppercase">Ngày</th>
+          <th class="hide-xs" style="text-align:left;padding:10px;font-size:11px;color:var(--muted);text-transform:uppercase">Ngày</th>
           <th style="text-align:left;padding:10px;font-size:11px;color:var(--muted);text-transform:uppercase">Mặt hàng / Lý do</th>
           <th style="text-align:right;padding:10px;font-size:11px;color:var(--muted);text-transform:uppercase">Hoàn</th>
-          <th style="text-align:left;padding:10px;font-size:11px;color:var(--muted);text-transform:uppercase">Trạng thái</th>
-          <th style="text-align:left;padding:10px;font-size:11px;color:var(--muted);text-transform:uppercase">Hành động</th>
+          <th class="hide-xs" style="text-align:left;padding:10px;font-size:11px;color:var(--muted);text-transform:uppercase">Trạng thái</th>
+          <th class="hide-xs" style="text-align:left;padding:10px;font-size:11px;color:var(--muted);text-transform:uppercase">Hành động</th>
         </tr></thead>
         <tbody id="retBody"></tbody>
       </table>
@@ -93,11 +113,12 @@
     const stLab = {pending:'⏳ Chờ xử lý', refunded:'✓ Đã hoàn', replaced:'🔄 Đổi hàng', rejected:'✕ Từ chối'};
     const stClr = {pending:'#92400E', refunded:'#15803D', replaced:'#1E40AF', rejected:'#B91C1C'};
     tb.innerHTML = list.slice().reverse().map(r => `<tr style="border-top:1px solid #F1F5F9">
-      <td style="padding:10px"><b>${r.id}</b></td>
-      <td style="padding:10px"><a href="orders.html" style="color:var(--navy)">${r.orderCode}</a></td>
-      <td style="padding:10px">${r.custName}</td>
-      <td style="padding:10px">${r.date}</td>
-      <td style="padding:10px;font-size:12px">
+      <td data-field="title" style="padding:10px"><b>${r.id}</b></td>
+      <td class="hide-xs" style="padding:10px"><a href="orders.html" style="color:var(--navy)">${r.orderCode}</a></td>
+      <td data-field="cust" style="padding:10px">${r.custName}</td>
+      <td class="hide-xs" style="padding:10px">${r.date}</td>
+      <td data-field="meta" style="padding:10px;font-size:12px">
+        <span class="ret-xs" style="font-size:11.5px;color:var(--muted);margin-bottom:4px"><b style="color:var(--navy)">${r.orderCode}</b> · ${r.date} · <span style="background:${stClr[r.status]}1f;color:${stClr[r.status]};padding:1px 7px;border-radius:99px;font-size:10px;font-weight:700">${stLab[r.status]}</span></span>
         ${r.item ? `<b>${r.item.name}</b> · ${r.qtyReturn||0}${r.item.unit||'kg'}<br>` : ''}
         <span style="color:var(--muted)">${r.reason}</span>
         <div style="margin-top:3px;display:flex;gap:4px;flex-wrap:wrap">
@@ -106,13 +127,13 @@
           ${r.fault==='supplier' ? `<span style="background:#FEF3C7;color:#B45309;font-size:10px;font-weight:700;padding:1px 6px;border-radius:99px">🏭 Đòi NCC${r.supplierName?': '+r.supplierName:''}</span>` : r.fault==='shipping' ? '<span style="background:#E0E7FF;color:#3730A3;font-size:10px;font-weight:700;padding:1px 6px;border-radius:99px">🚚 Lỗi vận chuyển</span>' : r.fault==='customer' ? '<span style="background:#F1F5F9;color:#475569;font-size:10px;font-weight:700;padding:1px 6px;border-radius:99px">👤 Lỗi KH</span>' : ''}
         </div>
       </td>
-      <td style="padding:10px;text-align:right;font-size:12px">${
+      <td data-field="money" style="padding:10px;text-align:right;font-size:12px">${
         (r.resolution && r.resolution.startsWith('replace'))
           ? `<span style="font-weight:700;color:#1E40AF">🔄 Bù hàng</span><div style="font-size:9px;color:var(--muted)">${r.resolution==='replace_next'?'hôm sau':'hôm nay'}${r.replacementCode?' · '+r.replacementCode:''}</div>`
           : `<span style="font-weight:700;color:#DC2626">${window.fmt(r.refundTotal)} ₫</span><div style="font-size:9px;color:var(--muted);font-weight:400">${r.refundMode==='cash'?'chi tiền mặt':'trừ công nợ'}</div>`
       }</td>
-      <td style="padding:10px"><span style="background:${stClr[r.status]}1f;color:${stClr[r.status]};padding:2px 8px;border-radius:99px;font-size:11px;font-weight:700">${stLab[r.status]}</span></td>
-      <td style="padding:10px">${r.status==='pending' ? `<button class="btn btn-ghost btn-sm" onclick="window.processReturn('${r.id}')">✓ Xử lý</button>` : ''}</td>
+      <td class="hide-xs" style="padding:10px"><span style="background:${stClr[r.status]}1f;color:${stClr[r.status]};padding:2px 8px;border-radius:99px;font-size:11px;font-weight:700">${stLab[r.status]}</span></td>
+      <td class="hide-xs" style="padding:10px">${r.status==='pending' ? `<button class="btn btn-ghost btn-sm" onclick="window.processReturn('${r.id}')">✓ Xử lý</button>` : ''}</td>
     </tr>`).join('');
   }
 

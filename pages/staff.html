@@ -21,6 +21,34 @@
   .t2.active{color:var(--navy);border-bottom-color:var(--navy)}
   .t2cnt{background:#E2E8F0;color:#475569;border-radius:99px;font-size:11px;font-weight:700;padding:1px 7px}
   .t2.active .t2cnt{background:var(--navy);color:#fff}
+
+  /* Mặc định ẩn dropdown phòng ban (chỉ hiện trên mobile) */
+  #staffDeptSelect{display:none;width:100%;padding:9px 12px;border:1px solid var(--line);border-radius:8px;font-size:13px;margin:6px 0 12px;background:#fff;font-weight:600;color:var(--navy)}
+  @media (max-width:560px){
+    /* chip phòng ban → dropdown */
+    #staffChips{display:none}
+    #staffDeptSelect{display:block}
+    /* MỖI NHÂN VIÊN = 1 THẺ (card) — block layout, SĐT ghim góc phải, đủ thông tin cốt lõi */
+    .table-card thead{display:none}
+    .table-card table,.table-card tbody{display:block;width:100%}
+    .table-card tbody tr{
+      display:block;position:relative;
+      border:1px solid var(--line);border-radius:12px;margin:0 0 10px;
+      padding:11px 13px;background:#fff;cursor:pointer
+    }
+    .table-card tbody tr:hover{box-shadow:var(--shadow-sm)}
+    .table-card tbody td{display:block;border:none!important;padding:0;white-space:normal;font-size:12.5px;line-height:1.45;text-align:left!important}
+    /* tên NV + avatar (đậm) — chừa chỗ cho SĐT góc phải */
+    .table-card tbody td[data-field="name"]{font-size:14px;padding-right:120px}
+    .table-card tbody td[data-field="name"] .cust-cell{align-items:center}
+    /* SĐT: ghim góc trên phải, xanh đậm */
+    .table-card tbody td[data-field="phone"]{display:block!important;position:absolute!important;top:11px;right:13px;width:auto;text-align:right!important;font-weight:800;color:var(--navy);font-size:13px}
+    .table-card tbody td[data-field="phone"]::before{content:"📞 "}
+    /* khối thông tin phụ: gạch ngang phía trên, mỗi dòng 1 icon, KHÔNG cắt cụt */
+    .table-card tbody td[data-field="dept"]{display:block!important;margin-top:7px;padding-top:7px;border-top:1px dashed var(--line)!important;color:var(--text);white-space:normal!important;overflow:visible!important}
+    .table-card tbody td[data-field="dept"]::before{content:"🏢 "}
+    .table-card tbody td[data-field="status"]{display:block!important;margin-top:4px;white-space:normal!important;overflow:visible!important}
+  }
 </style>
 </head>
 <body>
@@ -61,6 +89,8 @@
         <div class="kpi k-3"><div class="kpi-label">Tổng lương cơ bản</div><div class="kpi-value" id="kpiStaffSalary">0</div><div class="kpi-trend">LCB/tháng</div><div class="kpi-icon">💰</div></div>
       </section>
       <div class="quick-chips" id="staffChips"></div>
+      <!-- MOBILE: lọc phòng ban dạng dropdown (thay cụm chip cuộn ngang) -->
+      <select id="staffDeptSelect" onchange="window.setStaffDept(this.value)"></select>
       <div class="filter-bar">
         <div class="search-in" style="flex:1.5">
           <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="7"/><path d="m21 21-4.3-4.3"/></svg>
@@ -73,10 +103,10 @@
         <div class="table-wrap">
           <table>
             <thead><tr>
-              <th>Mã</th><th>Nhân viên</th><th class="hide-sm">Phòng ban</th>
-              <th class="hide-md">SĐT</th><th>Phân quyền</th>
+              <th class="hide-xs">Mã</th><th>Nhân viên</th><th class="hide-sm">Phòng ban</th>
+              <th class="hide-md">SĐT</th><th class="hide-xs">Phân quyền</th>
               <th class="hide-sm">KPI T5</th><th class="num hide-md">Lương cơ bản</th>
-              <th>Trạng thái</th><th class="num">Hành động</th>
+              <th>Trạng thái</th><th class="num hide-xs">Hành động</th>
             </tr></thead>
             <tbody id="stTbody"></tbody>
           </table>
