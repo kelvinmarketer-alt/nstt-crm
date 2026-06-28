@@ -28,12 +28,19 @@
     }
     .table-card tbody tr:hover{box-shadow:var(--shadow-sm)}
     .table-card tbody td{display:block;border:none!important;padding:0;white-space:normal}
+    /* hàng 1: mã đơn (trái) · tiền hàng (phải, đậm) */
     .table-card tbody td.ocell-code{grid-column:1;grid-row:1}
-    .table-card tbody td[data-field="freight"]{grid-column:2;grid-row:1;text-align:right;font-weight:800;color:var(--navy);font-size:14.5px;align-self:center}
+    .table-card tbody td[data-field="freight"]{grid-column:2;grid-row:1;text-align:right;font-weight:800;color:var(--red);font-size:15px;align-self:center}
+    /* hàng 2: khách hàng (đầy đủ ngang) */
     .table-card tbody td.cust-col{grid-column:1 / -1;grid-row:2;margin-top:5px;padding-top:5px;border-top:1px dashed var(--line)!important}
+    /* hàng 3: sản lượng (kg·quả·mã) — hiện lại dù là .hide-md, cho đủ thông tin */
+    .table-card tbody td.ocell-goods{display:block!important;grid-column:1 / -1;grid-row:3;margin-top:3px;color:var(--muted);font-size:12px}
     .table-card .table-foot{border:0}
   }
   /* Gộp nút phụ (Xuất Excel / In phiếu / Nhập phiếu) vào dropdown trên mobile */
+  /* Chips danh mục → dropdown trên mobile (gọn, khỏi cuộn hàng chip) */
+  #svcSelect{display:none;width:100%;padding:9px 12px;border:1px solid var(--line);border-radius:8px;font-size:13px;margin-bottom:10px;background:#fff;font-weight:600;color:var(--navy)}
+  @media (max-width:980px){ #serviceChips{display:none} #svcSelect{display:block} }
   .acts-flat{display:contents}
   .acts-dd{position:relative;display:none}
   .acts-dd>summary{list-style:none;cursor:pointer}
@@ -138,8 +145,9 @@
     <!-- Status pipeline -->
     <div class="pipeline" id="pipeline"></div>
 
-    <!-- Service chips -->
+    <!-- Service chips (desktop) + dropdown (mobile) -->
     <div class="quick-chips" id="serviceChips"></div>
+    <select id="svcSelect" onchange="window.filterService(this.value||null)"></select>
 
     <!-- Filter -->
     <div class="filter-bar">

@@ -141,6 +141,13 @@
         `<button class="chip ${currentService===s.id?'active':''}" onclick="filterService('${s.id}')" style="${currentService===s.id?'background:'+s.color+';color:#fff;border-color:'+s.color:''}">${s.icon} ${s.label} <span class="cnt">${counts[s.id]||0}</span></button>`
       ).join('');
     document.getElementById('serviceChips').innerHTML = html;
+    /* Dropdown danh mục (mobile) — đồng bộ cùng dữ liệu */
+    const sel = document.getElementById('svcSelect');
+    if (sel) {
+      sel.innerHTML = `<option value="">🗂 Tất cả nhóm hàng (${counts.all})</option>` +
+        (window.SERVICE_TYPES || []).map(s => `<option value="${s.id}">${s.icon} ${s.label} (${counts[s.id] || 0})</option>`).join('');
+      sel.value = currentService || '';
+    }
   }
 
   window.filterStatus = function(k) {
@@ -196,7 +203,7 @@
             <div style="font-size:11.5px;color:var(--muted);white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${o.cust || ''} · <span data-field="staff" title="Click để đổi NV phụ trách">${o.staff || ''}</span></div>
           </td>
           <td class="hide-md" data-field="drop" title="Click để sửa địa chỉ giao" style="font-size:12px">${dropStr}</td>
-          <td class="hide-md" style="font-size:12px" title="Tổng sản lượng — tách theo từng đơn vị (kg, gói, hộp… đếm RIÊNG, không cộng gộp)">${(() => {
+          <td class="hide-md ocell-goods" style="font-size:12px" title="Tổng sản lượng — tách theo từng đơn vị (kg, gói, hộp… đếm RIÊNG, không cộng gộp)">${(() => {
               const its = Array.isArray(o.items) ? o.items : [];
               const nSku = its.length;
               const bd = unitBreakdownOf(its);   /* "38.5 kg · 0.5 gói · 4 hộp" — KHÔNG cộng khác đơn vị thành kg */

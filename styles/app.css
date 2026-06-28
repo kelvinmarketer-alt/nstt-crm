@@ -728,6 +728,11 @@ td.num, td.hide-md {
   /* Bảng đặt trong .chart-card (vd Shipper) — cho cuộn ngang TRONG khung thẻ,
      không để bảng rộng đẩy lệch cả trang. (.chart-card vốn là div trần.) */
   .chart-card { overflow-x: auto; -webkit-overflow-scrolling: touch; }
+  /* DRAWER / MODAL không được trượt ngang (chi tiết đơn bị cụt trái) — nội dung rộng
+     thì bảng/khối bên trong tự cuộn, KHÔNG đẩy lệch cả drawer. */
+  .drawer { overflow-x: hidden; }
+  .tab-body, .drawer-body, .modal-body { overflow-x: hidden !important; }
+  .tab-body { padding-left: 14px !important; padding-right: 14px !important; }
   /* Bảng trong .main: GIỮ width:100% (table chuẩn) → tự khít màn, cột co lại, KHÔNG cuộn ngang/kéo trắng.
      (Bảng quá rộng chưa tinh giản cột sẽ cuộn trong .table-wrap/.chart-card đã có overflow riêng.)
      KHÔNG ép display:block cho bảng .main — vì display:block làm bảng dài theo nội dung → cuộn + trắng thừa. */
