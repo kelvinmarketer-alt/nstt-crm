@@ -25,12 +25,12 @@
     .table-card tbody tr{
       display:block;position:relative;
       border:1px solid var(--line);border-radius:12px;margin:0 0 10px;
-      padding:11px 13px;padding-right:96px;background:#fff;cursor:pointer
+      padding:11px 13px;background:#fff;cursor:pointer
     }
     .table-card tbody tr:hover{box-shadow:var(--shadow-sm)}
     .table-card tbody td{display:block;border:none!important;padding:0;white-space:normal;font-size:13px;line-height:1.45}
-    /* mã đơn (đậm) + badge nguồn ngay dưới */
-    .table-card tbody td.ocell-code{font-size:14.5px;margin-bottom:1px}
+    /* mã đơn (đậm) + badge nguồn ngay dưới — chừa chỗ cho ô tiền góc phải */
+    .table-card tbody td.ocell-code{font-size:14.5px;margin-bottom:1px;padding-right:92px}
     /* TIỀN HÀNG: ghim góc trên phải, đỏ đậm */
     .table-card tbody td[data-field="freight"]{
       position:absolute;top:11px;right:13px;width:auto;
