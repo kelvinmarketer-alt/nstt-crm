@@ -57,6 +57,26 @@
     .table-card tbody td[data-field="dept"]{display:block!important;margin-top:7px;padding-top:7px;border-top:1px dashed var(--line)!important;color:var(--text);white-space:normal!important;overflow:visible!important}
     .table-card tbody td[data-field="dept"]::before{content:"🏢 "}
     .table-card tbody td[data-field="status"]{display:block!important;margin-top:4px;white-space:normal!important;overflow:visible!important}
+
+    /* ===== TAB "Chấm công & Lương" (#panePay render inline trong staff) ===== */
+    /* ẩn nút Upload Excel chấm công */
+    .pay-head .pay-upload{display:none!important}
+    /* 2 nút "Gửi tất cả CFO" + "Bảng dự kiến CFO" cùng 1 hàng 50/50 */
+    .pay-head{flex-wrap:wrap;gap:8px}
+    .pay-head .pay-spacer{display:none}
+    .pay-head > label{flex:0 0 auto}
+    .pay-head #payMonth{flex:1 1 auto;min-width:0}
+    /* "Khung phạt muộn" chiếm trọn 1 hàng → 2 nút CFO sau đó tự ghép cặp 1 hàng */
+    .pay-head > button[onclick*="openLatePolicySettings"]{flex:1 1 100%}
+    .pay-head .cfo-act{flex:1 1 calc(50% - 10px);min-width:0;white-space:nowrap;justify-content:center}
+    /* tab "Chấm công" / "Bảng lương" full-width chia đều */
+    #payTabs.rpt-tabs{width:100%!important;flex-wrap:nowrap;display:flex}
+    #payTabs .rpt-tab{flex:1 1 0;min-width:0;text-align:center;padding:8px 6px;white-space:nowrap}
+    /* FIX bảng chấm công: chỉ 2 cột (Tên + Công), full-width, vô hiệu min-width:600 của t-responsive */
+    #payView .att-wrap{max-height:none!important;overflow:visible!important}
+    #payView table.att-table,#payView table.att-table.t-responsive{width:100%!important;min-width:0!important}
+    #payView .att-table .att-staff{position:static!important;min-width:0!important;width:auto;font-size:13px}
+    #payView .att-table .att-stat.sum{width:84px;text-align:center;padding:8px 6px!important;font-size:15px}
   }
 </style>
 </head>
@@ -125,14 +145,14 @@
 
     <!-- ===== TAB CHẤM CÔNG & LƯƠNG ===== -->
     <div id="panePay" style="display:none">
-      <div style="display:flex;align-items:center;gap:10px;margin-bottom:12px;flex-wrap:wrap">
+      <div class="pay-head" style="display:flex;align-items:center;gap:10px;margin-bottom:12px;flex-wrap:wrap">
         <label style="font-size:13px;color:var(--muted)">Tháng:</label>
         <input type="month" id="payMonth" value="2026-05" onchange="window.setPayMonth(this.value)" style="padding:7px 10px;border:1px solid var(--line);border-radius:7px">
-        <div style="flex:1"></div>
+        <div class="pay-spacer" style="flex:1"></div>
         <button class="btn btn-ghost" onclick="window.openLatePolicySettings && window.openLatePolicySettings()" title="Cấu hình mức phạt đi muộn (admin)">⚙ Khung phạt muộn</button>
-        <button class="btn btn-primary" onclick="window.openUploadTimesheet && window.openUploadTimesheet()" title="Up file Excel từ máy chấm công → tự cập nhật công + tính lương">📥 Upload Excel chấm công</button>
-        <button class="btn btn-navy" onclick="window.submitAllDrafts && window.submitAllDrafts(document.getElementById('payMonth').value)" title="HR gửi tất cả phiếu draft + tự lập phiếu cho NV chưa có">📤 Gửi tất cả CFO duyệt</button>
-        <button class="btn btn-ghost" onclick="window.openPayslipBatchReview && window.openPayslipBatchReview(document.getElementById('payMonth').value)" title="CFO xem hàng loạt + duyệt nhanh">📊 Bảng dự kiến CFO duyệt</button>
+        <button class="btn btn-primary pay-upload" onclick="window.openUploadTimesheet && window.openUploadTimesheet()" title="Up file Excel từ máy chấm công → tự cập nhật công + tính lương">📥 Upload Excel chấm công</button>
+        <button class="btn btn-navy cfo-act" onclick="window.submitAllDrafts && window.submitAllDrafts(document.getElementById('payMonth').value)" title="HR gửi tất cả phiếu draft + tự lập phiếu cho NV chưa có">📤 Gửi tất cả CFO duyệt</button>
+        <button class="btn btn-ghost cfo-act" onclick="window.openPayslipBatchReview && window.openPayslipBatchReview(document.getElementById('payMonth').value)" title="CFO xem hàng loạt + duyệt nhanh">📊 Bảng dự kiến CFO duyệt</button>
       </div>
       <div class="rpt-tabs" id="payTabs"></div>
       <div id="payView"></div>
