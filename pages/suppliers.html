@@ -64,6 +64,31 @@
     #panePur .pn-table tbody td[data-field="date"]::before{content:"📅 "}
     #panePur .pn-table tbody td[data-field="status"]{display:block!important;margin-top:5px}
   }
+  /* MOBILE ≤560: thanh chuyển 3 chức năng = segmented control (icon trên, chữ dưới, ô active nổi bật, dính trên cùng) */
+  @media (max-width:560px){
+    .tabs2{
+      position:sticky;top:0;z-index:20;
+      display:grid;grid-template-columns:1fr 1fr 1fr;gap:6px;
+      border:none;background:#F1F5F9;border-radius:14px;padding:5px;margin:0 0 16px;
+    }
+    .t2{
+      flex-direction:column;justify-content:center;gap:3px;
+      padding:9px 4px;margin:0;border:none!important;border-radius:10px;
+      font-size:12px;font-weight:700;line-height:1.15;text-align:center;color:var(--muted);
+    }
+    .t2 .t2ic{font-size:19px;line-height:1}
+    .t2 .t2lbl{display:block}
+    .t2.active{
+      color:#fff;background:var(--navy);
+      box-shadow:0 2px 6px rgba(0,0,0,.16);
+    }
+    .t2cnt{
+      position:absolute;top:4px;right:8px;margin:0;
+      font-size:10px;padding:0 5px;min-width:16px;
+    }
+    .t2.active .t2cnt{background:#fff;color:var(--navy)}
+    .t2{position:relative}
+  }
 </style>
 </head>
 <body>
@@ -84,9 +109,9 @@
     </div>
 
     <div class="tabs2">
-      <div class="t2 active" data-t2="ncc" onclick="window.supTab('ncc')">🏭 Nhà cung cấp <span id="t2nccCount" class="t2cnt"></span></div>
-      <div class="t2" data-t2="pur" onclick="window.supTab('pur')">📦 Phiếu nhập <span id="t2purCount" class="t2cnt"></span></div>
-      <div class="t2" data-t2="gom" onclick="window.supTab('gom')">🧺 Gom hàng → NCC</div>
+      <div class="t2 active" data-t2="ncc" onclick="window.supTab('ncc')"><span class="t2ic">🏭</span><span class="t2lbl">Nhà cung cấp</span> <span id="t2nccCount" class="t2cnt"></span></div>
+      <div class="t2" data-t2="pur" onclick="window.supTab('pur')"><span class="t2ic">📦</span><span class="t2lbl">Phiếu nhập</span> <span id="t2purCount" class="t2cnt"></span></div>
+      <div class="t2" data-t2="gom" onclick="window.supTab('gom')"><span class="t2ic">🧺</span><span class="t2lbl">Gom hàng</span></div>
     </div>
 
     <!-- ===== TAB NHÀ CUNG CẤP ===== -->

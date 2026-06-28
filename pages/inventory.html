@@ -24,8 +24,32 @@
   .ik-kpi .sub{font-size:11.5px;color:var(--muted);margin-top:2px}
   /* Ô "Tình trạng" chỉ dùng cho thẻ mobile — ẩn trên desktop để giữ bảng nguyên */
   .inv-lvl-cell{display:none}
+  /* Dropdown nút phụ — desktop ẩn (dùng nút phẳng), mobile hiện */
+  .inv-acts-dd{position:relative;display:none}
+  .inv-acts-dd>summary{list-style:none;cursor:pointer}
+  .inv-acts-dd>summary::-webkit-details-marker{display:none}
+  .inv-acts-dd-menu{position:absolute;right:0;top:calc(100% + 4px);z-index:30;background:#fff;border:1px solid var(--line);border-radius:10px;box-shadow:0 8px 24px rgba(0,0,0,.15);padding:6px;min-width:210px;display:flex;flex-direction:column;gap:4px}
+  .inv-acts-dd-menu .btn{width:100%;justify-content:flex-start}
   /* ===== MOBILE: bảng tồn kho chính → THẺ (≤560px) ===== */
   @media (max-width:560px){
+    /* HEADER: tiêu đề 1 dòng nhỏ gọn, ẩn nút phẳng → dùng dropdown ⋯, nút chính nổi bật */
+    .inv-head{gap:8px;margin-bottom:10px}
+    .inv-head .inv-h1{font-size:17px;line-height:1.25;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+    .inv-head-sub{display:none}
+    .inv-acts-flat{display:none}
+    .inv-acts-dd{display:block;flex:0 0 auto}
+    .inv-acts-dd>summary{padding:7px 11px}
+    .inv-btn-main{flex:0 0 auto;padding:8px 12px;font-size:13px;white-space:nowrap}
+    /* BANNER giới thiệu: thu nhỏ font/padding để khỏi chiếm cả màn */
+    .help-banner{padding:8px 10px;gap:8px;border-radius:9px}
+    .help-banner .hb-ic{font-size:15px}
+    .help-banner .hb-body{font-size:11.5px;line-height:1.4}
+    /* KPI: 2 ô/hàng, nén lại */
+    #invKpis{grid-template-columns:repeat(2,1fr)!important;gap:7px;margin-bottom:10px}
+    #invKpis .ik-kpi{padding:8px 10px;border-radius:9px}
+    #invKpis .ik-kpi .lab{font-size:9.5px;letter-spacing:0;line-height:1.3}
+    #invKpis .ik-kpi .val{font-size:18px;margin-top:2px}
+    #invKpis .ik-kpi .sub{font-size:10px;margin-top:1px}
     #invBody-host thead{display:none}
     #invBody-host table, #invBody-host tbody{display:block;width:100%;min-width:0!important}
     #invBody-host tbody tr{display:block;position:relative;border:1px solid var(--line);border-radius:12px;margin:0 0 10px;padding:11px 13px;background:#fff;cursor:pointer}
@@ -51,15 +75,26 @@
   </header>
 
   <main class="main">
-    <div style="display:flex;align-items:center;gap:12px;margin-bottom:14px">
-      <div>
-        <h1 style="margin:0;font-size:22px;color:var(--navy);font-weight:800">📥 Kho / Tồn kho <span id="hbTitle"></span></h1>
-        <div style="font-size:13px;color:var(--muted);margin-top:2px">Theo dõi tồn — cảnh báo hết — tự trừ khi xuất đơn</div>
+    <div class="inv-head" style="display:flex;align-items:center;gap:12px;margin-bottom:14px">
+      <div class="inv-head-titles">
+        <h1 class="inv-h1" style="margin:0;font-size:22px;color:var(--navy);font-weight:800">📥 Kho / Tồn kho <span id="hbTitle"></span></h1>
+        <div class="inv-head-sub" style="font-size:13px;color:var(--muted);margin-top:2px">Theo dõi tồn — cảnh báo hết — tự trừ khi xuất đơn</div>
       </div>
       <div style="flex:1"></div>
-      <button class="btn btn-ghost" onclick="window.exportInvCsv()">⬇ Xuất Excel</button>
-      <button class="btn btn-ghost" onclick="window.openInvAdjust()">⚖️ Kiểm kê / Điều chỉnh</button>
-      <button class="btn btn-primary" onclick="window.location.href='purchases.html'">+ Tạo phiếu nhập</button>
+      <!-- Desktop: 2 nút phụ phẳng -->
+      <span class="inv-acts-flat">
+        <button class="btn btn-ghost" onclick="window.exportInvCsv()">⬇ Xuất Excel</button>
+        <button class="btn btn-ghost" onclick="window.openInvAdjust()">⚖️ Kiểm kê / Điều chỉnh</button>
+      </span>
+      <!-- Mobile: gộp 2 nút phụ vào dropdown -->
+      <details class="inv-acts-dd">
+        <summary class="btn btn-ghost">⋯</summary>
+        <div class="inv-acts-dd-menu">
+          <button class="btn btn-ghost" onclick="this.closest('details').open=false;window.exportInvCsv()">⬇ Xuất Excel</button>
+          <button class="btn btn-ghost" onclick="this.closest('details').open=false;window.openInvAdjust()">⚖️ Kiểm kê / Điều chỉnh</button>
+        </div>
+      </details>
+      <button class="btn btn-primary inv-btn-main" onclick="window.location.href='purchases.html'">+ Tạo phiếu nhập</button>
     </div>
 
     <div id="hbHost"></div>

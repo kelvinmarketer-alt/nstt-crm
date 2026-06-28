@@ -36,15 +36,31 @@
   }
   window.PriceTiers = { getTiers, tierById, tierPriceOf, tierIcon };
 
+  /* Ô nhập giá hiển thị định dạng tiền (16.000) — gõ tới đâu format tới đó.
+     Đọc lại bằng _pmoney() (bỏ dấu chấm). */
+  window.fmtMoneyInput = function (el) {
+    const d = String(el.value).replace(/\D/g, '');
+    el.value = d ? (+d).toLocaleString('vi-VN') : '';
+  };
+  const _pmoney = v => parseInt(String(v).replace(/\D/g, ''), 10) || 0;
+  const _mfmt = n => (+n || 0).toLocaleString('vi-VN');
+
   function tierBarHTML() {
     const tiers = getTiers();
     let s = `<div class="chart-card" style="margin-bottom:14px"><div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap">
       <span style="font-size:12.5px;color:var(--muted);font-weight:700">📊 Nhóm bảng giá:</span>
+      <span class="tier-btns" style="display:contents">
       <button class="btn btn-sm ${boardTier === 0 ? 'btn-primary' : 'btn-ghost'}" onclick="window.boardSwitchTier(0)">📋 Gốc</button>`;
     tiers.forEach(t => {
       s += `<button class="btn btn-sm ${boardTier === t.id ? 'btn-primary' : 'btn-ghost'}" onclick="window.boardSwitchTier(${t.id})">${tierIcon(t)} ${t.name} <span style="opacity:.7">(${t.markup >= 0 ? '+' : ''}${t.markup}%)</span></button>`;
     });
     if (tiers.length < 8) s += `<button class="btn btn-sm btn-ghost" style="border-style:dashed" onclick="window.tierAdd()">＋ Thêm nhóm</button>`;
+    s += `</span>`;
+    /* MOBILE: chọn nhóm bằng dropdown cho gọn (thay hàng nút) */
+    s += `<select class="tier-select" onchange="window.boardSwitchTier(this.value)">
+      <option value="0" ${boardTier === 0 ? 'selected' : ''}>📋 Gốc (giá bán thật)</option>
+      ${tiers.map(t => `<option value="${t.id}" ${boardTier === t.id ? 'selected' : ''}>${tierIcon(t)} ${t.name} (${t.markup >= 0 ? '+' : ''}${t.markup}%)</option>`).join('')}
+    </select>`;
     s += `<button class="btn btn-sm btn-ghost" onclick="window.tierManage()" title="Đổi tên / % / xóa nhóm">⚙ Quản lý nhóm</button></div>`;
     const tier = boardTier ? tierById(boardTier) : null;
     if (!tier) {
@@ -269,12 +285,12 @@
       /* Cột giá: GỐC = input bprice; NHÓM = giá nhóm (override hoặc gốc±%) */
       let priceCell, lastCell;
       if (!tier) {
-        priceCell = `<input class="bprice" data-id="${p.id}" type="number" value="${todaySell}" style="width:110px;text-align:right;padding:6px 8px;border:1px solid var(--line);border-radius:6px">`;
+        priceCell = `<input class="bprice" data-id="${p.id}" type="text" inputmode="numeric" oninput="window.fmtMoneyInput(this)" value="${todaySell ? _mfmt(todaySell) : ''}" style="width:110px;text-align:right;padding:6px 8px;border:1px solid var(--line);border-radius:6px">`;
         lastCell = `<td class="num hide-xs">${delta}</td>`;
       } else {
         const hasOv = tier.overrides && tier.overrides[p.id] != null;
         const tp = tierPriceOf(tier, p.id, todaySell);
-        priceCell = `<input class="tprice" data-id="${p.id}" type="number" value="${tp}" title="${hasOv ? 'Giá ghi đè riêng' : 'Giá gốc ' + (tier.markup >= 0 ? '+' : '') + tier.markup + '%'}" style="width:110px;text-align:right;padding:6px 8px;border:1px solid ${hasOv ? '#F59E0B' : 'var(--line)'};border-radius:6px;${hasOv ? 'background:#FEF9C3;font-weight:700' : ''}">`;
+        priceCell = `<input class="tprice" data-id="${p.id}" type="text" inputmode="numeric" oninput="window.fmtMoneyInput(this)" value="${tp ? _mfmt(tp) : ''}" title="${hasOv ? 'Giá ghi đè riêng' : 'Giá gốc ' + (tier.markup >= 0 ? '+' : '') + tier.markup + '%'}" style="width:110px;text-align:right;padding:6px 8px;border:1px solid ${hasOv ? '#F59E0B' : 'var(--line)'};border-radius:6px;${hasOv ? 'background:#FEF9C3;font-weight:700' : ''}">`;
         lastCell = `<td class="num hide-xs">${hasOv ? `<button class="btn btn-ghost btn-sm" title="Bỏ ghi đè, về giá gốc ±%" onclick="window.tierResetOverride('${p.id}')">↺</button>` : `<span style="color:var(--muted);font-size:11px">theo %</span>`}</td>`;
       }
       return `<tr data-id="${p.id}">
@@ -317,10 +333,10 @@
       </div>`;
     document.getElementById('boardView').innerHTML = tgBanner + `
       <div class="chart-card" style="margin-bottom:14px">
-        <div style="display:flex;gap:12px;align-items:center;flex-wrap:wrap">
-          <div><label style="font-size:12px;color:var(--muted);display:block;margin-bottom:4px">Ngày áp dụng</label>
+        <div class="board-toolbar" style="display:flex;gap:12px;align-items:center;flex-wrap:wrap">
+          <div class="bt-date"><label style="font-size:12px;color:var(--muted);display:block;margin-bottom:4px">Ngày áp dụng</label>
             <input type="date" id="boardDateInp" value="${boardDate}" style="padding:7px 10px;border:1px solid var(--line);border-radius:7px"></div>
-          <div style="flex:1"></div>
+          <div class="bt-spacer" style="flex:1"></div>
           <button class="btn btn-ghost btn-sm" onclick="window.aiFillPrices()">📷 Cập nhật giá bằng ảnh (AI)</button>
           <button class="btn btn-ghost btn-sm" onclick="window.copyYesterday()">📋 Sao chép giá hôm qua</button>
           <button class="btn btn-ghost btn-sm" onclick="window.copyPriceText()" title="Copy text gọn dán Zalo">📋 Copy text</button>
@@ -372,7 +388,7 @@
         if (!boardTier) return;
         const tiers = getTiers(); const t = tiers.find(x => x.id === boardTier); if (!t) return;
         t.overrides = t.overrides || {};
-        t.overrides[inp.dataset.id] = parseInt(inp.value, 10) || 0;
+        t.overrides[inp.dataset.id] = _pmoney(inp.value);
         saveTiers(tiers); renderBoard();
         window.toast('✓ Đã ghi đè giá nhóm cho SP', 'success');
       });
@@ -420,7 +436,7 @@
         <td data-field="unit" style="color:var(--muted)">/${p.unit}</td>
         <td data-field="ref" class="num" style="color:var(--muted)">${window.fmt(real)}</td>
         <td data-field="price" class="num">
-          <input class="mktprice" data-id="${p.id}" type="number" value="${mkt}" style="width:110px;text-align:right;padding:6px 8px;border:1px solid ${isOverride?'#A16207':'var(--line)'};border-radius:6px;background:${isOverride?'#FEF9C3':'#fff'}" title="${isOverride?'Đã sửa tay':'Tự tính = giá thật + offset'}">
+          <input class="mktprice" data-id="${p.id}" type="text" inputmode="numeric" oninput="window.fmtMoneyInput(this)" value="${mkt ? _mfmt(mkt) : ''}" style="width:110px;text-align:right;padding:6px 8px;border:1px solid ${isOverride?'#A16207':'var(--line)'};border-radius:6px;background:${isOverride?'#FEF9C3':'#fff'}" title="${isOverride?'Đã sửa tay':'Tự tính = giá thật + offset'}">
           ${isOverride ? `<button onclick="window._mktClearOne('${p.id}')" title="Bỏ sửa tay, về công thức" style="background:none;border:none;color:#A16207;cursor:pointer;font-size:11px">↺</button>` : ''}
         </td>
         <td class="num hide-xs">${diffTxt}</td>
@@ -477,7 +493,7 @@
     document.querySelectorAll('.mktprice').forEach(inp => {
       inp.addEventListener('change', (e) => {
         const id = e.target.dataset.id;
-        const val = parseInt(e.target.value, 10) || 0;
+        const val = _pmoney(e.target.value);
         const cfg = mktCfg();
         cfg.override = cfg.override || {};
         cfg.override[id] = val;
@@ -569,7 +585,7 @@
       /* Matcher CHẶT — không khớp nhầm sang SP khác */
       const p = window.matchProductSmart ? window.matchProductSmart(it.name, ps)
         : ps.find(x => window.AI.norm(x.name) === window.AI.norm(it.name));
-      if (p) { const inp = document.querySelector('.bprice[data-id="' + p.id + '"]'); if (inp) { inp.value = price; matched++; } }
+      if (p) { const inp = document.querySelector('.bprice[data-id="' + p.id + '"]'); if (inp) { inp.value = _mfmt(price); matched++; } }
       else miss.push(it.name);
     });
     window.toast(`✓ AI điền ${matched} giá${miss.length ? ' · ⚠️ ' + miss.length + ' SP chưa có trong DM: ' + miss.slice(0, 4).join(', ') + (miss.length > 4 ? '…' : '') : ''} — kiểm tra rồi bấm "Lưu bảng giá".`, matched ? 'success' : 'warn');
@@ -580,7 +596,7 @@
     document.querySelectorAll('.bprice').forEach(inp => {
       const p = window.productById(inp.dataset.id);
       const prev = prevEntry(p, boardDate);
-      if (prev) inp.value = prev.sell;
+      if (prev) inp.value = _mfmt(prev.sell);
     });
     window.toast('Đã điền giá hôm qua — chỉnh lại rồi bấm Lưu', 'info');
   };
@@ -589,7 +605,7 @@
     let n = 0;
     document.querySelectorAll('.bprice').forEach(inp => {
       const id = inp.dataset.id;
-      const sell = parseInt(inp.value, 10) || 0;
+      const sell = _pmoney(inp.value);
       const p = window.productById(id);
       if (!p) return;
       const hist = [...(p.priceHistory || [])];
