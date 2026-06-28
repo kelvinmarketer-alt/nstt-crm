@@ -40,6 +40,34 @@
     .table-card tbody td[data-field="orders"]::after{content:" đơn"}
     .table-card tbody td[data-field="debt"]{display:block!important;margin-top:3px;font-weight:700;white-space:normal!important;overflow:visible!important}
     .table-card tbody td[data-field="debt"]::before{content:"💰 Công nợ: "}
+
+    /* ===== BỘ LỌC: gom 3 hàng → 2 hàng × 3 ô (ĐT) =====
+       DOM order: search-in, fGroup, fProvince, fService, fStatus, btn-xóa-lọc.
+       Dùng flex + order để xếp lại: hàng 1 = fGroup/fProvince/fService, hàng 2 = tìm kiếm/fStatus/xóa lọc */
+    .filter-bar{gap:8px;align-items:stretch}
+    .filter-bar > *{flex:1 1 calc(33.33% - 6px);min-width:0!important;margin:0}
+    .filter-bar .search-in{order:1}
+    .filter-bar #fGroup{order:-3}
+    .filter-bar #fProvince{order:-2}
+    .filter-bar #fService{order:-1}
+    .filter-bar #fStatus{order:2}
+    .filter-bar .btn[onclick*="clearFilters"]{order:3}
+    .filter-bar .search-in input{padding:8px 10px 8px 30px;font-size:12.5px}
+    .filter-bar .search-in svg{left:8px}
+    .filter-bar select,.filter-bar input{font-size:12.5px;padding:8px 8px}
+
+    /* ===== NÚT HEADER: ẩn Excel + Nhập CSV, dồn 2 nút còn lại 50/50 ===== */
+    .head-actions .btn[onclick*="exportCustomersCsv"],
+    .head-actions .btn[onclick*="importCustomersCsv"]{display:none}
+    .head-actions .btn[onclick*="aiAddCustomer"],
+    .head-actions .btn[onclick*="openAddCustomerModal"]{flex:1 1 calc(50% - 4px);min-width:0}
+
+    /* ===== HÀNG "Đang hiển thị…" + Cột hiển thị + Sắp xếp: 1 dòng thoáng ===== */
+    .table-head{gap:6px;flex-wrap:nowrap}
+    .table-head .checkbox{flex:0 0 auto}
+    .table-head .count{flex:1 1 auto;min-width:0;font-size:11px;line-height:1.25;white-space:normal}
+    .table-head .spacer{display:none}
+    .table-head .btn{flex:0 0 auto;white-space:nowrap;padding:6px 8px;font-size:11.5px}
   }
 </style>
 </head>

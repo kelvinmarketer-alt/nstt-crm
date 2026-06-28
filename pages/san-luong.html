@@ -17,6 +17,35 @@
   table.cn-tbl tr:hover td.par{background:#F3FAF3}
   table.cn-tbl tfoot td{position:sticky;bottom:0;background:#1B5E20;color:#fff;font-weight:700;border-top:2px solid #15803D;vertical-align:top}
   table.cn-tbl tfoot td.par{background:#1B5E20;color:#fff}
+
+  /* === ĐIỆN THOẠI (≤560px): gọn các cụm nút, ô card cho Tổng sản lượng. Desktop giữ nguyên. === */
+  @media (max-width:560px){
+    /* Cụm điều khiển trong thẻ lọc */
+    .chart-card > div[style*="flex-end"]{gap:8px}
+    .sl-spacer{display:none}
+    /* (A1) "Tất cả đối tác" + "Xem báo cáo" CÙNG 1 hàng */
+    .sl-cust{flex:1 1 62%;min-width:0;order:4}
+    .sl-cust select{width:100%;box-sizing:border-box}
+    .sl-btn-render{flex:1 1 34%;min-width:0;order:5;white-space:nowrap;padding-left:6px;padding-right:6px}
+    /* (A2) Ẩn "Xuất Excel" trên ĐT */
+    .sl-btn-export{display:none!important}
+    /* (A3) Nút mốc thời gian: 4 nút chia đều full 1 hàng, chữ nowrap */
+    .sl-presets{order:6;flex:1 1 100%;flex-wrap:nowrap;gap:5px}
+    .sl-presets .btn{flex:1 1 0;min-width:0;white-space:nowrap;padding-left:3px;padding-right:3px;font-size:11.5px}
+    /* (A4) "Tổng sản lượng" → các Ô (card) trên 1 hàng, mỗi đơn vị 1 ô */
+    .sl-totlabel{display:block;font-weight:600;color:var(--navy);margin-bottom:6px}
+    .sl-units{display:grid;grid-template-columns:repeat(2,1fr);gap:6px}
+    .sl-usep{display:none}
+    .sl-ucell{display:flex;flex-direction:column;align-items:center;justify-content:center;gap:2px;
+      background:#F0FDF4;border:1px solid #BBF7D0;border-radius:9px;padding:8px 6px;text-align:center}
+    .sl-uval{font-size:15px;line-height:1.1;color:#15803D}
+    .sl-uname{font-size:11px;font-weight:400;color:#15803D;opacity:.85}
+    /* (A5) Tabs lọc → chia đều full chiều ngang */
+    .sl-tabs{gap:6px;flex-wrap:nowrap}
+    .sl-tab{flex:1 1 0;min-width:0;white-space:normal;line-height:1.15;font-size:11px;padding-left:5px;padding-right:5px;overflow:hidden}
+    /* (A6) Bảng: thu nhỏ cột tên SP để cột số thoải mái hơn (vẫn cuộn ngang trong khung) */
+    table.cn-tbl td.par, table.cn-tbl th.par{max-width:120px}
+  }
 </style>
 </head>
 <body>
@@ -47,25 +76,25 @@
             <option value="thang">Tháng</option>
             <option value="quy">Quý</option>
           </select></div>
-        <div style="min-width:220px"><label style="font-size:12px;color:var(--muted);display:block;margin-bottom:4px">Đối tác</label>
+        <div class="sl-cust" style="min-width:220px"><label style="font-size:12px;color:var(--muted);display:block;margin-bottom:4px">Đối tác</label>
           <select id="slCust" onchange="window.slRender()" style="width:100%;padding:7px 10px;border:1px solid var(--line);border-radius:7px"></select></div>
-        <button class="btn btn-primary" onclick="window.slRender()">🔄 Xem báo cáo</button>
-        <div style="display:flex;gap:5px;flex-wrap:wrap">
+        <button class="btn btn-primary sl-btn-render" onclick="window.slRender()">🔄 Xem báo cáo</button>
+        <div class="sl-presets" style="display:flex;gap:5px;flex-wrap:wrap">
           <button class="btn btn-ghost btn-sm" onclick="window.slPreset('month')">Tháng này</button>
           <button class="btn btn-ghost btn-sm" onclick="window.slPreset('prev')">Tháng trước</button>
           <button class="btn btn-ghost btn-sm" onclick="window.slPreset('quarter')">Quý này</button>
           <button class="btn btn-ghost btn-sm" onclick="window.slPreset('year')">Năm nay</button>
         </div>
-        <div style="flex:1"></div>
-        <button class="btn btn-ghost" onclick="window.slExport()" title="Xuất file Excel">📥 Xuất Excel</button>
+        <div class="sl-spacer" style="flex:1"></div>
+        <button class="btn btn-ghost sl-btn-export" onclick="window.slExport()" title="Xuất file Excel">📥 Xuất Excel</button>
       </div>
       <div id="slSummary" style="margin-top:10px;font-size:12.5px;color:var(--muted)"></div>
     </div>
 
-    <div style="display:flex;gap:8px;margin-bottom:10px;flex-wrap:wrap">
-      <button data-slview="product" class="btn btn-sm" style="background:#15803D;color:#fff;border:1px solid var(--line)" onclick="window.slSetView('product')">📦 Theo sản phẩm</button>
-      <button data-slview="cust" class="btn btn-sm" style="background:#fff;color:var(--navy);border:1px solid var(--line)" onclick="window.slSetView('cust')">👥 Theo đối tác (sản lượng)</button>
-      <button data-slview="money" class="btn btn-sm" style="background:#fff;color:var(--navy);border:1px solid var(--line)" onclick="window.slSetView('money')">💰 Doanh thu/ngày theo đối tác</button>
+    <div class="sl-tabs" style="display:flex;gap:8px;margin-bottom:10px;flex-wrap:wrap">
+      <button data-slview="product" class="btn btn-sm sl-tab" style="background:#15803D;color:#fff;border:1px solid var(--line)" onclick="window.slSetView('product')">📦 Theo sản phẩm</button>
+      <button data-slview="cust" class="btn btn-sm sl-tab" style="background:#fff;color:var(--navy);border:1px solid var(--line)" onclick="window.slSetView('cust')">👥 Theo đối tác (sản lượng)</button>
+      <button data-slview="money" class="btn btn-sm sl-tab" style="background:#fff;color:var(--navy);border:1px solid var(--line)" onclick="window.slSetView('money')">💰 Doanh thu/ngày theo đối tác</button>
     </div>
 
     <div class="cn-wrap"><table class="cn-tbl" id="slTable"><tbody><tr><td style="padding:30px;text-align:center;color:var(--muted)">Chọn khoảng ngày + đối tác rồi bấm "Xem báo cáo".</td></tr></tbody></table></div>

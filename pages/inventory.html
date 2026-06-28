@@ -58,6 +58,9 @@
     #invBody-host tbody td[data-field="code"]{display:block!important;margin-top:6px;padding-top:6px;border-top:1px dashed var(--line)!important;color:var(--muted);white-space:normal!important;overflow:visible!important}
     #invBody-host tbody td[data-field="code"]::before{content:"🏷️ "}
     #invBody-host tbody td[data-field="level"]{display:block!important;margin-top:3px;white-space:normal!important;overflow:visible!important}
+    /* Lịch sử biến động kho: BỎ khung cuộn cao cố định → full, dài thoải mái theo trang */
+    #movList{max-height:none!important;overflow:visible!important}
+    #movList-card{overflow:visible!important}
   }
 </style>
 </head>
@@ -137,7 +140,7 @@
     </div>
 
     <!-- Movements -->
-    <div style="background:#fff;border:1px solid var(--line);border-radius:10px;margin-top:14px;overflow:hidden">
+    <div id="movList-card" style="background:#fff;border:1px solid var(--line);border-radius:10px;margin-top:14px;overflow:hidden">
       <div style="padding:12px 16px;border-bottom:1px solid var(--line);display:flex;align-items:center">
         <h3 style="margin:0;font-size:13px;color:var(--navy);font-weight:700;text-transform:uppercase;letter-spacing:0.4px">📜 Lịch sử biến động kho (gần đây) <span id="hbMv"></span></h3>
       </div>

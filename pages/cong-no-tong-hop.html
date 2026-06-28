@@ -46,15 +46,15 @@
     /* (3) Từ ngày / Đến ngày: 2 cột cân nhau, mỗi ô 50% */
     .cn-ctrl .cn-date{flex:1 1 calc(50% - 10px);min-width:0}
     .cn-ctrl .cn-date input{width:100%;box-sizing:border-box}
-    /* (2) "Xem báo cáo" full hàng riêng */
-    .cn-btn-render{order:3;flex:1 1 100%;white-space:nowrap}
-    /* (4) Nút kỳ: 1 hàng chia đều 4 nút, chữ nowrap */
-    .cn-presets{order:4;flex:1 1 100%;flex-wrap:nowrap;gap:5px}
-    .cn-presets .btn{flex:1 1 0;min-width:0;white-space:nowrap;padding-left:4px;padding-right:4px;font-size:12px}
-    /* (5) Bỏ "Xuất Excel"; đơn vị full-width */
-    .cn-btn-export{display:none}
-    .cn-unit{order:5;flex:1 1 100%}
+    /* (2)+(5) "Xem báo cáo" + "Đơn vị" CÙNG 1 hàng (cùng container .cn-ctrl) */
+    .cn-btn-render{order:5;flex:1 1 46%;min-width:0;white-space:nowrap;align-self:flex-end}
+    .cn-unit{order:4;flex:1 1 50%;min-width:0}
     .cn-unit select{width:100%;box-sizing:border-box}
+    /* (4) Nút kỳ: 1 hàng chia đều 4 nút, chữ nowrap */
+    .cn-presets{order:3;flex:1 1 100%;flex-wrap:nowrap;gap:5px}
+    .cn-presets .btn{flex:1 1 0;min-width:0;white-space:nowrap;padding-left:4px;padding-right:4px;font-size:12px}
+    /* (5) Bỏ "Xuất Excel" */
+    .cn-btn-export{display:none}
 
     /* (6) Dòng tổng hợp: thu nhỏ font cho gọn */
     #cnSummary{font-size:11px;line-height:1.35;margin-top:8px}

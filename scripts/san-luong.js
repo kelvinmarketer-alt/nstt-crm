@@ -74,7 +74,7 @@
     return { periods, list, nOrders };
   }
 
-  const ubFmt = obj => Object.keys(obj).sort((a, b) => a === 'kg' ? -1 : b === 'kg' ? 1 : a.localeCompare(b, 'vi')).map(u => `${fmtNum(obj[u])} ${u}`).join(' · ');
+  const ubFmt = obj => Object.keys(obj).sort((a, b) => a === 'kg' ? -1 : b === 'kg' ? 1 : a.localeCompare(b, 'vi')).map(u => `<span class="sl-ucell"><b class="sl-uval">${fmtNum(obj[u])}</b> <span class="sl-uname">${u}</span></span>`).join('<span class="sl-usep"> · </span>');
 
   let _last = null, _lastMoney = null;
   let _view = 'product';   /* 'product' = SP × thời gian · 'cust' = đối tác (SL) · 'money' = doanh thu/ngày theo đối tác */
@@ -145,7 +145,7 @@
     ctl('slSummary').innerHTML =
       `📅 <b>${periodLabel(periodOf(fromISO, 'ngay'), 'ngay')} → ${periodLabel(periodOf(toISO, 'ngay'), 'ngay')}</b> · gộp theo <b>${granLabel}</b> · `
       + `phạm vi: <b>${custFilter ? custName : 'TOÀN CÔNG TY'}</b> · ${data.list.length} mã SP${offN ? ` (gồm <b style="color:#92400E">${offN} mã ngoài DM</b>)` : ''} · ${data.nOrders} đơn${backLink}<br>`
-      + `📦 Tổng sản lượng: <b style="color:#15803D">${ubFmt(totUnit)}</b>`;
+      + `<span class="sl-totlabel">📦 Tổng sản lượng: </span><span class="sl-units" style="color:#15803D;font-weight:700">${ubFmt(totUnit)}</span>`;
   };
 
   /* === XEM THEO ĐỐI TÁC: 1 khách = 1 dòng → bấm để xem tổng SP của khách đó === */

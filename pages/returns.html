@@ -84,7 +84,8 @@
     <div style="background:#fff;border:1px solid var(--line);border-radius:10px;padding:14px">
       <p style="font-size:13px;margin:0 0 10px;color:var(--muted)">Chọn 1 đơn đã giao để upload ảnh POD (chữ ký KH / ảnh giao hàng tại bếp / hoá đơn ký nhận).</p>
       <div class="pod-search" style="display:flex;gap:8px;margin-bottom:14px">
-        <select id="podOrder" class="pod-search-sel" style="flex:1;border:1px solid var(--line);border-radius:7px;padding:7px 10px;font-size:13px"></select>
+        <input id="podOrder" class="pod-search-sel" list="podOrderList" autocomplete="off" placeholder="Gõ mã đơn / tên KH để tìm..." style="flex:1;border:1px solid var(--line);border-radius:7px;padding:7px 10px;font-size:13px">
+        <datalist id="podOrderList"></datalist>
         <input type="file" id="podFile" accept="image/*" capture="environment" style="display:none">
         <button class="btn btn-primary pod-search-btn" onclick="document.getElementById('podFile').click()">📷 Chụp / Chọn ảnh</button>
       </div>
@@ -164,16 +165,22 @@
     </div>`).join('');
   }
 
-  /* Populate POD order select */
+  /* Tách mã đơn ở đầu chuỗi gợi ý: "NSTT-526069 · Tên KH · ngày" → "NSTT-526069" */
+  function _parseOrderCode(val) {
+    if (!val) return '';
+    return String(val).split('·')[0].trim();
+  }
+
+  /* Populate POD order datalist (gõ để tìm mã đơn / tên KH) */
   function populatePODSelect() {
     const orders = getOrd().filter(o => o.status === 'delivered' || o.status === 'reconciled' || o.status === 'transit');
-    const sel = document.getElementById('podOrder');
-    sel.innerHTML = '<option value="">— Chọn đơn để gắn ảnh POD —</option>' + orders.slice(0, 50).map(o => `<option value="${o.code}">${o.code} · ${o.custName} · ${o.date}</option>`).join('');
+    const dl = document.getElementById('podOrderList');
+    dl.innerHTML = orders.slice(0, 200).map(o => `<option value="${o.code} · ${o.custName} · ${o.date}"></option>`).join('');
   }
 
   document.getElementById('podFile').onchange = (e) => {
     const f = e.target.files[0]; if (!f) return;
-    const orderCode = document.getElementById('podOrder').value;
+    const orderCode = _parseOrderCode(document.getElementById('podOrder').value);
     if (!orderCode) { window.toast('Chọn đơn trước','warn'); return; }
     const fr = new FileReader();
     fr.onload = () => {
@@ -333,9 +340,11 @@
         💡 Ghi rõ <b>mặt hàng + số kg trả</b>. Chọn cách xử lý tồn kho, lỗi do ai, và cách hoàn tiền. Bấm "✓ Xử lý" để chốt.
       </div>
       <label style="${_lbl}">Đơn gốc *</label>
-      <select id="rt_ord" onchange="window._rtOnOrder()" style="${_inp}"><option value="">— Chọn đơn —</option>${orders.slice(0,80).map(o => `<option value="${o.code}" data-cust="${o.custName}">${o.code} · ${o.custName} · ${o.date}</option>`).join('')}</select>
+      <input id="rt_ord" list="rt_ordList" autocomplete="off" oninput="window._rtOnOrder()" placeholder="Gõ mã đơn / tên KH để tìm..." style="${_inp}">
+      <datalist id="rt_ordList">${orders.slice(0,200).map(o => `<option value="${o.code} · ${o.custName} · ${o.date}"></option>`).join('')}</datalist>
       <label style="${_lbl}">Mặt hàng trả *</label>
-      <select id="rt_item" style="${_inp}"><option value="">— Chọn đơn trước —</option></select>
+      <input id="rt_item" list="rt_itemList" autocomplete="off" oninput="window._rtCalcRefund()" placeholder="— Chọn đơn trước —" style="${_inp}">
+      <datalist id="rt_itemList"></datalist>
       <div style="display:flex;gap:8px">
         <div style="flex:1"><label style="${_lbl}">Số lượng trả</label><input id="rt_qty" type="number" min="0" step="0.1" placeholder="VD: 2" oninput="window._rtCalcRefund()" style="${_inp}"></div>
         <div style="flex:1"><label style="${_lbl}">Trường hợp *</label>
@@ -390,15 +399,29 @@
     });
   };
 
+  /* Map đơn gốc (theo value gợi ý) → đối tượng đơn. Lưu để _rtSave tra cứu. */
+  window._rtResolveOrder = function() {
+    const code = _parseOrderCode(document.getElementById('rt_ord').value);
+    return code ? getOrd().find(x => x.code === code) : null;
+  };
+  /* Lookup mặt hàng theo display value đang gõ trong rt_item */
+  window._rtItemMap = {};
+  window._rtResolveItem = function() {
+    const val = (document.getElementById('rt_item').value || '').trim();
+    return val ? (window._rtItemMap[val] || null) : null;
+  };
   window._rtOnOrder = function() {
-    const code = document.getElementById('rt_ord').value;
-    const o = getOrd().find(x => x.code === code);
+    const o = window._rtResolveOrder();
     const items = (o && Array.isArray(o.items)) ? o.items : [];
-    const itemSel = document.getElementById('rt_item');
-    itemSel.innerHTML = items.length
-      ? items.map((it,idx) => `<option value="${idx}" data-price="${it.price||0}">${it.name} (đã giao ${it.qty||0}${it.unit||'kg'})</option>`).join('')
-      : '<option value="">(đơn này không có chi tiết mặt hàng)</option>';
-    itemSel.onchange = window._rtCalcRefund;
+    const dl = document.getElementById('rt_itemList');
+    window._rtItemMap = {};
+    dl.innerHTML = items.map((it,idx) => {
+      const label = `${it.name} (đã giao ${it.qty||0}${it.unit||'kg'})`;
+      window._rtItemMap[label] = { idx, price: +it.price || 0, item: it };
+      return `<option value="${label}"></option>`;
+    }).join('');
+    /* Đổi đơn → reset ô mặt hàng để tránh giữ lựa chọn cũ */
+    document.getElementById('rt_item').value = '';
     window._rtCalcRefund();
   };
   window._rtOnFault = function() {
@@ -406,9 +429,8 @@
   };
   /* Tự tính số tiền trừ = SL trả × đơn giá mặt hàng */
   window._rtCalcRefund = function() {
-    const itemSel = document.getElementById('rt_item');
-    const opt = itemSel && itemSel.options[itemSel.selectedIndex];
-    const price = opt ? (+opt.dataset.price || 0) : 0;
+    const sel = window._rtResolveItem();
+    const price = sel ? sel.price : 0;
     const qty = parseFloat(document.getElementById('rt_qty').value) || 0;
     const rf = document.getElementById('rt_refund');
     if (rf && price && qty) rf.value = Math.round(price * qty);
@@ -430,18 +452,18 @@
   };
 
   window._rtSave = function() {
-    const sel = document.getElementById('rt_ord');
-    if (!sel.value) { window.toast('Chọn đơn','warn'); return; }
-    const o = getOrd().find(x => x.code === sel.value);
-    const items = (o && Array.isArray(o.items)) ? o.items : [];
-    const it = items[+document.getElementById('rt_item').value] || null;
+    const code = _parseOrderCode(document.getElementById('rt_ord').value);
+    if (!code) { window.toast('Chọn đơn','warn'); return; }
+    const o = getOrd().find(x => x.code === code);
+    const sel = window._rtResolveItem();
+    const it = sel ? sel.item : null;
     const supSel = document.getElementById('rt_sup');
     const list = getR();
     list.push({
       id: 'RT' + String(list.length+1).padStart(3,'0'),
-      orderCode: sel.value,
+      orderCode: code,
       custId: o ? o.cust : '',
-      custName: o ? o.custName : sel.options[sel.selectedIndex].dataset.cust,
+      custName: o ? o.custName : '',
       date: viToday(),
       item: it ? { id: it.id, name: it.name, unit: it.unit || 'kg' } : null,
       qtyReturn: parseFloat(document.getElementById('rt_qty').value) || 0,
@@ -480,7 +502,11 @@
     setTimeout(() => {
       window.openReturnModal();
       const s = document.getElementById('rt_ord');
-      if (s) { s.value = pre; if (s.value === pre) window._rtOnOrder(); }
+      if (s) {
+        const o = getOrd().find(x => x.code === pre);
+        s.value = o ? `${o.code} · ${o.custName} · ${o.date}` : pre;
+        window._rtOnOrder();
+      }
     }, 450);
   })();
 })();

@@ -23,16 +23,22 @@
     /* Tab xem: co gọn để 3 tab vừa 1-2 hàng, KHÔNG để 1 tab xuống dòng giữa chữ */
     .pv-tabs{width:100%;gap:4px;padding:3px;justify-content:flex-start}
     .pv-tab{padding:6px 10px;font-size:11.5px;white-space:nowrap;flex:0 0 auto}
-    /* Nhóm bảng giá: hàng nút → dropdown gọn */
+    /* Nhóm bảng giá: hàng nút → dropdown + nút Quản lý CÙNG 1 HÀNG (dropdown ~68%, nút ~30%) */
     .tier-btns{display:none!important}
-    .tier-select{display:block;flex:1 1 100%;width:100%}
-    /* Toolbar bảng giá: nút phụ 2/hàng nhỏ gọn, nút Lưu full-width, bỏ spacer */
+    /* label xuống dòng riêng → dropdown + Quản lý nhóm chung 1 hàng */
+    .tier-label{flex:1 1 100%}
+    .tier-select{display:block;flex:1 1 64%;width:auto;min-width:0}
+    .tier-manage{flex:1 1 32%;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+    /* Toolbar bảng giá: bỏ spacer; hàng 1 = AI + Sao chép (50/50); hàng 2 = So sánh + PDF + Lưu (~33%) */
     .board-toolbar{gap:7px!important}
     .board-toolbar .bt-date{flex:1 1 100%}
     .board-toolbar .bt-date input{width:100%}
     .board-toolbar .bt-spacer{display:none!important}
-    .board-toolbar .btn{flex:1 1 calc(50% - 4px);font-size:11.5px;padding:7px 6px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
-    .board-toolbar .btn-primary{flex:1 1 100%}
+    .board-toolbar .btn{font-size:11.5px;padding:7px 6px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+    /* Nhóm AI + Sao chép giá hôm qua: 50% mỗi nút (1 hàng) */
+    .board-toolbar .bt-g1{flex:1 1 calc(50% - 4px)}
+    /* Nhóm So sánh + Xuất PDF + Lưu: ~33% mỗi nút (1 hàng) */
+    .board-toolbar .bt-g2{flex:1 1 calc(33.333% - 5px)}
     /* --- Bảng giá hôm nay (#boardView) & Bảng giá Marketing (#mktView) → thẻ --- */
     #boardView .mini-table thead, #mktView .mini-table thead{display:none}
     #boardView .mini-table, #boardView .mini-table tbody,

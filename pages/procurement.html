@@ -40,11 +40,27 @@
     #pcRunList .run-card{padding:11px 12px}
     #pcRunDetail{min-width:0;overflow-x:auto}
     table.pc-mini{display:block;overflow-x:auto;white-space:nowrap}
-    /* sub-tab gom hàng = lưới 2x2 ô cân đều, dính trên */
-    .pc-subtabs{position:sticky;top:0;z-index:15;background:#fff;display:grid!important;grid-template-columns:repeat(2,1fr);gap:6px;overflow-x:visible;flex-wrap:initial;border-bottom:none;margin-bottom:14px}
-    .pc-subtab{padding:9px 8px;font-size:12.5px;gap:5px;justify-content:center;min-width:0;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;border:1px solid var(--line);border-radius:8px;margin-bottom:0}
+    /* sub-tab gom hàng = lưới 2x2 ô cân đều, DÍNH TRÊN chắc chắn (nền trắng đặc, che nội dung cuộn) */
+    .pc-subtabs{
+      position:sticky;top:0;z-index:30;
+      background:#fff!important;
+      display:grid!important;grid-template-columns:repeat(2,1fr);gap:6px;
+      overflow-x:visible;flex-wrap:initial;
+      padding:8px 0 10px;margin:0 0 12px;
+      border-bottom:1px solid var(--line);
+      box-shadow:0 4px 8px -4px rgba(0,0,0,.18);
+    }
+    .pc-subtab{padding:9px 8px;font-size:12.5px;gap:5px;justify-content:center;min-width:0;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;border:1px solid var(--line);border-radius:8px;margin-bottom:0;background:#fff}
     .pc-subtab .pst-ic{font-size:15px;flex-shrink:0}
     .pc-subtab.active{border-color:var(--navy);background:var(--navy);color:#fff!important}
+    /* nút "Tạo phiên gom" → NÚT NỔI cố định góc dưới phải (trên nút AI), bấm được khi lướt */
+    #pcMakeRun{
+      position:fixed!important;right:16px;bottom:84px;z-index:9990;
+      margin:0!important;border-radius:999px!important;
+      padding:13px 20px!important;font-size:14px!important;font-weight:700;
+      box-shadow:0 8px 22px rgba(22,163,74,.42);
+    }
+    #pcMakeRun[disabled]{display:none!important}   /* chưa chọn đơn → ẩn hẳn, đỡ vướng */
   }
   /* Sub-tabs Gom hàng (tab-trong-tab) — áp cả desktop cho gọn */
   .pc-subtabs{display:flex;gap:6px;flex-wrap:wrap;border-bottom:1px solid var(--line);margin-bottom:18px}

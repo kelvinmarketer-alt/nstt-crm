@@ -133,16 +133,27 @@
       <div class="kpi k-4"><div class="kpi-label">Nghỉ / phép</div><div class="kpi-value">${cnt.paid_leave + cnt.absent + cnt.off_sunday}</div><div class="kpi-trend">${cnt.paid_leave}P · ${cnt.absent}V · ${cnt.off_sunday}CN</div><div class="kpi-icon">🌴</div></div>
       <div class="kpi k-5"><div class="kpi-label">Đơn hôm nay</div><div class="kpi-value">${totalTodayOrders}</div><div class="kpi-trend up">${totalDoneToday} xong · ${totalActiveOrders} đang chạy</div><div class="kpi-icon">📦</div></div>`;
 
-    // chips — filter theo live status
+    // chips — filter theo live status. MOBILE (≤560): dùng dropdown #shipSelect song song (chip ẩn qua CSS)
     const chips = document.getElementById('shipChips');
     if (chips) chips.innerHTML = `
+      <div class="ship-chips">
       <button class="chip ${currentFilter === 'all' ? 'active' : ''}" onclick="window.filterShip('all')">Tất cả <span class="cnt">${cnt.all}</span></button>
       <button class="chip ${currentFilter === 'busy' ? 'active' : ''}" onclick="window.filterShip('busy')">🚚 Đang giao <span class="cnt">${cnt.busy}</span></button>
       <button class="chip ${currentFilter === 'idle' ? 'active' : ''}" onclick="window.filterShip('idle')">🟡 Rảnh chờ <span class="cnt">${cnt.idle}</span></button>
       <button class="chip ${currentFilter === 'done_today' ? 'active' : ''}" onclick="window.filterShip('done_today')">✓ Xong ca <span class="cnt">${cnt.done_today}</span></button>
       <button class="chip ${currentFilter === 'paid_leave' ? 'active' : ''}" onclick="window.filterShip('paid_leave')">🟠 Phép <span class="cnt">${cnt.paid_leave}</span></button>
       <button class="chip ${currentFilter === 'absent' ? 'active' : ''}" onclick="window.filterShip('absent')">⚪ Vắng <span class="cnt">${cnt.absent}</span></button>
-      <button class="chip ${currentFilter === 'off_sunday' ? 'active' : ''}" onclick="window.filterShip('off_sunday')">⏸ CN <span class="cnt">${cnt.off_sunday}</span></button>`;
+      <button class="chip ${currentFilter === 'off_sunday' ? 'active' : ''}" onclick="window.filterShip('off_sunday')">⏸ CN <span class="cnt">${cnt.off_sunday}</span></button>
+      </div>
+      <select class="ship-select" onchange="window.filterShip(this.value)">
+        <option value="all" ${currentFilter === 'all' ? 'selected' : ''}>Tất cả (${cnt.all})</option>
+        <option value="busy" ${currentFilter === 'busy' ? 'selected' : ''}>🚚 Đang giao (${cnt.busy})</option>
+        <option value="idle" ${currentFilter === 'idle' ? 'selected' : ''}>🟡 Rảnh chờ (${cnt.idle})</option>
+        <option value="done_today" ${currentFilter === 'done_today' ? 'selected' : ''}>✓ Xong ca (${cnt.done_today})</option>
+        <option value="paid_leave" ${currentFilter === 'paid_leave' ? 'selected' : ''}>🟠 Phép (${cnt.paid_leave})</option>
+        <option value="absent" ${currentFilter === 'absent' ? 'selected' : ''}>⚪ Vắng (${cnt.absent})</option>
+        <option value="off_sunday" ${currentFilter === 'off_sunday' ? 'selected' : ''}>⏸ CN (${cnt.off_sunday})</option>
+      </select>`;
 
     /* Pre-compute tổng đơn đã nhận (ever) + tháng + ngày breakdown per driver */
     const allOrders = window.STORE.get('orders', window.ORDERS || []);

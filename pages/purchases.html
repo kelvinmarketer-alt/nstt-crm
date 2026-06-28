@@ -16,6 +16,7 @@
   .st-pill{padding:2px 8px;border-radius:99px;font-size:11px;font-weight:700}
   .item-row{display:grid;grid-template-columns:2fr 70px 90px 110px 28px;gap:6px;margin-bottom:5px;align-items:center}
   .item-row input,.item-row select{border:1px solid var(--line);border-radius:5px;padding:5px 7px;font-size:12px;width:100%}
+  .pur-btn-create-m{display:none}   /* nút Tạo phiếu bản mobile — chỉ hiện ≤560 */
   /* MOBILE ≤560: mỗi phiếu nhập = 1 THẺ (mã phiếu/NCC + tổng tiền góc phải + ngày/trạng thái) */
   @media (max-width:560px){
     .pn-table thead{display:none}
@@ -46,6 +47,17 @@
     #purKpis > div > div:first-child{white-space:nowrap;overflow:hidden;text-overflow:ellipsis;font-size:10px!important}
     #purKpis > div > div:nth-child(2){font-size:18px!important;white-space:nowrap}
     #purKpis > div > div:nth-child(3){white-space:nowrap;overflow:hidden;text-overflow:ellipsis;font-size:10.5px!important}
+    /* nội dung phiếu nhập full chiều ngang — không cuộn ngang */
+    .pn-table{min-width:0!important}
+    /* nút "+ Tạo phiếu" bản desktop (ở header) ẩn — đã chuyển xuống hàng tìm kiếm */
+    .pn-pagehd .pur-btn-create{display:none!important}
+    /* hàng 1: [+ Tạo phiếu nhập] (co lại) + [🔍 ô tìm] (flex:1) cùng 1 dòng */
+    .pur-filter-row{display:grid!important;grid-template-columns:auto 1fr;gap:8px!important;align-items:center}
+    .pur-filter-row .pur-btn-create-m{grid-column:1;white-space:nowrap;padding:9px 12px!important;font-size:13px}
+    .pur-filter-row #purQ{grid-column:2;min-width:0!important;width:100%}
+    /* hàng 2: 2 select trạng thái + NCC chia đôi 50/50 */
+    .pur-filter-row #purSt{grid-column:1;min-width:0!important;width:100%}
+    .pur-filter-row #purSup{grid-column:2;min-width:0!important;width:100%}
   }
 </style>
 </head>
@@ -68,14 +80,15 @@
       <div class="pn-pagehd-spacer" style="flex:1"></div>
       <button class="btn btn-ghost pur-btn-csv" onclick="window.exportPurCsv()">⬇ Xuất CSV</button>
       <button class="btn btn-ghost" style="border-color:#FDE68A;background:#FFFBEB;color:#92400E" onclick="window.openPurModal('EXT-MARKET')" title="Nhập phiếu thu mua chợ/vãng lai kèm giá thật → vào sổ quỹ kế toán">🛒 Thu mua ngoài</button>
-      <button class="btn btn-primary" onclick="window.openPurModal()">+ Tạo phiếu nhập</button>
+      <button class="btn btn-primary pur-btn-create" onclick="window.openPurModal()">+ Tạo phiếu nhập</button>
     </div>
 
     <div id="hbHost"></div>
 
     <div style="display:grid;grid-template-columns:repeat(4,1fr);gap:10px;margin-bottom:14px" id="purKpis"></div>
 
-    <div style="display:flex;gap:10px;margin-bottom:10px;flex-wrap:wrap">
+    <div class="pur-filter-row" style="display:flex;gap:10px;margin-bottom:10px;flex-wrap:wrap">
+      <button class="btn btn-primary pur-btn-create-m" onclick="window.openPurModal()">+ Tạo phiếu nhập</button>
       <input id="purQ" placeholder="🔍 Tìm mã phiếu, NCC..." style="flex:1;min-width:240px;border:1px solid var(--line);border-radius:7px;padding:7px 11px;font-size:13px">
       <select id="purSt" style="border:1px solid var(--line);border-radius:7px;padding:7px 11px;font-size:13px">
         <option value="">Tất cả trạng thái</option>

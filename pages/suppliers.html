@@ -43,6 +43,7 @@
   .st-pill{padding:2px 8px;border-radius:99px;font-size:11px;font-weight:700}
   .item-row{display:grid;grid-template-columns:2fr 70px 90px 110px 28px;gap:6px;margin-bottom:5px;align-items:center}
   .item-row input,.item-row select{border:1px solid var(--line);border-radius:5px;padding:5px 7px;font-size:12px;width:100%}
+  .pur-btn-create-m{display:none}   /* nút Tạo phiếu bản mobile — chỉ hiện ≤560 */
   /* MOBILE ≤560: danh bạ NCC = thẻ 1 cột vừa khít (đã là grid card sẵn) */
   @media (max-width:560px){
     #supList{grid-template-columns:1fr;gap:10px}
@@ -112,6 +113,18 @@
     #purKpis > div > div:first-child{white-space:nowrap;overflow:hidden;text-overflow:ellipsis;font-size:10px!important}
     #purKpis > div > div:nth-child(2){font-size:18px!important;white-space:nowrap}
     #purKpis > div > div:nth-child(3){white-space:nowrap;overflow:hidden;text-overflow:ellipsis;font-size:10.5px!important}
+    /* nội dung phiếu nhập full chiều ngang — bỏ thanh cuộn ngang + viền bo gọn */
+    #panePur .pn-table{min-width:0!important}
+    /* hàng nút: chỉ còn nút "+ Tạo phiếu" trên cùng (ẩn — đã chuyển xuống hàng tìm kiếm) */
+    #panePur .pur-actions-row{display:none!important}
+    #panePur .pur-btn-create{display:none!important}               /* nút tạo bản desktop — ẩn */
+    /* hàng 1: [+ Tạo phiếu nhập] (co lại) + [🔍 ô tìm] (flex:1) cùng 1 dòng */
+    #panePur .pur-filter-row{display:grid!important;grid-template-columns:auto 1fr;gap:8px!important;align-items:center}
+    #panePur .pur-btn-create-m{grid-column:1;white-space:nowrap;padding:9px 12px!important;font-size:13px}
+    #panePur #purQ{grid-column:2;min-width:0!important;width:100%}
+    /* hàng 2: 2 select trạng thái + NCC chia đôi 50/50 */
+    #panePur #purSt{grid-column:1;min-width:0!important;width:100%}
+    #panePur #purSup{grid-column:2;min-width:0!important;width:100%}
   }
 </style>
 </head>
@@ -174,12 +187,13 @@
       <div class="pur-banner" style="background:#EFF6FF;color:#1E40AF;padding:9px 12px;border-radius:8px;font-size:12.5px;margin-bottom:12px">
         💡 Quy trình: có đơn KH → bấm <b>Gom hàng → NCC</b> để gom, hoặc tạo phiếu nhập tay tại đây. Khi hàng về bấm <b>"✓ Nhận"</b> để cộng kho + ghi công nợ NCC. <b>Hạn chế tồn kho</b> — chỉ nhập đủ đơn.
       </div>
-      <div style="display:flex;justify-content:flex-end;gap:8px;margin-bottom:12px;flex-wrap:wrap">
+      <div class="pur-actions-row" style="display:flex;justify-content:flex-end;gap:8px;margin-bottom:12px;flex-wrap:wrap">
         <button class="btn btn-ghost pur-btn-csv" onclick="window.exportPurCsv()">⬇ Xuất CSV</button>
-        <button class="btn btn-primary" onclick="window.openPurModal()">+ Tạo phiếu nhập</button>
+        <button class="btn btn-primary pur-btn-create" onclick="window.openPurModal()">+ Tạo phiếu nhập</button>
       </div>
       <div style="display:grid;grid-template-columns:repeat(4,1fr);gap:10px;margin-bottom:14px" id="purKpis"></div>
-      <div style="display:flex;gap:10px;margin-bottom:10px;flex-wrap:wrap">
+      <div class="pur-filter-row" style="display:flex;gap:10px;margin-bottom:10px;flex-wrap:wrap">
+        <button class="btn btn-primary pur-btn-create-m" onclick="window.openPurModal()">+ Tạo phiếu nhập</button>
         <input id="purQ" placeholder="🔍 Tìm mã phiếu, NCC..." style="flex:1;min-width:240px;border:1px solid var(--line);border-radius:7px;padding:7px 11px;font-size:13px">
         <select id="purSt" style="border:1px solid var(--line);border-radius:7px;padding:7px 11px;font-size:13px">
           <option value="">Tất cả trạng thái</option>

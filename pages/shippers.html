@@ -17,9 +17,14 @@
   }
   .table-wrap table tbody tr:hover { background:#FAFAFB; }
   .table-wrap table tbody tr:last-child td { border-bottom:0; }
+  /* Dropdown lọc trạng thái — ẩn trên desktop (dùng cụm chip) */
+  .ship-select{display:none;width:100%;padding:9px 12px;border:1px solid var(--line);border-radius:8px;font-size:13px;background:#fff;font-weight:600;color:var(--navy)}
   /* ĐIỆN THOẠI (≤560): mini-table shipper CHÍNH (trong .chart-card) → THẺ.
      Scope .chart-card .mini-table để KHÔNG đụng mini-table lịch trong modal sửa. Desktop giữ nguyên. */
   @media (max-width:560px){
+    /* Cụm chip lọc trạng thái → dropdown (5 ô KPI trên cùng GIỮ NGUYÊN) */
+    .ship-chips{display:none!important}
+    .ship-select{display:block}
     .chart-card{overflow:visible!important}
     .chart-card .mini-table{display:block;min-width:0!important}
     .chart-card .mini-table thead{display:none}

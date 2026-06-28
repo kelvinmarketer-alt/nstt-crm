@@ -10,9 +10,19 @@
   /* Status pipeline */
   .pipeline{display:grid;grid-template-columns:repeat(7,1fr);gap:8px;margin-bottom:14px}
   @media (max-width:980px){.pipeline{grid-template-columns:repeat(4,1fr)}}
-  /* MOBILE: thu nhỏ thẻ trạng thái cho gọn (4 thẻ/hàng, ẩn dòng phụ) */
+  /* MOBILE: thu nhỏ thẻ trạng thái cho gọn (3 thẻ/hàng, ẩn dòng phụ + ẩn "Đã hủy") */
   @media (max-width:560px){
-    .pipeline{grid-template-columns:repeat(4,1fr);gap:6px;margin-bottom:10px}
+    /* ── Cụm nút đầu trang ─────────────────────────────────────────
+       "Đơn web chờ duyệt" = 1 hàng full-width; "Tạo đơn từ ảnh" + "Tạo đơn mới" = cùng hàng 50/50;
+       dropdown "⋯ Khác" (Xuất Excel / In phiếu / Nhập phiếu) ẩn hẳn. */
+    .head-actions{flex-wrap:wrap;gap:8px}
+    #btnWebOrders{flex:1 1 100%;min-width:0;justify-content:center}
+    .head-actions>.btn-ghost[onclick*="aiCreateOrder"],
+    .head-actions>.btn-primary{flex:1 1 calc(50% - 6px);min-width:0;justify-content:center}
+    .head-actions .acts-dd{display:none!important}
+    .pipeline{grid-template-columns:repeat(3,1fr);gap:6px;margin-bottom:10px}
+    /* ẩn ô "Đã hủy" trong pipeline */
+    .pipe-card.s-cancelled{display:none!important}
     .pipe-card{padding:6px 6px;border-radius:7px;border-left-width:3px;min-width:0;overflow:hidden}
     .pipe-card .lab{font-size:9px;font-weight:700;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
     .pipe-card .val{font-size:15px;font-weight:800;margin:1px 0}
@@ -47,6 +57,15 @@
     /* sản lượng kg·quả·mã */
     .table-card tbody td.ocell-goods{display:block!important;color:var(--muted);font-size:12px;margin-top:3px}
     .table-card .table-foot{border:0}
+
+    /* ── Bộ lọc: sắp lại thành hàng gọn (dùng order vì markup khác thứ tự) ──
+       Hàng 1: "Hình thức giao" + "NV phụ trách" (50/50)
+       Hàng 2: "Tìm kiếm" + "Shipper" + "Xóa lọc" (cùng 1 hàng) */
+    .filter-bar #fMode{order:1;flex:1 1 calc(50% - 6px);min-width:0;width:auto}
+    .filter-bar #fStaff{order:2;flex:1 1 calc(50% - 6px);min-width:0;width:auto}
+    .filter-bar .search-in{order:3;flex:1 1 calc(50% - 6px);min-width:0}
+    .filter-bar #fDriver{order:4;flex:1 1 calc(30% - 6px);min-width:0;width:auto}
+    .filter-bar button[onclick="clearOrderFilters()"]{order:5;flex:0 0 auto;min-width:0}
   }
   /* Gộp nút phụ (Xuất Excel / In phiếu / Nhập phiếu) vào dropdown trên mobile */
   /* Chips danh mục → dropdown trên mobile (gọn, khỏi cuộn hàng chip) */

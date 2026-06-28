@@ -48,7 +48,7 @@
   function tierBarHTML() {
     const tiers = getTiers();
     let s = `<div class="chart-card" style="margin-bottom:14px"><div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap">
-      <span style="font-size:12.5px;color:var(--muted);font-weight:700">📊 Nhóm bảng giá:</span>
+      <span class="tier-label" style="font-size:12.5px;color:var(--muted);font-weight:700">📊 Nhóm bảng giá:</span>
       <span class="tier-btns" style="display:contents">
       <button class="btn btn-sm ${boardTier === 0 ? 'btn-primary' : 'btn-ghost'}" onclick="window.boardSwitchTier(0)">📋 Gốc</button>`;
     tiers.forEach(t => {
@@ -61,7 +61,7 @@
       <option value="0" ${boardTier === 0 ? 'selected' : ''}>📋 Gốc (giá bán thật)</option>
       ${tiers.map(t => `<option value="${t.id}" ${boardTier === t.id ? 'selected' : ''}>${tierIcon(t)} ${t.name} (${t.markup >= 0 ? '+' : ''}${t.markup}%)</option>`).join('')}
     </select>`;
-    s += `<button class="btn btn-sm btn-ghost" onclick="window.tierManage()" title="Đổi tên / % / xóa nhóm">⚙ Quản lý nhóm</button></div>`;
+    s += `<button class="btn btn-sm btn-ghost tier-manage" onclick="window.tierManage()" title="Đổi tên / % / xóa nhóm">⚙ Quản lý nhóm</button></div>`;
     const tier = boardTier ? tierById(boardTier) : null;
     if (!tier) {
       /* Gốc: link toàn hệ thống — đặt giá = giá nhập + % */
@@ -337,13 +337,13 @@
           <div class="bt-date"><label style="font-size:12px;color:var(--muted);display:block;margin-bottom:4px">Ngày áp dụng</label>
             <input type="date" id="boardDateInp" value="${boardDate}" style="padding:7px 10px;border:1px solid var(--line);border-radius:7px"></div>
           <div class="bt-spacer" style="flex:1"></div>
-          <button class="btn btn-ghost btn-sm" onclick="window.aiFillPrices()">📷 Cập nhật giá bằng ảnh (AI)</button>
-          <button class="btn btn-ghost btn-sm" onclick="window.copyYesterday()">📋 Sao chép giá hôm qua</button>
+          <button class="btn btn-ghost btn-sm bt-g1" onclick="window.aiFillPrices()">📷 Cập nhật giá bằng ảnh (AI)</button>
+          <button class="btn btn-ghost btn-sm bt-g1" onclick="window.copyYesterday()">📋 Sao chép giá hôm qua</button>
           <button class="btn btn-ghost btn-sm hide-xs" onclick="window.copyPriceText()" title="Copy text gọn dán Zalo">📋 Copy text</button>
-          <button class="btn btn-ghost btn-sm" onclick="window.PriceAutoSend && window.PriceAutoSend.previewDiff()" title="Xem nhanh SP nào đổi giá so hôm qua">🔍 So sánh giá</button>
-          <button class="btn btn-ghost btn-sm" onclick="window.openExportTierPicker('pdf')" title="Mở popup print → Save as PDF">🖨 Xuất PDF</button>
+          <button class="btn btn-ghost btn-sm bt-g2" onclick="window.PriceAutoSend && window.PriceAutoSend.previewDiff()" title="Xem nhanh SP nào đổi giá so hôm qua">🔍 So sánh giá</button>
+          <button class="btn btn-ghost btn-sm bt-g2" onclick="window.openExportTierPicker('pdf')" title="Mở popup print → Save as PDF">🖨 Xuất PDF</button>
           <button class="btn btn-ghost btn-sm hide-xs" onclick="window.openExportTierPicker('html')" title="Tải HTML có ảnh embed + auto gửi Telegram">📥 Xuất HTML</button>
-          <button class="btn btn-primary btn-sm" onclick="window.savePriceBoard()">💾 Lưu bảng giá ${fmtD(boardDate)}</button>
+          <button class="btn btn-primary btn-sm bt-g2" onclick="window.savePriceBoard()">💾 Lưu bảng giá ${fmtD(boardDate)}</button>
         </div>
       </div>
       ${tierBarHTML()}
