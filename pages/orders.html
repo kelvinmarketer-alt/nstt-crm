@@ -19,22 +19,33 @@
     .pipe-card .sub{display:none}
     /* Bảng đơn TÓM TẮT: chỉ mã đơn · tên KH · tiền (ẩn ô chọn / trạng thái / hành động) */
     .ocol-x{display:none!important}
-    /* MỖI ĐƠN = 1 THẺ (card) thay vì dòng bảng — dễ đọc trên điện thoại */
+    /* MỖI ĐƠN = 1 THẺ (card) — block layout, tiền ghim góc phải, đủ thông tin (giống mẫu VTY) */
     .table-card thead{display:none}
     .table-card table,.table-card tbody{display:block;width:100%}
     .table-card tbody tr{
-      display:grid;grid-template-columns:1fr auto;align-items:start;gap:2px 10px;
-      border:1px solid var(--line);border-radius:10px;margin:0 0 8px;padding:10px 12px;background:#fff;cursor:pointer
+      display:block;position:relative;
+      border:1px solid var(--line);border-radius:12px;margin:0 0 10px;
+      padding:11px 13px;padding-right:96px;background:#fff;cursor:pointer
     }
     .table-card tbody tr:hover{box-shadow:var(--shadow-sm)}
-    .table-card tbody td{display:block;border:none!important;padding:0;white-space:normal}
-    /* hàng 1: mã đơn (trái) · tiền hàng (phải, đậm) */
-    .table-card tbody td.ocell-code{grid-column:1;grid-row:1}
-    .table-card tbody td[data-field="freight"]{grid-column:2;grid-row:1;text-align:right;font-weight:800;color:var(--red);font-size:15px;align-self:center}
-    /* hàng 2: khách hàng (đầy đủ ngang) */
-    .table-card tbody td.cust-col{grid-column:1 / -1;grid-row:2;margin-top:5px;padding-top:5px;border-top:1px dashed var(--line)!important}
-    /* hàng 3: sản lượng (kg·quả·mã) — hiện lại dù là .hide-md, cho đủ thông tin */
-    .table-card tbody td.ocell-goods{display:block!important;grid-column:1 / -1;grid-row:3;margin-top:3px;color:var(--muted);font-size:12px}
+    .table-card tbody td{display:block;border:none!important;padding:0;white-space:normal;font-size:13px;line-height:1.45}
+    /* mã đơn (đậm) + badge nguồn ngay dưới */
+    .table-card tbody td.ocell-code{font-size:14.5px;margin-bottom:1px}
+    /* TIỀN HÀNG: ghim góc trên phải, đỏ đậm */
+    .table-card tbody td[data-field="freight"]{
+      position:absolute;top:11px;right:13px;width:auto;
+      font-weight:800;color:var(--red);font-size:16px;text-align:right
+    }
+    /* ngày đặt: xám nhỏ */
+    .table-card tbody td[data-field="date"]{display:block!important;color:var(--muted);font-size:11.5px;margin:1px 0 6px}
+    /* khách hàng: khối riêng, gạch ngang phía trên, tên đậm */
+    .table-card tbody td.cust-col{margin-top:6px;padding-top:7px;border-top:1px dashed var(--line)!important}
+    .table-card tbody td.cust-col .name-clamp{font-weight:700;font-size:14px;color:var(--navy);white-space:normal!important;overflow:visible!important}
+    /* địa chỉ giao: hiện lại (dù .hide-md), có icon 📍 */
+    .table-card tbody td[data-field="drop"]{display:block!important;color:var(--text);font-size:12.5px;margin-top:4px;white-space:normal!important;overflow:visible!important}
+    .table-card tbody td[data-field="drop"]:not(:empty)::before{content:"📍 "}
+    /* sản lượng kg·quả·mã */
+    .table-card tbody td.ocell-goods{display:block!important;color:var(--muted);font-size:12px;margin-top:3px}
     .table-card .table-foot{border:0}
   }
   /* Gộp nút phụ (Xuất Excel / In phiếu / Nhập phiếu) vào dropdown trên mobile */

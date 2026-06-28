@@ -239,9 +239,12 @@
       new:   customers.filter(c => c.group === 'Mới').length,
       inact: customers.filter(c => !c.active || c.group === 'Inactive').length,
     };
+    const QUICK_LABELS = { all:'Tất cả', b2b:'🍽 Cơ sở KD', b2c:'👤 Cá nhân', vip:'⭐ VIP', debt:'⚠️ Có công nợ', new:'✨ Mới 30 ngày', inact:'💤 Không hoạt động' };
     Object.keys(counts).forEach(k => {
       const el = document.querySelector(`[data-cnt="${k}"]`);
       if (el) el.textContent = counts[k];
+      const opt = document.querySelector(`#quickSelect option[value="${k}"]`);
+      if (opt) opt.textContent = `${QUICK_LABELS[k] || k} (${counts[k]})`;
     });
     /* === Cập nhật KPI cards + sub-header (động từ data thật) === */
     const debtSum = customers.reduce((s, c) => s + (+c.debt || 0), 0);
@@ -324,10 +327,10 @@
         <td class="hide-md" data-field="province">${c.province}</td>
         <td class="hide-md" data-field="orderFreq" style="font-size:12px;color:var(--muted)">${freqLabel(c.orderFreq)}</td>
         <td class="hide-md" data-field="staffOwner"><span class="staff-pill">${c.staffOwner}</span></td>
-        <td class="num">${c.orders}</td>
-        <td class="num">${window.fmt(c.revenue)}</td>
-        <td class="num debt-cell hide-xs ${debtCls}">${debtVal}${overdueBadge}</td>
-        <td class="hide-md" style="font-size:12px;color:var(--muted)">${c.lastContact}</td>
+        <td class="num" data-field="orders">${c.orders}</td>
+        <td class="num" data-field="revenue">${window.fmt(c.revenue)}</td>
+        <td class="num debt-cell ${debtCls}" data-field="debt">${debtVal}${overdueBadge}</td>
+        <td class="hide-md hide-xs" style="font-size:12px;color:var(--muted)">${c.lastContact}</td>
         <td class="hide-xs" onclick="event.stopPropagation()">
           <div class="row-actions">
             <button class="ra-zalo" title="Nhắn Zalo: ${c.phone}" data-act="zalo" data-id="${c.id}"><span style="font-size:13px;font-weight:700">Z</span></button>
@@ -829,14 +832,16 @@
   };
 
   /* ============ Wire events ============ */
+  window.setQuickFilter = function (v) {
+    currentQuick = v;
+    curPage = 1;
+    document.querySelectorAll('.chip').forEach(x => x.classList.toggle('active', x.dataset.quick === v));
+    const sel = document.getElementById('quickSelect');
+    if (sel && sel.value !== v) sel.value = v;
+    render();
+  };
   document.querySelectorAll('.chip').forEach(ch => {
-    ch.addEventListener('click', () => {
-      document.querySelectorAll('.chip').forEach(x => x.classList.remove('active'));
-      ch.classList.add('active');
-      currentQuick = ch.dataset.quick;
-      curPage = 1;
-      render();
-    });
+    ch.addEventListener('click', () => window.setQuickFilter(ch.dataset.quick));
   });
   ['qSearch', 'fGroup', 'fProvince', 'fService', 'fStatus'].forEach(id => {
     document.getElementById(id)?.addEventListener('input', () => { curPage = 1; render(); });

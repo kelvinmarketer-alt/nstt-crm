@@ -6,6 +6,42 @@
 <title>Quản lý Khách hàng · Nông Sản Tuấn Tú Hà Nội</title>
 <link rel="stylesheet" href="../styles/tokens.css">
 <link rel="stylesheet" href="../styles/app.css">
+<style>
+  /* Mặc định ẩn dropdown loại khách (chỉ hiện trên mobile) */
+  #quickSelect{display:none;width:100%;padding:9px 12px;border:1px solid var(--line);border-radius:8px;font-size:13px;margin-bottom:10px;background:#fff;font-weight:600;color:var(--navy)}
+  @media (max-width:560px){
+    /* chip loại khách → dropdown */
+    #quickChips{display:none}
+    #quickSelect{display:block}
+    /* MỖI KHÁCH = 1 THẺ (card) — block layout, doanh thu ghim góc phải, đủ thông tin */
+    .table-card thead{display:none}
+    .table-card table,.table-card tbody{display:block;width:100%}
+    .table-card tbody tr{
+      display:block;position:relative;
+      border:1px solid var(--line);border-radius:12px;margin:0 0 10px;
+      padding:11px 13px;padding-right:96px;background:#fff;cursor:pointer
+    }
+    .table-card tbody tr:hover{box-shadow:var(--shadow-sm)}
+    .table-card tbody td{display:block;border:none!important;padding:0;white-space:normal;font-size:12.5px;line-height:1.45}
+    /* tên + avatar (đậm) */
+    .table-card tbody td[data-field="name"]{font-size:14px}
+    .table-card tbody td[data-field="name"] .cust-cell{align-items:center}
+    /* doanh thu: ghim góc trên phải, navy đậm */
+    .table-card tbody td[data-field="revenue"]{position:absolute!important;top:11px;right:13px;width:auto;text-align:right;font-weight:800;color:var(--navy);font-size:15px}
+    /* khối thông tin phụ: gạch ngang phía trên, mỗi dòng 1 icon */
+    .table-card tbody td[data-field="province"]{display:block!important;margin-top:7px;padding-top:7px;border-top:1px dashed var(--line)!important;color:var(--text)}
+    .table-card tbody td[data-field="province"]::before{content:"📍 "}
+    .table-card tbody td[data-field="orderFreq"]{display:block!important;margin-top:3px}
+    .table-card tbody td[data-field="orderFreq"]::before{content:"🔁 "}
+    .table-card tbody td[data-field="staffOwner"]{display:block!important;margin-top:3px}
+    .table-card tbody td[data-field="staffOwner"]::before{content:"👤 NV: "}
+    .table-card tbody td[data-field="orders"]{display:inline-block;margin-top:4px;color:var(--muted)}
+    .table-card tbody td[data-field="orders"]::before{content:"📦 "}
+    .table-card tbody td[data-field="orders"]::after{content:" đơn"}
+    .table-card tbody td[data-field="debt"]{display:block!important;margin-top:3px;font-weight:700}
+    .table-card tbody td[data-field="debt"]::before{content:"💰 Công nợ: "}
+  }
+</style>
 </head>
 <body>
 
@@ -87,6 +123,16 @@
       <button class="chip" data-quick="new">✨ Mới 30 ngày <span class="cnt" data-cnt="new">0</span></button>
       <button class="chip" data-quick="inact">💤 Không hoạt động <span class="cnt" data-cnt="inact">0</span></button>
     </div>
+    <!-- MOBILE: lọc loại khách hàng dạng dropdown (thay cụm chip cuộn ngang) -->
+    <select id="quickSelect" onchange="window.setQuickFilter(this.value)">
+      <option value="all">Tất cả</option>
+      <option value="b2b">🍽 Cơ sở KD</option>
+      <option value="b2c">👤 Cá nhân</option>
+      <option value="vip">⭐ VIP</option>
+      <option value="debt">⚠️ Có công nợ</option>
+      <option value="new">✨ Mới 30 ngày</option>
+      <option value="inact">💤 Không hoạt động</option>
+    </select>
 
     <!-- Filter -->
     <div class="filter-bar">
