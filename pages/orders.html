@@ -19,6 +19,19 @@
     .pipe-card .sub{display:none}
     /* Bảng đơn TÓM TẮT: chỉ mã đơn · tên KH · tiền (ẩn ô chọn / trạng thái / hành động) */
     .ocol-x{display:none!important}
+    /* MỖI ĐƠN = 1 THẺ (card) thay vì dòng bảng — dễ đọc trên điện thoại */
+    .table-card thead{display:none}
+    .table-card table,.table-card tbody{display:block;width:100%}
+    .table-card tbody tr{
+      display:grid;grid-template-columns:1fr auto;align-items:start;gap:2px 10px;
+      border:1px solid var(--line);border-radius:10px;margin:0 0 8px;padding:10px 12px;background:#fff;cursor:pointer
+    }
+    .table-card tbody tr:hover{box-shadow:var(--shadow-sm)}
+    .table-card tbody td{display:block;border:none!important;padding:0;white-space:normal}
+    .table-card tbody td.ocell-code{grid-column:1;grid-row:1}
+    .table-card tbody td[data-field="freight"]{grid-column:2;grid-row:1;text-align:right;font-weight:800;color:var(--navy);font-size:14.5px;align-self:center}
+    .table-card tbody td.cust-col{grid-column:1 / -1;grid-row:2;margin-top:5px;padding-top:5px;border-top:1px dashed var(--line)!important}
+    .table-card .table-foot{border:0}
   }
   /* Gộp nút phụ (Xuất Excel / In phiếu / Nhập phiếu) vào dropdown trên mobile */
   .acts-flat{display:contents}

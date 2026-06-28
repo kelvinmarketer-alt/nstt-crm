@@ -186,7 +186,7 @@
                           : { icon: '✍️', label: 'Tự tạo', color: '#0EA5E9' };
         return `<tr data-code="${o.code}">
           <td class="ocol-x" onclick="event.stopPropagation()"><div class="checkbox" onclick="this.classList.toggle('on')"></div></td>
-          <td><b style="color:var(--navy)">${o.code || '—'}</b>
+          <td class="ocell-code"><b style="color:var(--navy)">${o.code || '—'}</b>
               <div style="margin-top:2px">
                 <span class="tag" style="background:${src.color}1a;color:${src.color};font-weight:600;font-size:10.5px">${src.icon} ${src.label}</span>
               </div></td>
