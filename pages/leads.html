@@ -11,6 +11,12 @@
   .lead-card:hover{background:#fff;border-color:var(--navy)}
   .lead-card .n1{font-weight:700;color:var(--text);line-height:1.3}
   .lead-card .n2{font-size:11px;color:var(--muted);margin-top:2px}
+  /* MOBILE: bảng nguồn lead vừa khít, không tràn/cắt cụt (cuộn trong khung nếu cần) */
+  @media (max-width:560px){
+    #srcTable{overflow-x:auto;-webkit-overflow-scrolling:touch}
+    #srcTable table{min-width:0!important}
+    #srcTable table.t-responsive{min-width:0!important}
+  }
 </style>
 </head>
 <body>

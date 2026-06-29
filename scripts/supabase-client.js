@@ -307,15 +307,25 @@
 
   /* === Supabase data API === */
   window.SB_DATA = {
-    /* Lấy tất cả records của 1 bảng */
+    /* Lấy TẤT CẢ records của 1 bảng — PHÂN TRANG theo lô 1000 (Supabase giới hạn
+       1000 dòng/lần; nếu không lặp range sẽ tự RỚT đơn cũ khi >1000 → lệch dữ liệu). */
     async getAll(table) {
-      const { data, error } = await client.from(table).select('*').order('created_at', { ascending: false });
-      if (error) {
-        console.error('[SB getAll]', table, error);
-        window.toast?.('⚠ Load ' + table + ' lỗi cloud: ' + (error.message||'unknown'), 'warn');
+      const PAGE = 1000;
+      let from = 0, out = [], lastErr = null;
+      for (let guard = 0; guard < 200; guard++) {   /* tối đa 200k dòng */
+        const { data, error } = await client.from(table).select('*')
+          .order('created_at', { ascending: false }).range(from, from + PAGE - 1);
+        if (error) { lastErr = error; break; }
+        out = out.concat(data || []);
+        if (!data || data.length < PAGE) break;       /* lô cuối → xong */
+        from += PAGE;
+      }
+      if (lastErr && !out.length) {
+        console.error('[SB getAll]', table, lastErr);
+        window.toast?.('⚠ Load ' + table + ' lỗi cloud: ' + (lastErr.message||'unknown'), 'warn');
         return [];
       }
-      return data.map(r => mapFrom(table, r));
+      return out.map(r => mapFrom(table, r));
     },
 
     /* Lấy mã đơn kế tiếp THEO CLOUD (chống trùng khi nhiều máy tạo đơn cùng lúc) */
