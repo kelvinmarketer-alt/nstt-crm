@@ -38,7 +38,7 @@
     .cn-head-sub{display:none}
 
     /* (2) Ẩn nút "Nhập hoá đơn ngày (Excel)" trên ĐT (không dùng); "Xem báo cáo" full hàng */
-    .cn-btn-import{display:none!important}
+    .cn-btn-import, .cn-btn-recon{display:none!important}
 
     /* Cụm điều khiển trong thẻ lọc: xếp dọc, mỗi nhóm 1 hàng gọn gàng */
     .cn-ctrl{gap:8px;align-items:stretch}
@@ -87,6 +87,7 @@
         <div class="cn-head-sub" style="font-size:13px;color:var(--muted);margin-top:2px">Ma trận đối tác × ngày — tự sinh từ đơn hàng. Theo dõi <b>đã thu / chưa thu</b> · xuất Excel cho CFO.</div>
       </div>
       <div style="flex:1"></div>
+      <button class="btn btn-ghost cn-btn-recon" onclick="window.cnReconcile && window.cnReconcile()" title="Up file DOANH THU (ma trận KH × ngày) → so tổng/ngày file vs app, liệt kê đơn thiếu/dư/lệch">📋 Đối soát file ↔ app</button>
       <button class="btn btn-primary cn-btn-import" onclick="window.openPhieuImport && window.openPhieuImport()" title="Up file hoá đơn/phiếu bán hàng từng ngày (Excel) → tự tạo đơn + cập nhật công nợ">📥 Nhập hoá đơn ngày (Excel)</button>
     </div>
 

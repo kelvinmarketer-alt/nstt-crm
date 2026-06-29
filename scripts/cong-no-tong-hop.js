@@ -617,6 +617,139 @@
     /* Re-render khi đơn/KH/sổ nợ về từ cloud */
     if (S().subscribe) { S().subscribe('orders', () => window.cnRender()); S().subscribe('customers', () => {}); }
   }
+  /* ===================================================================
+     ĐỐI SOÁT FILE ↔ APP — up file ma trận (KH × ngày) → so tổng/ngày,
+     liệt kê đơn THIẾU / DƯ / LỆCH để biết chính xác chỗ sai.
+     =================================================================== */
+  /* Convert giá trị ô ngày → ISO. Dùng UTC để KHỎI lệch 1 ngày (serial Excel = UTC midnight). */
+  function cellToISO(v) {
+    if (typeof v === 'number' && v > 40000 && v < 60000) {
+      const d = new Date(Math.round((v - 25569) * 86400000));
+      return isNaN(d) ? '' : `${d.getUTCFullYear()}-${pad(d.getUTCMonth() + 1)}-${pad(d.getUTCDate())}`;
+    }
+    if (v instanceof Date && !isNaN(v)) return `${v.getUTCFullYear()}-${pad(v.getUTCMonth() + 1)}-${pad(v.getUTCDate())}`;
+    const m = String(v).match(/^(\d{4})-(\d{2})-(\d{2})/); if (m) return m[0];
+    const m2 = String(v).match(/(\d{1,2})\/(\d{1,2})\/(\d{4})/); if (m2) return `${m2[3]}-${pad(m2[2])}-${pad(m2[1])}`;
+    return '';
+  }
+  const _SUMLBL = /^(doanh thu|gi[áa] v[ốo]n|l[ợo]i nhu[ậaậ]n|s[ốo] đơn|t[ổoổ]ng|c[ộoộ]ng)/i;
+  /* Parse workbook ma trận → { iso: {total, custs:[{name,amt}]} } */
+  function parseMasterFile(wb) {
+    const out = {};
+    for (const sn of wb.SheetNames) {
+      /* BỎ QUA sheet "NHẬP" (giá nhập/cost) — chỉ đối soát DOANH THU, tránh cộng gộp đôi cùng ngày */
+      const snn = String(sn).toLowerCase().normalize('NFD').replace(/[̀-ͯ]/g, '').replace(/đ/g, 'd');
+      if (snn.includes('nhap')) continue;
+      const grid = window.XLSX.utils.sheet_to_json(wb.Sheets[sn], { header: 1, raw: true, defval: '' });
+      let hr = -1, daycols = [];
+      for (let r = 0; r < Math.min(grid.length, 10); r++) {
+        const cols = [];
+        for (let c = 1; c < (grid[r] || []).length; c++) { const iso = cellToISO(grid[r][c]); if (iso) cols.push([c, iso]); }
+        if (cols.length >= 4) { hr = r; daycols = cols; break; }
+      }
+      if (hr < 0) continue;
+      /* đoán đơn vị: nếu giá trị nhỏ (<100k) → file ghi NGHÌN đồng → ×1000 */
+      const sample = [];
+      for (let r = hr + 1; r < grid.length; r++) {
+        const a = String(grid[r][0] || '').trim(); if (!a || _SUMLBL.test(a)) continue;
+        for (const [c] of daycols) { const v = +grid[r][c]; if (v) sample.push(v); }
+      }
+      sample.sort((a, b) => a - b);
+      const med = sample[Math.floor(sample.length / 2)] || 0;
+      const mult = (med && med < 100000) ? 1000 : 1;
+      for (let r = hr + 1; r < grid.length; r++) {
+        const name = String(grid[r][0] || '').trim();
+        if (!name || _SUMLBL.test(name)) continue;
+        for (const [c, iso] of daycols) {
+          const v = +grid[r][c]; if (!v) continue;
+          const o = out[iso] || (out[iso] = { total: 0, custs: [] });
+          const amt = Math.round(v * mult);
+          o.total += amt; o.custs.push({ name, amt });
+        }
+      }
+    }
+    return out;
+  }
+  /* Khớp file.custs ↔ cloud.orders theo TIỀN (sai số ±2000đ), greedy giảm dần */
+  function reconDay(fileCusts, cloudOrders) {
+    const cl = cloudOrders.slice(); const miss = [];
+    fileCusts.slice().sort((a, b) => b.amt - a.amt).forEach(fc => {
+      let k = -1; for (let i = 0; i < cl.length; i++) { if (Math.abs(cl[i].amt - fc.amt) <= 2000) { k = i; break; } }
+      if (k < 0) miss.push(fc); else cl.splice(k, 1);
+    });
+    return { miss, extra: cl };   /* extra = đơn cloud không khớp file */
+  }
+  window.cnReconcile = function () {
+    if (!window.XLSX) { window.toast && window.toast('Thư viện Excel chưa tải — reload trang', 'warn'); return; }
+    const inp = document.createElement('input');
+    inp.type = 'file'; inp.accept = '.xlsx,.xls';
+    inp.onchange = e => {
+      const f = e.target.files && e.target.files[0]; if (!f) return;
+      const rd = new FileReader();
+      rd.onload = ev => {
+        try {
+          const wb = window.XLSX.read(new Uint8Array(ev.target.result), { type: 'array' });
+          const fileMap = parseMasterFile(wb);
+          if (!Object.keys(fileMap).length) { window.toast && window.toast('Không tìm thấy bảng ma trận (hàng tiêu đề có các CỘT NGÀY) trong file', 'warn'); return; }
+          renderReconcile(fileMap, f.name);
+        } catch (err) { console.error(err); window.toast && window.toast('Lỗi đọc file: ' + err.message, 'warn'); }
+      };
+      rd.readAsArrayBuffer(f);
+    };
+    inp.click();
+  };
+  function renderReconcile(fileMap, fname) {
+    const orders = S().get('orders', window.ORDERS || []) || [];
+    const cloudMap = {};
+    orders.forEach(o => {
+      if (o.status === 'draft' || o.status === 'cancelled') return;
+      const iso = orderISO(o); if (!iso || !fileMap[iso]) return;     /* chỉ ngày có trong file */
+      const amt = +o.freight || 0; if (!amt) return;
+      const cm = cloudMap[iso] || (cloudMap[iso] = { total: 0, orders: [] });
+      cm.total += amt; cm.orders.push({ name: o.custName || o.cust || '—', amt, code: o.code });
+    });
+    /* Lọc theo khoảng ngày đang chọn trên trang (nếu có) — để đối soát đúng kỳ, bỏ tháng khác trong file */
+    const fEl = document.getElementById('cnFrom'), tEl = document.getElementById('cnTo');
+    const fromR = fEl && fEl.value, toR = tEl && tEl.value;
+    let days = Object.keys(fileMap).sort();
+    if (fromR && toR) days = days.filter(d => d >= fromR && d <= toR);
+    const m = n => (+n || 0).toLocaleString('vi-VN');
+    let gF = 0, gC = 0, body = '', drill = '';
+    days.forEach(d => {
+      const fT = fileMap[d].total, cT = (cloudMap[d] || {}).total || 0; const diff = cT - fT;
+      gF += fT; gC += cT;
+      const cls = Math.abs(diff) < 1 ? 'ok' : (diff < 0 ? 'low' : 'high');
+      const tag = Math.abs(diff) < 1 ? '✓ khớp' : (diff < 0 ? `app THIẾU ${m(-diff)}` : `app DƯ ${m(diff)}`);
+      body += `<tr class="rc-${cls}"><td><b>${ddmm(d)}</b></td><td class="num">${m(fT)}</td><td class="num">${m(cT)}</td><td class="num" style="font-weight:700">${diff > 0 ? '+' : ''}${m(diff)}</td><td style="font-size:11.5px">${tag}</td></tr>`;
+      if (Math.abs(diff) >= 1000) {
+        const { miss, extra } = reconDay(fileMap[d].custs, (cloudMap[d] || {}).orders || []);
+        if (miss.length || extra.length) {
+          drill += `<details style="margin:6px 0;border:1px solid var(--line);border-radius:8px;padding:0"><summary style="padding:8px 12px;cursor:pointer;font-weight:700;color:var(--navy)">${ddmm(d)} — chênh ${diff > 0 ? '+' : ''}${m(diff)}đ (${miss.length} đơn THIẾU · ${extra.length} đơn DƯ ở app)</summary><div style="padding:8px 12px">`;
+          if (miss.length) drill += `<div style="color:#B91C1C;font-weight:700;font-size:12px;margin-bottom:3px">✗ Có trong FILE, app THIẾU:</div>` + miss.map(x => `<div style="font-size:12px">• ${x.name} = <b>${m(x.amt)}</b></div>`).join('');
+          if (extra.length) drill += `<div style="color:#A16207;font-weight:700;font-size:12px;margin:6px 0 3px">+ App có, FILE không khớp tiền (đơn lệch/dư):</div>` + extra.map(x => `<div style="font-size:12px">• ${x.code} · ${x.name} = <b>${m(x.amt)}</b></div>`).join('');
+          drill += `</div></details>`;
+        }
+      }
+    });
+    const gd = gC - gF;
+    const html = `
+      <style>
+        .rc-tbl{width:100%;border-collapse:collapse;font-size:13px}
+        .rc-tbl th,.rc-tbl td{padding:7px 10px;border-bottom:1px solid #EEF2F0;text-align:left}
+        .rc-tbl th{background:#F0FDF4;color:#15803D;font-weight:700;position:sticky;top:0}
+        .rc-tbl td.num{text-align:right;font-variant-numeric:tabular-nums}
+        .rc-low td{background:#FEF2F2}.rc-high td{background:#FFFBEB}.rc-ok td{background:#F0FDF4}
+      </style>
+      <div style="font-size:12.5px;color:var(--muted);margin-bottom:10px">📄 File: <b>${fname || ''}</b> · so <b>tổng tiền/ngày</b> giữa file (nguồn) và đơn trong app. <span style="color:#B91C1C">đỏ = app thiếu</span> · <span style="color:#A16207">vàng = app dư</span>.</div>
+      <div style="overflow:auto;max-height:46vh;border:1px solid var(--line);border-radius:8px">
+        <table class="rc-tbl"><thead><tr><th>Ngày</th><th class="num">FILE</th><th class="num">APP</th><th class="num">CHÊNH</th><th>Tình trạng</th></tr></thead>
+        <tbody>${body}</tbody>
+        <tfoot><tr style="background:#1B5E20;color:#fff;font-weight:700"><td>TỔNG ${days.length} ngày</td><td class="num">${m(gF)}</td><td class="num">${m(gC)}</td><td class="num">${gd > 0 ? '+' : ''}${m(gd)}</td><td>${gd < 0 ? 'app thiếu ' + m(-gd) : gd > 0 ? 'app dư ' + m(gd) : '✓ khớp'}</td></tr></tfoot></table>
+      </div>
+      <div style="margin-top:12px"><div style="font-weight:700;color:var(--navy);margin-bottom:4px">🔍 Chi tiết ngày lệch (đơn thiếu/dư):</div>${drill || '<div style="color:#15803D">✓ Không ngày nào lệch ≥1.000đ.</div>'}</div>`;
+    window.openModal('📋 Đối soát File ↔ App', html, { width: 760 });
+  }
+
   if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', init);
   else init();
 })();
