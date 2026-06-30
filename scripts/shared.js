@@ -938,7 +938,9 @@ window.NAV = [
     { id: 'staff',      label: 'Nhân sự',     icon: '🧑‍💼', href: 'staff.html' },
     { id: 'tai-khoan',  label: 'Tài khoản đăng nhập', icon: '🔐', href: 'tai-khoan.html' },
     { id: 'reports',    label: 'Báo cáo',     icon: '📈', href: 'reports.html' },
+    /* Ẩn theo yêu cầu (chưa dùng — bật lại khi cần gửi blast):
     { id: 'marketing',  label: 'Email/Zalo blast', icon: '📨', href: 'marketing.html' },
+    */
     { id: 'audit',      label: 'Nhật ký',     icon: '📋', href: 'audit.html' },
     /* tg-bot.html ẩn — chỉ là simulator demo, chưa hoạt động thật.
        Khi có backend Telegram webhook thật → unhide lại. */
