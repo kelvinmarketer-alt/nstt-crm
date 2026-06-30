@@ -433,9 +433,14 @@
     const keep = neverSynced.length <= 200 ? neverSynced : [];
     const merged = cloudMerged.concat(keep);
     const newJson = JSON.stringify(merged);
+    /* PERF: so với BASELINE cloud lần trước (_synced[key]) thay vì stringify lại _data[key].
+       Bảng orders (kèm items JSONB) ~ngàn dòng → 2× JSON.stringify mỗi tick poll/focus = đơ main-thread.
+       Baseline = "trạng thái cloud sau merge" — nếu cloud không đổi thì newJson === prevBaseline → bỏ qua,
+       khỏi notify lại subscriber. Local-only đổi đã được set() tự notify riêng. */
+    const prevBaseline = _synced[key];
     _synced[key] = newJson;   /* baseline = trạng thái cloud sau merge/self-heal */
     _persistSyncedIds(key, merged);  /* lưu id-set bền qua reload để lần sau biết record nào bị xoá */
-    if (newJson !== JSON.stringify(_data[key] || [])) {
+    if (newJson !== prevBaseline) {
       _data[key] = merged;
       try { localStorage.setItem(PREFIX + key, newJson); } catch (e) {}
       (_subs[key] || []).forEach(fn => fn(merged));
@@ -855,7 +860,10 @@
     const _foreSync = () => {
       if (!isSupabaseMode() || document.hidden) return;
       const now = Date.now();
-      if (now - _lastForeSync < 3000) return;
+      /* PERF: throttle 20s (cũ 3s). Mỗi lần focus = re-pull MỌI bảng (orders nặng) song song
+         → đổi tab liên tục là kéo lại cả ngàn dòng mỗi 3s, đơ app. Realtime websocket vẫn
+         đẩy delta tức thì nên không cần kéo full mỗi lần focus; 20s là lưới an toàn đủ tươi. */
+      if (now - _lastForeSync < 20000) return;
       _lastForeSync = now;
       _preloaded.forEach(key => {
         if (TABLE_MAP[key]) _mergeTableFromCloud(key, TABLE_MAP[key]).catch(() => {});

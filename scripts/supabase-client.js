@@ -486,11 +486,16 @@
         updated_at: new Date().toISOString(),
       });
       if (error) {
-        console.warn('[SB setKv]', key, error.message);
-        /* CHỐNG SPAM: tối đa 1 toast / key / 30s (tránh hàng chục toast khi mạng chập chờn) */
+        console.warn('[SB setKv]', key, error.code, error.message);
+        /* CHỐNG SPAM: tối đa 1 toast / key / 30s (tránh hàng chục toast khi mạng chập chờn).
+           Kèm LÝ DO (code/message) để chẩn đoán: 42501/permission = RLS chặn ghi · 413/quá lớn ·
+           mạng = lỗi fetch. Lưu lần lỗi gần nhất ra window.__kvLastErr để xem nhanh ở console. */
+        window.__kvLastErr = { key, code: error.code, message: error.message, at: new Date().toISOString() };
         const W = (window.__kvWarnAt = window.__kvWarnAt || {});
         const now = Date.now();
-        if (!W[key] || now - W[key] > 30000) { W[key] = now; window.toast?.('⚠ Chưa đồng bộ được ' + key + ' — sẽ tự thử lại', 'warn'); }
+        const why = /permission|rls|policy|42501/i.test(error.message + error.code) ? ' (quyền ghi bị chặn)'
+          : /JWT|token|expired|401/i.test(error.message + error.code) ? ' (phiên hết hạn — đăng nhập lại)' : '';
+        if (!W[key] || now - W[key] > 30000) { W[key] = now; window.toast?.('⚠ Chưa lưu được "' + key + '" lên cloud' + why + ' — sẽ tự thử lại', 'warn'); }
       }
       return !error;
     },

@@ -622,32 +622,47 @@
      liệt kê đơn THIẾU / DƯ / LỆCH để biết chính xác chỗ sai.
      =================================================================== */
   /* Convert giá trị ô ngày → ISO. Dùng UTC để KHỎI lệch 1 ngày (serial Excel = UTC midnight). */
-  function cellToISO(v) {
-    if (typeof v === 'number' && v > 40000 && v < 60000) {
-      const d = new Date(Math.round((v - 25569) * 86400000));
+  function cellToISO(v, defYear) {
+    /* serial Excel (số HOẶC chuỗi toàn số trong khoảng ngày) */
+    const numV = (typeof v === 'number') ? v : (/^\d{5}(\.\d+)?$/.test(String(v).trim()) ? +String(v).trim() : NaN);
+    if (!isNaN(numV) && numV > 40000 && numV < 60000) {
+      const d = new Date(Math.round((numV - 25569) * 86400000));
       return isNaN(d) ? '' : `${d.getUTCFullYear()}-${pad(d.getUTCMonth() + 1)}-${pad(d.getUTCDate())}`;
     }
     if (v instanceof Date && !isNaN(v)) return `${v.getUTCFullYear()}-${pad(v.getUTCMonth() + 1)}-${pad(v.getUTCDate())}`;
-    const m = String(v).match(/^(\d{4})-(\d{2})-(\d{2})/); if (m) return m[0];
-    const m2 = String(v).match(/(\d{1,2})\/(\d{1,2})\/(\d{4})/); if (m2) return `${m2[3]}-${pad(m2[2])}-${pad(m2[1])}`;
+    const s = String(v).trim();
+    const m = s.match(/^(\d{4})-(\d{1,2})-(\d{1,2})/); if (m) return `${m[1]}-${pad(m[2])}-${pad(m[3])}`;
+    /* dd/mm/yyyy · dd-mm-yyyy · dd.mm.yyyy */
+    const m2 = s.match(/^(\d{1,2})[\/.\-](\d{1,2})[\/.\-](\d{2,4})$/);
+    if (m2) { const y = m2[3].length === 2 ? '20' + m2[3] : m2[3]; return `${y}-${pad(m2[2])}-${pad(m2[1])}`; }
+    /* dd/mm (KHÔNG có năm) — phổ biến ở sheet ngày VN → suy năm từ kỳ đang chọn / năm hiện tại */
+    const m3 = s.match(/^(\d{1,2})[\/.\-](\d{1,2})$/);
+    if (m3 && defYear) { const dd = +m3[1], mm = +m3[2]; if (dd >= 1 && dd <= 31 && mm >= 1 && mm <= 12) return `${defYear}-${pad(mm)}-${pad(dd)}`; }
     return '';
   }
   const _SUMLBL = /^(doanh thu|gi[áa] v[ốo]n|l[ợo]i nhu[ậaậ]n|s[ốo] đơn|t[ổoổ]ng|c[ộoộ]ng)/i;
   /* Parse workbook ma trận → { iso: {total, custs:[{name,amt}]} } */
-  function parseMasterFile(wb) {
+  function parseMasterFile(wb, diag) {
     const out = {};
+    /* Năm mặc định cho cột ghi "dd/mm" thiếu năm: lấy theo kỳ đang chọn (cnFrom) → năm hiện tại */
+    let defYear = 0;
+    const _fEl = document.getElementById('cnFrom'); const _fv = _fEl && _fEl.value;
+    const _ym = _fv && String(_fv).match(/^(\d{4})/); if (_ym) defYear = +_ym[1];
+    if (!defYear) defYear = new Date().getFullYear();
     for (const sn of wb.SheetNames) {
       /* BỎ QUA sheet "NHẬP" (giá nhập/cost) — chỉ đối soát DOANH THU, tránh cộng gộp đôi cùng ngày */
       const snn = String(sn).toLowerCase().normalize('NFD').replace(/[̀-ͯ]/g, '').replace(/đ/g, 'd');
       if (snn.includes('nhap')) continue;
       const grid = window.XLSX.utils.sheet_to_json(wb.Sheets[sn], { header: 1, raw: true, defval: '' });
-      let hr = -1, daycols = [];
-      for (let r = 0; r < Math.min(grid.length, 10); r++) {
+      /* Dò hàng tiêu đề = hàng có NHIỀU ô NGÀY nhất trong 20 hàng đầu (bền với hàng tiêu đề/merge) */
+      let hr = -1, daycols = [], best = 0;
+      for (let r = 0; r < Math.min(grid.length, 20); r++) {
         const cols = [];
-        for (let c = 1; c < (grid[r] || []).length; c++) { const iso = cellToISO(grid[r][c]); if (iso) cols.push([c, iso]); }
-        if (cols.length >= 4) { hr = r; daycols = cols; break; }
+        for (let c = 1; c < (grid[r] || []).length; c++) { const iso = cellToISO(grid[r][c], defYear); if (iso) cols.push([c, iso]); }
+        if (cols.length > best) { best = cols.length; hr = r; daycols = cols; }
       }
-      if (hr < 0) continue;
+      if (diag) diag.push({ sheet: sn, dateCols: best, sample: (grid[hr > -1 ? hr : 0] || []).slice(0, 6).map(x => String(x).slice(0, 10)) });
+      if (daycols.length < 4) continue;
       /* đoán đơn vị: nếu giá trị nhỏ (<100k) → file ghi NGHÌN đồng → ×1000 */
       const sample = [];
       for (let r = hr + 1; r < grid.length; r++) {
@@ -713,9 +728,21 @@
       const rd = new FileReader();
       rd.onload = ev => {
         try {
+          /* KHÔNG cellDates:true → giữ serial dạng SỐ, cellToISO tự đổi bằng UTC (tránh lệch 1 ngày theo TZ) */
           const wb = window.XLSX.read(new Uint8Array(ev.target.result), { type: 'array' });
-          const fileMap = parseMasterFile(wb);
-          if (!Object.keys(fileMap).length) { window.toast && window.toast('Không tìm thấy bảng ma trận (hàng tiêu đề có các CỘT NGÀY) trong file', 'warn'); return; }
+          const diag = [];
+          const fileMap = parseMasterFile(wb, diag);
+          if (!Object.keys(fileMap).length) {
+            /* CHẨN ĐOÁN: liệt kê sheet + số cột ngày dò được + mẫu hàng tiêu đề → biết vì sao trượt */
+            const esc = s => String(s == null ? '' : s).replace(/&/g, '&amp;').replace(/</g, '&lt;');
+            const rows = diag.map(d => `<tr><td style="padding:4px 8px">${esc(d.sheet)}</td><td style="padding:4px 8px;text-align:center;color:${d.dateCols >= 4 ? '#15803D' : '#B91C1C'}">${d.dateCols}</td><td style="padding:4px 8px;font-size:11px;color:var(--muted)">${esc((d.sample || []).join(' | '))}</td></tr>`).join('');
+            window.openModal('⚠ Chưa đọc được bảng ma trận', `
+              <div style="font-size:13px;line-height:1.6;margin-bottom:10px">Cần 1 sheet có <b>hàng tiêu đề chứa các CỘT NGÀY</b> (vd 01/06, 02/06… hoặc ngày Excel). Dưới đây là thứ app dò được trong file <b>${esc(f.name)}</b>:</div>
+              <table style="width:100%;border-collapse:collapse;font-size:12.5px;border:1px solid var(--line)"><thead><tr style="background:#F0FDF4"><th style="padding:5px 8px;text-align:left">Sheet</th><th style="padding:5px 8px">Số cột ngày</th><th style="padding:5px 8px;text-align:left">Mẫu hàng tiêu đề</th></tr></thead><tbody>${rows || '<tr><td colspan="3" style="padding:8px">Không có sheet nào (trừ sheet NHẬP).</td></tr>'}</tbody></table>
+              <div style="font-size:12px;color:var(--muted);margin-top:10px">💡 Nếu mọi sheet đều 0 cột ngày: hàng tiêu đề có thể nằm sâu hơn 20 dòng, hoặc ngày ghi dạng chữ lạ. Gửi ảnh chụp 5 dòng đầu của sheet để mình chỉnh.</div>
+            `, { width: 640 });
+            return;
+          }
           renderReconcile(fileMap, f.name);
         } catch (err) { console.error(err); window.toast && window.toast('Lỗi đọc file: ' + err.message, 'warn'); }
       };
