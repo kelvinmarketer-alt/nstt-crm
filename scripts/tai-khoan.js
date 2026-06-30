@@ -53,16 +53,16 @@
         uname ? `👤 <b>${esc(uname)}</b>` : '<span style="color:#B45309">+ thêm username</span>',
       ].filter(Boolean).join('<br>');
       return `<tr>
-        <td><input type="checkbox" class="ak-cb" data-id="${esc(sid)}"></td>
-        <td><div style="display:flex;align-items:center;gap:9px">
+        <td data-field="cb"><input type="checkbox" class="ak-cb" data-id="${esc(sid)}"></td>
+        <td data-field="name"><div style="display:flex;align-items:center;gap:9px">
           <div class="cust-ava" style="background:${col};flex:none">${esc(window.initials ? window.initials(s.name) : '?')}</div>
           <div><div style="font-weight:600">${esc(s.name)}</div><div class="id-mono">${esc(sid)}</div></div>
         </div></td>
-        <td style="font-size:12px;line-height:1.7">${logins}</td>
-        <td style="font-size:12px">${esc(s.role || '')}<div style="color:var(--muted)">${esc(s.dept || '')}</div></td>
-        <td>${hasPw ? '<span class="pill pill-cust">Đã đặt riêng</span>' : '<span class="pill pill-def">Mặc định</span>'}</td>
-        <td>${locked ? '<span class="pill pill-off">🔒 Đã khóa</span>' : '<span class="pill pill-on">✓ Hoạt động</span>'}</td>
-        <td class="acc-act" style="white-space:nowrap">
+        <td data-field="logins" style="font-size:12px;line-height:1.7">${logins}</td>
+        <td data-field="role" style="font-size:12px">${esc(s.role || '')}<div style="color:var(--muted)">${esc(s.dept || '')}</div></td>
+        <td data-field="pw">${hasPw ? '<span class="pill pill-cust">Đã đặt riêng</span>' : '<span class="pill pill-def">Mặc định</span>'}</td>
+        <td data-field="status">${locked ? '<span class="pill pill-off">🔒 Đã khóa</span>' : '<span class="pill pill-on">✓ Hoạt động</span>'}</td>
+        <td data-field="act" class="acc-act" style="white-space:nowrap">
           <button onclick="window.akSetPw('${esc(sid)}')" title="Đặt / đổi mật khẩu">🔑 Mật khẩu</button>
           <button onclick="window.akSetUser('${esc(sid)}')" title="Đặt tên đăng nhập">👤 Username</button>
           <button onclick="window.akToggleLock('${esc(sid)}')" title="${locked ? 'Mở khóa' : 'Khóa'} tài khoản">${locked ? '▶ Mở' : '⏸ Khóa'}</button>

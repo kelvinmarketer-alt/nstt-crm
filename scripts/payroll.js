@@ -754,6 +754,34 @@
         .pay-table tfoot td:first-child,.pay-table tfoot td:last-child{background:#F9FAFB}
         .pay-table tbody tr:hover td{background:#F8FAF8}
         .pay-table tbody tr:hover td:first-child,.pay-table tbody tr:hover td:last-child{background:#F3FAF3}
+        /* ===== ĐIỆN THOẠI: bảng lương → mỗi NV 1 THẺ (hết kéo ngang) ===== */
+        @media (max-width:560px){
+          .pay-wrap{overflow:visible!important;border:none;background:transparent}
+          .pay-table{min-width:0!important;width:100%}
+          .pay-table thead{display:none}
+          .pay-table,.pay-table tbody,.pay-table tfoot{display:block;width:100%}
+          .pay-table tbody tr,.pay-table tfoot tr{display:block;position:relative;background:#fff;border:1px solid var(--line);border-radius:12px;margin:0 0 10px;padding:11px 13px}
+          .pay-table tfoot tr{background:#F0FDF4;border-color:#15803D}
+          .pay-table td,.pay-table th:first-child,.pay-table td:first-child,.pay-table td:last-child{position:static!important;display:block;white-space:normal!important;border:none!important;box-shadow:none!important;padding:2px 0!important;text-align:left!important;font-size:12.5px}
+          .pay-table td.num{text-align:left!important}
+          /* tên NV = tiêu đề thẻ, chừa chỗ cho Thực lĩnh ghim phải */
+          .pay-table tbody td:nth-child(1),.pay-table tfoot td:nth-child(1){font-weight:800;font-size:14px;padding-right:120px!important;padding-bottom:7px!important;margin-bottom:6px;border-bottom:1px dashed var(--line)!important}
+          /* nhãn từng con số */
+          .pay-table tbody td:nth-child(n+2)::before{color:var(--muted);font-weight:600;font-size:11px}
+          .pay-table tbody td:nth-child(2)::before{content:"Lương CB: "}
+          .pay-table tbody td:nth-child(3)::before{content:"Công: "}
+          .pay-table tbody td:nth-child(4)::before{content:"Lương theo công: "}
+          .pay-table tbody td:nth-child(5)::before{content:"Thưởng: "}
+          .pay-table tbody td:nth-child(6)::before{content:"Phạt: "}
+          .pay-table tbody td:nth-child(7)::before{content:"BHXH: "}
+          .pay-table tbody td:nth-child(8)::before{content:"Tạm ứng: "}
+          .pay-table tbody td:nth-child(10)::before{content:"Trạng thái: "}
+          /* Thực lĩnh (cột 9) = số chính, ghim góc phải */
+          .pay-table tbody td:nth-child(9){position:absolute!important;top:11px;right:13px;width:auto;font-weight:800;color:#DC2626;font-size:16px}
+          /* nút Phiếu (cột 11) = hàng đáy full-width */
+          .pay-table tbody td:nth-child(11){margin-top:8px;text-align:center!important}
+          .pay-table tbody td:nth-child(11) .btn{width:100%}
+        }
       </style>
       <div class="pay-wrap">
         <table class="mini-table pay-table">

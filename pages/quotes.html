@@ -14,6 +14,62 @@
   .qst-accepted{background:#DCFCE7;color:#15803D}
   .qst-rejected{background:#FEE2E2;color:#B91C1C}
   .qst-expired{background:#FEF3C7;color:#92400E}
+  /* Nhãn chữ trong nút hành động — chỉ hiện trên thẻ mobile */
+  .qt-btn-lbl{display:none}
+
+  /* ===== MOBILE ≤560px: mỗi báo giá = 1 THẺ (card), không kéo ngang ===== */
+  @media (max-width:560px){
+    /* Bẻ gãy force min-width:600px + overflow của ux-improvements.js */
+    .qt-table{min-width:0!important;width:100%}
+    /* Specificity cao hơn rule cùng tên của ux-improvements (được inject sau) */
+    main div[style*="overflow-x:auto"]{overflow-x:hidden!important}
+
+    .qt-table thead{display:none}
+    .qt-table,.qt-table tbody{display:block;width:100%}
+    .qt-table tbody tr{
+      display:block;position:relative;
+      border:1px solid var(--line);border-radius:12px;margin:0 0 10px;
+      padding:11px 13px;background:#fff
+    }
+    .qt-table tbody td{
+      display:block;border:none!important;padding:2px 0;
+      text-align:left!important;white-space:normal;font-size:12.5px;line-height:1.45
+    }
+    /* Tên KH = tiêu đề thẻ (đậm), chừa chỗ cho ô tổng tiền ghim phải */
+    .qt-table tbody td[data-field="cust"]{
+      font-size:14.5px;font-weight:800;color:var(--navy);padding-right:104px;line-height:1.25
+    }
+    /* Mã BG: dòng phụ ngay dưới tên */
+    .qt-table tbody td[data-field="id"]{margin-top:1px;color:var(--muted);font-size:11.5px}
+    .qt-table tbody td[data-field="id"] b{font-weight:600}
+    /* TỔNG TIỀN: ghim góc trên phải, navy đậm */
+    .qt-table tbody td[data-field="total"]{
+      position:absolute!important;top:11px;right:13px;width:auto;
+      padding:0!important;text-align:right!important;
+      font-weight:800;color:var(--navy);font-size:15px
+    }
+    /* Khối thông tin phụ: gạch ngang phía trên, mỗi dòng 1 icon/nhãn */
+    .qt-table tbody td[data-field="status"]{margin-top:8px;padding-top:8px;border-top:1px dashed var(--line)!important}
+    .qt-table tbody td[data-field="date"]::before{content:"📅 Ngày: "}
+    .qt-table tbody td[data-field="valid"]::before{content:"⏳ Hết hạn: "}
+    .qt-table tbody td[data-field="staff"]::before{content:"👤 NV: "}
+    .qt-table tbody td[data-field="date"],
+    .qt-table tbody td[data-field="valid"]{color:var(--muted);margin-top:3px}
+    .qt-table tbody td[data-field="staff"]{margin-top:3px}
+    /* HÀNH ĐỘNG: hàng nút full-width dưới cùng, chia đều */
+    .qt-table tbody td[data-field="actions"]{
+      margin-top:10px;display:flex!important;gap:10px;flex-wrap:wrap
+    }
+    .qt-table tbody td[data-field="actions"] .btn{
+      flex:1 1 calc(50% - 10px);min-width:0;justify-content:center;white-space:nowrap
+    }
+    .qt-btn-lbl{display:inline}
+
+    /* Bộ lọc: tìm kiếm + trạng thái xếp dọc cho thoáng */
+    #qtQ{min-width:0!important}
+    /* KPI 5 ô → lưới 2 cột cho dễ đọc trên ĐT */
+    #qtKpis{grid-template-columns:repeat(2,1fr)!important}
+  }
 </style>
 </head>
 <body>

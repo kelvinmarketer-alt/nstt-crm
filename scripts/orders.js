@@ -1918,73 +1918,7 @@ CHỈ TRẢ JSON, không giải thích gì thêm.`;
     renderOrderItems();
   };
 
-  /* Modal quản lý từ điển riêng của 1 KH */
-  window.openCustAliasMgr = function(custId) {
-    const c = window.STORE.get('customers', []).find(x => x.id === custId);
-    const p = window.CustPrefs.get(custId);
-    const products = window.STORE.get('products', window.PRODUCTS || []) || [];
-    const aliasRows = Object.entries(p.aliases).map(([w, pid]) => {
-      const prod = products.find(x => x.id === pid);
-      const dq = p.defaultQty[pid] || '';
-      return `<tr><td>"${w}"</td><td>→ ${prod ? prod.name + ' <span style="color:var(--muted);font-family:monospace;font-size:11px">'+pid+'</span>' : '<i style="color:#DC2626">SP không còn</i>'}</td><td>${dq}</td><td><button class="btn btn-ghost btn-sm" style="color:var(--danger)" onclick="window._delAlias('${custId}','${w}')">✕</button></td></tr>`;
-    }).join('') || `<tr><td colspan="4" style="padding:14px;text-align:center;color:var(--muted)">Chưa có từ điển nào. Thêm bên dưới ↓</td></tr>`;
 
-    window.openModal('📖 Từ điển riêng của ' + (c?.name || custId), `
-      <div style="background:#EFF6FF;color:#1E40AF;padding:10px 12px;border-radius:8px;font-size:12.5px;margin-bottom:12px;line-height:1.55">
-        💡 <b>Cá nhân hoá per KH</b> — giải quyết tình huống KH "${c?.name||'này'}" nhắn ngắn (vd "hành 50kg") nhưng kho có nhiều loại hành (tây/ta/lá). Bạn dạy hệ thống 1 lần — sau đó AI tự hiểu khi đọc ảnh đơn của KH.
-        <br><br><b>Ví dụ:</b> Word "hành" → SP "Hành tây trắng" (SP006) · SL mặc định 50kg.
-      </div>
-
-      <h3 style="font-size:12px;color:var(--navy);text-transform:uppercase;margin:0 0 6px">Từ điển hiện có (${Object.keys(p.aliases).length})</h3>
-      <table class="mini-table" style="width:100%">
-        <thead><tr><th>Khi KH viết</th><th>= SP nào</th><th>SL mặc định</th><th></th></tr></thead>
-        <tbody id="aliasTbody">${aliasRows}</tbody>
-      </table>
-
-      <h3 style="font-size:12px;color:var(--navy);text-transform:uppercase;margin:14px 0 6px">+ Thêm từ điển mới</h3>
-      <div style="display:grid;grid-template-columns:1fr 2fr 90px 80px;gap:6px;align-items:end">
-        <div><label style="font-size:11px;color:var(--muted)">Từ KH viết</label><input id="alWord" placeholder="hành" style="width:100%;border:1px solid var(--line);border-radius:5px;padding:6px;font-size:12px"></div>
-        <div><label style="font-size:11px;color:var(--muted)">= SP nào (gõ tìm)</label><input class="prodpick" id="alPid" data-pid="" placeholder="Gõ tên SP…" style="width:100%;border:1px solid var(--line);border-radius:5px;padding:6px 9px;font-size:12px"></div>
-        <div><label style="font-size:11px;color:var(--muted)">SL TB</label><input id="alQty" type="number" placeholder="50" style="width:100%;border:1px solid var(--line);border-radius:5px;padding:6px;font-size:12px"></div>
-        <div><button class="btn btn-primary btn-sm" onclick="window._addAlias('${custId}')">+ Thêm</button></div>
-      </div>
-
-      <h3 style="font-size:12px;color:var(--navy);text-transform:uppercase;margin:16px 0 6px">⭐ Top SP KH này hay đặt</h3>
-      <div style="display:flex;flex-wrap:wrap;gap:5px;font-size:11.5px">
-        ${(p.favorites||[]).map(pid => {
-          const prod = products.find(x => x.id === pid);
-          return prod ? `<span style="background:#F0FDF4;color:#15803D;padding:3px 8px;border-radius:99px">${prod.name} ${p.defaultQty[pid]?'· ~'+p.defaultQty[pid]+prod.unit:''}</span>` : '';
-        }).join('') || '<span style="color:var(--muted)">Chưa có đơn — không có dữ liệu</span>'}
-      </div>
-
-      <h3 style="font-size:12px;color:var(--navy);text-transform:uppercase;margin:16px 0 6px">🧠 Mẫu nét chữ đã học</h3>
-      <div id="custSampleBox" style="font-size:11.5px;color:var(--muted)">Đang tải…</div>
-    `, {
-      footer:`<button class="btn btn-ghost" onclick="window.closeModal()">Đóng</button>`,
-      width:'620px'
-    });
-    if (window.wireAllProductSearch) window.wireAllProductSearch(document.querySelector('.modal-bg:last-of-type') || document);
-    if (window._renderAliasSamples) window._renderAliasSamples(custId);
-  };
-
-  /* Hiển thị mẫu nét chữ (ảnh) của KH trong modal Từ điển — async đọc IndexedDB */
-  window._renderAliasSamples = async function (custId) {
-    const box = document.getElementById('custSampleBox');
-    if (!box) return;
-    if (!window.OrderSamples) { box.innerHTML = '<span>Mở từ trang Đơn hàng để xem mẫu nét chữ.</span>'; return; }
-    let samples = [];
-    try { samples = await window.OrderSamples.listCust(custId); } catch (e) {}
-    if (!samples.length) {
-      box.innerHTML = 'Chưa có mẫu. Khi bạn dùng <b>📷 Từ ảnh</b> đọc đơn của KH này rồi lưu đơn → hệ thống tự lưu mẫu để AI nhớ nét chữ.';
-      return;
-    }
-    box.innerHTML = `<div style="display:flex;gap:8px;flex-wrap:wrap;align-items:flex-start">
-      ${samples.slice(0, 6).map(s => `<div style="position:relative">
-        <img src="data:${s.mime};base64,${s.b64}" title="${(s.finalItems||[]).map(it=>it.name+' '+it.qty).join(', ')}" style="width:74px;height:74px;object-fit:cover;border-radius:6px;border:1px solid var(--line);cursor:zoom-in" onclick="window.open('order-samples.html?cust=${encodeURIComponent(custId)}','_blank')">
-      </div>`).join('')}
-    </div>
-    <div style="margin-top:6px"><b style="color:#15803D">${samples.length} mẫu</b> — AI dùng 2 mẫu mới nhất khi đọc đơn KH này. <a href="order-samples.html?cust=${encodeURIComponent(custId)}" style="color:#1B5E20;font-weight:600">Quản lý →</a></div>`;
-  };
 
   /* ============ Lưu items hiện tại thành đơn định kỳ ============ */
   window.saveAsRecurring = function() {
@@ -2002,20 +1936,6 @@ CHỈ TRẢ JSON, không giải thích gì thêm.`;
     window.location.href = 'recurring.html?fromOrder=1';
   };
 
-  window._addAlias = function(custId) {
-    const w = document.getElementById('alWord').value.trim();
-    const pid = document.getElementById('alPid').dataset.pid || '';
-    const qty = parseFloat(document.getElementById('alQty').value) || 0;
-    if (!w || !pid) { window.toast('Nhập từ + gõ chọn SP','warn'); return; }
-    window.CustPrefs.addAlias(custId, w, pid, qty);
-    window.toast('✓ Đã thêm từ điển','success');
-    window.openCustAliasMgr(custId);  /* Re-render modal */
-  };
-
-  window._delAlias = function(custId, word) {
-    window.CustPrefs.removeAlias(custId, word);
-    window.openCustAliasMgr(custId);
-  };
   window.onChangeService = function(svcId) {
     const isLienTinh = svcId === 'lien-tinh';
     const modeWrap = document.getElementById('modeWrap');

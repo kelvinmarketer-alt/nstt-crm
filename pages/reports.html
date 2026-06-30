@@ -60,6 +60,101 @@
   .pf-guide-card .g-ex{font-size:11.5px;color:#0369A1;background:#E0F2FE;padding:4px 8px;border-radius:4px;display:inline-block;margin-top:2px}
   .pf-guide-card code{background:#FFFBEB;color:#92400E;padding:1px 5px;border-radius:3px;font-size:11px;font-family:ui-monospace,monospace}
   @media (max-width:780px){.pf-guide-card[style*="grid-column"]{grid-column:auto!important}}
+
+  /* ============================================================
+     MOBILE ≤560px — KHÔNG kéo ngang trang trên MỌI bảng báo cáo.
+     Beat ux-improvements.js (force .t-responsive min-width:600px +
+     wrapper overflow-x:auto ở ≤720px).
+     Chiến lược: bảng danh sách → THU GỌN cho vừa khung + ẩn cột phụ;
+     ma trận theo kỳ (cohort) → cuộn ngang TRONG thẻ + ghim cột đầu.
+     ============================================================ */
+  @media (max-width:560px){
+    /* --- Gỡ ép min-width 600px + tắt cuộn ngang TRANG cho bảng danh sách --- */
+    #varianceTbl, #ovCompareTbl,
+    #paneRevenue .mini-table, #pfTopProd, #pfByStaff,
+    #remindHistory, #recentReceipts,
+    #varianceTbl table, .mini-table{
+      min-width:0!important;
+      width:100%!important;
+      table-layout:fixed;
+      font-size:11px;
+    }
+    /* các thẻ/khung của bảng danh sách: KHÔNG cho cuộn ngang trang */
+    #varianceTbl, #ovCompareTbl{overflow-x:hidden!important}
+    .chart-card .mini-table{display:table}
+
+    /* gọn padding + cho xuống dòng, không cắt cụt số */
+    .mini-table th, .mini-table td,
+    #varianceTbl th, #varianceTbl td{
+      padding:6px 5px!important;
+      white-space:normal!important;
+      word-break:break-word;
+      overflow:visible!important;
+      text-overflow:clip!important;
+      max-width:none!important;
+    }
+    .mini-table .num, .mini-table td.num{font-size:11px}
+
+    /* ---------- ovCompareTbl: Chỉ số | T4 | T5 | Δ | Xu hướng ----------
+       giữ Chỉ số + T5 (hiện tại) + Δ; ẩn T4 (col2) + Xu hướng badge (col5) */
+    #ovCompareTbl td:nth-child(2), #ovCompareTbl th:nth-child(2),
+    #ovCompareTbl td:nth-child(5), #ovCompareTbl th:nth-child(5){display:none}
+
+    /* ---------- varianceTbl: Chỉ số | Budget | Actual | Chênh lệch | Đánh giá ----------
+       giữ Chỉ số + Actual + Chênh lệch; ẩn Budget (col2) + Đánh giá (col5) */
+    #varianceTbl table td:nth-child(2), #varianceTbl table th:nth-child(2),
+    #varianceTbl table td:nth-child(5), #varianceTbl table th:nth-child(5){display:none}
+
+    /* ---------- Revenue: bảng DT theo NV (5 cột) NV|Đơn|DT|AOV|%MT ----------
+       ẩn AOV (col4) — giữ NV + Đơn + DT + %Mục tiêu */
+    #paneRevenue .mini-table td:nth-child(4),
+    #paneRevenue .mini-table th:nth-child(4){display:none}
+
+    /* ---------- salesBody: #|NV|Đơn|DT|%DT|KH|Công nợ|TB/đơn (8 cột) ----------
+       giữ NV(2) + Đơn(3) + DT(4) + Công nợ(7); ẩn #(1) %DT(5) KH(6) TB/đơn(8) */
+    #paneSales .mini-table td:nth-child(1), #paneSales .mini-table th:nth-child(1),
+    #paneSales .mini-table td:nth-child(5), #paneSales .mini-table th:nth-child(5),
+    #paneSales .mini-table td:nth-child(6), #paneSales .mini-table th:nth-child(6),
+    #paneSales .mini-table td:nth-child(8), #paneSales .mini-table th:nth-child(8){display:none}
+
+    /* ---------- pfTopProd: #|SP|SL|DT|Giá vốn|Lãi gộp|Biên (7 cột) ----------
+       giữ SP(2) + DT(4) + Lãi gộp(6) + Biên(7); ẩn #(1) SL(3) Giá vốn(5).
+       .tbl-pfprod đặt trên <table> nên ẩn cả thead+tbody cùng lúc. */
+    .tbl-pfprod th:nth-child(1), .tbl-pfprod td:nth-child(1),
+    .tbl-pfprod th:nth-child(3), .tbl-pfprod td:nth-child(3),
+    .tbl-pfprod th:nth-child(5), .tbl-pfprod td:nth-child(5){display:none}
+
+    /* ---------- pfByStaff: NV|Đơn|DT|Giá vốn|Lãi gộp|Biên (6 cột) ----------
+       ẩn Giá vốn (col4); giữ NV+Đơn+DT+Lãi gộp+Biên */
+    .tbl-pfstaff th:nth-child(4), .tbl-pfstaff td:nth-child(4){display:none}
+
+    /* ---------- remindHistory: Ngày|KH|Kênh|NV|Phản hồi|Msg (6 cột) ----------
+       giữ Ngày(1)+KH(2)+Phản hồi(5)+Msg(6); ẩn Kênh(3)+NV(4) */
+    .tbl-remind th:nth-child(3), .tbl-remind td:nth-child(3),
+    .tbl-remind th:nth-child(4), .tbl-remind td:nth-child(4){display:none}
+    .tbl-remind td:last-child{max-width:none!important}
+
+    /* ---------- recentReceipts: Ngày|Số phiếu|KH|Số tiền|TK nhận|NV thu (6 cột) ----------
+       giữ Ngày(1)+KH(3)+Số tiền(4)+NV thu(6); ẩn Số phiếu(2)+TK nhận(5) */
+    .tbl-receipts th:nth-child(2), .tbl-receipts td:nth-child(2),
+    .tbl-receipts th:nth-child(5), .tbl-receipts td:nth-child(5){display:none}
+
+    /* ============ MA TRẬN theo kỳ: COHORT → cuộn ngang TRONG thẻ ============
+       Đây là pivot (Cohort|Size|M+0..M+5) — giữ cuộn ngang nhưng GIAM trong khung,
+       ghim cột đầu để đọc tên cohort. KHÔNG để tràn ra trang. */
+    #cohortTbl{
+      overflow-x:auto!important;
+      -webkit-overflow-scrolling:touch;
+      max-width:100%;
+    }
+    #cohortTbl table{min-width:520px;font-size:10.5px}
+    #cohortTbl table th:first-child,
+    #cohortTbl table td:first-child{
+      position:sticky;left:0;background:#fff;z-index:1;
+      box-shadow:1px 0 0 var(--line);
+    }
+    #cohortTbl table thead th:first-child{background:#FAFBFC}
+  }
 </style>
 </head>
 <body>
@@ -365,7 +460,7 @@
 
       <div class="chart-card">
         <h3>🥇 Sản phẩm sinh lời nhất kỳ này</h3>
-        <table class="mini-table">
+        <table class="mini-table tbl-pfprod">
           <thead><tr>
             <th>#</th><th>Sản phẩm</th>
             <th class="num">SL bán</th>
@@ -380,7 +475,7 @@
 
       <div class="chart-card">
         <h3>🧑‍💼 Lợi nhuận theo NV phụ trách</h3>
-        <table class="mini-table">
+        <table class="mini-table tbl-pfstaff">
           <thead><tr>
             <th>NV</th><th class="num">Đơn</th><th class="num">Doanh thu</th>
             <th class="num">Giá vốn</th><th class="num">Lãi gộp</th><th class="num">Biên LN</th>
@@ -539,7 +634,7 @@
       <!-- Lịch sử nhắc nợ -->
       <div class="chart-card">
         <h3>📞 Lịch sử nhắc nợ (30 ngày gần nhất)</h3>
-        <table class="mini-table">
+        <table class="mini-table tbl-remind">
           <thead><tr><th>Ngày</th><th>KH</th><th>Kênh</th><th>NV</th><th>Phản hồi</th><th>Trạng thái sau</th></tr></thead>
           <tbody id="remindHistory"></tbody>
         </table>
@@ -548,7 +643,7 @@
       <!-- Theo dõi thanh toán -->
       <div class="chart-card">
         <h3>💵 Phiếu thu nợ gần đây</h3>
-        <table class="mini-table">
+        <table class="mini-table tbl-receipts">
           <thead><tr><th>Ngày</th><th>Số phiếu</th><th>KH</th><th class="num">Số tiền</th><th>TK nhận</th><th>NV thu</th></tr></thead>
           <tbody id="recentReceipts"></tbody>
         </table>

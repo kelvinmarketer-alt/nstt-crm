@@ -33,6 +33,36 @@
     .ak-filters .search-in{flex:1 1 100%!important;min-width:0!important}
     .ak-filters select{flex:1 1 calc(50% - 6px)!important;min-width:0!important}
     .ak-filters #akSummary{flex:1 1 100%!important}
+
+    /* 3) MỖI TÀI KHOẢN = 1 THẺ (card) — hết kéo ngang.
+       Thắng min-width:880px của .acc-tbl + min-width:600px do ux-improvements.js bơm vào. */
+    .acc-wrap{overflow-x:hidden!important}
+    table.acc-tbl{min-width:0!important;width:100%}
+    .acc-tbl thead{display:none}
+    .acc-tbl table,.acc-tbl tbody{display:block;width:100%}
+    .acc-tbl tbody tr{
+      display:block;position:relative;
+      border:1px solid var(--line);border-radius:12px;margin:0 0 10px;
+      padding:11px 13px;background:#fff
+    }
+    .acc-tbl tbody td{display:block;border:none!important;padding:2px 0;text-align:left!important;white-space:normal}
+    /* Ghim tên NV (đậm) — chừa chỗ cho pill trạng thái góc phải */
+    .acc-tbl tbody td[data-field="name"]{padding-right:96px}
+    .acc-tbl tbody td[data-field="name"] div div:first-child{font-size:14px}
+    /* Ghim trạng thái (hoạt động/khóa) góc trên phải */
+    .acc-tbl tbody td[data-field="status"]{position:absolute!important;top:11px;right:13px;width:auto;padding:0}
+    /* Khối phụ: vai trò, đăng nhập bằng, mật khẩu — mỗi dòng 1 nhãn icon */
+    .acc-tbl tbody td[data-field="role"]{margin-top:8px;padding-top:8px;border-top:1px dashed var(--line)!important}
+    .acc-tbl tbody td[data-field="role"]::before{content:"💼 ";color:var(--muted)}
+    .acc-tbl tbody td[data-field="logins"]{margin-top:5px}
+    .acc-tbl tbody td[data-field="logins"]::before{content:"🔑 Đăng nhập: ";color:var(--muted);font-size:11px}
+    .acc-tbl tbody td[data-field="pw"]{margin-top:6px}
+    .acc-tbl tbody td[data-field="pw"]::before{content:"Mật khẩu: ";color:var(--muted);font-size:11px}
+    /* Ô checkbox không cần ở mobile */
+    .acc-tbl tbody td[data-field="cb"]{display:none}
+    /* Hàng nút thao tác: full-width đáy thẻ, mỗi nút chia đều cùng 1 hàng */
+    .acc-tbl tbody td[data-field="act"]{margin-top:10px;white-space:normal!important;display:flex;flex-wrap:wrap;gap:6px}
+    .acc-tbl tbody td[data-field="act"] button{flex:1 1 calc(50% - 10px);margin-right:0!important;text-align:center}
   }
 </style>
 </head>
