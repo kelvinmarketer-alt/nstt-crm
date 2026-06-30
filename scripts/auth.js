@@ -29,7 +29,8 @@
     { email:'cfo@nstt.vn', password:'Nstt@2026', staffId:'CFO',
       name:'CFO — Giám đốc tài chính', role:'CFO', dept:'Ban giám đốc',
       avatar:'CF', avatarColor:'#15803D',
-      permissions:_FINANCE_PERMS, status:'active' },
+      /* Theo yêu cầu: CFO FULL QUYỀN như CEO (trước đây chỉ _FINANCE_PERMS) */
+      permissions:['all'], status:'active' },
   ];
 
   /* ===== Mật khẩu mặc định + phân quyền theo VỊ TRÍ (cho login bằng bản ghi staff) ===== */
