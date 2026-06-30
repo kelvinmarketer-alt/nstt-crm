@@ -20,19 +20,21 @@
   function matchCustomer(custList, name, addr) {
     const list = custList || [];
     const a = nkey(addr);
+    /* Tên coi là "cùng khách": trùng / chứa nhau ≥4 ký tự. Thiếu tên 1 phía → chấp nhận. */
+    const nameOK = (cn, nn) => (!nn || !cn) ? true
+      : (cn === nn || (nn.length >= 4 && cn.includes(nn)) || (cn.length >= 4 && nn.includes(cn)));
     if (a) {
-      const exact = list.find(c => nkey(c.address) === a); if (exact) return { c: exact, by: 'addr' };
-      /* Địa chỉ "chứa nhau" (1 phần) → PHẢI đòi tên cũng khớp.
-         Tránh gộp nhầm nhiều nhà hàng KHÁC tên dùng chung 1 địa điểm/chợ
-         (vd 3 NH cùng ghi "OCP Gia Lâm"). */
       const nn = nkey(name);
+      /* Địa chỉ KHỚP CHÍNH XÁC vẫn PHẢI kiểm tra TÊN hợp lệ.
+         Nhiều nhà hàng KHÁC tên cùng ghi 1 địa điểm/chợ (vd "OCP Gia Lâm") = KHÁCH RIÊNG,
+         KHÔNG dồn doanh thu/công nợ vào 1. (Tên na ná/chứa nhau ≥4 ký tự vẫn là 1 khách.) */
+      const exact = list.find(c => nkey(c.address) === a && nameOK(nkey(c.name), nn));
+      if (exact) return { c: exact, by: 'addr' };
+      /* Địa chỉ "chứa nhau" (1 phần) → cũng đòi tên khớp. */
       const fuzzy = list.find(c => {
         const ca = nkey(c.address); if (ca.length < 6) return false;
         const addrHit = (a.length >= 6 && ca.includes(a)) || (ca.length >= 6 && a.includes(ca));
-        if (!addrHit) return false;
-        const cn = nkey(c.name);
-        if (!nn || !cn) return true;   /* thiếu tên 1 phía → chấp nhận theo địa chỉ */
-        return cn === nn || (nn.length >= 4 && cn.includes(nn)) || (cn.length >= 4 && nn.includes(cn));
+        return addrHit && nameOK(nkey(c.name), nn);
       });
       if (fuzzy) return { c: fuzzy, by: 'addr~' };
       return null;   /* có địa chỉ nhưng không khớp → KHÁCH MỚI, không gộp theo tên */
