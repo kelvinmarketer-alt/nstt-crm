@@ -670,14 +670,39 @@
     }
     return out;
   }
-  /* Khớp file.custs ↔ cloud.orders theo TIỀN (sai số ±2000đ), greedy giảm dần */
+  /* Token "đặc trưng" của 1 tên khách (bỏ từ chung) — để ghép master(tên tuyến) ↔ app(tên NH) */
+  const _RC_STOP = new Set(['nh', 'bia', 'oi', 'do', 'cong', 'no', 'tuan', 'khach', 'quan', 'nhau', 'com', 'pho', 'cs', 'nha', 'hang', 'ngay', 'cua', 'so', 'duong', 'pkb', 'kem']);
+  const _rcToks = s => _nk(s).split(' ').filter(t => t.length >= 3 && !_RC_STOP.has(t));
+  /* Khớp file.custs ↔ cloud.orders.
+     B1: GỘP đơn app theo KHÁCH (cộng Sáng+Chiều) — vì master gộp 1 ô/khách/ngày, app tách ca.
+     B2: ghép theo TIỀN (±2500đ) greedy giảm dần → loại sạch cặp trùng tiền (đã gồm cả ca tách).
+     B3: phần dư 2 bên thử ghép theo TÊN (token chung) → 'lệch tiền' (cùng khách khác số),
+         còn lại miss = THIẾU HẲN (app không có đơn nào), extra = app DƯ HẲN. */
   function reconDay(fileCusts, cloudOrders) {
-    const cl = cloudOrders.slice(); const miss = [];
-    fileCusts.slice().sort((a, b) => b.amt - a.amt).forEach(fc => {
-      let k = -1; for (let i = 0; i < cl.length; i++) { if (Math.abs(cl[i].amt - fc.amt) <= 2000) { k = i; break; } }
-      if (k < 0) miss.push(fc); else cl.splice(k, 1);
+    /* B1 — gộp app theo khách */
+    const agg = {};
+    cloudOrders.forEach(o => {
+      const k = o.key || _nk(o.name);
+      const a = agg[k] || (agg[k] = { name: o.name, amt: 0, codes: [], tk: _rcToks(o.name) });
+      a.amt += o.amt; if (o.code) a.codes.push(o.code);
     });
-    return { miss, extra: cl };   /* extra = đơn cloud không khớp file */
+    let cl = Object.values(agg);
+    const fc = fileCusts.map(x => ({ ...x, tk: _rcToks(x.name) }));
+    /* B2 — ghép theo tiền */
+    const missAmt = [];
+    fc.slice().sort((a, b) => b.amt - a.amt).forEach(f => {
+      let k = -1; for (let i = 0; i < cl.length; i++) { if (Math.abs(cl[i].amt - f.amt) <= 2500) { k = i; break; } }
+      if (k < 0) missAmt.push(f); else cl.splice(k, 1);
+    });
+    /* B3 — phần dư: ghép theo tên (≥1 token chung) → lệch tiền */
+    const diffAmt = [], miss = [];
+    missAmt.forEach(f => {
+      let bi = -1, bs = 0;
+      cl.forEach((c, i) => { const ov = f.tk.filter(t => c.tk.includes(t)).length; if (ov > bs) { bs = ov; bi = i; } });
+      if (bi >= 0) { diffAmt.push({ name: f.name, fileAmt: f.amt, appName: cl[bi].name, appAmt: cl[bi].amt, codes: cl[bi].codes }); cl.splice(bi, 1); }
+      else miss.push(f);
+    });
+    return { miss, extra: cl, diff: diffAmt };   /* miss=thiếu hẳn · extra=app dư hẳn · diff=cùng khách lệch tiền */
   }
   window.cnReconcile = function () {
     if (!window.XLSX) { window.toast && window.toast('Thư viện Excel chưa tải — reload trang', 'warn'); return; }
@@ -706,7 +731,8 @@
       const iso = orderISO(o); if (!iso || !fileMap[iso]) return;     /* chỉ ngày có trong file */
       const amt = +o.freight || 0; if (!amt) return;
       const cm = cloudMap[iso] || (cloudMap[iso] = { total: 0, orders: [] });
-      cm.total += amt; cm.orders.push({ name: o.custName || o.cust || '—', amt, code: o.code });
+      /* key gộp theo KHÁCH (id ưu tiên, fallback tên chuẩn hoá) → gộp Sáng/Chiều khi đối soát */
+      cm.total += amt; cm.orders.push({ key: o.cust || _nk(o.custName || ''), name: o.custName || o.cust || '—', amt, code: o.code });
     });
     /* Lọc theo khoảng ngày đang chọn trên trang (nếu có) — để đối soát đúng kỳ, bỏ tháng khác trong file */
     const fEl = document.getElementById('cnFrom'), tEl = document.getElementById('cnTo');
@@ -722,11 +748,13 @@
       const tag = Math.abs(diff) < 1 ? '✓ khớp' : (diff < 0 ? `app THIẾU ${m(-diff)}` : `app DƯ ${m(diff)}`);
       body += `<tr class="rc-${cls}"><td><b>${ddmm(d)}</b></td><td class="num">${m(fT)}</td><td class="num">${m(cT)}</td><td class="num" style="font-weight:700">${diff > 0 ? '+' : ''}${m(diff)}</td><td style="font-size:11.5px">${tag}</td></tr>`;
       if (Math.abs(diff) >= 1000) {
-        const { miss, extra } = reconDay(fileMap[d].custs, (cloudMap[d] || {}).orders || []);
-        if (miss.length || extra.length) {
-          drill += `<details style="margin:6px 0;border:1px solid var(--line);border-radius:8px;padding:0"><summary style="padding:8px 12px;cursor:pointer;font-weight:700;color:var(--navy)">${ddmm(d)} — chênh ${diff > 0 ? '+' : ''}${m(diff)}đ (${miss.length} đơn THIẾU · ${extra.length} đơn DƯ ở app)</summary><div style="padding:8px 12px">`;
-          if (miss.length) drill += `<div style="color:#B91C1C;font-weight:700;font-size:12px;margin-bottom:3px">✗ Có trong FILE, app THIẾU:</div>` + miss.map(x => `<div style="font-size:12px">• ${x.name} = <b>${m(x.amt)}</b></div>`).join('');
-          if (extra.length) drill += `<div style="color:#A16207;font-weight:700;font-size:12px;margin:6px 0 3px">+ App có, FILE không khớp tiền (đơn lệch/dư):</div>` + extra.map(x => `<div style="font-size:12px">• ${x.code} · ${x.name} = <b>${m(x.amt)}</b></div>`).join('');
+        const { miss, extra, diff: dlist } = reconDay(fileMap[d].custs, (cloudMap[d] || {}).orders || []);
+        const missSum = miss.reduce((s, x) => s + x.amt, 0), extraSum = extra.reduce((s, x) => s + x.amt, 0);
+        if (miss.length || extra.length || dlist.length) {
+          drill += `<details style="margin:6px 0;border:1px solid var(--line);border-radius:8px;padding:0"><summary style="padding:8px 12px;cursor:pointer;font-weight:700;color:var(--navy)">${ddmm(d)} — chênh ${diff > 0 ? '+' : ''}${m(diff)}đ${miss.length ? ` · ${miss.length} khách THIẾU HẲN (${m(missSum)}đ)` : ''}${extra.length ? ` · ${extra.length} app DƯ` : ''}${dlist.length ? ` · ${dlist.length} lệch tiền` : ''}</summary><div style="padding:8px 12px">`;
+          if (miss.length) drill += `<div style="color:#B91C1C;font-weight:700;font-size:12px;margin-bottom:3px">✗ Có trong FILE, app KHÔNG có đơn nào (thiếu hẳn — cần nhập phiếu):</div>` + miss.map(x => `<div style="font-size:12px">• ${x.name} = <b>${m(x.amt)}</b></div>`).join('');
+          if (dlist.length) drill += `<div style="color:#9333EA;font-weight:700;font-size:12px;margin:6px 0 3px">≠ Cùng khách nhưng LỆCH TIỀN (file ↔ app):</div>` + dlist.map(x => `<div style="font-size:12px">• ${x.name} <span style="color:var(--muted)">(app: ${x.appName})</span> · file <b>${m(x.fileAmt)}</b> ↔ app <b>${m(x.appAmt)}</b> = ${x.appAmt - x.fileAmt > 0 ? '+' : ''}${m(x.appAmt - x.fileAmt)}</div>`).join('');
+          if (extra.length) drill += `<div style="color:#A16207;font-weight:700;font-size:12px;margin:6px 0 3px">+ App có khách này, FILE không có (app dư hẳn):</div>` + extra.map(x => `<div style="font-size:12px">• ${(x.codes || []).join(', ')} · ${x.name} = <b>${m(x.amt)}</b></div>`).join('');
           drill += `</div></details>`;
         }
       }
