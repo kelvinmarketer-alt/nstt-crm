@@ -60,6 +60,24 @@
   } catch (e) {}
 
   const _data = {};
+  /* ⚠️ CHỐNG MẤT DỮ LIỆU: id đang có write GỬI DỞ lên cloud (insert/update) — LƯU RA localStorage
+     để BỀN qua F5 (F5 huỷ write đang bay + reset RAM). Tác dụng:
+     (1) merge (reload/poll/focus) KHÔNG cho cloud CŨ ghi đè bản LOCAL của record pending;
+     (2) mỗi lần merge sẽ ĐẨY LẠI record pending lên cloud (write trước bị F5 cắt) đến khi thành công.
+     → "vừa nhập/sửa xong, F5" không còn mất / quay về data cũ. Xoá pending khi cloud xác nhận. */
+  const PENDING_PREFIX = 'vty__pending_';
+  const _pendingCache = {};
+  function _loadPending(key) {
+    if (!_pendingCache[key]) {
+      try { _pendingCache[key] = new Set((JSON.parse(localStorage.getItem(PENDING_PREFIX + key) || '[]') || []).map(String)); }
+      catch (e) { _pendingCache[key] = new Set(); }
+    }
+    return _pendingCache[key];
+  }
+  function _savePending(key) { try { localStorage.setItem(PENDING_PREFIX + key, JSON.stringify([...(_pendingCache[key] || [])])); } catch (e) {} }
+  function _markPending(key, id) { if (id == null) return; _loadPending(key).add(String(id)); _savePending(key); }
+  function _clearPending(key, id) { if (id == null) return; _loadPending(key).delete(String(id)); _savePending(key); }
+  function _isPending(key, id) { return id != null && _loadPending(key).has(String(id)); }
   const _subs = {};
   const _preloaded = new Set();
   /* Snapshot (JSON) bản đã đồng bộ cloud gần nhất, per table key.
@@ -397,23 +415,35 @@
     /* Phân biệt: record local-only TỪNG có trên cloud (baseline) = đã bị XOÁ ở nơi khác → bỏ;
        record CHƯA từng lên cloud = mới tạo offline / sync lỗi → tự đẩy lên. */
     const prevIds = _loadSyncedIds(key);
-    const deletedOnCloud = prevIds ? localOnly.filter(it => prevIds.has(keyOf(it))) : [];
-    const neverSynced    = prevIds ? localOnly.filter(it => !prevIds.has(keyOf(it))) : localOnly;
+    /* Record đang insert DỞ (pending) → LUÔN coi "chưa sync" (giữ + đẩy lại), KHÔNG bao giờ coi
+       là "đã xoá trên cloud" (tránh reload giữa chừng làm mất record vừa thêm). */
+    const deletedOnCloud = prevIds ? localOnly.filter(it => prevIds.has(keyOf(it)) && !_isPending(key, keyOf(it))) : [];
+    const neverSynced    = prevIds ? localOnly.filter(it => !prevIds.has(keyOf(it)) || _isPending(key, keyOf(it))) : localOnly;
 
     /* Self-heal: CHỈ đẩy record chưa từng lên cloud (guard ≤200 tránh mass-push nhầm) */
     if (neverSynced.length > 0 && neverSynced.length <= 200) {
       console.log(`[STORE] ${key}: tự đẩy ${neverSynced.length} record mới (chưa sync) lên cloud`);
       for (const it of neverSynced) {
+        const oid = keyOf(it);
         const saved = await window.SB_DATA.insert(table, it).catch(() => null);
+        if (saved) _clearPending(key, oid);   /* đẩy lại thành công → hết pending */
         /* Nếu insert cấp lại MÃ MỚI (vd đơn trùng mã được đổi) → cập nhật lại id cục bộ
            để khớp cloud, tránh kẹt/đẩy lặp + giữ đúng record (không bị nuốt). */
         if (saved && idCol && saved[idCol] && it[idCol] !== saved[idCol]) {
-          const old = it[idCol]; it[idCol] = saved[idCol];
+          const old = it[idCol]; it[idCol] = saved[idCol]; _clearPending(key, saved[idCol]);
           console.log(`[STORE] ${key}: mã '${old}' đổi → '${saved[idCol]}' (chống trùng)`);
         }
       }
     } else if (neverSynced.length > 200) {
       console.warn(`[STORE] ${key}: ${neverSynced.length} record chưa sync — BỎ QUA auto-push (quá nhiều)`);
+    }
+    /* ĐẨY LẠI record đang PENDING nhưng ĐÃ có trên cloud (giá trị cloud CŨ vì update trước bị F5
+       cắt giữa chừng) → PATCH lại bằng bản LOCAL rồi mới clear pending. Cùng với việc cloudMerged
+       giữ bản local cho record pending → F5 không còn quay về data cũ. */
+    for (const it of local) {
+      const id = keyOf(it);
+      if (id == null || !_isPending(key, id) || !cloudIds.has(id)) continue;
+      window.SB_DATA.update(table, id, it, idCol).then(() => _clearPending(key, id)).catch(() => {});
     }
     if (deletedOnCloud.length) {
       console.log(`[STORE] ${key}: bỏ ${deletedOnCloud.length} record đã bị xoá trên cloud (KHÔNG hồi sinh)`);
@@ -426,6 +456,9 @@
     const cloudMerged = cloud.map(c => {
       const lr = localById.get(keyOf(c));
       if (!lr) return c;
+      /* Record đang GỬI DỞ write lên cloud (pending) → GIỮ bản LOCAL, đừng để cloud CŨ ghi đè
+         (nếu không reload giữa lúc lưu sẽ mất thay đổi vừa nhập/sửa). */
+      if (_isPending(key, keyOf(c))) return lr;
       const flags = {};
       for (const k of Object.keys(lr)) if (k.charAt(0) === '_') flags[k] = lr[k];
       return Object.keys(flags).length ? { ...c, ...flags } : c;
@@ -580,14 +613,16 @@
       /* Push to Supabase */
       if (isSupabaseMode() && TABLE_MAP[key]) {
         const idCol = ID_COLUMN[key] || 'id';
+        _markPending(key, item[idCol]);
         window.SB_DATA.insert(TABLE_MAP[key], item)
           .then(saved => {
             /* Insert đổi MÃ (vd đơn trùng mã → cấp mã mới) → cập nhật lại cache + UI */
             if (saved && saved[idCol] && item[idCol] !== saved[idCol]) {
               const old = item[idCol]; item[idCol] = saved[idCol];
+              _clearPending(key, old); _markPending(key, saved[idCol]); _clearPending(key, saved[idCol]);
               _save(key);
               if (key === 'orders') window.toast?.(`Mã đơn ${old} trùng — đã tự đổi thành ${saved[idCol]} ✓`, 'info');
-            }
+            } else { _clearPending(key, item[idCol]); }
             /* ⚠️ CHỐNG MẤT DỮ LIỆU: CHỈ ghi baseline khi insert THÀNH CÔNG (saved != null =
                record đã CHẮC CHẮN ở cloud). Trước đây ghi baseline ĐỒNG BỘ ngay lúc add →
                nếu insert lỗi/chưa kịp xong mà user reload → merge tưởng "đã sync rồi bị xoá
@@ -597,7 +632,7 @@
               _synced[key] = JSON.stringify(_data[key]); _persistSyncedIds(key, _data[key]);
             }
           })
-          .catch(e => console.warn(`[STORE add ${key} → SB]`, e));
+          .catch(e => { _clearPending(key, item[idCol]); console.warn(`[STORE add ${key} → SB]`, e); });
       }
       return item;
     },
@@ -614,10 +649,16 @@
           /* Mặc định khóa = 'id' (KH/NCC/NV... cloud dùng id, KHÔNG có cột code).
              Bảng dùng code/no đã khai báo rõ trong ID_COLUMN (orders=code, invoices/cashEntries=no). */
           const idCol = ID_COLUMN[key] || 'id';
+          _markPending(key, identifier);
           window.SB_DATA.update(TABLE_MAP[key], identifier, patch, idCol)
-            .catch(e => console.warn(`[STORE update ${key} → SB]`, e));
+            .then(() => {
+              _clearPending(key, identifier);
+              /* Chỉ ghi baseline khi cloud XÁC NHẬN update xong → trong lúc chờ, merge giữ bản local
+                 (pending) nên F5 KHÔNG bị quay về giá trị cũ trên cloud. */
+              if (TABLE_MAP[key] && Array.isArray(_data[key])) { _synced[key] = JSON.stringify(_data[key]); _persistSyncedIds(key, _data[key]); }
+            })
+            .catch(e => { _clearPending(key, identifier); console.warn(`[STORE update ${key} → SB]`, e); });
         }
-        if (TABLE_MAP[key] && Array.isArray(_data[key])) _synced[key] = JSON.stringify(_data[key]); if (TABLE_MAP[key] && Array.isArray(_data[key])) _persistSyncedIds(key, _data[key]);
         return arr[i];
       }
       return null;

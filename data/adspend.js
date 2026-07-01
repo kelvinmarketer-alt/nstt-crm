@@ -24,8 +24,8 @@ window.AD_OBJECTIVES = [
       { key:'custs', label:'Khách mua', cp:'CP/Khách' },
     ] },
   { id:'tuyen-dung', label:'Tuyển dụng', icon:'🧑‍💼', hasRevenue:false,
+    /* Bỏ Inbox + CP/Inbox theo yêu cầu — chỉ theo dõi SĐT → Ứng viên */
     steps:[
-      { key:'units',      label:'Inbox', cp:'CP/Inbox' },
       { key:'leads',      label:'SĐT',   cp:'CP/SĐT' },
       { key:'candidates', label:'Ứng viên', cp:'CP/Ứng viên' },
     ] },
