@@ -173,31 +173,38 @@
   window.aiFillAds = function () {
     if (!window.AI) { window.toast('Chưa tải module AI', 'warn'); return; }
     const obj = objMeta(objective);
-    /* Từ đồng nghĩa tiêu đề cột cho từng field → AI gán ĐÚNG cột theo TÊN, không theo vị trí */
-    const SYN = {
-      spend: 'Chi tiêu / Chi phí / Số tiền đã chi tiêu / Amount spent',
-      units: 'Inbox / Tin nhắn / Mess / Lượt bắt đầu cuộc trò chuyện / Messaging',
-      leads: 'SĐT / SDT / Số điện thoại / Phone',
-      custs: 'SLKH / Khách mua / Số khách / Số đơn / Đơn hàng',
-      candidates: 'Ứng viên / Hồ sơ / CV / Số ứng viên',
-      revenue: 'Doanh thu / DT / Revenue',
-    };
-    const fieldLines = [`"spend": lấy từ cột "${SYN.spend}"`]
-      .concat(obj.steps.map(s => `"${s.key}": lấy từ cột "${SYN[s.key] || s.label}" (nghĩa: ${s.label})`));
-    if (obj.hasRevenue) fieldLines.push(`"revenue": lấy từ cột "${SYN.revenue}"`);
     window.AI.openFillModal({
       task: 'adspend',
       title: '📷 Nhập chi phí Ads từ ảnh',
-      guideHtml: `Đính kèm <b>ảnh báo cáo</b> (Facebook Ads Manager / bảng thống kê). AI đọc <b>từng ngày</b> cho mục đích <b>${obj.label}</b>, gán số vào <b>đúng cột theo tên tiêu đề</b>.<br><b>Cột nhận diện:</b> Ngày · Chi tiêu · ${obj.steps.map(s => s.label).join(' · ')}${obj.hasRevenue ? ' · Doanh thu' : ''}.`,
-      prompt: `Đọc bảng thống kê quảng cáo trong ảnh (tiếng Việt). Mỗi DÒNG = 1 ngày.
-⚠️ CỰC KỲ QUAN TRỌNG: gán số vào ĐÚNG field theo TÊN TIÊU ĐỀ CỘT, KHÔNG theo thứ tự/vị trí cột. Nếu ảnh KHÔNG có một cột nào đó → để field đó = 0. TUYỆT ĐỐI KHÔNG lấy số của cột này điền sang field khác (vd: cột SĐT không được nhảy vào field Inbox/units).
-Trả JSON mảng, mỗi phần tử 1 ngày: {"date":"ngày dạng d/m hoặc dd/mm/yyyy", ${fieldLines.join(', ')}}.
-Quy tắc số: bỏ dấu chấm phân cách nghìn + đơn vị (đ, ₫, $). Ô trống hoặc cột không tồn tại → 0. CHỈ trả JSON, không giải thích.`,
+      guideHtml: `Đính kèm <b>ảnh bảng báo cáo</b> theo ngày. App đọc <b>tên cột</b> rồi tự gán vào đúng field (Chi tiêu · Inbox · SĐT · Khách · Doanh thu) cho mục đích <b>${obj.label}</b> — cột phái sinh (CP/Inbox, $/SĐT) tự bỏ, cột nào ảnh không có thì để 0.`,
+      /* Bắt AI CHỈ chép nguyên bảng (tên cột + giá trị) → APP tự map cột theo tên (chắc hơn để AI tự gán) */
+      prompt: `Đọc BẢNG trong ảnh (báo cáo quảng cáo theo từng ngày, tiếng Việt). CHỈ CHÉP LẠI Y NGUYÊN, KHÔNG tự suy diễn hay đổi cột. Trả JSON đúng dạng:
+{"headers":["tên cột 1","tên cột 2", ...],"rows":[["ô ngày","ô cột 2", ...], ...]}
+- "headers" = tên TIÊU ĐỀ các cột đúng như trong ảnh, từ trái sang phải (vd: "Ngày","Chi tiêu ngày","Inbox","CP/Inbox","SDT","$/SDT","SLKH","Doanh thu").
+- "rows" = mỗi phần tử là 1 NGÀY; số ô trong mỗi row = ĐÚNG số cột headers, giữ nguyên thứ tự trái→phải. Ô trống để "".
+- Giữ nguyên giá trị số (có thể còn dấu chấm/đơn vị). CHỈ trả JSON, không giải thích.`,
       onResult: applyAIAds,
     });
   };
 
   function applyAIAds(data) {
+    /* AI trả BẢNG THÔ {headers, rows} → APP tự map cột theo TÊN (chắc hơn để AI tự gán field).
+       Bỏ cột phái sinh (CP/Inbox, $/SĐT, CP/Khách — chứa 'cp' hoặc '$') → SĐT không nhảy sang Inbox. */
+    if (data && Array.isArray(data.headers) && Array.isArray(data.rows)) {
+      const norm = s => String(s == null ? '' : s).toLowerCase().normalize('NFD').replace(/[̀-ͯ]/g, '');
+      const isCost = s => /\$|cp/i.test(String(s || ''));
+      const col = re => data.headers.findIndex(h => !isCost(h) && re.test(norm(h)));
+      const cD = col(/ngay|date/), cS = col(/chi tieu|chi phi|so tien|amount|spend/);
+      const cU = col(/inbox|tin nhan|mess|tro chuyen|messaging/);
+      const cL = col(/sdt|dien thoai|phone/);
+      const cK = col(/slkh|khach|so don|don hang/);
+      const cR = col(/doanh thu|revenue/);
+      data = data.rows.map(r => ({
+        date: cD >= 0 ? r[cD] : '', spend: cS >= 0 ? r[cS] : 0,
+        units: cU >= 0 ? r[cU] : 0, leads: cL >= 0 ? r[cL] : 0,
+        custs: cK >= 0 ? r[cK] : 0, candidates: 0, revenue: cR >= 0 ? r[cR] : 0,
+      }));
+    }
     const list = Array.isArray(data) ? data : (data.items || data.data || data.rows || []);
     if (!list.length) { window.toast('Không đọc được dòng chi phí nào từ ảnh', 'warn'); return; }
     const obj = objMeta(objective);
