@@ -79,7 +79,7 @@
     /* bảng theo ngày — cột đổi theo mục đích */
     const stepCols = obj.steps.map(s => `<th class="num">${s.label}</th><th class="num">${s.cp}</th>`).join('');
     const revCols = obj.hasRevenue ? `<th class="num">Doanh thu</th><th class="num">ROAS</th>` : '';
-    const head = `<tr><th>Ngày</th><th>Kênh</th><th>Hình thức</th><th class="num">Chi tiêu</th>${stepCols}${revCols}<th></th></tr>`;
+    const head = `<tr><th style="width:32px"><input type="checkbox" onchange="window.adsToggleAll(this.checked)" title="Chọn tất cả dòng đang hiện"></th><th>Ngày</th><th>Kênh</th><th>Hình thức</th><th class="num">Chi tiêu</th>${stepCols}${revCols}<th></th></tr>`;
 
     const rows = list.map(e => {
       const ch = chanMeta(e.channel);
@@ -91,6 +91,7 @@
         ? `<td class="num">${window.fmtShort(e.revenue || 0)}</td><td class="num" style="color:${(e.revenue / (e.spend || 1)) >= 1 ? 'var(--ok)' : 'var(--danger)'}"><b>${(e.revenue / (e.spend || 1)).toFixed(2)}x</b></td>`
         : '';
       return `<tr>
+        <td><input type="checkbox" class="ads-cb" value="${e.id}" onchange="window.adsSelChange()"></td>
         <td><b>${fmtD(e.date)}</b></td>
         <td><span class="tag" style="background:${ch.color}20;color:${ch.color}">${ch.icon} ${ch.label}</span></td>
         <td style="font-size:12.5px;color:var(--muted)">${e.form || '—'}</td>
@@ -101,9 +102,10 @@
           <button class="icon-btn" title="Xóa" style="color:var(--danger)" onclick="window.deleteAd('${e.id}')">🗑</button>
         </td>
       </tr>`;
-    }).join('') || `<tr><td colspan="12" style="padding:26px;text-align:center;color:var(--muted)">Chưa có dữ liệu chi tiêu cho mục đích này. Bấm "+ Nhập chi phí ngày".</td></tr>`;
+    }).join('') || `<tr><td colspan="13" style="padding:26px;text-align:center;color:var(--muted)">Chưa có dữ liệu chi tiêu cho mục đích này. Bấm "+ Nhập chi phí ngày".</td></tr>`;
 
     document.getElementById('adTable').innerHTML = `<thead>${head}</thead><tbody>${rows}</tbody>`;
+    if (window.adsSelChange) window.adsSelChange();   /* reset thanh chọn hàng loạt sau mỗi lần vẽ */
   }
 
   window.setObjective = function (id) { objective = id; render(); };
@@ -188,7 +190,7 @@
     const obj = objMeta(objective);
     const ch = channel === 'all' ? 'fb' : channel;
     const cur = all();
-    let n = 0, jumpMonth = null;
+    const _bt = Date.now(); let n = 0, jumpMonth = null;   /* _bt = mã LÔ nhập (chung cả đợt) → xoá lô */
     list.forEach(it => {
       const date = normDate(it.date); if (!date) return;
       const spend = toInt(it.spend); if (!spend) return;
@@ -198,7 +200,7 @@
       if (obj.hasRevenue) rec.revenue = toInt(it.revenue);
       const ex = cur.find(x => x.date === date && x.objective === objective && x.channel === ch);
       if (ex) window.STORE.update('adspend', ex.id, rec);
-      else { rec.id = 'AD-' + Date.now() + '-' + n + '-' + Math.random().toString(36).slice(2, 6); window.STORE.add('adspend', rec); }
+      else { rec.id = 'AD-imp-' + _bt + '-' + n + '-' + Math.random().toString(36).slice(2, 6); window.STORE.add('adspend', rec); }
       n++;
     });
     if (jumpMonth && jumpMonth !== month) {
@@ -421,6 +423,7 @@
     if (C.spend < 0) { window.toast('Phải có cột "Chi tiêu"', 'danger'); return; }
 
     const ads = window.STORE.get('adspend', window.ADSPEND || []).slice();
+    const _bt = Date.now();   /* mã LÔ nhập Excel (chung cả đợt) → xoá lô */
     let added = 0, skipped = 0, jumpMonth = null;
     for (let r = 1; r < data.length; r++) {
       const row = data[r]; if (!row || !row.length) continue;
@@ -441,7 +444,7 @@
       if (!date) date = new Date().toISOString().slice(0, 10);
       if (!jumpMonth) jumpMonth = date.slice(0, 7);
       ads.unshift({
-        id: 'AD' + Date.now() + Math.random().toString(36).slice(2, 5),
+        id: 'AD-imp-' + _bt + '-' + r + '-' + Math.random().toString(36).slice(2, 5),
         date, channel: channelId,
         campaign: camp,
         spend: sp,
@@ -462,6 +465,81 @@
     window.closeModal();
     render();
     window.toast(`✓ Đã nhập ${added} chiến dịch · ${skipped} bỏ qua${jumpMonth ? ' · đang xem tháng ' + jumpMonth.slice(5) + '/' + jumpMonth.slice(0,4) : ''}`, 'success');
+  };
+
+  /* ===== XOÁ LÔ NHẬP chi phí ads (undo cả đợt up nhầm — gom theo mã lô trong id AD-imp-<bt>-) ===== */
+  window.openAdsBatches = function () {
+    const map = {};
+    all().forEach(e => {
+      const m = String(e.id || '').match(/^AD-imp-(\d+)-/); if (!m) return;
+      const bt = m[1];
+      const b = map[bt] || (map[bt] = { bt: +bt, n: 0, spend: 0, dates: new Set(), chans: new Set() });
+      b.n++; b.spend += (+e.spend || 0); b.dates.add(e.date); b.chans.add(e.channel);
+    });
+    const batches = Object.values(map).sort((a, b) => b.bt - a.bt);
+    const fmt = v => (+v || 0).toLocaleString('vi-VN');
+    const tISO = ms => { const d = new Date(ms); return isNaN(d) ? '—' : d.toLocaleString('vi-VN'); };
+    const rows = batches.length ? batches.map(b => {
+      const chans = [...b.chans].map(c => (chanMeta(c) || {}).label || c).join(', ');
+      return `<tr>
+        <td style="white-space:nowrap">${tISO(b.bt)}</td>
+        <td class="num"><b>${b.n}</b> dòng · <span style="color:var(--muted)">${b.dates.size} ngày</span></td>
+        <td class="num">${fmt(b.spend)}đ</td>
+        <td style="font-size:11px;color:var(--muted);max-width:150px">${chans}</td>
+        <td><button class="btn btn-sm" style="background:#B91C1C;color:#fff" onclick="window._delAdsBatch('${b.bt}')">🗑 Xoá lô</button></td>
+      </tr>`;
+    }).join('') : '<tr><td colspan="5" style="padding:16px;text-align:center;color:var(--muted)">Chưa có lô nhập nào (chỉ có dòng nhập tay).</td></tr>';
+    window.openModal('🗑 Xoá lô nhập chi phí ads', `
+      <div style="background:#FEF2F2;color:#991B1B;padding:9px 11px;border-radius:8px;font-size:12px;margin-bottom:10px;line-height:1.5">
+        Mỗi dòng = <b>1 lần nhập</b> (ảnh AI / Excel). Xoá lô = xoá <b>tất cả dòng chi phí của lô đó</b>. <b>Không hoàn tác.</b>
+      </div>
+      <div style="max-height:380px;overflow:auto;border:1px solid var(--line);border-radius:8px">
+        <table class="mini-table" style="margin:0;font-size:12px;width:100%">
+          <thead><tr><th>Thời điểm nhập</th><th class="num">Số dòng</th><th class="num">Tổng chi</th><th>Kênh</th><th></th></tr></thead>
+          <tbody>${rows}</tbody>
+        </table></div>
+    `, { width: '640px', footer: `<button class="btn btn-ghost" onclick="window.closeModal()">Đóng</button>` });
+  };
+  window._delAdsBatch = function (bt) {
+    const ids = all().filter(e => String(e.id || '').startsWith('AD-imp-' + bt + '-')).map(e => e.id);
+    if (!ids.length) { window.toast('Lô không còn dòng nào — reload.', 'warn'); return; }
+    if (!window.confirm(`Xoá LÔ này?\n\n• ${ids.length} dòng chi phí\n\nKHÔNG hoàn tác được.`)) return;
+    ids.forEach(id => window.STORE.remove('adspend', id));
+    window.toast(`✓ Đã xoá lô ${ids.length} dòng chi phí.`, 'success');
+    setTimeout(() => { window.openAdsBatches(); render(); }, 350);
+  };
+
+  /* ===== CHỌN / SỬA / XOÁ HÀNG LOẠT ===== */
+  function _adsSelIds() { return [...document.querySelectorAll('#adTable .ads-cb:checked')].map(cb => cb.value); }
+  window.adsToggleAll = function (on) {
+    document.querySelectorAll('#adTable .ads-cb').forEach(cb => cb.checked = on);
+    window.adsSelChange();
+  };
+  window.adsSelChange = function () {
+    const bar = document.getElementById('adsBulkBar'); if (!bar) return;
+    const n = _adsSelIds().length;
+    if (!n) { bar.style.display = 'none'; return; }
+    bar.style.display = 'flex';
+    const el = bar.querySelector('.ads-sel-n'); if (el) el.textContent = n;
+    const sel = bar.querySelector('.ads-bulk-chan');
+    if (sel && !sel.dataset.filled) {
+      sel.innerHTML = '<option value="">— Đổi kênh cho dòng đã chọn… —</option>' + CHANS.map(c => `<option value="${c.id}">${c.icon} ${c.label}</option>`).join('');
+      sel.dataset.filled = '1';
+    }
+  };
+  window.adsDeleteSelected = function () {
+    const ids = _adsSelIds(); if (!ids.length) return;
+    if (!window.confirm(`Xoá ${ids.length} dòng chi phí đã chọn?\n\nKHÔNG hoàn tác.`)) return;
+    ids.forEach(id => window.STORE.remove('adspend', id));
+    window.toast(`✓ Đã xoá ${ids.length} dòng`, 'success');
+    render();
+  };
+  window.adsBulkChannel = function (chId) {
+    if (!chId) return;
+    const ids = _adsSelIds(); if (!ids.length) return;
+    ids.forEach(id => window.STORE.update('adspend', id, { channel: chId }));
+    window.toast(`✓ Đã đổi kênh ${ids.length} dòng`, 'success');
+    render();
   };
 
   /* init */

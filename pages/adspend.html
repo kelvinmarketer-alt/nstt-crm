@@ -71,6 +71,7 @@
         <input type="month" id="adsMonth" onchange="window.setAdsMonth && window.setAdsMonth(this.value)" style="padding:7px 10px;border:1px solid var(--line);border-radius:7px;font-size:13px;font-weight:600;color:var(--navy);cursor:pointer">
         <button class="btn btn-ghost" id="adsExcelBtn" onclick="window.openAdsExcelImport()">📥 Nhập Excel</button>
         <button class="btn btn-ghost" onclick="window.aiFillAds()">📷 Nhập từ ảnh</button>
+        <button class="btn btn-ghost" onclick="window.openAdsBatches()">🗑 Xoá lô</button>
         <button class="btn btn-primary" onclick="window.openAddAd()">+ Nhập chi phí ngày</button>
       </div>
     </div>
@@ -79,6 +80,12 @@
     <div class="quick-chips" id="chanFilter" style="margin-bottom:14px"></div>
 
     <section class="kpis" id="adKpis" style="margin-bottom:14px"></section>
+
+    <div id="adsBulkBar" style="display:none;align-items:center;gap:10px;flex-wrap:wrap;padding:8px 12px;background:#FEF2F2;border:1px solid #FECACA;border-radius:8px;margin-bottom:8px">
+      <span style="font-size:13px;font-weight:600">Đã chọn <b class="ads-sel-n">0</b> dòng</span>
+      <select class="ads-bulk-chan" onchange="window.adsBulkChannel(this.value); this.value=''" style="border:1px solid var(--line);border-radius:6px;padding:6px 8px;font-size:12.5px"></select>
+      <button class="btn btn-sm" style="background:#B91C1C;color:#fff" onclick="window.adsDeleteSelected()">🗑 Xoá đã chọn</button>
+    </div>
 
     <div class="chart-card">
       <table class="mini-table" id="adTable"></table>
