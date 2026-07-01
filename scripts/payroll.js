@@ -830,11 +830,20 @@
     if (!canEdit())   { window.toast('🔒 Upload cần thêm perm payroll.edit để ghi dữ liệu', 'warn'); return; }
     window.openModal('📥 Upload file chấm công Excel', `
       <p style="font-size:12.5px;color:var(--muted);margin-bottom:10px">
-        Chấp nhận <b>.xlsx / .xls / .csv</b> từ máy chấm công.
-        App tự tìm cột <code>Họ tên</code> hoặc <code>Mã NV</code> + các cột số <code>1..31</code>.
+        Chấp nhận <b>.xlsx / .xls / .csv</b> từ máy chấm công. App khớp theo <b>Tên viết tắt</b> (tên trong máy)
+        đã gắn cho từng NV; ai chưa có tên viết tắt hoặc tên mới sẽ hiện ở bước "khớp thủ công".
         Giá trị ô: <code>X</code>/<code>1</code>/<code>8</code> (có mặt) · <code>P</code> (phép) · <code>V</code>/<code>0</code> (vắng).
         Áp dụng cho tháng <b>${month}</b> hiện chọn.
       </p>
+      <div style="display:flex;gap:10px;align-items:center;margin-bottom:8px;flex-wrap:wrap">
+        <label style="font-size:12.5px;font-weight:600">Khu vực / máy chấm công:</label>
+        <select id="tsZone" style="padding:7px 10px;border:1px solid var(--line);border-radius:7px;font-size:13px">
+          <option value="">Tự động (mọi khu vực)</option>
+          <option value="vp">🏢 Văn phòng</option>
+          <option value="kho">📦 Kho &amp; Ship</option>
+        </select>
+        <span style="font-size:11px;color:var(--muted)">Chọn đúng máy → tự tách người trùng tên viết tắt (vd "quang" VP ≠ "quang" Kho).</span>
+      </div>
       <input type="file" id="tsFile" accept=".xlsx,.xls,.csv" style="display:block;margin:10px 0;padding:8px;border:1px solid var(--line);border-radius:7px;width:100%">
       <div id="tsPreview" style="font-size:12.5px;color:var(--muted);min-height:24px;padding:8px 0"></div>
     `, {
@@ -862,55 +871,177 @@
     });
   };
 
+  /* Chuẩn hoá tên viết tắt: bỏ dấu, thường hoá, gộp khoảng trắng (máy chấm công thường không dấu) */
+  const _normAlias = s => String(s || '').toLowerCase().normalize('NFD').replace(/[̀-ͯ]/g, '').replace(/\s+/g, ' ').trim();
+  /* Khu vực từ bộ phận: 'kho' nếu Kho/Ship/Giao, còn lại 'vp' (văn phòng) */
+  const _deptZone = d => /kho|ship|giao/i.test(String(d || '')) ? 'kho' : 'vp';
+  function _cellStatus(v) {
+    v = String(v || '').trim().toUpperCase();
+    if (/^X$|^1$|^8$|^CO|^C$|^FULL/.test(v) || (!isNaN(parseFloat(v)) && parseFloat(v) >= 7)) return 'X';
+    if (/^L$|MUON|LATE/.test(v)) return 'L';
+    if (/^H$|^0\.5$|NUA|HALF/.test(v) || (!isNaN(parseFloat(v)) && parseFloat(v) >= 3.5 && parseFloat(v) < 7)) return 'H';
+    if (/^P$|PHEP/.test(v)) return 'P';
+    if (/^V$|^0$|^K$|VANG/.test(v)) return 'V';
+    return null;
+  }
+  function _applyTsDays(sheets, staffId, dayStat, last) {
+    let sh = sheets.find(t => t.staffId === staffId && t.month === month);
+    if (!sh) { sh = { staffId, month, days: defaultDays() }; sheets.unshift(sh); }
+    sh.days = sh.days.slice();
+    Object.keys(dayStat).forEach(k => { const di = +k; if (di >= last || sh.days[di] === '_') return; sh.days[di] = dayStat[k]; });
+  }
+
   window.applyUploadedTimesheet = function () {
     const data = window._tsUploadData; if (!data || !data.length) { window.toast('Chưa chọn file', 'warn'); return; }
+    const zone = (document.getElementById('tsZone') || {}).value || '';
     const header = data[0].map(h => String(h || '').trim());
-    let nameCol = -1, codeCol = -1;
+    let nameCol = -1, codeCol = -1, deptCol = -1;
     header.forEach((h, i) => {
-      if (nameCol < 0 && /(họ.*tên|tên.*nv|tên.*nhân|^tên|fullname|name)/i.test(h)) nameCol = i;
+      if (nameCol < 0 && /(họ.*tên|tên.*nv|tên.*nhân|tên.*viết|viết.*tắt|^tên|fullname|name)/i.test(h)) nameCol = i;
       if (codeCol < 0 && /(mã.*nv|mã.*nhân|^mã|empid|code)/i.test(h)) codeCol = i;
+      if (deptCol < 0 && /(bộ phận|phòng ban|dept|department|khu vực)/i.test(h)) deptCol = i;
     });
     const dayCols = {};
-    header.forEach((h, i) => {
-      const n = parseInt(String(h).replace(/[^0-9]/g, ''), 10);
-      if (n >= 1 && n <= 31) dayCols[n] = i;
-    });
-    if (nameCol < 0 && codeCol < 0) { window.toast('Không tìm thấy cột Họ tên / Mã NV', 'warn'); return; }
+    header.forEach((h, i) => { const n = parseInt(String(h).replace(/[^0-9]/g, ''), 10); if (n >= 1 && n <= 31) dayCols[n] = i; });
+    if (nameCol < 0 && codeCol < 0) { window.toast('Không tìm thấy cột Tên viết tắt / Họ tên / Mã NV', 'warn'); return; }
     if (!Object.keys(dayCols).length) { window.toast('Không tìm thấy cột ngày (1..31) trong header', 'warn'); return; }
 
     const staffs = window.STORE.get('staff', window.STAFFS || []);
+    const aliasMap = window.STORE.get('staffAliases', {}) || {};
+    const aliasIdx = {};   /* normAlias → [staffId] (có thể trùng: "quang"→[NV001,NV063]) */
+    Object.entries(aliasMap).forEach(([sid, al]) => { const k = _normAlias(al); if (!k) return; (aliasIdx[k] = aliasIdx[k] || []).push(sid); });
+
     const sheets = window.STORE.get('timesheet', window.TIMESHEET || []).slice();
     const [y, mm] = month.split('-').map(Number); const last = new Date(y, mm, 0).getDate();
-    let updated = 0; const miss = [];
+    let updated = 0; const unmatched = []; const ambiguous = [];
+
     for (let r = 1; r < data.length; r++) {
       const row = data[r]; if (!row || !row.length) continue;
-      const name = String(row[nameCol] || '').trim();
+      const rawName = String(row[nameCol] || '').trim();
       const code = codeCol >= 0 ? String(row[codeCol] || '').trim() : '';
-      if (!name && !code) continue;
-      const nm = window.AI ? window.AI.norm(name) : name.toLowerCase();
-      const s = (code && staffs.find(x => x.code === code || x.id === code))
-        || staffs.find(x => window.AI ? window.AI.norm(x.name) === nm : x.name.toLowerCase() === nm)
-        || staffs.find(x => { const xn = window.AI ? window.AI.norm(x.name) : x.name.toLowerCase(); return xn.includes(nm) || nm.includes(xn); });
-      if (!s) { if (name) miss.push(name); continue; }
-      let sh = sheets.find(t => t.staffId === s.id && t.month === month);
-      if (!sh) { sh = { staffId: s.id, month, days: defaultDays() }; sheets.unshift(sh); }
-      sh.days = sh.days.slice();
-      Object.keys(dayCols).forEach(d => {
-        const di = parseInt(d, 10) - 1; if (di >= last) return;
-        const v = String(row[dayCols[d]] || '').trim().toUpperCase();
-        if (sh.days[di] === '_') return;
-        if (/^X$|^1$|^8$|^CO|^C$|^FULL/.test(v) || (!isNaN(parseFloat(v)) && parseFloat(v) >= 7)) sh.days[di] = 'X';
-        else if (/^L$|MUON|LATE/.test(v)) sh.days[di] = 'L';
-        else if (/^H$|^0\.5$|NUA|HALF/.test(v) || (!isNaN(parseFloat(v)) && parseFloat(v) >= 3.5 && parseFloat(v) < 7)) sh.days[di] = 'H';
-        else if (/^P$|PHEP/.test(v)) sh.days[di] = 'P';
-        else if (/^V$|^0$|^K$|VANG/.test(v)) sh.days[di] = 'V';
-      });
+      if (!rawName && !code) continue;
+      const dayStat = {};
+      Object.keys(dayCols).forEach(d => { const st = _cellStatus(row[dayCols[d]]); if (st) dayStat[parseInt(d, 10) - 1] = st; });
+      const key = _normAlias(rawName);
+      const fileZone = deptCol >= 0 ? _deptZone(row[deptCol]) : '';
+      const wantZone = zone || fileZone;
+
+      /* 1) Khớp theo TÊN VIẾT TẮT; nếu trùng → lọc theo khu vực (máy/bộ phận) */
+      let cand = (aliasIdx[key] || []).map(id => staffs.find(x => x.id === id)).filter(Boolean);
+      if (wantZone && cand.length > 1) cand = cand.filter(s => _deptZone(s.dept) === wantZone);
+
+      let s = null;
+      if (cand.length === 1) s = cand[0];
+      else if (cand.length > 1) { ambiguous.push({ name: rawName, days: dayStat, cands: cand.map(x => x.id) }); continue; }
+      else {
+        /* 2) Dự phòng: theo Mã NV / họ tên đầy đủ (NV chưa gắn tên viết tắt) */
+        s = (code && staffs.find(x => x.code === code || x.id === code))
+          || staffs.find(x => _normAlias(x.name) === key)
+          || staffs.find(x => { const xn = _normAlias(x.name); return key.length > 2 && (xn.includes(key) || key.includes(xn)); });
+        if (s && wantZone && _deptZone(s.dept) !== wantZone) s = null;
+      }
+      if (!s) { if (rawName) unmatched.push({ name: rawName, days: dayStat }); continue; }
+      _applyTsDays(sheets, s.id, dayStat, last);
       updated++;
     }
     window.STORE.set('timesheet', sheets);
-    window.closeModal();
-    window.toast(`✓ Cập nhật chấm công cho ${updated} NV${miss.length ? ' · chưa khớp: ' + miss.slice(0, 3).join(', ') : ''}`, updated ? 'success' : 'warn');
     render();
+
+    if (unmatched.length || ambiguous.length) {
+      window._tsResolve = { unmatched, ambiguous, last };
+      openResolveTimesheet(updated);
+    } else {
+      window.closeModal();
+      window.toast(`✓ Đã khớp chấm công cho ${updated} NV`, 'success');
+    }
+  };
+
+  /* === Bước "khớp thủ công": tên trong máy chưa gắn với ai / trùng → user chọn đúng NV (NHỚ cho lần sau) === */
+  function openResolveTimesheet(matchedCount) {
+    const R = window._tsResolve; if (!R) return;
+    const staffs = window.STORE.get('staff', window.STAFFS || []).slice().sort((a, b) => String(a.dept||'').localeCompare(String(b.dept||'')) || String(a.name).localeCompare(String(b.name)));
+    const allOpt = staffs.map(s => `<option value="${s.id}">${s.name} — ${s.dept || ''}</option>`).join('');
+    const esc = t => String(t == null ? '' : t).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/"/g, '&quot;');
+    const rowHtml = (item, i, kind) => `<tr>
+        <td><b>${esc(item.name)}</b>${kind === 'amb' ? ' <span style="color:#B45309;font-size:11px">(trùng tên)</span>' : ''}</td>
+        <td><select class="ts-res" data-i="${i}" data-kind="${kind}" style="width:100%;padding:6px;border:1px solid var(--line);border-radius:6px;font-size:12.5px">
+          <option value="">— Bỏ qua —</option>
+          ${kind === 'amb'
+            ? item.cands.map(id => { const s = staffs.find(x => x.id === id); return s ? `<option value="${id}">${s.name} — ${s.dept}</option>` : ''; }).join('')
+            : allOpt}
+        </select></td></tr>`;
+    const body = `
+      <div style="font-size:12.5px;color:var(--muted);margin-bottom:8px">Đã khớp tự động <b style="color:var(--ok)">${matchedCount}</b> NV. Các tên dưới đây máy chấm công có nhưng app chưa nhận diện — chọn đúng người, app sẽ <b>NHỚ tên viết tắt</b> cho lần sau (khỏi làm lại).</div>
+      <div style="max-height:52vh;overflow:auto;border:1px solid var(--line);border-radius:8px">
+        <table class="mini-table" style="margin:0;width:100%;font-size:12.5px">
+          <thead><tr><th style="width:40%">Tên trong máy</th><th>Là nhân sự nào?</th></tr></thead>
+          <tbody>${R.ambiguous.map((it, i) => rowHtml(it, i, 'amb')).join('')}${R.unmatched.map((it, i) => rowHtml(it, i, 'un')).join('')}</tbody>
+        </table>
+      </div>`;
+    window.openModal('🔗 Khớp tên chấm công chưa nhận diện', body, {
+      footer: `<button class="btn btn-ghost" onclick="closeModal()">Để sau</button>
+               <button class="btn btn-primary" onclick="window.saveResolveTimesheet()">💾 Lưu & khớp</button>`,
+      width: '640px',
+    });
+  }
+
+  window.saveResolveTimesheet = function () {
+    const R = window._tsResolve; if (!R) { window.closeModal(); return; }
+    const aliasMap = { ...(window.STORE.get('staffAliases', {}) || {}) };
+    const sheets = window.STORE.get('timesheet', window.TIMESHEET || []).slice();
+    let done = 0;
+    document.querySelectorAll('.ts-res').forEach(sel => {
+      const sid = sel.value; if (!sid) return;
+      const item = (sel.dataset.kind === 'amb' ? R.ambiguous : R.unmatched)[+sel.dataset.i]; if (!item) return;
+      if (item.name) aliasMap[sid] = item.name.trim();   /* NHỚ tên viết tắt */
+      _applyTsDays(sheets, sid, item.days, R.last);
+      done++;
+    });
+    window.STORE.set('staffAliases', aliasMap);
+    window.STORE.set('timesheet', sheets);
+    window._tsResolve = null;
+    window.closeModal();
+    window.toast(`✓ Đã khớp thêm ${done} NV & nhớ tên viết tắt cho lần sau`, done ? 'success' : 'info');
+    render();
+  };
+
+  /* === Quản lý TÊN VIẾT TẮT máy chấm công (xem/sửa/gán cho NV mới) === */
+  window.openAliasManager = function () {
+    const staffs = window.STORE.get('staff', window.STAFFS || []).slice();
+    const aliasMap = window.STORE.get('staffAliases', {}) || {};
+    const esc = t => String(t == null ? '' : t).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/"/g, '&quot;');
+    const byDept = {};
+    staffs.forEach(s => { const d = s.dept || 'Khác'; (byDept[d] = byDept[d] || []).push(s); });
+    const filled = Object.values(aliasMap).filter(Boolean).length;
+    const rows = Object.keys(byDept).sort().map(d => byDept[d].map(s => `<tr class="alias-row" data-k="${esc((s.name + ' ' + (s.dept || '')).toLowerCase())}">
+        <td><b>${esc(s.name)}</b></td>
+        <td><span class="staff-pill">${esc(s.dept || '')}</span></td>
+        <td><input class="alias-inp" data-id="${s.id}" value="${esc(aliasMap[s.id] || '')}" placeholder="(chưa vân tay)" style="width:100%;padding:5px 7px;border:1px solid var(--line);border-radius:6px;font-size:12.5px"></td>
+      </tr>`).join('')).join('');
+    window.openModal('🔤 Tên viết tắt máy chấm công', `
+      <div style="font-size:12.5px;color:var(--muted);margin-bottom:8px">Điền <b>tên viết tắt</b> = đúng tên hiển thị trong máy chấm công (đang có <b>${filled}</b> NV). Để trống = chưa lấy vân tay. NV mới điền vào đây → kỳ sau tự khớp.</div>
+      <input id="aliasSearch" placeholder="🔍 Tìm nhân viên…" oninput="window._aliasFilter(this.value)" style="width:100%;padding:8px 10px;border:1px solid var(--line);border-radius:7px;font-size:13px;margin-bottom:10px">
+      <div style="max-height:56vh;overflow:auto;border:1px solid var(--line);border-radius:8px">
+        <table class="mini-table" style="margin:0;width:100%;font-size:12.5px">
+          <thead><tr><th>Nhân viên</th><th style="width:26%">Bộ phận</th><th style="width:30%">Tên viết tắt</th></tr></thead>
+          <tbody>${rows}</tbody>
+        </table>
+      </div>`, {
+      footer: `<button class="btn btn-ghost" onclick="closeModal()">Hủy</button>
+               <button class="btn btn-primary" onclick="window.saveAliasManager()">💾 Lưu</button>`,
+      width: '680px',
+    });
+  };
+  window._aliasFilter = function (q) {
+    q = String(q || '').toLowerCase().trim();
+    document.querySelectorAll('.alias-row').forEach(tr => { tr.style.display = (!q || (tr.dataset.k || '').includes(q)) ? '' : 'none'; });
+  };
+  window.saveAliasManager = function () {
+    const map = {};
+    document.querySelectorAll('.alias-inp').forEach(inp => { const v = inp.value.trim(); if (v) map[inp.dataset.id] = v; });
+    window.STORE.set('staffAliases', map);
+    window.closeModal();
+    window.toast('✓ Đã lưu tên viết tắt (' + Object.keys(map).length + ' NV)', 'success');
   };
 
   /* === init === (chỉ chạy nếu có #payView — trang Nhân sự gộp hoặc payroll.html) */
