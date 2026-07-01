@@ -320,10 +320,12 @@
         if (!data || data.length < PAGE) break;       /* lô cuối → xong */
         from += PAGE;
       }
-      if (lastErr && !out.length) {
+      if (lastErr) {
         console.error('[SB getAll]', table, lastErr);
         window.toast?.('⚠ Load ' + table + ' lỗi cloud: ' + (lastErr.message||'unknown'), 'warn');
-        return [];
+        /* Lỗi (rỗng HOẶC thiếu trang) → trả NULL để merge BỎ QUA lượt này, KHÔNG coi cloud rỗng
+           rồi drop record local (bảng nhấp nháy trắng). Poll kế sẽ thử lại. Mọi caller đã guard Array.isArray. */
+        return null;
       }
       return out.map(r => mapFrom(table, r));
     },

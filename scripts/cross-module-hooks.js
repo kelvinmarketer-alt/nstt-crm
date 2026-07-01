@@ -160,9 +160,11 @@
           const charged = dlHas(o.code, 'charge');
           const reversed = dlHas(o.code + '-rev', 'reverse');
 
-          /* Cộng nợ 1 LẦN DUY NHẤT (sổ cái chưa có bút toán charge) */
+          /* Ghi bút toán CHARGE 1 lần (sổ cái chưa có). KHÔNG tự cộng c.debt ở đây nữa:
+             công nợ giờ CHỈ tính từ 1 nguồn = đơn (payBy 'nợ') − thanh toán (ledger) trong
+             rebuildCustStats/enrichCustomerStats. Trước đây hook cộng c.debt += freight (KHÔNG trừ
+             tiền đã trả) rồi ghi đè lên số đúng → công nợ hiển thị lệch giữa các trang. */
           if (isFinalSettled && isUnpaid && !charged) {
-            c.debt = (c.debt || 0) + (o.freight || 0);
             o._debtApplied = true;
             changed = true;
             window.addDebtLedger && window.addDebtLedger({
@@ -170,9 +172,8 @@
               date: o.deliveredAt || o.date, desc: 'Tiền hàng đơn ' + o.code,
             });
           }
-          /* Hoàn nợ 1 LẦN (đã charge + chưa có bút toán -rev) */
+          /* Hoàn nợ 1 LẦN (đã charge + chưa có bút toán -rev) — chỉ ghi ledger, c.debt tự tính lại */
           if (isCancelled && charged && !reversed) {
-            c.debt = Math.max(0, (c.debt || 0) - (o.freight || 0));
             o._debtApplied = false;
             changed = true;
             window.addDebtLedger && window.addDebtLedger({
@@ -181,10 +182,9 @@
             });
           }
         });
-        if (changed) {
-          S.set('customers', custs);
-          S.set('orders', list);
-        }
+        /* Chỉ lưu cờ _debtApplied trên orders (KHÔNG đụng customers nữa → hết nguồn kép c.debt).
+           Nhờ #4 (set bỏ diff field '_'), S.set('orders') này KHÔNG bắn update rỗng lên cloud. */
+        if (changed) S.set('orders', list);
       } finally { _debtRunning = false; }
     }
     S.subscribe('orders', applyOrderDebt);
@@ -355,10 +355,9 @@
         status: 'draft',
         relatedOrder: o.code,
         customerId: c.id || o.cust || '',
-        items: (o.items || []).map(it => ({
-          name: it.name, qty: it.qty, unit: it.unit || 'kg',
-          price: it.price, total: it.total,
-        })),
+        /* KHÔNG lưu 'items': bảng invoices không có cột này (bị strip mỗi lần insert) và
+           printInvoice in theo desc+net, không đọc items. Cần dòng hàng chi tiết thì suy từ
+           đơn liên kết (relatedOrder) lúc in. */
       };
       window.STORE.add('invoices', newInv);
       window.STORE.update('orders', o.code, { invoiceNo: no });

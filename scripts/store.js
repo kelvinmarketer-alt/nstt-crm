@@ -465,8 +465,10 @@
       for (const k of Object.keys(lr)) if (k.charAt(0) === '_') flags[k] = lr[k];
       return Object.keys(flags).length ? { ...c, ...flags } : c;
     });
-    /* GIỮ lại record mới chưa sync (neverSynced) — KHÔNG giữ record đã bị xoá trên cloud */
-    const keep = neverSynced.length <= 200 ? neverSynced : [];
+    /* GIỮ lại record mới chưa sync (neverSynced) — KHÔNG giữ record đã bị xoá trên cloud.
+       LUÔN giữ (kể cả >200): chỉ auto-PUSH bị hoãn khi >200 (ở trên), còn record vẫn phải
+       nằm trong local — trước đây keep=[] khi >200 làm MẤT record local (import offline lớn). */
+    const keep = neverSynced;
     const merged = cloudMerged.concat(keep);
     const newJson = JSON.stringify(merged);
     /* PERF: so với BASELINE cloud lần trước (_synced[key]) thay vì stringify lại _data[key].
@@ -558,8 +560,11 @@
          KHÔNG được phép ghi đè img — nếu máy đó có img CŨ/lệch thì sẽ làm "ảnh nhảy lung
          tung" sang SP khác. Nên set() bỏ qua img: không so sánh, không gửi lên. */
       const PROTECTED = { products: ['img'] };
-      const prot = PROTECTED[key];
-      const _strip = prot ? (o) => { const c = { ...o }; prot.forEach(f => delete c[f]); return c; } : null;
+      const prot = PROTECTED[key] || [];
+      /* Bỏ field '_' (cờ per-máy, KHÔNG bao giờ gửi cloud) + cột bảo vệ (products.img) trước khi
+         SO DIFF. Nhờ vậy record chỉ đổi cờ '_' (vd _invApplied) → diff BẰNG NHAU → KHÔNG bắn
+         update rỗng lên cloud (trước đây mỗi lần đánh cờ = 1 request no-op / đơn). */
+      const _strip = (o) => { const c = {}; for (const k of Object.keys(o)) { if (k.charAt(0) === '_' || prot.includes(k)) continue; c[k] = o[k]; } return c; };
 
       /* Items mới hoặc thay đổi */
       value.forEach(item => {
@@ -571,11 +576,11 @@
           window.SB_DATA.insert(table, item)
             .catch(e => console.warn(`[STORE set→insert ${key}]`, e));
         } else {
-          const oC = _strip ? _strip(old) : old;
-          const iC = _strip ? _strip(item) : item;
+          const oC = _strip(old);
+          const iC = _strip(item);
           if (JSON.stringify(oC) !== JSON.stringify(iC)) {
-            /* Changed → update; với bảng có cột bảo vệ thì KHÔNG gửi cột đó lên cloud */
-            window.SB_DATA.update(table, id, _strip ? iC : item, idCol)
+            /* Changed → update; gửi bản đã strip ('_' + cột bảo vệ img) lên cloud */
+            window.SB_DATA.update(table, id, iC, idCol)
               .catch(e => console.warn(`[STORE set→update ${key}]`, e));
           }
         }
