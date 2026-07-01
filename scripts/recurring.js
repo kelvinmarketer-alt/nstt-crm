@@ -27,7 +27,13 @@
   /* === Shipper mặc định của mẫu định kỳ — lưu KV (roaming đa máy; recurring_orders không có cột driver) === */
   const _roDrvMap = () => (window.STORE.get('recurringDrivers', {}) || {});
   function roDriverOf(ro) { const kv = _roDrvMap()[ro.id]; return kv || { id: ro.driver || '', name: ro.driverName || '' }; }
-  function setRoDriver(roId, id, name) { const m = { ..._roDrvMap() }; if (id) m[roId] = { id, name: name || '' }; else delete m[roId]; window.STORE.set('recurringDrivers', m); }
+  function setRoDriver(roId, id, name) {
+    window.STORE.rmwKv('recurringDrivers', m => {   /* chống đè: áp set/xoá theo roId lên bản cloud mới nhất */
+      m = (m && typeof m === 'object' && !Array.isArray(m)) ? m : {};
+      if (id) m[roId] = { id, name: name || '' }; else delete m[roId];
+      return m;
+    });
+  }
 
   /* === Auto-assign: tìm shipper rảnh nhất (ít đơn confirmed/pickup/transit hôm nay nhất) === */
   function findFreeShipper() {

@@ -26,7 +26,7 @@
   }
   /* % giá GỐC so với giá nhập (link toàn hệ thống) */
   function getBaseMarkup() { const v = window.STORE.get('priceBaseMarkup', null); return v == null ? 30 : v; }
-  function saveTiers(tiers) { window.STORE.set('priceTiers', tiers); }
+  /* (đã bỏ saveTiers ghi-đè-cả-khối — mọi thao tác nhóm giá nay qua STORE.rmwKv('priceTiers')) */
   function tierById(id) { return getTiers().find(t => t.id === +id); }
   function tierIcon(t) { return TIER_ICONS[(t.id - 1) % 8] || '#'; }
   /* Giá hiệu lực của SP trong 1 nhóm: override riêng → dùng; không thì giá gốc ±% */

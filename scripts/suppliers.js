@@ -9,7 +9,13 @@
   const supplyTypeOf = id => { const m = getSupMeta()[id]; return (m && m.type) || 'both'; };
   const TYPE_LABEL = { si: 'Sỉ', le: 'Lẻ', both: 'Sỉ + Lẻ' };
   const TYPE_DESC = { si: 'Bán sỉ — đóng 1 lô lớn theo tổng', le: 'Bán lẻ — chia sẵn theo từng khách', both: 'Cả sỉ và lẻ' };
-  function saveSupplyType(id, type) { const m = getSupMeta(); m[id] = Object.assign({}, m[id] || {}, { type }); window.STORE.set('supplierMeta', m); }
+  function saveSupplyType(id, type) {
+    window.STORE.rmwKv('supplierMeta', m => {   /* chống đè: set loại NCC theo id lên bản cloud mới nhất */
+      m = (m && typeof m === 'object' && !Array.isArray(m)) ? m : {};
+      m[id] = Object.assign({}, m[id] || {}, { type });
+      return m;
+    });
+  }
   const CATS = { 'rau-ta':'Rau ta', 'rau-dalat':'Rau Đà Lạt', 'nam':'Nấm',
                  'rau-vung-mien':'Rau vùng miền', 'rau-gia-vi':'Rau gia vị', 'hai-san':'Hải sản' };
 

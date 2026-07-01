@@ -94,9 +94,13 @@
   async function _flushRmw(key) {
     const mutates = _rmwQueue[key] || []; _rmwQueue[key] = [];
     if (!mutates.length || !isSupabaseMode() || !window.SB_DATA || !window.SB_DATA.setKv) return;
+    /* GIỮ ĐÚNG HÌNH DẠNG: cloud có thể là MẢNG (priceTiers, debtLedger…) HOẶC OBJECT/MAP
+       (mktPrices, custPriceTiers, accountOpenings…). Trước đây ép non-array → [] khiến blob dạng
+       object BỊ XOÁ sạch bản cloud khi flush (mất chỉnh của người khác). Nay lấy nguyên bản cloud
+       nếu có; fallback bản local (đã đổi optimistic → đúng hình dạng); cuối cùng mới []. */
     let base;
-    try { const cloud = await window.SB_DATA.getKv(key); base = Array.isArray(cloud) ? cloud : (Array.isArray(_data[key]) ? _data[key] : []); }
-    catch (e) { base = Array.isArray(_data[key]) ? _data[key] : []; }
+    try { const cloud = await window.SB_DATA.getKv(key); base = (cloud != null) ? cloud : (_data[key] != null ? _data[key] : []); }
+    catch (e) { base = (_data[key] != null ? _data[key] : []); }
     let cur = JSON.parse(JSON.stringify(base));
     mutates.forEach(m => { try { cur = m(cur) || cur; } catch (e) {} });   /* áp lại mọi thay đổi lên bản cloud mới */
     _data[key] = cur;

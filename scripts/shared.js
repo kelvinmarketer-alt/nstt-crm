@@ -5,7 +5,7 @@
 
 /* Phiên bản app hiển thị (đối chiếu với CACHE_VERSION trong sw.js) — để user tự XÁC NHẬN
    đang chạy bản mới hay còn kẹt JS cũ (hiện ở góc sidebar + log console). */
-window.APP_VERSION = 'v329';
+window.APP_VERSION = 'v330';
 console.log('%c[NSTT] App ' + window.APP_VERSION, 'color:#339B21;font-weight:bold');
 
 /* Gom NGUỒN khách về 3 nhóm chuẩn: 'mkt' / 'sales' / 'sep-gioi-thieu'.
@@ -426,9 +426,11 @@ window.accountOpening = function (accId) {
 };
 window.setAccountOpening = function (accId, val) {
   if (accId == null || !window.STORE) return;
-  const m = { ...((window.STORE.get('accountOpenings', {})) || {}) };
-  m[accId] = Math.round(+val || 0);
-  window.STORE.set('accountOpenings', m);
+  window.STORE.rmwKv('accountOpenings', m => {
+    m = (m && typeof m === 'object' && !Array.isArray(m)) ? m : {};
+    m[accId] = Math.round(+val || 0);
+    return m;
+  });
 };
 window.accountBalance = function (acc) {
   if (!acc) return 0;
@@ -441,10 +443,14 @@ window.migrateAccountOpenings = function () {
   if (!window.STORE) return;
   if (window.STORE.isPreloaded && (!window.STORE.isPreloaded('cashEntries') || !window.STORE.isPreloaded('paymentAccounts'))) return;
   const accs = window.STORE.get('paymentAccounts', []) || [];
-  const m = { ...((window.STORE.get('accountOpenings', {})) || {}) };
-  let changed = false;
-  accs.forEach(a => { if (a && a.id != null && m[a.id] == null) { m[a.id] = Math.round((+a.balance || 0) - window.accountNet(a.name)); changed = true; } });
-  if (changed) window.STORE.set('accountOpenings', m);
+  const cur = (window.STORE.get('accountOpenings', {})) || {};
+  const missing = accs.some(a => a && a.id != null && cur[a.id] == null);
+  if (!missing) return;   /* đã đủ opening → khỏi ghi (tránh flush cloud thừa mỗi lần load) */
+  window.STORE.rmwKv('accountOpenings', m => {
+    m = (m && typeof m === 'object' && !Array.isArray(m)) ? m : {};
+    accs.forEach(a => { if (a && a.id != null && m[a.id] == null) m[a.id] = Math.round((+a.balance || 0) - window.accountNet(a.name)); });
+    return m;
+  });
 };
 
 /* Nhóm giá GÁN cho 1 KH — nguồn chuẩn = KV 'custPriceTiers' (sync đa máy),
@@ -457,10 +463,12 @@ window.custPriceTier = function (custId) {
   return (c && c.priceTier != null) ? String(c.priceTier) : '';
 };
 window.setCustPriceTier = function (custId, tierId) {
-  if (!custId) return;
-  const map = (window.STORE && window.STORE.get('custPriceTiers', {})) || {};
-  if (tierId == null || tierId === '') delete map[custId]; else map[custId] = String(tierId);
-  window.STORE.set('custPriceTiers', map);
+  if (!custId || !window.STORE) return;
+  window.STORE.rmwKv('custPriceTiers', m => {
+    m = (m && typeof m === 'object' && !Array.isArray(m)) ? m : {};
+    if (tierId == null || tierId === '') delete m[custId]; else m[custId] = String(tierId);
+    return m;
+  });
 };
 
 /* ============ CHÍNH SÁCH CÔNG NỢ (Tuấn Tú Farm) ============
@@ -482,10 +490,12 @@ window.custCreditDays = function (custId) {
   return (v != null && v !== '') ? (+v || window.DEBT_TERM_DEFAULT) : window.DEBT_TERM_DEFAULT;
 };
 window.setCustCreditDays = function (custId, days) {
-  if (!custId) return;
-  const map = (window.STORE && window.STORE.get('custCreditDays', {})) || {};
-  if (days == null || days === '') delete map[custId]; else map[custId] = +days;
-  window.STORE.set('custCreditDays', map);
+  if (!custId || !window.STORE) return;
+  window.STORE.rmwKv('custCreditDays', m => {
+    m = (m && typeof m === 'object' && !Array.isArray(m)) ? m : {};
+    if (days == null || days === '') delete m[custId]; else m[custId] = +days;
+    return m;
+  });
 };
 /* Quá hạn THẬT: lấy charge cũ nhất CHƯA trả (FIFO) trong sổ nợ, so với hạn nợ KH.
    Trả {days, amount, term, sinceDate}. days=0 nếu chưa quá hạn / chưa đủ dữ liệu. */
