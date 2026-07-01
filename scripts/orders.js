@@ -207,7 +207,7 @@
               <div style="margin-top:2px">
                 <span class="tag" style="background:${src.color}1a;color:${src.color};font-weight:600;font-size:10.5px">${src.icon} ${src.label}</span>
               </div></td>
-          <td class="hide-sm" data-field="date" title="Click để sửa ngày đặt" style="font-size:12px;color:var(--muted)">${o.date || '—'}</td>
+          <td class="hide-sm" data-field="date" title="Giờ tạo đơn (chính xác)" style="font-size:12px;color:var(--muted)">${orderWhen(o)}</td>
           <td class="cust-col">
             <div class="name-clamp" data-field="custName" title="Click để sửa tên KH">${o.custName || '—'}</div>
             <div style="font-size:11.5px;color:var(--muted);white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${o.cust || ''} · <span data-field="staff" title="Click để đổi NV phụ trách">${o.staff || ''}</span></div>
@@ -331,6 +331,43 @@
     const m = String(o.date || '').match(/(\d{1,2})\/(\d{1,2})\/(\d{4})/);
     return m ? `${m[3]}-${m[2].padStart(2, '0')}-${m[1].padStart(2, '0')}` : '';
   }
+  /* Giờ TẠO đơn CHÍNH XÁC: dùng createdAt (timestamp có giờ thật). o.date bị cloud cắt còn
+     00:00 vì cột order_date là kiểu DATE (không giữ giờ) → hết cảnh "đơn nào cũng 0:00". */
+  function orderWhen(o) {
+    if (o && o.createdAt) {
+      const d = new Date(o.createdAt);
+      if (!isNaN(d)) return d.toLocaleString('vi-VN', { day: '2-digit', month: '2-digit', year: 'numeric', hour: '2-digit', minute: '2-digit' });
+    }
+    return (o && o.date) || '—';
+  }
+  /* Ghi 1 dòng lịch sử đơn (ai · lúc nào · làm gì) vào audit_log (đồng bộ cloud) → tab Lịch sử.
+     Dùng để biết NGƯỜI CUỐI CÙNG sửa đơn — sai thì quy trách nhiệm. */
+  function logOrderEdit(code, desc) {
+    try { if (code && window.audit && window.audit.log) window.audit.log('order', desc, { code }); } catch (e) {}
+  }
+  /* Render tab "Lịch sử" trong chi tiết đơn — lọc audit_log theo mã đơn, mới nhất trước. */
+  function renderOrderHistoryTab(o) {
+    const box = document.getElementById('orderHistoryPane');
+    if (!box) return;
+    const all = (window.audit && window.audit.list) ? (window.audit.list() || []) : [];
+    const rows = all.filter(e => e && e.meta && e.meta.code === o.code)
+      .sort((a, b) => String(b.ts || '').localeCompare(String(a.ts || '')));
+    const esc = s => String(s == null ? '' : s).replace(/</g, '&lt;');
+    const fmtTs = ts => { const d = new Date(ts); return isNaN(d) ? esc(ts) : d.toLocaleString('vi-VN', { day: '2-digit', month: '2-digit', year: '2-digit', hour: '2-digit', minute: '2-digit' }); };
+    if (!rows.length) {
+      box.innerHTML = '<div style="padding:16px;color:var(--muted);font-size:13px;line-height:1.6">Chưa ghi nhận thay đổi nào cho đơn này.<br><span style="font-size:11.5px">Lịch sử bắt đầu ghi từ nay: mọi thao tác <b>tạo · sửa mặt hàng/giá · đổi trạng thái</b> sẽ hiện ở đây kèm <b>người thực hiện</b> + thời gian.</span></div>';
+      return;
+    }
+    const last = rows[0];
+    box.innerHTML = `<div style="padding:9px 11px;background:#F0FDF4;border:1px solid #BBF7D0;border-radius:8px;font-size:12.5px;margin-bottom:10px">
+        👤 Người sửa gần nhất: <b>${esc(last.user || '?')}</b>${last.role ? ` <span style="color:var(--muted)">(${esc(last.role)})</span>` : ''} · 🕒 ${fmtTs(last.ts)}</div>`
+      + rows.map(e => `<div style="display:flex;gap:10px;padding:9px 2px;border-bottom:1px solid var(--line)">
+          <div style="flex:0 0 82px;font-size:11px;color:var(--muted);line-height:1.35">${fmtTs(e.ts)}</div>
+          <div style="flex:1;min-width:0">
+            <div style="font-size:12.5px">${esc(e.detail || '(thay đổi)')}</div>
+            <div style="font-size:11px;color:var(--muted)">👤 ${esc(e.user || '?')}${e.role ? ' · ' + esc(e.role) : ''}</div>
+          </div></div>`).join('');
+  }
   function match(o) {
     if (currentStatus && o.status !== currentStatus) return false;
     if (currentService && !svcIdsOf(o).includes(currentService)) return false;
@@ -409,6 +446,7 @@
     } else {
       window.STORE.update('orders', code, { status: newStatus });
     }
+    logOrderEdit(code, `🔄 Đổi trạng thái: ${(STATUS[oldStatus] || {}).label || oldStatus} → ${(STATUS[newStatus] || {}).label || newStatus}`);
 
     /* Auto adjust doanh thu / công nợ KH */
     const customers = window.STORE.get('customers', window.CUSTOMERS || []);
@@ -665,7 +703,7 @@
       <span class="status-pill st-${o.status}">${st.icon} ${st.label}</span>
       ${svcList.map(svc => `<span class="svc-tag" style="background:${svc.color}20;color:${svc.color}">${svc.icon} ${svc.label}</span>`).join(' ')}
       ${tm ? `<span class="tm-tag">${tm.icon} ${tm.label}</span>` : ''}
-      <span>· ${o.date}</span>
+      <span>· 🕒 ${orderWhen(o)}</span>
     `;
     document.getElementById('dFreight').textContent = window.fmtShort(o.freight) + ' ₫';
     document.getElementById('dPay').textContent = o.payBy;
@@ -682,7 +720,7 @@
     document.getElementById('iCode').textContent  = o.code;
     document.getElementById('iCust').textContent  = o.custName + ' (' + o.cust + ')';
     document.getElementById('iStaff').textContent = o.staff;
-    document.getElementById('iDate').textContent  = o.date;
+    document.getElementById('iDate').textContent  = orderWhen(o);
     document.getElementById('iGoods').textContent = `${o.qty} ${o.unit.toLowerCase()} · ${o.goods}` + (_kg != null ? ' · ' + fmtNum2(_kg) + ' kg' : (o.weight ? ' · ' + o.weight + ' kg' : ''));
     const shipEl = document.getElementById('iShip');
     if (shipEl) {
@@ -702,6 +740,8 @@
     document.getElementById('iVehicle').textContent = o.vehicle;
     /* === Tab Hàng hóa: checklist + tổng sản lượng từng SP === */
     renderOrderGoodsTab(o);
+    /* === Tab Lịch sử: ai sửa đơn, lúc nào === */
+    renderOrderHistoryTab(o);
     /* Hiển thị thêm thông tin chi phí đối tác trong tổng thu */
     if (o.external && o.partnerCost) {
       const total = o.freight + (o.cod||0);
@@ -717,13 +757,13 @@
     const curIdx = STEPS.indexOf(o.status);
     let html = '';
     if (o.status === 'cancelled') {
-      html = `<div class="tl-item current"><div class="t1">Đã hủy</div><div class="t2">${o.date} · Lý do: ${o.cancelReason || 'Không rõ'}</div></div>`;
+      html = `<div class="tl-item current"><div class="t1">Đã hủy</div><div class="t2">${orderWhen(o)} · Lý do: ${o.cancelReason || 'Không rõ'}</div></div>`;
     } else {
       STEPS.forEach((s, i) => {
         const cls = i < curIdx ? 'done' : i === curIdx ? 'current' : 'pending';
         html += `<div class="tl-item ${cls}">
           <div class="t1">${STEP_LABEL[s]}</div>
-          <div class="t2">${i <= curIdx ? (i === 0 ? o.date : '(đã hoàn thành)') : 'Chưa diễn ra'}</div>
+          <div class="t2">${i <= curIdx ? (i === 0 ? orderWhen(o) : '(đã hoàn thành)') : 'Chưa diễn ra'}</div>
         </div>`;
       });
     }
@@ -1279,6 +1319,7 @@
     const goods = ((document.getElementById('oGoods') || {}).value || '').trim() || orderItems.map(x => x.name).join(', ');
     const weight = parseFloat((document.getElementById('oWeight') || {}).value) || 0;
     window.STORE.update('orders', code, { items: orderItems.slice(), freight, goods, weight });
+    logOrderEdit(code, `✏️ Sửa mặt hàng & giá — ${orderItems.length} mã · tổng ${window.fmt(freight)}₫`);
     orderItems = []; orderTier = ''; _editItemsCode = null;
     window.closeModal();
     window.toast && window.toast('✓ Đã cập nhật mặt hàng & giá cho ' + code, 'success');
@@ -2058,6 +2099,7 @@ CHỈ TRẢ JSON, không giải thích gì thêm.`;
       items: orderItems.slice(),
     };
     window.STORE.add('orders', newOrder);
+    logOrderEdit(newOrder.code, '📝 Tạo đơn mới');
     /* === LƯU "MẪU NÉT CHỮ": nếu đơn này đọc từ ảnh AI → lưu ảnh + kết quả cuối (đã sửa tay) === */
     if (_pendingSample && window.OrderSamples && cust && _pendingSample.custId === cust.id) {
       const ps = _pendingSample;

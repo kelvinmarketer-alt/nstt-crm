@@ -275,6 +275,7 @@
     <div class="tab" data-tab="timeline">⏱ Trạng thái</div>
     <div class="tab" data-tab="vehicle">🚚 Shipper / Xe</div>
     <div class="tab" data-tab="actions">⚡ Hành động</div>
+    <div class="tab" data-tab="history">📜 Lịch sử</div>
   </div>
 
   <div class="tab-body">
@@ -348,6 +349,11 @@
         <button class="btn btn-ghost" onclick="window.sendOrderToShipper && window.sendOrderToShipper(window._currentOrderCode)">📤 Gửi đơn cho shipper qua Telegram</button>
         <button class="btn btn-ghost" onclick="window.copyOrderTrackingLink && window.copyOrderTrackingLink(window._currentOrderCode)">🔗 Sao chép link tracking</button>
       </div>
+    </div>
+
+    <div class="tab-pane" data-pane="history">
+      <div class="section-h">📜 Lịch sử thay đổi đơn (ai · lúc nào · làm gì)</div>
+      <div id="orderHistoryPane"></div>
     </div>
 
   </div>
