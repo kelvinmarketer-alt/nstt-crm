@@ -891,6 +891,7 @@
     Object.keys(dayStat).forEach(k => { const di = +k; if (di >= last || sh.days[di] === '_') return; sh.days[di] = dayStat[k]; });
   }
 
+  /* Upload → PARSE + phân loại → mở bảng ĐỐI SOÁT (chưa ghi gì). Giống up đơn có SP ngoài danh mục. */
   window.applyUploadedTimesheet = function () {
     const data = window._tsUploadData; if (!data || !data.length) { window.toast('Chưa chọn file', 'warn'); return; }
     const zone = (document.getElementById('tsZone') || {}).value || '';
@@ -910,98 +911,117 @@
     const aliasMap = window.STORE.get('staffAliases', {}) || {};
     const aliasIdx = {};   /* normAlias → [staffId] (có thể trùng: "quang"→[NV001,NV063]) */
     Object.entries(aliasMap).forEach(([sid, al]) => { const k = _normAlias(al); if (!k) return; (aliasIdx[k] = aliasIdx[k] || []).push(sid); });
-
-    const sheets = window.STORE.get('timesheet', window.TIMESHEET || []).slice();
     const [y, mm] = month.split('-').map(Number); const last = new Date(y, mm, 0).getDate();
-    let updated = 0; const unmatched = []; const ambiguous = [];
 
+    const rows = [];
     for (let r = 1; r < data.length; r++) {
       const row = data[r]; if (!row || !row.length) continue;
       const rawName = String(row[nameCol] || '').trim();
       const code = codeCol >= 0 ? String(row[codeCol] || '').trim() : '';
       if (!rawName && !code) continue;
-      const dayStat = {};
-      Object.keys(dayCols).forEach(d => { const st = _cellStatus(row[dayCols[d]]); if (st) dayStat[parseInt(d, 10) - 1] = st; });
+      const days = {};
+      Object.keys(dayCols).forEach(d => { const st = _cellStatus(row[dayCols[d]]); if (st) days[parseInt(d, 10) - 1] = st; });
+      const work = Object.values(days).reduce((a, st) => a + (st === 'X' ? 1 : st === 'H' ? 0.5 : 0), 0);
       const key = _normAlias(rawName);
-      const fileZone = deptCol >= 0 ? _deptZone(row[deptCol]) : '';
-      const wantZone = zone || fileZone;
-
-      /* 1) Khớp theo TÊN VIẾT TẮT; nếu trùng → lọc theo khu vực (máy/bộ phận) */
+      const wantZone = zone || (deptCol >= 0 ? _deptZone(row[deptCol]) : '');
       let cand = (aliasIdx[key] || []).map(id => staffs.find(x => x.id === id)).filter(Boolean);
       if (wantZone && cand.length > 1) cand = cand.filter(s => _deptZone(s.dept) === wantZone);
-
-      let s = null;
-      if (cand.length === 1) s = cand[0];
-      else if (cand.length > 1) { ambiguous.push({ name: rawName, days: dayStat, cands: cand.map(x => x.id) }); continue; }
+      let chosen = '', status = '';
+      if (cand.length === 1) { chosen = cand[0].id; status = 'ok'; }
+      else if (cand.length > 1) { chosen = ''; status = 'amb'; }
       else {
-        /* 2) Dự phòng: theo Mã NV / họ tên đầy đủ (NV chưa gắn tên viết tắt) */
-        s = (code && staffs.find(x => x.code === code || x.id === code))
+        let s = (code && staffs.find(x => x.code === code || x.id === code))
           || staffs.find(x => _normAlias(x.name) === key)
           || staffs.find(x => { const xn = _normAlias(x.name); return key.length > 2 && (xn.includes(key) || key.includes(xn)); });
         if (s && wantZone && _deptZone(s.dept) !== wantZone) s = null;
+        if (s) { chosen = s.id; status = 'ok'; } else { chosen = ''; status = 'new'; }
       }
-      if (!s) { if (rawName) unmatched.push({ name: rawName, days: dayStat }); continue; }
-      _applyTsDays(sheets, s.id, dayStat, last);
-      updated++;
+      rows.push({ name: rawName || code, code, days, work, chosen, auto: chosen, status });
     }
-    window.STORE.set('timesheet', sheets);
-    render();
-
-    if (unmatched.length || ambiguous.length) {
-      window._tsResolve = { unmatched, ambiguous, last };
-      openResolveTimesheet(updated);
-    } else {
-      window.closeModal();
-      window.toast(`✓ Đã khớp chấm công cho ${updated} NV`, 'success');
-    }
+    if (!rows.length) { window.toast('Không đọc được dòng NV nào trong file', 'warn'); return; }
+    window._tsParsed = { rows, last };
+    openTimesheetPreview();
   };
 
-  /* === Bước "khớp thủ công": tên trong máy chưa gắn với ai / trùng → user chọn đúng NV (NHỚ cho lần sau) === */
-  function openResolveTimesheet(matchedCount) {
-    const R = window._tsResolve; if (!R) return;
-    const staffs = window.STORE.get('staff', window.STAFFS || []).slice().sort((a, b) => String(a.dept||'').localeCompare(String(b.dept||'')) || String(a.name).localeCompare(String(b.name)));
-    const allOpt = staffs.map(s => `<option value="${s.id}">${s.name} — ${s.dept || ''}</option>`).join('');
+  /* === BẢNG ĐỐI SOÁT: từng dòng máy ↔ NV app; sửa được; NV chưa có → cảnh báo đỏ; xác nhận mới ghi === */
+  function _tsStaffOptions(sel) {
+    const staffs = window.STORE.get('staff', window.STAFFS || []).slice()
+      .sort((a, b) => String(a.dept || '').localeCompare(String(b.dept || '')) || String(a.name).localeCompare(String(b.name)));
+    return `<option value="">— Chưa khớp / bỏ qua —</option>` + staffs.map(s => `<option value="${s.id}" ${s.id === sel ? 'selected' : ''}>${s.name} — ${s.dept || ''}</option>`).join('');
+  }
+  function _tsStatusPill(row) {
+    if (row.chosen) return '<span class="tag" style="background:#DCFCE7;color:#15803D">✓ Khớp</span>';
+    if (row.status === 'amb') return '<span class="tag" style="background:#FEF3C7;color:#B45309">⚠ Trùng — chọn người</span>';
+    return '<span class="tag" style="background:#FEE2E2;color:#B91C1C">🔴 Chưa có trong app</span>';
+  }
+  function openTimesheetPreview() {
+    const P = window._tsParsed; if (!P) return;
+    const staffs = window.STORE.get('staff', window.STAFFS || []);
     const esc = t => String(t == null ? '' : t).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/"/g, '&quot;');
-    const rowHtml = (item, i, kind) => `<tr>
-        <td><b>${esc(item.name)}</b>${kind === 'amb' ? ' <span style="color:#B45309;font-size:11px">(trùng tên)</span>' : ''}</td>
-        <td><select class="ts-res" data-i="${i}" data-kind="${kind}" style="width:100%;padding:6px;border:1px solid var(--line);border-radius:6px;font-size:12.5px">
-          <option value="">— Bỏ qua —</option>
-          ${kind === 'amb'
-            ? item.cands.map(id => { const s = staffs.find(x => x.id === id); return s ? `<option value="${id}">${s.name} — ${s.dept}</option>` : ''; }).join('')
-            : allOpt}
-        </select></td></tr>`;
     const body = `
-      <div style="font-size:12.5px;color:var(--muted);margin-bottom:8px">Đã khớp tự động <b style="color:var(--ok)">${matchedCount}</b> NV. Các tên dưới đây máy chấm công có nhưng app chưa nhận diện — chọn đúng người, app sẽ <b>NHỚ tên viết tắt</b> cho lần sau (khỏi làm lại).</div>
-      <div style="max-height:52vh;overflow:auto;border:1px solid var(--line);border-radius:8px">
+      <div id="tsBanner"></div>
+      <div style="font-size:12px;color:var(--muted);margin:2px 0 8px">Kiểm tra máy chấm công đã khớp đúng người chưa. Sai thì đổi ở cột <b>Khớp NV</b>. Bấm <b>Xác nhận</b> mới ghi vào chấm công tháng <b>${month}</b>.</div>
+      <div style="max-height:56vh;overflow:auto;border:1px solid var(--line);border-radius:8px">
         <table class="mini-table" style="margin:0;width:100%;font-size:12.5px">
-          <thead><tr><th style="width:40%">Tên trong máy</th><th>Là nhân sự nào?</th></tr></thead>
-          <tbody>${R.ambiguous.map((it, i) => rowHtml(it, i, 'amb')).join('')}${R.unmatched.map((it, i) => rowHtml(it, i, 'un')).join('')}</tbody>
+          <thead><tr><th>Tên trong máy</th><th class="num">Công</th><th style="width:34%">Khớp NV trong app</th><th>Bộ phận</th><th>Trạng thái</th></tr></thead>
+          <tbody>${P.rows.map((r, i) => `<tr>
+            <td><b>${esc(r.name)}</b></td>
+            <td class="num">${r.work % 1 ? r.work.toFixed(1) : r.work}</td>
+            <td><select id="tsp${i}" onchange="window._tsPick(${i},this.value)" style="width:100%;padding:5px;border:1px solid ${r.chosen ? 'var(--line)' : '#FCA5A5'};border-radius:6px;font-size:12px">${_tsStaffOptions(r.chosen)}</select></td>
+            <td id="tspd${i}" style="font-size:12px;color:var(--muted)">${esc((staffs.find(s => s.id === r.chosen) || {}).dept || '—')}</td>
+            <td id="tsps${i}">${_tsStatusPill(r)}</td>
+          </tr>`).join('')}</tbody>
         </table>
       </div>`;
-    window.openModal('🔗 Khớp tên chấm công chưa nhận diện', body, {
-      footer: `<button class="btn btn-ghost" onclick="closeModal()">Để sau</button>
-               <button class="btn btn-primary" onclick="window.saveResolveTimesheet()">💾 Lưu & khớp</button>`,
-      width: '640px',
+    window.openModal('🧾 Đối soát chấm công trước khi cập nhật', body, {
+      footer: `<button class="btn btn-ghost" onclick="closeModal()">Hủy</button>
+               <button class="btn btn-primary" onclick="window.confirmTimesheet()">✅ Xác nhận & cập nhật</button>`,
+      width: '780px',
     });
+    _tsRefreshBanner();
   }
-
-  window.saveResolveTimesheet = function () {
-    const R = window._tsResolve; if (!R) { window.closeModal(); return; }
-    const aliasMap = { ...(window.STORE.get('staffAliases', {}) || {}) };
+  window._tsPick = function (i, val) {
+    const P = window._tsParsed; if (!P || !P.rows[i]) return;
+    P.rows[i].chosen = val;
+    const staffs = window.STORE.get('staff', window.STAFFS || []);
+    const dEl = document.getElementById('tspd' + i); if (dEl) dEl.textContent = (staffs.find(s => s.id === val) || {}).dept || '—';
+    const sEl = document.getElementById('tsps' + i); if (sEl) sEl.innerHTML = _tsStatusPill(P.rows[i]);
+    const selEl = document.getElementById('tsp' + i); if (selEl) selEl.style.borderColor = val ? 'var(--line)' : '#FCA5A5';
+    _tsRefreshBanner();
+  };
+  function _tsRefreshBanner() {
+    const P = window._tsParsed; const el = document.getElementById('tsBanner'); if (!P || !el) return;
+    const newCnt = P.rows.filter(r => !r.chosen && r.status === 'new').length;
+    const ambCnt = P.rows.filter(r => !r.chosen && r.status === 'amb').length;
+    const okCnt = P.rows.filter(r => r.chosen).length;
+    let h = `<div style="font-size:12.5px;margin-bottom:6px">Sẽ cập nhật <b style="color:var(--ok)">${okCnt}</b> NV.</div>`;
+    if (newCnt) h += `<div style="background:#FEE2E2;border:1px solid #FCA5A5;color:#991B1B;border-radius:8px;padding:8px 11px;font-size:12.5px;margin-bottom:6px;display:flex;align-items:center;gap:10px;flex-wrap:wrap">🔴 <b>${newCnt}</b> người trong máy chấm công CHƯA có trong app — thêm vào Nhân sự (hoặc chọn đúng người nếu họ đã có tên khác). <button class="btn btn-sm" style="background:#B91C1C;color:#fff" onclick="window._tsAddStaff()">➕ Thêm nhân viên</button></div>`;
+    if (ambCnt) h += `<div style="background:#FEF3C7;border:1px solid #FDE68A;color:#92400E;border-radius:8px;padding:8px 11px;font-size:12.5px;margin-bottom:6px">⚠ <b>${ambCnt}</b> dòng trùng tên viết tắt — chọn đúng người ở cột "Khớp NV".</div>`;
+    el.innerHTML = h;
+  }
+  window._tsAddStaff = function () {
+    if (window.formNv && window.footNv) window.openModal('+ Thêm nhân viên', window.formNv(), { footer: window.footNv(), width: '560px' });
+    else window.toast('Vào trang Nhân sự để thêm NV, rồi up lại file', 'info');
+  };
+  window.confirmTimesheet = function () {
+    const P = window._tsParsed; if (!P) { window.closeModal(); return; }
+    const existing = window.STORE.get('staffAliases', {}) || {};
+    const aliasMap = { ...existing };
     const sheets = window.STORE.get('timesheet', window.TIMESHEET || []).slice();
-    let done = 0;
-    document.querySelectorAll('.ts-res').forEach(sel => {
-      const sid = sel.value; if (!sid) return;
-      const item = (sel.dataset.kind === 'amb' ? R.ambiguous : R.unmatched)[+sel.dataset.i]; if (!item) return;
-      if (item.name) aliasMap[sid] = item.name.trim();   /* NHỚ tên viết tắt */
-      _applyTsDays(sheets, sid, item.days, R.last);
-      done++;
+    let applied = 0;
+    P.rows.forEach(r => {
+      if (!r.chosen) return;
+      /* NHỚ tên viết tắt khi HR đổi khác gợi ý, hoặc NV chưa có alias (học tên mới) — KHÔNG đè alias đã đúng */
+      if (r.name && (r.chosen !== r.auto || !existing[r.chosen])) aliasMap[r.chosen] = r.name.trim();
+      _applyTsDays(sheets, r.chosen, r.days, P.last);
+      applied++;
     });
     window.STORE.set('staffAliases', aliasMap);
     window.STORE.set('timesheet', sheets);
-    window._tsResolve = null;
+    const skipped = P.rows.length - applied;
+    window._tsParsed = null;
     window.closeModal();
-    window.toast(`✓ Đã khớp thêm ${done} NV & nhớ tên viết tắt cho lần sau`, done ? 'success' : 'info');
+    window.toast(`✓ Đã cập nhật chấm công ${applied} NV${skipped ? ' · bỏ qua ' + skipped + ' dòng chưa khớp' : ''}`, 'success');
     render();
   };
 
