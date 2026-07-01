@@ -12,6 +12,14 @@
   const S = () => window.STORE;
   const getRuns = () => S().get('procurementRuns', []) || [];
   const saveRuns = (r) => S().set('procurementRuns', r);
+  /* Lưu 1 PHIÊN qua RMW (idempotent upsert theo run.id) → 2 NV sửa 2 phiên cùng lúc KHÔNG đè của nhau.
+     Dùng cho các thao tác biết chắc run.id (tạo/gán SL/xác nhận/chốt). saveRuns() giữ cho xóa/bulk. */
+  const saveRun = (run) => window.STORE.rmwKv('procurementRuns', arr => {
+    arr = Array.isArray(arr) ? arr : [];
+    const i = arr.findIndex(x => x.id === run.id);
+    if (i >= 0) arr[i] = run; else arr.unshift(run);
+    return arr;
+  });
   const getOrders = () => S().get('orders', window.ORDERS || []) || [];
   const getSuppliers = () => S().get('suppliers', []) || [];
   const getProducts = () => S().get('products', window.PRODUCTS || []) || [];
@@ -191,7 +199,7 @@
       status: 'draft'
     };
     runs.unshift(run);
-    saveRuns(runs);
+    saveRun(run);
     /* đánh dấu đơn đang gom */
     const orders = getOrders();
     codes.forEach(c => { const o = orders.find(x => x.code === c); if (o) o.whStatus = 'gathering'; });
@@ -661,14 +669,14 @@
       const sumExceptLast = l.allocations.reduce((s, a, idx) => idx === last ? s : s + (+a.qty || 0), 0);
       l.allocations[last].qty = +Math.max(0, l.totalQty - sumExceptLast).toFixed(2);
     }
-    saveRuns(runs); window.pcOpenRun(runId);
+    saveRun(run); window.pcOpenRun(runId);
   };
   window.pcSetAllocConf = function (runId, key, ai, val) {
     const runs = getRuns(); const run = runs.find(r => r.id === runId); if (!run) return;
     readConfirmInputs(run);
     const l = _line(run, key); if (!l || !l.allocations[ai]) return;
     l.allocations[ai].confirmedQty = val === '' ? null : +val;
-    saveRuns(runs); window.pcOpenRun(runId);
+    saveRun(run); window.pcOpenRun(runId);
   };
 
   /* Tìm NCC theo tên (không phân biệt hoa/thường); nếu chưa có → tạo mới luôn */
@@ -729,6 +737,11 @@
   /* Chốt: ghi SL phân bổ về từng đơn + note thiếu + báo Sale */
   window.pcApplyAlloc = function (runId) {
     const runs = getRuns(); const run = runs.find(r => r.id === runId); if (!run) return;
+    /* GATE: đơn chưa tải xong từ cloud → KHÔNG ghi (tránh áp phân bổ lên cache rỗng rồi đè cloud). */
+    if (!window.STORE.isPreloaded('orders')) {
+      window.toast && window.toast('Đang tải dữ liệu đơn, thử lại sau vài giây', 'warn');
+      return;
+    }
     readConfirmInputs(run);
     const orders = getOrders();
     const shortByOrder = {};   /* code → [ {name, short, reason} ] */
@@ -763,7 +776,7 @@
     S().set('orders', orders);
     run.status = 'applied';                       /* CHỐT & phân bổ xong → vào Lịch sử đã gom */
     run.confirmedAt = new Date().toISOString();
-    saveRuns(runs);
+    saveRun(run);
 
     /* Báo Sale: gom theo đơn → 1 tin Telegram (kênh 'alert') */
     const shortCodes = Object.keys(shortByOrder);

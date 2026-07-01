@@ -623,12 +623,9 @@ Mong quý khách thu xếp thanh toán sớm. Cảm ơn!
       });
     }
 
-    /* Giảm công nợ KH */
-    const newDebt = Math.max(0, c.debt - amount);
-    const newOverdue = Math.max(0, c.debtOverdue - amount);
+    /* Công nợ KH: KHÔNG ghi debt/debtOverdue vào customers (nguồn kép).
+       Nguồn duy nhất là addDebtLedger type 'payment' bên dưới → tính qua window.custDebt(). */
     window.STORE.update('customers', custId, {
-      debt: newDebt,
-      debtOverdue: newOverdue,
       lastContact: date,
     });
 

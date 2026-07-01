@@ -152,7 +152,7 @@
 
     /* 2. Gửi file HTML báo giá đầy đủ (qua PriceCatalogue.export sendOnly) */
     try {
-      await window.PriceCatalogue.export(diff.today, { sendOnly: true });
+      await window.PriceCatalogue.export(diff.today, { sendOnly: true, channelPurpose: cfg.channelPurpose });
     } catch (e) {
       console.warn('[PriceAutoSend] Gửi file fail:', e);
       return { ok: false, error: 'Gửi file lỗi: ' + e.message };

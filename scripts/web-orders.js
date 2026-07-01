@@ -113,7 +113,12 @@
       qty: it.qty, price: it.price, total: it.subtotal != null ? it.subtotal : (it.price || 0) * (it.qty || 0),
     }));
     const total = r.total != null ? r.total : items.reduce((s, it) => s + (it.total || 0), 0);
-    const code = window.STORE.nextOrderCode();
+    let code;
+    try {
+      code = (window.SB_DATA && window.SB_DATA.nextCloudOrderCode)
+        ? await window.SB_DATA.nextCloudOrderCode()
+        : window.STORE.nextOrderCode();
+    } catch (e) { code = window.STORE.nextOrderCode(); }
     const me = (window.CURRENT_USER || {}).name || '';
     window.STORE.add('orders', {
       code, date: new Date().toLocaleString('vi-VN'),

@@ -63,44 +63,10 @@
     window.STORE.update('inventory', item.id, patch);
   };
 
-  /* Auto sub khi đơn chuyển sang delivered */
-  window.STORE.subscribe('orders', orders => {
-    /* Tránh trigger vòng lặp: dùng flag _invApplied trong order */
-    let changed = false;
-    const list = orders || [];
-    list.forEach(o => {
-      if ((o.status === 'delivered' || o.status === 'reconciled') && !o._invApplied) {
-        (o.items || []).forEach(it => {
-          if (it.id) {
-            window.invApply(it.id, -(it.qty || 0));
-            window.invRecordMovement(it.id, -(it.qty || 0), 'sale', `Xuất bán cho ${o.custName}`, o.code);
-          }
-        });
-        o._invApplied = true;
-        changed = true;
-      }
-    });
-    if (changed) window.STORE.set('orders', list);
-  });
-
-  /* Auto cộng khi purchase nhận hàng */
-  window.STORE.subscribe('purchases', purchases => {
-    let changed = false;
-    const list = purchases || [];
-    list.forEach(p => {
-      if (p.status === 'received' && !p._invApplied && !p.noStock) {
-        (p.items || []).forEach(it => {
-          if (it.productId) {
-            window.invApply(it.productId, +(it.qty || 0));
-            window.invRecordMovement(it.productId, +(it.qty || 0), 'purchase', `Nhập từ NCC`, p.id);
-          }
-        });
-        p._invApplied = true;
-        changed = true;
-      }
-    });
-    if (changed) window.STORE.set('purchases', list);
-  });
+  /* Auto-áp tồn kho khi orders/purchases đổi trạng thái đã chuyển sang
+     cross-module-hooks.js (nguồn DUY NHẤT, có guard mvHas + ready).
+     Ở đây không tự áp kho nữa để tránh áp trùng. Việc vẽ lại inventory
+     khi orders/purchases thay đổi đã do subscribe render-only ở cuối file lo. */
 
   /* ====== Render ====== */
   function fmtQty(n) { return (n || 0).toLocaleString('vi-VN'); }

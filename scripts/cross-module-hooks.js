@@ -52,16 +52,20 @@
     }
     if (!window.invRecordMovement) {
       window.invRecordMovement = function (productId, qty, type, note, refId) {
-        const moves = window.STORE.get('inv_movements', []) || [];
-        moves.unshift({
+        const mv = {
           id: 'MV' + Date.now().toString(36),
           ts: new Date().toISOString(),
           productId, qty, type,
           note: note || '', refId: refId || '',
           user: (window.CURRENT_USER || {}).name || 'Hệ thống',
+        };
+        window.STORE.rmwKv('inv_movements', arr => {
+          arr = Array.isArray(arr) ? arr : [];
+          if (refId && arr.some(m => m.refId === refId && m.type === type)) return arr;
+          arr.unshift(mv);
+          if (arr.length > 500) arr.length = 500;
+          return arr;
         });
-        if (moves.length > 500) moves.length = 500;
-        window.STORE.set('inv_movements', moves);
       };
     }
 
@@ -248,7 +252,7 @@
               date: ad.date || '',
               type: 'out',
               party: platform,
-              description: `Chi phí QC ${platform} ${ad.date||''}`,
+              desc: `Chi phí QC ${platform} ${ad.date||''}`,
               account: 'Tiền mặt',
               amount: ad.spend,
               staff: 'Hệ thống',
@@ -291,7 +295,7 @@
               date: (p.paidAt || p.payDate || new Date().toISOString()).slice(0, 10),
               type: 'out',
               party: p.staffName || p.name || 'NV',
-              description: `Lương tháng ${p.month||''} — ${p.staffName||p.name||''}`,
+              desc: `Lương tháng ${p.month||''} — ${p.staffName||p.name||''}`,
               account: 'Tiền mặt',
               amount,
               staff: (window.CURRENT_USER||{}).name || 'Hệ thống',

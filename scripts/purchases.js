@@ -16,6 +16,19 @@
   function getProds() { return window.STORE.get('products', window.PRODUCTS || []) || []; }
   function findSup(id) { return id === EXT_SUP_ID ? EXT_SUP : getSup().find(s => s.id === id); }
 
+  /* Sinh số phiếu quỹ không trùng PK 'no': lấy max seq hiện có theo prefix rồi +1,
+     kiểm tra tồn tại (tránh trùng nếu dữ liệu thưa/nhảy số). */
+  function _nextCashNo(cash, prefix) {
+    const list = cash || [];
+    const rx = new RegExp('^' + prefix + '(\\d+)$');
+    let max = 0;
+    list.forEach(c => { const m = c && c.no && String(c.no).match(rx); if (m) { const n = +m[1]; if (n > max) max = n; } });
+    let seq = max + 1;
+    let no = prefix + String(seq).padStart(4, '0');
+    while (list.some(c => c && c.no === no)) { seq++; no = prefix + String(seq).padStart(4, '0'); }
+    return no;
+  }
+
   function renderKpis() {
     const list = getPur();
     const today = window.todayVN();
@@ -161,9 +174,8 @@
       /* Thu mua ngoài: trả tiền mặt ngay → ghi PHIẾU CHI vào sổ quỹ kế toán (schema chuẩn type:'out') */
       list[i].paid = list[i].total;
       const cash = window.STORE.get('cashEntries', []) || [];
-      const seq = String(cash.length + 1).padStart(4, '0');
       cash.unshift({
-        no: 'PCTMN' + seq, date: list[i].date || window.todayVN(),
+        no: _nextCashNo(cash, 'PCTMN'), date: list[i].date || window.todayVN(),
         type: 'out', party: 'Thu mua ngoài', account: 'Tiền mặt',
         amount: list[i].total,
         desc: 'Thu mua ngoài ' + list[i].id + ' · ' + (list[i].items || []).length + ' mã',
@@ -207,10 +219,31 @@
     const list = getPur();
     const i = list.findIndex(x => x.id === id);
     if (i < 0) return;
-    if (list[i].status === 'received' && list[i]._invApplied) {
-      (list[i].items || []).forEach(it => {
-        if (it.productId) window.invApply && window.invApply(it.productId, -(it.qty||0));
+    const p = list[i];
+    if (p.status === 'received') {
+      /* Trừ lại kho theo BÚT TOÁN inv_movements thật (không dựa cờ _invApplied bị strip).
+         Idempotent: chỉ trừ mỗi SP đã có movement 'purchase' ref=p.id và CHƯA có
+         bút toán 'adjust' ref=p.id (tránh trừ 2 lần). Ghi adjust có audit. */
+      const moves = window.STORE.get('inv_movements', []) || [];
+      const hasPurchase = pid => moves.some(m => m && m.type === 'purchase' && m.refId === p.id && m.productId === pid);
+      const alreadyReversed = pid => moves.some(m => m && m.type === 'adjust' && m.refId === p.id && m.productId === pid);
+      (p.items || []).forEach(it => {
+        if (!it.productId) return;
+        if (hasPurchase(it.productId) && !alreadyReversed(it.productId)) {
+          const q = it.qty || 0;
+          if (window.invRecordMovement) window.invRecordMovement(it.productId, -q, 'adjust', 'Hủy phiếu nhập ' + p.id, p.id);
+          if (window.invApply) window.invApply(it.productId, -q);
+        }
       });
+      /* Hoàn công nợ NCC nếu NCC là NET (đã cộng debt/totalSpend lúc nhận) */
+      const total = p.total || 0;
+      const sup = getSup().find(s => s.id === p.supplierId);
+      if (sup) {
+        window.STORE.update('suppliers', sup.id, {
+          debt: Math.max(0, (+sup.debt || 0) - total),
+          totalSpend: Math.max(0, (+sup.totalSpend || 0) - total),
+        });
+      }
     }
     list[i].status = 'cancelled';
     window.STORE.set('purchases', list);
@@ -239,10 +272,10 @@
     /* Ghi phiếu chi */
     const cash = window.STORE.get('cashEntries', []) || [];
     cash.unshift({
-      no:'PC' + String(cash.length+1).padStart(4,'0'), date:window.todayVN(),
-      type:'expense', amount: amt, account:'Tiền mặt',
-      counterparty: findSup(p.supplierId)?.name || p.supplierId,
-      description:'Thanh toán phiếu ' + id,
+      no: _nextCashNo(cash, 'PC'), date:window.todayVN(),
+      type:'out', amount: amt, account:'Tiền mặt',
+      party: findSup(p.supplierId)?.name || p.supplierId,
+      desc:'Thanh toán phiếu ' + id,
     });
     window.STORE.set('cashEntries', cash);
     if (window.audit) window.audit.log('purchase.pay', `${id}: ${window.fmt(amt)} ₫`);

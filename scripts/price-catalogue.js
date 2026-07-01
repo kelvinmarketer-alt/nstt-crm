@@ -581,8 +581,9 @@ ${sections}
         document.body.appendChild(a); a.click(); a.remove();
         setTimeout(() => URL.revokeObjectURL(url), 4000);
       }
-      /* gửi Telegram dạng document — dùng kênh 'price_update' nếu có */
-      const ch = window.getTgChannel ? window.getTgChannel('price_update') : null;
+      /* gửi Telegram dạng document — dùng kênh opts.channelPurpose (mặc định 'price_update') nếu có.
+         noSend: KHÔNG auto-gửi (vd bảng giá Marketing không được gửi vào kênh khách) */
+      const ch = (window.getTgChannel && !opts.noSend) ? window.getTgChannel(opts.channelPurpose || 'price_update') : null;
       if (ch) {
         window.toast(`Đang gửi file báo giá → ${ch.channelName || 'Telegram'}…`, 'info');
         try {

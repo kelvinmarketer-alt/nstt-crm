@@ -11,7 +11,11 @@
 (function () {
   const TODAY_VI = window.todayVN();
   const TODAY_ISO = window.todayISO();
-  const MONTH_VI = '05/2026';
+  const _NOW = window.todayDate();
+  const _CUR_MO = _NOW.getMonth() + 1;
+  const _CUR_YR = _NOW.getFullYear();
+  const MONTH_VI = `${String(_CUR_MO).padStart(2, '0')}/${_CUR_YR}`;
+  const _ADS_PREFIX = `${_CUR_YR}-${String(_CUR_MO).padStart(2, '0')}`;
 
   function parseViDate(s) {
     const m = (s || '').match(/(\d+)\/(\d+)\/(\d+)/);
@@ -19,7 +23,7 @@
   }
   function isThisMonth(o) {
     const d = parseViDate(o.date);
-    return d && d.mo === 5 && d.y === 2026;
+    return d && d.mo === _CUR_MO && d.y === _CUR_YR;
   }
   function buyPriceFor(p, viDate) {
     if (!p || !p.priceHistory || !p.priceHistory.length) return null;
@@ -116,7 +120,7 @@
         monthCogs += (bp || 0) * (it.qty || 0);
       });
     });
-    const monthAds = ads.filter(a => (a.date || '').startsWith('2026-05')).reduce((s, a) => s + (a.spend || 0), 0);
+    const monthAds = ads.filter(a => (a.date || '').startsWith(_ADS_PREFIX)).reduce((s, a) => s + (a.spend || 0), 0);
     const grossProfit = monthRev - monthCogs;
     const grossMargin = monthRev ? grossProfit / monthRev * 100 : 0;
     /* Lương ước cho tháng = lương cơ bản (full) — simplified */
@@ -127,7 +131,7 @@
     const overdueDebt = customers.reduce((s, c) => s + (c.debtOverdue || 0), 0);
 
     /* === MARKETING === */
-    const adsMonth = ads.filter(a => (a.date || '').startsWith('2026-05'));
+    const adsMonth = ads.filter(a => (a.date || '').startsWith(_ADS_PREFIX));
     const adsSale = adsMonth.filter(a => a.objective === 'ban-hang');
     const adsRecruit = adsMonth.filter(a => a.objective === 'tuyen-dung');
     const adSpendSale = adsSale.reduce((s, a) => s + (a.spend || 0), 0);

@@ -179,6 +179,8 @@
     'staffAliases',    /* Tên viết tắt máy chấm công {staffId: 'tên viết tắt'} — khoá khớp phiếu chấm công */
     'mktPrices',       /* Bảng giá Marketing (chào hàng/ads) — KHÔNG ảnh hưởng đơn */
     'priceTiers',      /* Nhóm bảng giá theo nhóm KH (±% + override) — gửi báo giá riêng */
+    'priceBaseMarkup', /* % giá gốc so giá nhập (link toàn hệ thống) — phải roaming đa máy */
+    'priceAutoSend',   /* Cấu hình + lastSentDate auto-send bảng giá — sync tránh gửi Telegram trùng */
     'procurementRuns', /* Phiên gom hàng → đặt NCC (Kho) — CRITICAL */
     'supplierClaims',  /* Khoản đòi lại NCC khi hàng NCC giao hỏng (Trả hàng) */
     'supplierMeta',    /* Loại NCC (sỉ/lẻ/cả hai) — cloud suppliers không có cột này */

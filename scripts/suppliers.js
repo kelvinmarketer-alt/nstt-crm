@@ -348,11 +348,15 @@
     window.STORE.set('suppliers', list);
     /* Ghi phiếu chi */
     const cash = window.STORE.get('cashEntries', []) || [];
+    const _pcMax = cash.reduce((m, e) => {
+      const n = parseInt(String(e.no || '').replace(/^PC/, ''), 10);
+      return isNaN(n) ? m : Math.max(m, n);
+    }, 0);
     cash.unshift({
-      no: 'PC' + String(cash.length+1).padStart(4,'0'),
-      date: '18/05/2026', type: 'expense', amount: s.debt,
-      account: 'Tiền mặt', counterparty: s.name,
-      description: 'Thanh toán công nợ NCC ' + s.id,
+      no: 'PC' + String(_pcMax + 1).padStart(4,'0'),
+      date: window.todayVN(), type: 'out', amount: s.debt,
+      account: 'Tiền mặt', party: s.name,
+      desc: 'Thanh toán công nợ NCC ' + s.id,
     });
     window.STORE.set('cashEntries', cash);
     if (window.audit) window.audit.log('supplier.pay', `Trả ${window.fmt(s.debt)} ₫ cho ${s.name}`);

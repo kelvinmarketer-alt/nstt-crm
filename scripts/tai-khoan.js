@@ -9,6 +9,7 @@
   function staffList() { return (S().get('staff', window.STAFFS || []) || []).slice(); }
   const esc = s => String(s == null ? '' : s).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/"/g, '&quot;');
   const norm = s => (s || '').toString().replace(/\s+/g, '').toLowerCase();
+  const isLocked = s => ['off', 'inactive', 'nghỉ'].includes(s);
 
   function init() {
     if (window.renderAppShell) window.renderAppShell('tai-khoan', 'Tài khoản đăng nhập');
@@ -29,7 +30,7 @@
     const A = window.AUTH || {};
     const rows = all.filter(s => {
       if (fd && s.dept !== fd) return false;
-      const locked = (s.status === 'off' || s.status === 'inactive' || s.status === 'nghỉ');
+      const locked = isLocked(s.status);
       if (fs === 'active' && locked) return false;
       if (fs === 'off' && !locked) return false;
       if (q) {
@@ -43,7 +44,7 @@
     if (!rows.length) { tb.innerHTML = '<tr><td colspan="7" style="padding:24px;text-align:center;color:var(--muted)">Không có nhân viên nào khớp.</td></tr>'; }
     else tb.innerHTML = rows.map(s => {
       const sid = s.id || s.code;
-      const locked = (s.status === 'off' || s.status === 'inactive' || s.status === 'nghỉ');
+      const locked = isLocked(s.status);
       const hasPw = A.hasCustomPassword && A.hasCustomPassword(sid);
       const uname = A.getStaffUsername ? A.getStaffUsername(sid) : '';
       const col = window.avatarColor ? window.avatarColor(sid) : '#1B5E20';
@@ -71,7 +72,7 @@
     }).join('');
     const sum = document.getElementById('akSummary');
     if (sum) {
-      const locked = all.filter(s => s.status === 'off' || s.status === 'inactive').length;
+      const locked = all.filter(s => isLocked(s.status)).length;
       sum.innerHTML = `<b>${all.length}</b> tài khoản · ${all.length - locked} hoạt động · ${locked} khóa`;
     }
   };

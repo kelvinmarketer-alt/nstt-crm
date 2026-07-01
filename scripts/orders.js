@@ -466,6 +466,16 @@
       }
     }
 
+    /* FIX #19: set 'returned' cho đơn TỪNG delivered mà chưa có phiếu trả → nhắc đi qua module Trả hàng để hoàn kho.
+       CHỈ cảnh báo, KHÔNG tự sửa kho. */
+    if (newStatus === 'returned' && wasCounted) {
+      const rets = window.STORE.get('returns', []) || [];
+      const hasSlip = rets.some(r => r && r.orderCode === code);
+      if (!hasSlip) {
+        window.toast('⚠️ Đơn từng đã giao — nên đi qua module Trả hàng để hoàn kho (tồn kho KHÔNG tự điều chỉnh)', 'warn');
+      }
+    }
+
     /* Toast */
     const msgType = newStatus === 'cancelled' ? 'danger' : newStatus === 'returned' ? 'warn' : 'success';
     window.toast(`${code}: ${STATUS[oldStatus].label} → ${STATUS[newStatus].label}`, msgType);
@@ -721,7 +731,7 @@
     document.getElementById('iCust').textContent  = o.custName + ' (' + o.cust + ')';
     document.getElementById('iStaff').textContent = o.staff;
     document.getElementById('iDate').textContent  = orderWhen(o);
-    document.getElementById('iGoods').textContent = `${o.qty} ${o.unit.toLowerCase()} · ${o.goods}` + (_kg != null ? ' · ' + fmtNum2(_kg) + ' kg' : (o.weight ? ' · ' + o.weight + ' kg' : ''));
+    document.getElementById('iGoods').textContent = `${o.qty} ${(o.unit||'kg').toLowerCase()} · ${o.goods}` + (_kg != null ? ' · ' + fmtNum2(_kg) + ' kg' : (o.weight ? ' · ' + o.weight + ' kg' : ''));
     const shipEl = document.getElementById('iShip');
     if (shipEl) {
       const parts = [];
@@ -1320,6 +1330,11 @@
     const weight = parseFloat((document.getElementById('oWeight') || {}).value) || 0;
     window.STORE.update('orders', code, { items: orderItems.slice(), freight, goods, weight });
     logOrderEdit(code, `✏️ Sửa mặt hàng & giá — ${orderItems.length} mã · tổng ${window.fmt(freight)}₫`);
+    /* FIX #18: sửa items khi đơn đã 'delivered'/'reconciled' → nhắc kiểm kho tay.
+       CHỈ cảnh báo, KHÔNG tự điều chỉnh tồn kho. */
+    if (o.status === 'delivered' || o.status === 'reconciled') {
+      window.toast && window.toast('⚠️ Đơn đã giao — tồn kho KHÔNG tự điều chỉnh, kiểm tra kho thủ công', 'warn');
+    }
     orderItems = []; orderTier = ''; _editItemsCode = null;
     window.closeModal();
     window.toast && window.toast('✓ Đã cập nhật mặt hàng & giá cho ' + code, 'success');
@@ -2031,7 +2046,7 @@ CHỈ TRẢ JSON, không giải thích gì thêm.`;
     });
   };
 
-  window.submitCreateOrder = function(initStatus) {
+  window.submitCreateOrder = async function(initStatus) {
     const custId = window.formVal('#oCust');
     const goods = window.formVal('#oGoods');
     const freight = _moneyVal('#oFreight');
@@ -2065,8 +2080,17 @@ CHỈ TRẢ JSON, không giải thích gì thêm.`;
     const vehicle = drv ? (drv.primaryPlate || 'Xe máy') : '—';
 
     const svcIds = window.getOrderSvcIds ? window.getOrderSvcIds() : [];
+    /* FIX #35: sinh mã đơn LÚC SUBMIT (không phải lúc mở form) để tránh trùng đa máy.
+       Ưu tiên mã từ cloud (chống trùng toàn hệ thống), fallback mã local. */
+    let orderCode;
+    try {
+      orderCode = (window.SB_DATA && window.SB_DATA.nextCloudOrderCode)
+        ? await window.SB_DATA.nextCloudOrderCode()
+        : null;
+    } catch (e) { orderCode = null; }
+    if (!orderCode) orderCode = window.STORE.nextOrderCode();
     const newOrder = {
-      code: window.formVal('#oCode'),
+      code: orderCode,
       date: new Date().toLocaleString('vi-VN'),
       createdAt: new Date().toISOString(),   /* dùng cho phân bổ ưu tiên đơn đặt trước */
       deliverDate: window.formVal('#oDeliverDate') || '',

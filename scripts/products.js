@@ -427,6 +427,25 @@
     return { offset: +c.offset || 0, override: c.override || {} };
   }
   function saveMkt(c) { window.STORE.set('mktPrices', c); }
+  /* Coerce về đúng kiểu object {offset, override} — dùng trong mutate của rmwKv */
+  function _mktCoerce(o) {
+    o = (o && typeof o === 'object' && !Array.isArray(o)) ? o : {};
+    o.offset = +o.offset || 0;
+    o.override = (o.override && typeof o.override === 'object' && !Array.isArray(o.override)) ? o.override : {};
+    return o;
+  }
+  /* RMW chống đè-nhau: đặt offset (idempotent — chỉ ghi offset, giữ override của NV khác) */
+  function _mktSetOffset(offset) {
+    window.STORE.rmwKv('mktPrices', o => { o = _mktCoerce(o); o.offset = +offset || 0; return o; });
+  }
+  /* RMW: đặt override 1 SP (idempotent theo id) */
+  function _mktSetOverride(id, price) {
+    window.STORE.rmwKv('mktPrices', o => { o = _mktCoerce(o); o.override[id] = +price || 0; return o; });
+  }
+  /* RMW: xoá override 1 SP (idempotent theo id) */
+  function _mktDelOverride(id) {
+    window.STORE.rmwKv('mktPrices', o => { o = _mktCoerce(o); delete o.override[id]; return o; });
+  }
   function realPrice(p) {
     return (window.priceEntryOn ? (window.priceEntryOn(p, window.todayISO())?.sell) : null) ?? p.price ?? 0;
   }
@@ -514,10 +533,7 @@
       inp.addEventListener('change', (e) => {
         const id = e.target.dataset.id;
         const val = _pmoney(e.target.value);
-        const cfg = mktCfg();
-        cfg.override = cfg.override || {};
-        cfg.override[id] = val;
-        saveMkt(cfg);
+        _mktSetOverride(id, val);
         renderMkt();
       });
     });
@@ -526,9 +542,7 @@
   }
 
   window._mktQuick = function (giaNum) {
-    const cfg = mktCfg();
-    cfg.offset = Math.round(giaNum * 1000);
-    saveMkt(cfg);
+    _mktSetOffset(Math.round(giaNum * 1000));
     renderMkt();
     window.toast(giaNum === 0 ? '↺ Giá MKT = giá thật' : `⚡ Giá MKT = giá thật ${giaNum>0?'+':'−'} ${Math.abs(giaNum)} giá`, 'success');
   };
@@ -536,9 +550,7 @@
     const op = parseInt(document.getElementById('mktOp').value, 10) || 1;
     const gia = parseFloat(document.getElementById('mktGia').value) || 0;
     if (gia > 50) { if (!confirm(`Bạn nhập ${gia} giá = ${(gia*1000).toLocaleString('vi-VN')}đ — số khá lớn. Chắc chắn?`)) return; }
-    const cfg = mktCfg();
-    cfg.offset = op * Math.round(gia * 1000);
-    saveMkt(cfg);
+    _mktSetOffset(op * Math.round(gia * 1000));
     renderMkt();
     window.toast(`⚡ Đã áp dụng giá MKT = giá thật ${op>0?'+':'−'} ${gia} giá`, 'success');
   };
@@ -553,7 +565,8 @@
     if (!window.PriceCatalogue) { window.toast('Chưa tải module báo giá', 'warn'); return; }
     const c = mktCfg();
     window.toast('Đang tạo file HTML bảng giá Marketing…', 'info');
-    try { await window.PriceCatalogue.export(window.todayISO(), { priceFn: (p) => mktPriceOf(p, c) }); }
+    /* noSend: KHÔNG auto-gửi Telegram — bảng giá MKT không được gửi vào kênh khách */
+    try { await window.PriceCatalogue.export(window.todayISO(), { priceFn: (p) => mktPriceOf(p, c), noSend: true }); }
     catch (e) { window.toast('Lỗi tạo file: ' + e.message, 'warn'); }
   };
   window._mktReset = function () {
@@ -563,9 +576,7 @@
     window.toast('↺ Đã reset giá MKT = giá thật', 'success');
   };
   window._mktClearOne = function (id) {
-    const cfg = mktCfg();
-    if (cfg.override) delete cfg.override[id];
-    saveMkt(cfg);
+    _mktDelOverride(id);
     renderMkt();
   };
   window._mktCopyText = function () {
@@ -595,6 +606,7 @@
     });
   };
   function applyAIPrices(data) {
+    if (boardTier > 0) { window.toast && window.toast('Về bảng giá Gốc (bỏ chọn nhóm) để cập nhật giá bán', 'warn'); return; }
     const list = Array.isArray(data) ? data : (data.products || data.items || data.data || []);
     if (!list.length) { window.toast('Không đọc được sản phẩm nào từ ảnh', 'warn'); return; }
     const ps = products();
@@ -613,6 +625,7 @@
   }
 
   window.copyYesterday = function () {
+    if (boardTier > 0) { window.toast && window.toast('Về bảng giá Gốc (bỏ chọn nhóm) để cập nhật giá bán', 'warn'); return; }
     document.querySelectorAll('.bprice').forEach(inp => {
       const p = window.productById(inp.dataset.id);
       const prev = prevEntry(p, boardDate);
@@ -622,14 +635,19 @@
   };
 
   window.savePriceBoard = function () {
+    if (boardTier > 0) { window.toast && window.toast('Về bảng giá Gốc (bỏ chọn nhóm) để cập nhật giá bán', 'warn'); return; }
     let n = 0;
     document.querySelectorAll('.bprice').forEach(inp => {
       const id = inp.dataset.id;
+      /* Bỏ qua ô rỗng — không ghi giá 0 đè lên SP chưa nhập giá */
+      if (!String(inp.value).trim()) return;
       const sell = _pmoney(inp.value);
       const p = window.productById(id);
       if (!p) return;
       const hist = [...(p.priceHistory || [])];
       const existing = hist.find(h => h.date === boardDate);
+      /* Chỉ ghi SP có giá bán THỰC SỰ đổi so entry hiện có của boardDate */
+      if (existing && existing.sell === sell) return;
       const lastBuy = (window.priceEntryOn(p, boardDate)?.buy) ?? 0;
       if (existing) { existing.sell = sell; }
       else { hist.push({ date: boardDate, buy: lastBuy, sell }); }

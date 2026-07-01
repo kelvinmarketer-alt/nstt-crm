@@ -296,7 +296,7 @@
     const kindLabel = { cash:'Tiền mặt', bank:'Ngân hàng', ewallet:'Ví điện tử' };
     const isEdit = !!existing;
     const a = existing || { kind, name:'', detail:'', balance:0, keeper:'', active:true };
-    const nextId = 'A' + (accounts.length + 1);
+    const nextId = 'A' + ((accounts.reduce((m, a) => { const n = parseInt(String(a.id).replace(/\D/g, ''), 10); return isNaN(n) ? m : Math.max(m, n); }, 0)) + 1);
     window.openModal((isEdit?'✏️ Sửa ':'+ Thêm ') + kindLabel[kind], `
       <div class="form-row wide"><label>Tên TK *</label>
         <input id="aName" value="${a.name}" placeholder="${kind==='cash'?'VD: Quỹ tiền mặt văn phòng':kind==='bank'?'VD: Vietcombank · 1021xxxxxx':'VD: MoMo · 0903xxx'}"></div>
@@ -389,7 +389,7 @@
 
   /* === ĐỐI SOÁT NGÂN HÀNG === */
   window.openBankReconcile = function () {
-    const accs = window.STORE.get('paymentAccounts', INITIAL_ACCOUNTS).filter(a => a.type === 'bank');
+    const accs = window.STORE.get('paymentAccounts', INITIAL_ACCOUNTS).filter(a => a.kind === 'bank');
     if (!accs.length) { window.toast('Chưa có TK ngân hàng để đối soát', 'warn'); return; }
     const html = `
       <div style="font-size:12.5px;color:var(--muted);margin-bottom:12px">
@@ -399,7 +399,7 @@
         <thead><tr><th>Tài khoản</th><th class="num">Số dư sổ (₫)</th><th class="num">Số dư thực tế (₫)</th><th class="num">Chênh lệch</th></tr></thead>
         <tbody>
           ${accs.map(a => `<tr data-acc="${a.id}">
-            <td><b>${a.name}</b><div style="font-size:11px;color:var(--muted)">${a.no || ''}</div></td>
+            <td><b>${a.name}</b><div style="font-size:11px;color:var(--muted)">${a.detail || ''}</div></td>
             <td class="num" id="bal_${a.id}" data-bal="${a.balance||0}">${(a.balance||0).toLocaleString('vi-VN')}</td>
             <td class="num"><input type="number" class="bnk-actual" data-acc="${a.id}" placeholder="${(a.balance||0).toLocaleString('vi-VN')}" style="width:140px;text-align:right;padding:6px 8px;border:1px solid var(--line);border-radius:6px"></td>
             <td class="num" id="diff_${a.id}" style="font-weight:700">—</td>
@@ -429,8 +429,7 @@
 
   window.applyBankReconcile = function () {
     const accs = window.STORE.get('paymentAccounts', INITIAL_ACCOUNTS);
-    let entries = window.STORE.get('cashEntries', INITIAL_ENTRIES).slice();
-    let nextNo = entries.length + 1;
+    let seq = (typeof nextPNo === 'function' ? nextPNo('PT') : 1);
     let changes = 0;
     document.querySelectorAll('.bnk-actual').forEach(inp => {
       const id = inp.dataset.acc;
@@ -443,7 +442,7 @@
       const isPlus = diff > 0;
       const entry = {
         id: 'CE' + Date.now() + Math.random().toString(36).slice(2, 4),
-        no: 'PT' + String(nextNo++).padStart(5, '0'),
+        no: 'PT-' + (seq++),
         date: new Date().toLocaleDateString('vi-VN'),
         type: isPlus ? 'in' : 'out',
         party: 'Đối soát ngân hàng',
@@ -452,12 +451,11 @@
         account: acc.name,
         staff: (window.CURRENT_USER && window.CURRENT_USER.name) || 'Tôi',
       };
-      entries.unshift(entry);
+      window.STORE.add('cashEntries', entry);
       window.STORE.update('paymentAccounts', id, { balance: actual });
       changes++;
     });
     if (!changes) { window.toast('Không có thay đổi để đối soát', 'info'); window.closeModal(); return; }
-    window.STORE.set('cashEntries', entries);
     window.closeModal();
     window.toast(`✓ Đã đối soát ${changes} TK + tạo ${changes} phiếu điều chỉnh`, 'success');
   };

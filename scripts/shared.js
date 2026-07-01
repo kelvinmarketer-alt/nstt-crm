@@ -5,7 +5,7 @@
 
 /* Phiên bản app hiển thị (đối chiếu với CACHE_VERSION trong sw.js) — để user tự XÁC NHẬN
    đang chạy bản mới hay còn kẹt JS cũ (hiện ở góc sidebar + log console). */
-window.APP_VERSION = 'v325';
+window.APP_VERSION = 'v326';
 console.log('%c[NSTT] App ' + window.APP_VERSION, 'color:#339B21;font-weight:bold');
 
 /* Gom NGUỒN khách về 3 nhóm chuẩn: 'mkt' / 'sales' / 'sep-gioi-thieu'.
@@ -379,12 +379,35 @@ window.addDebtLedger = function (e) {
     desc: e.desc || '',
   };
   if (!entry.amount) return;
-  const arr = (window.STORE.get('debtLedger', []) || []);
-  /* tránh trùng: cùng ref + type + custId thì bỏ qua (idempotent với hook chạy lại) */
-  if (entry.ref && arr.some(x => x.custId === entry.custId && x.ref === entry.ref && x.type === entry.type)) return;
-  arr.unshift(entry);
-  window.STORE.set('debtLedger', arr);
+  /* rmwKv: áp lên bản CLOUD MỚI NHẤT → 2 NV ghi phiếu thu/bút toán cùng lúc KHÔNG mất của nhau
+     (trước đây STORE.set đè cả sổ = mất bút toán). Dedup theo (custId,ref,type) giữ idempotent. */
+  window.STORE.rmwKv('debtLedger', arr => {
+    arr = Array.isArray(arr) ? arr : [];
+    if (entry.ref && arr.some(x => x.custId === entry.custId && x.ref === entry.ref && x.type === entry.type)) return arr;
+    arr.unshift(entry);
+    return arr;
+  });
 };
+
+/* Công nợ CHUẨN của 1 KH (nguồn DUY NHẤT) = tổng tiền đơn "Công nợ" (không draft/cancelled) −
+   tổng phiếu thu (ledger payment). Dùng cho Báo cáo/Dashboard (không cần nạp customers.js).
+   Khớp đúng rebuildCustStats trong customers.js. */
+window.custDebt = function (custId) {
+  if (!custId || !window.STORE) return 0;
+  const orders = window.STORE.get('orders', []) || [];
+  let charge = 0;
+  orders.forEach(o => {
+    if (o.status === 'draft' || o.status === 'cancelled') return;
+    if ((o.cust || o.custId) !== custId) return;
+    if (/nợ|cong no|credit/i.test(o.payBy || o.pay_by || '')) charge += (+o.freight || 0);
+  });
+  let paid = 0;
+  (window.getDebtLedger ? window.getDebtLedger(custId) : []).forEach(e => { if (e.type === 'payment') paid += (+e.amount || 0); });
+  return Math.max(0, charge - paid);
+};
+/* Số ngày quá hạn thực của KH (0 nếu chưa quá hạn) — wrapper gọn của debtOverdueInfo cho báo cáo. */
+window.debtOverdueDays = function (custId) { const i = window.debtOverdueInfo ? window.debtOverdueInfo(custId) : null; return i ? i.days : 0; };
+window.custDebtOverdue = function (custId) { const i = window.debtOverdueInfo ? window.debtOverdueInfo(custId) : null; return i ? i.amount : 0; };
 
 /* Nhóm giá GÁN cho 1 KH — nguồn chuẩn = KV 'custPriceTiers' (sync đa máy),
    fallback field priceTier trên bản ghi KH (cache cũ/local). */

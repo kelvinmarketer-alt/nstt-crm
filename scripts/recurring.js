@@ -51,15 +51,24 @@
 
   /* Generator: sinh đơn nếu nextRun ≤ TODAY */
   function runGenerator() {
+    if (!window.STORE.isPreloaded('recurring_orders') || !window.STORE.isPreloaded('orders')) return;
     const ros = getRO();
     const orders = window.STORE.get('orders', window.ORDERS || []) || [];
+    const TODAY_VN = window.todayVN();
     let created = 0, autoAssigned = 0;
     ros.forEach(ro => {
       if (!ro.active) return;
       const next = parseVi(ro.nextRun);
       if (!next || next > TODAY) return;
+      /* Idempotent: đã sinh cho mẫu này hôm nay rồi thì bỏ qua */
+      if (ro.generatedFor === TODAY_VN) return;
+      /* Idempotent lớp 2: orders đã có đơn recurring cùng KH + hôm nay */
+      if (orders.some(o => o.source === 'recurring' && o.custId === ro.custId && (o.date || '').startsWith(TODAY_VN))) {
+        ro.generatedFor = TODAY_VN;
+        return;
+      }
       /* Tạo đơn */
-      const code = 'NSTT-' + String(orders.length + 200 + created).padStart(6,'0');
+      const code = window.STORE.nextOrderCode();
       const items = ro.items.map(it => ({
         id: it.productId, name: it.name, qty: it.qty,
         price: window.priceOn ? window.priceOn(it.productId, window.todayISO()) : 15000,
@@ -89,6 +98,9 @@
         custName: ro.custName,
         custPhone: c?.phone || '', drop: c?.address || '',
         date: fmtVi(TODAY), status: 'confirmed',
+        deliverDate: TODAY_VN,
+        whStatus: 'new',
+        shipTime: ro.deliverAt || '',
         items, freight, cod: freight,
         staff: ro.staffOwner,
         driver, driverName,
@@ -98,6 +110,7 @@
       });
       ro.lastRun = fmtVi(TODAY);
       ro.nextRun = fmtVi(nextRunFrom(TODAY, ro.daysOfWeek));
+      ro.generatedFor = TODAY_VN;
       created++;
     });
     if (created) {
@@ -130,7 +143,7 @@
     const q = (document.getElementById('roQ').value || '').toLowerCase();
     const st = document.getElementById('roSt').value;
     let rows = getRO();
-    if (q) rows = rows.filter(r => r.custName.toLowerCase().includes(q));
+    if (q) rows = rows.filter(r => (r.custName||'').toLowerCase().includes(q));
     if (st === 'active') rows = rows.filter(r => r.active);
     if (st === 'paused') rows = rows.filter(r => !r.active);
     const host = document.getElementById('roList');
@@ -497,7 +510,8 @@ CHỈ TRẢ JSON.`,
   ['roQ','roSt'].forEach(id => document.getElementById(id).oninput = render);
   window.STORE.subscribe('recurring_orders', render);
   render();
-  /* Auto-run generator 1 lần khi load page */
+  /* Auto-run generator khi dữ liệu đã preload xong (chống chạy trên data rỗng) */
+  window.STORE.subscribe('__preloaded__', k => { if (k === 'orders' || k === 'recurring_orders') runGenerator(); });
   setTimeout(runGenerator, 800);
 
   /* === Pre-fill từ Order form: nếu có sessionStorage._pendingRO → mở modal === */

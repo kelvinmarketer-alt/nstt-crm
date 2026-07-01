@@ -32,7 +32,7 @@
   function getCust(o) {
     if (!o) return {};
     const list = window.STORE.get('customers', window.CUSTOMERS || []) || [];
-    return list.find(c => c.id === o.custId || c.code === o.custId) || { name: o.custName, phone: o.custPhone, address: o.drop };
+    return list.find(c => c.id === (o.cust||o.custId) || c.code === (o.cust||o.custId)) || { name: o.custName, phone: o.custPhone, address: o.drop };
   }
   function getCompany() {
     return window.STORE.get('company', {

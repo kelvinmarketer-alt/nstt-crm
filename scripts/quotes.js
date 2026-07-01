@@ -30,27 +30,27 @@
     const q = (document.getElementById('qtQ').value || '').toLowerCase();
     const st = document.getElementById('qtSt').value;
     let rows = getQ().slice().reverse();
-    if (q) rows = rows.filter(x => (x.id+' '+x.custName).toLowerCase().includes(q));
+    if (q) rows = rows.filter(x => ((x.id||'')+' '+(x.custName||'')).toLowerCase().includes(q));
     if (st) rows = rows.filter(x => x.status === st);
     const tb = document.getElementById('qtBody');
     if (!rows.length) { tb.innerHTML = `<tr><td colspan="8" style="padding:36px;text-align:center;color:var(--muted)">Không có báo giá.</td></tr>`; return; }
-    tb.innerHTML = rows.map(q => `<tr>
-      <td data-field="id"><b style="font-family:monospace">${q.id}</b></td>
-      <td data-field="cust">${q.custName}</td>
-      <td data-field="date">${q.date}</td>
-      <td data-field="valid">${q.validUntil}</td>
-      <td class="num" data-field="total"><b>${window.fmt(q.total)}</b></td>
-      <td data-field="staff"><span class="staff-pill">${q.staffOwner||'—'}</span></td>
+    tb.innerHTML = rows.map(qq => `<tr>
+      <td data-field="id"><b style="font-family:monospace">${qq.id}</b></td>
+      <td data-field="cust">${qq.custName}</td>
+      <td data-field="date">${qq.date}</td>
+      <td data-field="valid">${qq.validUntil}</td>
+      <td class="num" data-field="total"><b>${window.fmt(qq.total)}</b></td>
+      <td data-field="staff"><span class="staff-pill">${qq.staffOwner||'—'}</span></td>
       <td data-field="status">
-        <select onchange="window.qtChangeStatus('${q.id}', this.value)"
-          style="appearance:none;-webkit-appearance:none;border:1px solid ${ST_COLOR[q.status]};background:${ST_BG[q.status]};color:${ST_COLOR[q.status]};font-weight:700;font-size:11px;padding:3px 22px 3px 8px;border-radius:99px;cursor:pointer;background-image:url(&quot;data:image/svg+xml;charset=UTF-8,%3csvg xmlns='http://www.w3.org/2000/svg' width='10' height='10' viewBox='0 0 24 24' fill='none' stroke='${encodeURIComponent(ST_COLOR[q.status])}' stroke-width='3'%3e%3cpolyline points='6 9 12 15 18 9'/%3e%3c/svg%3e&quot;);background-repeat:no-repeat;background-position:right 6px center">
-          ${Object.keys(ST_LAB).map(s => `<option value="${s}" ${s===q.status?'selected':''}>${ST_LAB[s]}</option>`).join('')}
+        <select onchange="window.qtChangeStatus('${qq.id}', this.value)"
+          style="appearance:none;-webkit-appearance:none;border:1px solid ${ST_COLOR[qq.status]};background:${ST_BG[qq.status]};color:${ST_COLOR[qq.status]};font-weight:700;font-size:11px;padding:3px 22px 3px 8px;border-radius:99px;cursor:pointer;background-image:url(&quot;data:image/svg+xml;charset=UTF-8,%3csvg xmlns='http://www.w3.org/2000/svg' width='10' height='10' viewBox='0 0 24 24' fill='none' stroke='${encodeURIComponent(ST_COLOR[qq.status])}' stroke-width='3'%3e%3cpolyline points='6 9 12 15 18 9'/%3e%3c/svg%3e&quot;);background-repeat:no-repeat;background-position:right 6px center">
+          ${Object.keys(ST_LAB).map(s => `<option value="${s}" ${s===qq.status?'selected':''}>${ST_LAB[s]}</option>`).join('')}
         </select>
-        ${q.approvedBy ? `<div style="font-size:10px;color:var(--muted);margin-top:3px">👤 ${q.approvedBy}${q.approvedAt ? ' · ' + q.approvedAt.split(' ')[1] : ''}</div>` : ''}
+        ${qq.approvedBy ? `<div style="font-size:10px;color:var(--muted);margin-top:3px">👤 ${qq.approvedBy}${qq.approvedAt ? ' · ' + qq.approvedAt.split(' ')[1] : ''}</div>` : ''}
       </td>
       <td data-field="actions">
-        <button class="btn btn-ghost btn-sm" onclick="window.openQtDrawer('${q.id}')" title="Xem chi tiết">👁 <span class="qt-btn-lbl">Chi tiết</span></button>
-        <button class="btn btn-ghost btn-sm" onclick="window.qtPrint('${q.id}')" title="In PDF báo giá">🖨 <span class="qt-btn-lbl">In PDF</span></button>
+        <button class="btn btn-ghost btn-sm" onclick="window.openQtDrawer('${qq.id}')" title="Xem chi tiết">👁 <span class="qt-btn-lbl">Chi tiết</span></button>
+        <button class="btn btn-ghost btn-sm" onclick="window.qtPrint('${qq.id}')" title="In PDF báo giá">🖨 <span class="qt-btn-lbl">In PDF</span></button>
       </td>
     </tr>`).join('');
   }
@@ -68,12 +68,12 @@
         render(); return;
       }
       const orders = window.STORE.get('orders', []) || [];
-      const code = 'NSTT-' + String(orders.length + 400).padStart(6,'0');
+      const code = window.STORE.nextOrderCode();
       const c = getCusts().find(x => x.id === q.custId);
       orders.push({
         code, custId: q.custId, cust: q.custId, custName: q.custName,
         custPhone: c?.phone || '', drop: c?.address || '',
-        date: '18/05/2026', status: 'confirmed',
+        date: window.todayVN(), deliverDate: window.todayVN(), status: 'confirmed', whStatus: 'new',
         items: q.items.map(it => ({ name: it.name, qty: it.qty, price: it.price, total: it.total })),
         freight: q.total, cod: q.total, staff: window.CURRENT_USER?.name || q.staffOwner,
         source: 'quote', note: 'Từ báo giá ' + q.id,
@@ -689,7 +689,7 @@
     const obj = {
       id: document.getElementById('qf_id').value,
       custId: custId, custName: c ? c.name : '',
-      date: '18/05/2026',
+      date: window.todayVN(),
       validUntil: m ? `${m[3]}/${m[2]}/${m[1]}` : '25/05/2026',
       status: 'draft', total: items.reduce((s,i) => s+i.total, 0),
       items, staffOwner: window.CURRENT_USER?.name || '',
@@ -706,7 +706,7 @@
   /* Auto expire */
   setTimeout(() => {
     const list = getQ();
-    const today = new Date(2026, 4, 18);
+    const today = new Date();
     let changed = false;
     list.forEach(q => {
       if (q.status === 'sent') {

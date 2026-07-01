@@ -114,12 +114,6 @@
     const total = filtered.reduce((s,o)=>s+(o.freight||0),0);
     const aov = filtered.length ? total/filtered.length : 0;
     const custIds = new Set(filtered.map(o => o.cust)); const custCount = custIds.size;
-    const routes = {};
-    filtered.forEach(o => {
-      const r = (o.pickup||'').split(',')[0] + ' → ' + (o.drop||'').split(',')[0];
-      routes[r] = (routes[r]||0) + 1;
-    });
-    const topRoutes = Object.entries(routes).sort((a,b)=>b[1]-a[1]).slice(0,5);
 
     /* Update KPI strip Doanh thu */
     const kpiEl = document.querySelector('#paneRevenue .kpis');
@@ -134,18 +128,6 @@
       if (filters.metrics.includes('cust'))
         metricCards.push(`<div class="kpi k-5"><div class="kpi-label">Số KH (lọc)</div><div class="kpi-value">${custCount}</div><div class="kpi-trend">khác nhau</div><div class="kpi-icon">👥</div></div>`);
       kpiEl.innerHTML = metricCards.join('') || '<div style="padding:20px;color:var(--muted)">Chọn ít nhất 1 chỉ số trong filter</div>';
-    }
-
-    /* Update top routes nếu được chọn */
-    if (filters.metrics.includes('route')) {
-      const routesTable = document.querySelector('#paneRoutes table tbody');
-      if (routesTable && topRoutes.length) {
-        routesTable.innerHTML = topRoutes.map(([r, count], i) => {
-          const ordersOnRoute = filtered.filter(o => (o.pickup||'').split(',')[0] + ' → ' + (o.drop||'').split(',')[0] === r);
-          const rev = ordersOnRoute.reduce((s,o)=>s+(o.freight||0),0);
-          return `<tr><td><b>${r}</b></td><td class="num">${count}</td><td class="num">${window.fmtShort(rev)} ₫</td><td class="num">${window.fmtShort(rev*0.65)} ₫</td><td class="num" style="color:var(--ok)"><b>65%</b></td></tr>`;
-        }).join('');
-      }
     }
   }
 
@@ -334,8 +316,8 @@
     const todayOrders = orders.filter(o => (o.date || '').startsWith(DAILY_VI) && o.status !== 'cancelled');
     const revenue = todayOrders.reduce((s, o) => s + (o.freight || 0), 0);
     const cod = todayOrders.reduce((s, o) => s + (o.cod || 0), 0);
-    const debt = customers.reduce((s, c) => s + (c.debt || 0), 0);
-    const overdue = customers.reduce((s, c) => s + (c.debtOverdue || 0), 0);
+    const debt = customers.reduce((s, c) => s + (window.custDebt ? window.custDebt(c.id) : (c.debt || 0)), 0);
+    const overdue = customers.reduce((s, c) => s + (window.custDebtOverdue ? window.custDebtOverdue(c.id) : (c.debtOverdue || 0)), 0);
     const todayAds = ads.filter(a => a.date === DAILY_ISO);
     const adSpend = todayAds.reduce((s, a) => s + (a.spend || 0), 0);
     return { todayOrders, revenue, cod, debt, overdue, todayAds, adSpend };
@@ -432,14 +414,14 @@
 
   /* === DEBT REPORT === */
   function overdueDays(c) {
-    if (c.id === 'KH003') return 35;
-    if (c.id === 'KH008') return 65;
-    return 0;
+    return (window.debtOverdueDays ? window.debtOverdueDays(c.id) : 0);
   }
 
   function renderDebtReport() {
     const customers = window.STORE.get('customers', window.CUSTOMERS || []);
-    const debtors = customers.filter(c => c.debt > 0).map(c => ({...c, overdue: overdueDays(c)}));
+    const debtors = customers
+      .map(c => ({...c, debt: (window.custDebt ? window.custDebt(c.id) : (c.debt || 0)), overdue: overdueDays(c)}))
+      .filter(c => c.debt > 0);
     const cashEntries = window.STORE.get('cashEntries', []);
     const recentReceipts = cashEntries.filter(e =>
       e.type === 'in' && (e.desc||'').toLowerCase().includes('công nợ')
@@ -450,8 +432,8 @@
     const buckets = { '0-30':[], '31-60':[], '61-90':[], '91+':[], 'baddebt':[] };
     debtors.forEach(c => {
       if (c.overdue === 0) buckets['0-30'].push(c);
-      else if (c.overdue <= 60) buckets['31-60'].push(c);
-      else if (c.overdue <= 90) buckets['61-90'].push(c);
+      else if (c.overdue <= 7) buckets['31-60'].push(c);
+      else if (c.overdue <= 15) buckets['61-90'].push(c);
       else buckets['91+'].push(c);
     });
     const totalDebt = debtors.reduce((s,c) => s+c.debt, 0);
@@ -474,9 +456,9 @@
     /* Aging cards */
     const agingData = [
       { key:'0-30', label:'Trong hạn', color:'var(--ok)' },
-      { key:'31-60', label:'31-60 ngày', color:'#3B82F6' },
-      { key:'61-90', label:'61-90 ngày', color:'var(--warn)' },
-      { key:'91+', label:'> 90 ngày', color:'#EA580C' },
+      { key:'31-60', label:'1-7 ngày', color:'#3B82F6' },
+      { key:'61-90', label:'8-15 ngày', color:'var(--warn)' },
+      { key:'91+', label:'> 15 ngày', color:'#EA580C' },
       { key:'baddebt', label:'Khó đòi', color:'var(--danger)' },
     ];
     document.getElementById('agingChart').innerHTML = agingData.map(b => {
@@ -787,25 +769,31 @@
       <div class="pf-row minus"><div class="lab"><div class="ic" style="background:#FEE2E2">👨‍💼</div>− Chi phí lương kỳ</div><div class="val">−${window.fmt(d.payroll)} ₫</div></div>
       <div class="pf-row total ${d.netProfit >= 0 ? 'plus' : 'minus'}"><div class="lab"><div class="ic" style="background:${d.netProfit >= 0 ? '#BBF7D0' : '#FCA5A5'}">💎</div><b>LÃI RÒNG</b></div><div class="val"><b>${window.fmt(d.netProfit)} ₫</b> · ${d.netMargin.toFixed(1)}%</div></div>`;
 
-    /* 12-month gross profit chart */
+    /* 12-month gross profit chart — dựng Map + bucket theo tháng 1 lần, tra O(1) */
+    const _allOrders = window.STORE.get('orders', window.ORDERS || []) || [];
+    const _allProducts = window.STORE.get('products', window.PRODUCTS || []) || [];
+    const productById = new Map(_allProducts.map(p => [p.id, p]));
+    const ordersByMonth = new Map();   /* "yyyy-mm" → [orders] */
+    _allOrders.forEach(o => {
+      if (o.status === 'cancelled') return;
+      const od = parseViDate(o.date);
+      if (!od) return;
+      const key = od.getFullYear() + '-' + String(od.getMonth() + 1).padStart(2, '0');
+      let arr = ordersByMonth.get(key);
+      if (!arr) { arr = []; ordersByMonth.set(key, arr); }
+      arr.push(o);
+    });
     const months = [];
     for (let i = 11; i >= 0; i--) {
       const m = new Date(TODAY.getFullYear(), TODAY.getMonth() - i, 1);
       const yy = m.getFullYear(), mm = m.getMonth() + 1;
-      const r = { from: m, to: new Date(yy, mm, 0, 23, 59, 59), label: '' };
-      const saved = profitPeriod; profitPeriod = '__tmp';
-      /* Tạm reuse computeProfit bằng cách patch periodRange — gọn hơn: compute riêng */
-      profitPeriod = saved;
-      const orders = (window.STORE.get('orders', window.ORDERS || []) || []).filter(o => {
-        if (o.status === 'cancelled') return false;
-        const d = parseViDate(o.date); return d && d >= r.from && d <= r.to;
-      });
-      const products = window.STORE.get('products', window.PRODUCTS || []) || [];
+      const key = yy + '-' + String(mm).padStart(2, '0');
+      const orders = ordersByMonth.get(key) || [];
       let rev = 0, c = 0;
       orders.forEach(o => {
         rev += (o.freight || 0);
         (o.items || []).forEach(it => {
-          const p = products.find(x => x.id === it.id);
+          const p = productById.get(it.id);
           const buy = p ? (buyPriceAt(p, o.date) || it.price * 0.8) : it.price * 0.8;
           c += (buy || 0) * (it.qty || 0);
         });
@@ -870,12 +858,20 @@
     const ads       = window.STORE.get('adspend', window.ADSPEND || []) || [];
     const timesheet = window.STORE.get('timesheet', window.TIMESHEET || []) || [];
 
+    /* Tháng hiện tại (động) + tháng trước cho cột so sánh */
+    const _ovToday = window.todayDate ? window.todayDate() : new Date();
+    const CUR_M = _ovToday.getMonth() + 1, CUR_Y = _ovToday.getFullYear();
+    const _prev = new Date(CUR_Y, CUR_M - 2, 1);
+    const PREV_M = _prev.getMonth() + 1, PREV_Y = _prev.getFullYear();
+    const CUR_ISO = CUR_Y + '-' + String(CUR_M).padStart(2, '0');
+    const DAYS_IN_CUR = new Date(CUR_Y, CUR_M, 0).getDate();
+
     const isInMonth = (o, mo, y) => {
       const m = (o.date || '').match(/(\d+)\/(\d+)\/(\d+)/);
       return m && +m[2] === mo && +m[3] === y;
     };
-    const t5 = orders.filter(o => o.status !== 'cancelled' && isInMonth(o, 5, 2026));
-    const t4 = orders.filter(o => o.status !== 'cancelled' && isInMonth(o, 4, 2026));
+    const t5 = orders.filter(o => o.status !== 'cancelled' && isInMonth(o, CUR_M, CUR_Y));
+    const t4 = orders.filter(o => o.status !== 'cancelled' && isInMonth(o, PREV_M, PREV_Y));
     const rev5 = t5.reduce((s, o) => s + (o.freight || 0), 0);
     const rev4 = t4.reduce((s, o) => s + (o.freight || 0), 0);
     const cogs5 = (() => {
@@ -888,7 +884,7 @@
       return c;
     })();
     const gross5 = rev5 - cogs5;
-    const adsT5 = ads.filter(a => (a.date || '').startsWith('2026-05')).reduce((s, a) => s + (a.spend || 0), 0);
+    const adsT5 = ads.filter(a => (a.date || '').startsWith(CUR_ISO)).reduce((s, a) => s + (a.spend || 0), 0);
     const activeStaff = staff.filter(s => s.status === 'active');
     const totalSalary = activeStaff.reduce((s, x) => s + (x.salary || 0), 0);
     const net5 = gross5 - adsT5 - totalSalary;
@@ -897,7 +893,7 @@
     const newCust = customers.filter(c => c.group === 'Mới').length;
     const activeCust = new Set(t5.map(o => o.cust)).size;
     document.getElementById('ovSales').innerHTML = `
-      <h3 style="margin:0 0 10px;display:flex;align-items:center;gap:8px;color:#15803D">💰 SALES — Bán hàng tháng 5</h3>
+      <h3 style="margin:0 0 10px;display:flex;align-items:center;gap:8px;color:#15803D">💰 SALES — Bán hàng tháng ${CUR_M}</h3>
       <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;font-size:12.5px">
         <div><div style="color:var(--muted);font-size:11px">Doanh thu</div><div style="font-size:18px;font-weight:800;color:#15803D">${window.fmtShort(rev5)}</div></div>
         <div><div style="color:var(--muted);font-size:11px">Số đơn</div><div style="font-size:18px;font-weight:800;color:var(--navy)">${t5.length}</div></div>
@@ -930,10 +926,10 @@
     `;
 
     /* === 3. FINANCE === */
-    const totalDebt = customers.reduce((s, c) => s + (c.debt || 0), 0);
-    const overdueDebt = customers.reduce((s, c) => s + (c.debtOverdue || 0), 0);
+    const totalDebt = customers.reduce((s, c) => s + (window.custDebt ? window.custDebt(c.id) : (c.debt || 0)), 0);
+    const overdueDebt = customers.reduce((s, c) => s + (window.custDebtOverdue ? window.custDebtOverdue(c.id) : (c.debtOverdue || 0)), 0);
     document.getElementById('ovFinance').innerHTML = `
-      <h3 style="margin:0 0 10px;display:flex;align-items:center;gap:8px;color:#B91C1C">💎 TÀI CHÍNH — Lãi lỗ + Công nợ T5</h3>
+      <h3 style="margin:0 0 10px;display:flex;align-items:center;gap:8px;color:#B91C1C">💎 TÀI CHÍNH — Lãi lỗ + Công nợ T${CUR_M}</h3>
       <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;font-size:12.5px">
         <div><div style="color:var(--muted);font-size:11px">Lãi gộp</div><div style="font-size:18px;font-weight:800;color:var(--ok)">${window.fmtShort(gross5)}</div><div style="font-size:10.5px;color:var(--muted)">Biên ${rev5?(gross5/rev5*100).toFixed(1):0}%</div></div>
         <div><div style="color:var(--muted);font-size:11px">Lãi ròng</div><div style="font-size:18px;font-weight:800;color:${net5>=0?'var(--ok)':'var(--danger)'}">${window.fmtShort(net5)}</div><div style="font-size:10.5px;color:var(--muted)">Biên ${rev5?(net5/rev5*100).toFixed(1):0}%</div></div>
@@ -969,14 +965,14 @@
     `;
 
     /* === 5. MARKETING === */
-    const adsSale = ads.filter(a => (a.date || '').startsWith('2026-05') && a.objective === 'ban-hang');
-    const adsRecruit = ads.filter(a => (a.date || '').startsWith('2026-05') && a.objective === 'tuyen-dung');
+    const adsSale = ads.filter(a => (a.date || '').startsWith(CUR_ISO) && a.objective === 'ban-hang');
+    const adsRecruit = ads.filter(a => (a.date || '').startsWith(CUR_ISO) && a.objective === 'tuyen-dung');
     const adSpendSale = adsSale.reduce((s, a) => s + (a.spend || 0), 0);
     const adSpendRec = adsRecruit.reduce((s, a) => s + (a.spend || 0), 0);
     const adCusts = adsSale.reduce((s, a) => s + (a.custs || 0), 0);
     const adCpc = adCusts ? Math.round(adSpendSale / adCusts) : 0;
     document.getElementById('ovMarketing').innerHTML = `
-      <h3 style="margin:0 0 10px;display:flex;align-items:center;gap:8px;color:#6D28D9">📣 MARKETING — Chi phí quảng cáo T5</h3>
+      <h3 style="margin:0 0 10px;display:flex;align-items:center;gap:8px;color:#6D28D9">📣 MARKETING — Chi phí quảng cáo T${CUR_M}</h3>
       <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;font-size:12.5px">
         <div><div style="color:var(--muted);font-size:11px">Bán hàng</div><div style="font-size:16px;font-weight:800;color:var(--ok)">${window.fmtShort(adSpendSale)}</div><div style="font-size:10.5px;color:var(--muted)">${adsSale.length} chiến dịch</div></div>
         <div><div style="color:var(--muted);font-size:11px">Tuyển dụng</div><div style="font-size:16px;font-weight:800;color:#7C3AED">${window.fmtShort(adSpendRec)}</div><div style="font-size:10.5px;color:var(--muted)">${adsRecruit.length} chiến dịch</div></div>
@@ -1004,12 +1000,13 @@
 
     /* === Heatmap đơn theo ngày === */
     const byDay = {};
-    t5.forEach(o => { const d = (o.date || '').match(/(\d+)\/05\/2026/); if (d) byDay[+d[1]] = (byDay[+d[1]] || 0) + 1; });
+    const _dayRe = new RegExp('(\\d+)\\/' + String(CUR_M).padStart(2, '0') + '\\/' + CUR_Y);
+    t5.forEach(o => { const d = (o.date || '').match(_dayRe); if (d) byDay[+d[1]] = (byDay[+d[1]] || 0) + 1; });
     const maxDay = Math.max(1, ...Object.values(byDay));
     const heatmap = [];
-    for (let d = 1; d <= 31; d++) {
+    for (let d = 1; d <= DAYS_IN_CUR; d++) {
       const cnt = byDay[d] || 0;
-      const dow = new Date(2026, 4, d).getDay();
+      const dow = new Date(CUR_Y, CUR_M - 1, d).getDay();
       const intensity = cnt === 0 ? 0 : Math.ceil(cnt / maxDay * 4);
       const colors = ['#FAFAFB', '#F0FDF4', '#BBF7D0', '#86EFAC', '#22C55E', '#15803D'];
       const bg = dow === 0 ? '#FEE2E2' : dow === 6 ? '#FEF3C7' : colors[intensity];
@@ -1072,6 +1069,35 @@
   renderChart();
   recalculate();
   gateProfitTab();
+
+  /* Re-render tab đang mở (hoặc Overview mặc định) khi data đổi/preload xong */
+  function rerenderActiveTabOrOverview() {
+    const paneRenderers = {
+      Overview: renderOverview, Debt: renderDebtReport, Sales: renderSalesReport,
+      Daily: renderDailyReport, Profit: renderProfitReport,
+      Forecast: renderForecast, Variance: renderVariance,
+    };
+    let ran = false;
+    Object.keys(paneRenderers).forEach(p => {
+      const el = document.getElementById('pane' + p);
+      if (el && el.style.display !== 'none') {
+        try { paneRenderers[p](); } catch (e) { console.warn('rerender ' + p, e); }
+        ran = true;
+      }
+    });
+    if (!ran) { try { renderOverview(); } catch (e) { console.warn('renderOverview', e); } }
+  }
+
+  /* FIX #3: data preload/đổi → tính lại + vẽ lại tab hiện hành */
+  window.STORE.subscribe('__preloaded__', k => {
+    if (['orders','customers','products','adspend','staff','timesheet'].includes(k)) {
+      if (typeof recalculate === 'function') recalculate();
+      renderChart();
+      rerenderActiveTabOrOverview();
+    }
+  });
+  window.STORE.subscribe('orders', () => { recalculate(); renderChart(); rerenderActiveTabOrOverview(); });
+  window.STORE.subscribe('customers', () => { recalculate(); rerenderActiveTabOrOverview(); });
   /* Render Overview ngay vì là tab mặc định */
   setTimeout(() => { try { renderOverview(); } catch (e) { console.warn('renderOverview', e); } }, 50);
 
