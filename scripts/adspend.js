@@ -61,7 +61,7 @@
       `<div class="kpi k-1"><div class="kpi-label">Tổng chi tiêu (${month.slice(5)}/${month.slice(0,4)})</div><div class="kpi-value">${window.fmtShort(sum.spend)}</div><div class="kpi-trend">${list.length} ngày chạy</div><div class="kpi-icon">💸</div></div>`,
       /* Thẻ Tổng Inbox chỉ hiện khi mục đích còn theo dõi Inbox (vd Tuyển dụng) — Bán hàng đã bỏ */
       obj.steps.some(s => s.key === 'units') ? `<div class="kpi k-2"><div class="kpi-label">Tổng Inbox</div><div class="kpi-value">${window.fmt(sum.units)}</div><div class="kpi-trend">CP ${window.fmt(cp(sum.spend, sum.units))}/inbox</div><div class="kpi-icon">💬</div></div>` : '',
-      `<div class="kpi k-4"><div class="kpi-label">Tổng SĐT</div><div class="kpi-value">${window.fmt(sum.leads)}</div><div class="kpi-trend">CP ${window.fmt(cp(sum.spend, sum.leads))}/SĐT</div><div class="kpi-icon">📞</div></div>`,
+      `<div class="kpi k-4"><div class="kpi-label">Tổng ${obj.steps[0].label}</div><div class="kpi-value">${window.fmt(sum.leads)}</div><div class="kpi-trend">CP ${window.fmt(cp(sum.spend, sum.leads))}/${obj.steps[0].label}</div><div class="kpi-icon">📞</div></div>`,
       `<div class="kpi k-3"><div class="kpi-label">${lastStep.label}</div><div class="kpi-value">${window.fmt(lastCount)}</div><div class="kpi-trend">${lastStep.cp} ${window.fmt(cp(sum.spend, lastCount))}</div><div class="kpi-icon">${objective === 'tuyen-dung' ? '🧑‍💼' : '🛒'}</div></div>`,
     ].filter(Boolean);
     if (obj.hasRevenue) {
@@ -202,13 +202,14 @@
       const col = re => data.headers.findIndex(h => !isCost(h) && re.test(norm(h)));
       const cD = col(/ngay|date/), cS = col(/chi tieu|chi phi|so tien|amount|spend/);
       const cU = col(/inbox|tin nhan|mess|tro chuyen|messaging/);
-      const cL = col(/sdt|dien thoai|phone/);
+      const cL = col(/sdt|dien thoai|phone|lead/);        /* "Lead" = SĐT (báo cáo tuyển dụng dùng "Lead") */
       const cK = col(/slkh|khach|so don|don hang/);
+      const cC = col(/\bcv\b|ung vien|candidate|ung tuyen|ho so/);   /* CV / Ứng viên (trước đây bị bỏ = 0) */
       const cR = col(/doanh thu|revenue/);
       data = data.rows.map(r => ({
         date: cD >= 0 ? r[cD] : '', spend: cS >= 0 ? r[cS] : 0,
         units: cU >= 0 ? r[cU] : 0, leads: cL >= 0 ? r[cL] : 0,
-        custs: cK >= 0 ? r[cK] : 0, candidates: 0, revenue: cR >= 0 ? r[cR] : 0,
+        custs: cK >= 0 ? r[cK] : 0, candidates: cC >= 0 ? r[cC] : 0, revenue: cR >= 0 ? r[cR] : 0,
       }));
     }
     const list = Array.isArray(data) ? data : (data.items || data.data || data.rows || []);

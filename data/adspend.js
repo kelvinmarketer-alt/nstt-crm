@@ -24,10 +24,10 @@ window.AD_OBJECTIVES = [
       { key:'custs', label:'Khách mua', cp:'CP/Khách' },
     ] },
   { id:'tuyen-dung', label:'Tuyển dụng', icon:'🧑‍💼', hasRevenue:false,
-    /* Bỏ Inbox + CP/Inbox theo yêu cầu — chỉ theo dõi SĐT → Ứng viên */
+    /* Cột đặt ĐÚNG như báo cáo tuyển dụng của user: Lead → CV (bỏ Inbox) */
     steps:[
-      { key:'leads',      label:'SĐT',   cp:'CP/SĐT' },
-      { key:'candidates', label:'Ứng viên', cp:'CP/Ứng viên' },
+      { key:'leads',      label:'Lead', cp:'$/Lead' },
+      { key:'candidates', label:'CV',   cp:'$/CV' },
     ] },
 ];
 
