@@ -173,13 +173,26 @@
   window.aiFillAds = function () {
     if (!window.AI) { window.toast('Chưa tải module AI', 'warn'); return; }
     const obj = objMeta(objective);
-    const stepDesc = obj.steps.map(s => `"${s.key}": ${s.label} (số)`).join(', ');
-    const revDesc = obj.hasRevenue ? ', "revenue": doanh thu VND (số)' : '';
+    /* Từ đồng nghĩa tiêu đề cột cho từng field → AI gán ĐÚNG cột theo TÊN, không theo vị trí */
+    const SYN = {
+      spend: 'Chi tiêu / Chi phí / Số tiền đã chi tiêu / Amount spent',
+      units: 'Inbox / Tin nhắn / Mess / Lượt bắt đầu cuộc trò chuyện / Messaging',
+      leads: 'SĐT / SDT / Số điện thoại / Phone',
+      custs: 'SLKH / Khách mua / Số khách / Số đơn / Đơn hàng',
+      candidates: 'Ứng viên / Hồ sơ / CV / Số ứng viên',
+      revenue: 'Doanh thu / DT / Revenue',
+    };
+    const fieldLines = [`"spend": lấy từ cột "${SYN.spend}"`]
+      .concat(obj.steps.map(s => `"${s.key}": lấy từ cột "${SYN[s.key] || s.label}" (nghĩa: ${s.label})`));
+    if (obj.hasRevenue) fieldLines.push(`"revenue": lấy từ cột "${SYN.revenue}"`);
     window.AI.openFillModal({
       task: 'adspend',
       title: '📷 Nhập chi phí Ads từ ảnh',
-      guideHtml: `Đính kèm <b>ảnh báo cáo quảng cáo</b> (Facebook Ads Manager, Google Ads, file Excel...). AI đọc theo <b>từng ngày</b> cho mục đích <b>${obj.label}</b> và tự điền (đổi tab mục đích + chọn kênh trước nếu cần).<br><b>Cấu trúc gợi ý:</b> Ngày · Chi tiêu · ${obj.steps.map(s => s.label).join(' · ')}${obj.hasRevenue ? ' · Doanh thu' : ''}.`,
-      prompt: `Đọc ảnh báo cáo chi phí quảng cáo (tiếng Việt). Mỗi DÒNG là 1 ngày. Trả JSON mảng: [{"date":"ngày dạng d/m hoặc dd/mm/yyyy","spend": chi tiêu VND dạng số, ${stepDesc}${revDesc}}]. Số bỏ dấu chấm và đơn vị. Thiếu thì để 0. CHỈ trả JSON, không giải thích.`,
+      guideHtml: `Đính kèm <b>ảnh báo cáo</b> (Facebook Ads Manager / bảng thống kê). AI đọc <b>từng ngày</b> cho mục đích <b>${obj.label}</b>, gán số vào <b>đúng cột theo tên tiêu đề</b>.<br><b>Cột nhận diện:</b> Ngày · Chi tiêu · ${obj.steps.map(s => s.label).join(' · ')}${obj.hasRevenue ? ' · Doanh thu' : ''}.`,
+      prompt: `Đọc bảng thống kê quảng cáo trong ảnh (tiếng Việt). Mỗi DÒNG = 1 ngày.
+⚠️ CỰC KỲ QUAN TRỌNG: gán số vào ĐÚNG field theo TÊN TIÊU ĐỀ CỘT, KHÔNG theo thứ tự/vị trí cột. Nếu ảnh KHÔNG có một cột nào đó → để field đó = 0. TUYỆT ĐỐI KHÔNG lấy số của cột này điền sang field khác (vd: cột SĐT không được nhảy vào field Inbox/units).
+Trả JSON mảng, mỗi phần tử 1 ngày: {"date":"ngày dạng d/m hoặc dd/mm/yyyy", ${fieldLines.join(', ')}}.
+Quy tắc số: bỏ dấu chấm phân cách nghìn + đơn vị (đ, ₫, $). Ô trống hoặc cột không tồn tại → 0. CHỈ trả JSON, không giải thích.`,
       onResult: applyAIAds,
     });
   };
