@@ -5,8 +5,25 @@
 
 /* Phiên bản app hiển thị (đối chiếu với CACHE_VERSION trong sw.js) — để user tự XÁC NHẬN
    đang chạy bản mới hay còn kẹt JS cũ (hiện ở góc sidebar + log console). */
-window.APP_VERSION = 'v320';
+window.APP_VERSION = 'v321';
 console.log('%c[NSTT] App ' + window.APP_VERSION, 'color:#339B21;font-weight:bold');
+
+/* Gom NGUỒN khách về 3 nhóm chuẩn: 'mkt' / 'sales' / 'sep-gioi-thieu'.
+   Map cả giá trị CŨ để không vỡ dữ liệu lịch sử:
+     facebook/zalo/web/seo/youtube/tiktok/hội chợ/google/social → mkt
+     sales / chủ động → sales
+     giới thiệu / sếp → sep-gioi-thieu
+     import-phiếu / khác / trống → other (KHÔNG tính là MKT).
+   Dùng cho dropdown Nguồn (Sửa KH) + tính Doanh thu ads theo nguồn MKT. */
+window.srcGroup = function (s) {
+  const x = String(s == null ? '' : s).toLowerCase().normalize('NFD')
+    .replace(/[̀-ͯ]/g, '').replace(/[-_]+/g, ' ').trim();
+  if (!x) return 'other';
+  if (/sale|chu dong/.test(x)) return 'sales';
+  if (/gioi thieu|sep|referral/.test(x)) return 'sep-gioi-thieu';
+  if (/mkt|market|facebook|fb|zalo|web|seo|youtube|tiktok|hoi cho|google|social|ads/.test(x)) return 'mkt';
+  return 'other';
+};
 
 /* ============ PWA setup =============
    Tự register service worker + inject manifest vào mọi page
@@ -1067,14 +1084,12 @@ window.MD_DEFAULTS = {
     { id:'hang-tuan',    label:'Hằng tuần' },
     { id:'thinh-thoang', label:'Thỉnh thoảng' },
   ],
+  /* Gom về 3 nguồn theo yêu cầu (MKT = mọi kênh social/digital: web/fb/zalo/youtube/hội chợ).
+     Giá trị cũ vẫn nhận diện đúng qua window.srcGroup() khi tính doanh thu + preselect form. */
   sources: [
-    { id:'gioi-thieu',  label:'Giới thiệu' },
-    { id:'web',         label:'Web / SEO' },
-    { id:'facebook',    label:'Facebook' },
-    { id:'zalo',        label:'Zalo' },
-    { id:'sales',       label:'Sales chủ động' },
-    { id:'hoi-cho',     label:'Hội chợ / triển lãm' },
-    { id:'youtube',     label:'YouTube / TikTok' },
+    { id:'mkt',            label:'MKT' },
+    { id:'sales',          label:'Sale Chủ Động' },
+    { id:'sep-gioi-thieu', label:'Sếp Giới Thiệu' },
   ],
   units: [
     { id:'kg',   label:'kg' },   { id:'g',    label:'g' },

@@ -772,6 +772,9 @@
   function openEditCustomer(id) {
     const c = customers.find(x => x.id === id);
     if (!c) return;
+    /* created (dd/mm/yyyy hoặc ISO) → yyyy-mm-dd cho <input type=date> */
+    const _toDI = (s) => { s = String(s || '').trim(); let m = s.match(/^(\d{4})-(\d{2})-(\d{2})/); if (m) return `${m[1]}-${m[2]}-${m[3]}`; m = s.match(/(\d{1,2})\/(\d{1,2})\/(\d{4})/); return m ? `${m[3]}-${m[2].padStart(2,'0')}-${m[1].padStart(2,'0')}` : ''; };
+    const _biz = c.type !== 'ca-nhan';
     window.openModal('✏️ Sửa khách hàng — ' + c.code, `
       <div class="form-row">
         <div><label>Loại KH</label>
@@ -804,9 +807,32 @@
           <select id="eCreditDays">${window.creditDaysOptions ? window.creditDaysOptions(window.custCreditDays ? window.custCreditDays(c.id) : '') : '<option value="7">7 ngày</option>'}</select></div>
       </div>
       <div class="form-row wide"><label>Địa chỉ</label><input id="eAddress" value="${c.address}"></div>
+      <div class="form-row">
+        <div><label>Nguồn khách (đến từ đâu) *</label>
+          <select id="eSource">${(window.srcGroup && window.srcGroup(c.source) === 'other' && c.source) ? `<option value="${String(c.source).replace(/"/g,'&quot;')}" selected>Giữ nguyên: ${c.source}</option>` : ''}${window.MD.options('sources', window.srcGroup ? window.srcGroup(c.source) : c.source)}</select></div>
+        <div><label>Tần suất đặt</label>
+          <select id="eFreq">${window.MD.options('orderFreq', c.orderFreq)}</select></div>
+      </div>
+      <div class="form-row">
+        <div><label>Tỉnh/TP</label>
+          <select id="eProvince"><option value="">— Chọn —</option>${(window.MD.get('provinces')||[]).map(p=>{const v=(typeof p==='string'?p:(p.label||p.id||''));return `<option value="${v}" ${c.province===v?'selected':''}>${v}</option>`;}).join('')}</select></div>
+        <div><label>Ngày tạo (ngày KH đến) ${window.helpTip?window.helpTip('Quyết định doanh thu MKT của khách này cộng vào NGÀY nào trong báo cáo Chi phí Ads.'):''}</label>
+          <input id="eCreated" type="date" value="${_toDI(c.created)}"></div>
+      </div>
+      ${_biz ? `
+      <div class="section-h" style="margin:10px 0 4px">🏢 Thông tin doanh nghiệp</div>
+      <div class="form-row">
+        <div><label>Tên công ty</label><input id="eCompany" value="${(c.company||'').replace(/"/g,'&quot;')}"></div>
+        <div><label>Mã số thuế</label><input id="eTax" value="${(c.tax||'').replace(/"/g,'&quot;')}"></div>
+      </div>
+      <div class="form-row">
+        <div><label>Người đại diện</label><input id="eRep" value="${(c.rep||'').replace(/"/g,'&quot;')}"></div>
+        <div><label>Hợp đồng</label><input id="eContract" value="${(c.contract||'').replace(/"/g,'&quot;')}"></div>
+      </div>` : ''}
     `, {
       footer: `<button class="btn btn-ghost" onclick="closeModal()">Hủy</button>
-               <button class="btn btn-navy" onclick="window.submitEditCustomer('${id}')">💾 Lưu thay đổi</button>`
+               <button class="btn btn-navy" onclick="window.submitEditCustomer('${id}')">💾 Lưu thay đổi</button>`,
+      width: '620px'
     });
   }
   window.submitEditCustomer = function(id) {
@@ -822,7 +848,18 @@
       fb: window.formVal('#eFb'),
       staffOwner: window.formVal('#eStaff'),
       address: window.formVal('#eAddress'),
+      source: window.formVal('#eSource'),
+      orderFreq: window.formVal('#eFreq'),
+      province: window.formVal('#eProvince'),
     };
+    /* Ngày tạo (yyyy-mm-dd → dd/mm/yyyy) — quyết định doanh thu MKT cộng vào ngày nào ở báo cáo Ads */
+    const cr = window.formVal('#eCreated');
+    if (cr) { const [y,m,d] = cr.split('-'); patch.created = `${d}/${m}/${y}`; }
+    /* Thông tin DN (chỉ khi có trên form = KH doanh nghiệp) */
+    const gv = (sel) => { const el = document.querySelector(sel); return el ? el.value.trim() : undefined; };
+    ['company:#eCompany','tax:#eTax','rep:#eRep','contract:#eContract'].forEach(pair => {
+      const [f, s] = pair.split(':'); const v = gv(s); if (v !== undefined) patch[f] = v;
+    });
     window.STORE.update('customers', id, patch);
     /* Nhóm giá KH → KV custPriceTiers (sync đa máy) */
     if (window.setCustPriceTier) window.setCustPriceTier(id, window.formVal('#ePriceTier'));

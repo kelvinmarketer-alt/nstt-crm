@@ -23,6 +23,31 @@
   const fmtD = iso => { const [y, m, d] = iso.split('-'); return `${d}/${m}`; };
   const cp = (spend, n) => n > 0 ? Math.round(spend / n) : 0;
 
+  /* === ATTRIBUTION (Bán hàng): Khách mua + Doanh thu KHÔNG do NV ads nhập —
+     tự tính từ Đơn hàng + Khách. Quy tắc: khách NGUỒN MKT tạo ngày D (và có phát sinh đơn)
+     → cộng số khách + tổng tiền tất cả đơn của khách đó vào NGÀY D. */
+  const _createdISO = (s) => {
+    s = String(s || '').trim();
+    let m = s.match(/^(\d{4})-(\d{2})-(\d{2})/); if (m) return `${m[1]}-${m[2]}-${m[3]}`;
+    m = s.match(/(\d{1,2})\/(\d{1,2})\/(\d{4})/);
+    return m ? `${m[3]}-${m[2].padStart(2, '0')}-${m[1].padStart(2, '0')}` : null;
+  };
+  function mktByDay() {
+    const custs = window.STORE.get('customers', window.CUSTOMERS || []);
+    const orders = window.STORE.get('orders', window.ORDERS || []);
+    const rev = {}, cnt = {};
+    orders.forEach(o => { const id = o.custId || o.cust; if (!id) return; rev[id] = (rev[id] || 0) + (+o.freight || 0); cnt[id] = (cnt[id] || 0) + 1; });
+    const revByDay = {}, custByDay = {};
+    custs.forEach(c => {
+      if (!window.srcGroup || window.srcGroup(c.source) !== 'mkt') return;   /* chỉ khách nguồn MKT */
+      const d = _createdISO(c.created); if (!d) return;
+      if ((cnt[c.id] || 0) <= 0) return;   /* "Khách mua" = khách có phát sinh đơn */
+      custByDay[d] = (custByDay[d] || 0) + 1;
+      revByDay[d] = (revByDay[d] || 0) + (rev[c.id] || 0);
+    });
+    return { revByDay, custByDay };
+  }
+
   function entries() {
     return all().filter(e => e.objective === objective
       && (channel === 'all' || e.channel === channel)
@@ -53,6 +78,13 @@
       a.custs += e.custs || 0; a.candidates += e.candidates || 0; a.revenue += e.revenue || 0;
       return a;
     }, { spend: 0, units: 0, leads: 0, custs: 0, candidates: 0, revenue: 0 });
+    /* Bán hàng: ghi đè Khách mua + Doanh thu bằng số TỰ TÍNH từ Đơn hàng (theo NGÀY đang hiện) */
+    const _mkt = obj.hasRevenue ? mktByDay() : null;
+    if (_mkt) {
+      let sc = 0, sr = 0; const seen = new Set();
+      list.forEach(e => { if (seen.has(e.date)) return; seen.add(e.date); sc += _mkt.custByDay[e.date] || 0; sr += _mkt.revByDay[e.date] || 0; });
+      sum.custs = sc; sum.revenue = sr;
+    }
     const lastStep = obj.steps[obj.steps.length - 1];
     const lastCount = sum[lastStep.key] || 0;
     const roas = sum.spend ? (sum.revenue / sum.spend) : 0;
@@ -70,9 +102,9 @@
       const customers = window.STORE.get('customers', window.CUSTOMERS || []);
       const [my, mm] = [parseInt(month.slice(0, 4), 10), parseInt(month.slice(5), 10)];
       const mktCusts = customers.filter(c => {
-        if (!c.source || /sales\s*chủ\s*động|sales-chu-dong/i.test(c.source)) return false;
-        const m = (c.created || '').match(/(\d{1,2})\/(\d{1,2})\/(\d{4})/);
-        return m && parseInt(m[2], 10) === mm && parseInt(m[3], 10) === my;
+        if (!window.srcGroup || window.srcGroup(c.source) !== 'mkt') return false;
+        const d = _createdISO(c.created);
+        return d && parseInt(d.slice(5, 7), 10) === mm && parseInt(d.slice(0, 4), 10) === my;
       });
       const bySrc = {};
       mktCusts.forEach(c => { bySrc[c.source] = (bySrc[c.source] || 0) + 1; });
@@ -90,11 +122,13 @@
     const rows = list.map(e => {
       const ch = chanMeta(e.channel);
       const stepCells = obj.steps.map(s => {
-        const n = e[s.key] || 0;
+        let n = e[s.key] || 0;
+        if (_mkt && s.key === 'custs') n = _mkt.custByDay[e.date] || 0;   /* Khách mua tự tính */
         return `<td class="num">${window.fmt(n)}</td><td class="num" style="color:var(--muted)">${window.fmt(cp(e.spend, n))}</td>`;
       }).join('');
+      const _rev = _mkt ? (_mkt.revByDay[e.date] || 0) : (e.revenue || 0);   /* Doanh thu tự tính từ Đơn hàng */
       const revCells = obj.hasRevenue
-        ? `<td class="num">${window.fmtShort(e.revenue || 0)}</td><td class="num" style="color:${(e.revenue / (e.spend || 1)) >= 1 ? 'var(--ok)' : 'var(--danger)'}"><b>${(e.revenue / (e.spend || 1)).toFixed(2)}x</b></td>`
+        ? `<td class="num">${window.fmtShort(_rev)}</td><td class="num" style="color:${(_rev / (e.spend || 1)) >= 1 ? 'var(--ok)' : 'var(--danger)'}"><b>${(_rev / (e.spend || 1)).toFixed(2)}x</b></td>`
         : '';
       return `<tr>
         <td><input type="checkbox" class="ads-cb" value="${e.id}" onchange="window.adsSelChange()"></td>
@@ -122,10 +156,14 @@
     const chanOpts = CHANS.map(c => `<option value="${c.id}" ${e && e.channel === c.id ? 'selected' : ''}>${c.icon} ${c.label}</option>`).join('');
     const objOpts = OBJS.map(o => `<option value="${o.id}" ${(e ? e.objective : objective) === o.id ? 'selected' : ''}>${o.icon} ${o.label}</option>`).join('');
     const formOpts = (window.AD_FORMS || []).map(f => `<option ${e && e.form === f ? 'selected' : ''}>${f}</option>`).join('');
+    /* Bán hàng: Khách mua + Doanh thu là TỰ ĐỘNG (từ Đơn hàng) → khoá tay, NV ads chỉ nhập Chi tiêu + SĐT */
+    const _auto = obj.hasRevenue ? { custs: 1 } : {};
     const stepInputs = obj.steps.map(s =>
-      `<div><label>${s.label}</label><input id="ad_${s.key}" type="number" min="0" value="${e ? (e[s.key] || '') : ''}" placeholder="0"></div>`).join('');
+      _auto[s.key]
+        ? `<div><label>${s.label} <span style="color:var(--muted);font-weight:400;font-size:11px">(tự tính từ Đơn hàng)</span></label><input value="⟳ tự động" disabled style="background:#F3F4F6;color:var(--muted)"></div>`
+        : `<div><label>${s.label}</label><input id="ad_${s.key}" type="number" min="0" value="${e ? (e[s.key] || '') : ''}" placeholder="0"></div>`).join('');
     const revInput = obj.hasRevenue
-      ? `<div><label>Doanh thu (₫)</label><input id="ad_revenue" type="number" min="0" value="${e ? (e.revenue || '') : ''}" placeholder="0"></div>` : '';
+      ? `<div><label>Doanh thu (₫) <span style="color:var(--muted);font-weight:400;font-size:11px">(tự tính từ Đơn hàng)</span></label><input value="⟳ tự động" disabled style="background:#F3F4F6;color:var(--muted)"></div>` : '';
     return `
       <div class="form-row">
         <div><label>Ngày *</label><input id="ad_date" type="date" value="${e ? e.date : window.todayISO()}"></div>
@@ -223,8 +261,8 @@
       const spend = toInt(it.spend); if (!spend) return;
       if (!jumpMonth) jumpMonth = date.slice(0, 7);
       const rec = { date, objective, channel: ch, form: it.form || 'Mess', spend, units: 0, leads: 0, custs: 0, candidates: 0, revenue: 0 };
-      obj.steps.forEach(s => { rec[s.key] = toInt(it[s.key]); });
-      if (obj.hasRevenue) rec.revenue = toInt(it.revenue);
+      /* Bán hàng: KHÔNG lấy Khách mua (custs) + Doanh thu từ ảnh — 2 cột này tự tính từ Đơn hàng */
+      obj.steps.forEach(s => { if (obj.hasRevenue && s.key === 'custs') return; rec[s.key] = toInt(it[s.key]); });
       const ex = cur.find(x => x.date === date && x.objective === objective && x.channel === ch);
       if (ex) window.STORE.update('adspend', ex.id, rec);
       else { rec.id = 'AD-imp-' + _bt + '-' + n + '-' + Math.random().toString(36).slice(2, 6); window.STORE.add('adspend', rec); }
@@ -573,6 +611,11 @@
 
   /* init */
   window.STORE.subscribe('adspend', render);
+  /* Doanh thu/Khách mua Bán hàng phụ thuộc Đơn hàng + Khách → nạp + vẽ lại khi 2 bảng này về từ cloud */
+  window.STORE.subscribe('orders', render);
+  window.STORE.subscribe('customers', render);
+  window.STORE.get('orders', window.ORDERS || []);
+  window.STORE.get('customers', window.CUSTOMERS || []);
   window.renderAppShell('adspend', 'Chi phí quảng cáo');
   /* Set giá trị input tháng = tháng hiện tại */
   setTimeout(() => { const el = document.getElementById('adsMonth'); if (el) el.value = month; }, 0);
