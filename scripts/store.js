@@ -973,5 +973,13 @@
     document.addEventListener('visibilitychange', _foreSync);
     window.addEventListener('focus', _foreSync);
     window.addEventListener('online', _foreSync);
+
+    /* === FLUSH edit đang chờ (rmwKv) NGAY khi rời trang/ẩn tab ===
+       Phòng trường hợp NV sửa giá xong ĐÓNG/RELOAD trong <1.2s (trước khi debounce flush) →
+       edit chưa kịp lên cloud → tải lại bị mất. Ẩn tab / đóng → đẩy ngay các key còn pending. */
+    const _flushAllRmw = () => { Object.keys(_rmwQueue).forEach(k => { if (_rmwQueue[k] && _rmwQueue[k].length) { try { _flushRmw(k); } catch (e) {} } }); };
+    document.addEventListener('visibilitychange', () => { if (document.hidden) _flushAllRmw(); });
+    window.addEventListener('pagehide', _flushAllRmw);
+    window.addEventListener('beforeunload', _flushAllRmw);
   }
 })();

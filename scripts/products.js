@@ -52,16 +52,16 @@
       <span class="tier-btns" style="display:contents">
       <button class="btn btn-sm ${boardTier === 0 ? 'btn-primary' : 'btn-ghost'}" onclick="window.boardSwitchTier(0)">📋 Gốc</button>`;
     tiers.forEach(t => {
-      s += `<button class="btn btn-sm ${boardTier === t.id ? 'btn-primary' : 'btn-ghost'}" onclick="window.boardSwitchTier(${t.id})">${tierIcon(t)} ${t.name} <span style="opacity:.7">(${t.markup >= 0 ? '+' : ''}${t.markup}%)</span></button>`;
+      s += `<button class="btn btn-sm ${boardTier === t.id ? 'btn-primary' : 'btn-ghost'}" onclick="window.boardSwitchTier(${t.id})">${tierIcon(t)} ${t.name}</button>`;
     });
     if (tiers.length < 8) s += `<button class="btn btn-sm btn-ghost" style="border-style:dashed" onclick="window.tierAdd()">＋ Thêm nhóm</button>`;
     s += `</span>`;
     /* MOBILE: chọn nhóm bằng dropdown cho gọn (thay hàng nút) */
     s += `<select class="tier-select" onchange="window.boardSwitchTier(this.value)">
       <option value="0" ${boardTier === 0 ? 'selected' : ''}>📋 Gốc (giá bán thật)</option>
-      ${tiers.map(t => `<option value="${t.id}" ${boardTier === t.id ? 'selected' : ''}>${tierIcon(t)} ${t.name} (${t.markup >= 0 ? '+' : ''}${t.markup}%)</option>`).join('')}
+      ${tiers.map(t => `<option value="${t.id}" ${boardTier === t.id ? 'selected' : ''}>${tierIcon(t)} ${t.name}</option>`).join('')}
     </select>`;
-    s += `<button class="btn btn-sm btn-ghost tier-manage" onclick="window.tierManage()" title="Đổi tên / % / xóa nhóm">⚙ Quản lý nhóm</button></div>`;
+    s += `<button class="btn btn-sm btn-ghost tier-manage" onclick="window.tierManage()" title="Đổi tên / nhân bản / xóa nhóm">⚙ Quản lý nhóm</button></div>`;
     const tier = boardTier ? tierById(boardTier) : null;
     if (!tier) {
       /* Gốc: link toàn hệ thống — đặt giá = giá nhập + % */
@@ -76,10 +76,8 @@
     if (tier) {
       s += `<div style="margin-top:10px;display:flex;align-items:center;gap:10px;flex-wrap:wrap;background:#F0FDF4;border:1px solid #BBF7D0;border-radius:8px;padding:9px 12px">
         <span style="font-size:13px;font-weight:700;color:var(--navy)">${tierIcon(tier)} ${tier.name}</span>
-        <label style="font-size:12px;color:var(--muted)">% so giá gốc: <input id="tierMarkup" type="number" value="${tier.markup}" style="width:64px;text-align:right;padding:4px 6px;border:1px solid var(--line);border-radius:5px"> %</label>
-        <button class="btn btn-sm btn-primary" onclick="window.tierApplyMarkup()">Áp dụng %</button>
         <span style="flex:1"></span>
-        <span style="font-size:11.5px;color:var(--muted)">💡 Giá = giá gốc ±%. Sửa tay 1 ô = ghi đè riêng SP đó (nền vàng), ↺ để bỏ ghi đè.</span>
+        <span style="font-size:11.5px;color:var(--muted)">💡 Sửa tay TỪNG ô giá cho nhóm này (nền vàng = đã sửa riêng), ↺ để bỏ về giá gốc. Sửa tới đâu tự lưu tới đó.</span>
       </div>`;
     }
     s += `</div>`;
@@ -157,12 +155,11 @@
     const rows = tiers.map(t => `<div style="display:flex;align-items:center;gap:8px;margin-bottom:8px">
         <span style="font-size:16px">${tierIcon(t)}</span>
         <input value="${(t.name || '').replace(/"/g, '&quot;')}" data-tid="${t.id}" class="tm-name" style="flex:1;border:1px solid var(--line);border-radius:6px;padding:6px 8px;font-size:13px">
-        <input type="number" value="${t.markup}" data-tid="${t.id}" class="tm-mk" style="width:70px;text-align:right;border:1px solid var(--line);border-radius:6px;padding:6px" title="% so giá gốc"> %
         <button class="btn btn-ghost btn-sm" onclick="window.tierClone(${t.id})" title="Nhân bản nhóm này (copy toàn bộ giá) rồi chỉnh vài SP">⧉ Nhân bản</button>
         <button class="btn btn-ghost btn-sm" style="color:var(--danger)" onclick="window.tierDelete(${t.id})" title="Xóa nhóm">🗑</button>
       </div>`).join('');
     window.openModal('⚙ Quản lý nhóm bảng giá', `
-      <div style="font-size:12.5px;color:var(--muted);margin-bottom:10px">Mỗi nhóm = 1 mức giá riêng cho 1 nhóm khách. Khách gán nhóm nào sẽ nhận bảng giá đó. % là điều chỉnh so với giá gốc.</div>
+      <div style="font-size:12.5px;color:var(--muted);margin-bottom:10px">Mỗi nhóm = 1 mức giá riêng cho 1 nhóm khách. Khách gán nhóm nào sẽ nhận bảng giá đó. Đặt tên nhóm ở đây; giá của từng SP sửa tay ở bảng giá.</div>
       ${rows || '<div style="color:var(--muted)">Chưa có nhóm.</div>'}
       ${tiers.length < 8 ? `<button class="btn btn-ghost btn-sm" onclick="window.closeModal();window.tierAdd()">＋ Thêm nhóm</button>` : ''}
     `, {
@@ -171,13 +168,12 @@
     });
   };
   window.tierSaveManage = function () {
-    /* Chỉ đổi TÊN + % theo id (KHÔNG đụng overrides) → merge lên bản cloud mới, giữ giá NV khác vừa sửa */
+    /* Chỉ đổi TÊN theo id (KHÔNG đụng overrides/markup) → merge lên bản cloud mới, giữ giá NV khác vừa sửa */
     const upd = {};
-    document.querySelectorAll('.tm-name').forEach(inp => { const id = +inp.dataset.tid; (upd[id] = upd[id] || {}).name = inp.value.trim(); });
-    document.querySelectorAll('.tm-mk').forEach(inp => { const id = +inp.dataset.tid; const v = parseFloat(inp.value); if (!isNaN(v)) (upd[id] = upd[id] || {}).markup = v; });
-    window.STORE.rmwKv('priceTiers', arr => { arr.forEach(t => { const u = upd[t.id]; if (u) { if (u.name) t.name = u.name; if (u.markup != null) t.markup = u.markup; } }); return arr; });
+    document.querySelectorAll('.tm-name').forEach(inp => { const id = +inp.dataset.tid; if (inp.value.trim()) upd[id] = inp.value.trim(); });
+    window.STORE.rmwKv('priceTiers', arr => { arr.forEach(t => { if (upd[t.id]) t.name = upd[t.id]; }); return arr; });
     window.closeModal(); renderBoard();
-    window.toast('✓ Đã lưu nhóm bảng giá', 'success');
+    window.toast('✓ Đã lưu tên nhóm bảng giá', 'success');
   };
   window.tierDelete = function (id) {
     if (!confirm('Xóa nhóm bảng giá này? (giá gốc + nhóm khác không ảnh hưởng)')) return;
