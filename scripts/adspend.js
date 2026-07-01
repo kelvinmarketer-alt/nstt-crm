@@ -54,10 +54,11 @@
 
     const kpis = [
       `<div class="kpi k-1"><div class="kpi-label">Tổng chi tiêu (${month.slice(5)}/${month.slice(0,4)})</div><div class="kpi-value">${window.fmtShort(sum.spend)}</div><div class="kpi-trend">${list.length} ngày chạy</div><div class="kpi-icon">💸</div></div>`,
-      `<div class="kpi k-2"><div class="kpi-label">Tổng Inbox</div><div class="kpi-value">${window.fmt(sum.units)}</div><div class="kpi-trend">CP ${window.fmt(cp(sum.spend, sum.units))}/inbox</div><div class="kpi-icon">💬</div></div>`,
+      /* Thẻ Tổng Inbox chỉ hiện khi mục đích còn theo dõi Inbox (vd Tuyển dụng) — Bán hàng đã bỏ */
+      obj.steps.some(s => s.key === 'units') ? `<div class="kpi k-2"><div class="kpi-label">Tổng Inbox</div><div class="kpi-value">${window.fmt(sum.units)}</div><div class="kpi-trend">CP ${window.fmt(cp(sum.spend, sum.units))}/inbox</div><div class="kpi-icon">💬</div></div>` : '',
       `<div class="kpi k-4"><div class="kpi-label">Tổng SĐT</div><div class="kpi-value">${window.fmt(sum.leads)}</div><div class="kpi-trend">CP ${window.fmt(cp(sum.spend, sum.leads))}/SĐT</div><div class="kpi-icon">📞</div></div>`,
       `<div class="kpi k-3"><div class="kpi-label">${lastStep.label}</div><div class="kpi-value">${window.fmt(lastCount)}</div><div class="kpi-trend">${lastStep.cp} ${window.fmt(cp(sum.spend, lastCount))}</div><div class="kpi-icon">${objective === 'tuyen-dung' ? '🧑‍💼' : '🛒'}</div></div>`,
-    ];
+    ].filter(Boolean);
     if (obj.hasRevenue) {
       kpis.push(`<div class="kpi k-5"><div class="kpi-label">Doanh thu · ROAS</div><div class="kpi-value">${window.fmtShort(sum.revenue)}</div><div class="kpi-trend ${roas >= 1 ? 'up' : 'down'}">ROAS ${roas.toFixed(2)}x</div><div class="kpi-icon">📈</div></div>`);
       /* === KPI thực tế từ DATA KH: nguồn ≠ Sales chủ động → tính là MKT === */

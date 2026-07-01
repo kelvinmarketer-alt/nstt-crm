@@ -18,8 +18,8 @@ window.AD_FORMS = ['Mess', 'Tin nhắn', 'Tương tác', 'Form', 'Lead', 'Video'
 /* Mục đích chạy → khung chỉ số (funnel) riêng → mẫu báo cáo khác nhau */
 window.AD_OBJECTIVES = [
   { id:'ban-hang', label:'Bán hàng / Sản phẩm', icon:'🛒', hasRevenue:true,
+    /* Bỏ cột Inbox + CP/Inbox theo yêu cầu — chỉ theo dõi SĐT → Khách mua → Doanh thu */
     steps:[
-      { key:'units', label:'Inbox', cp:'CP/Inbox' },
       { key:'leads', label:'SĐT',   cp:'CP/SĐT' },
       { key:'custs', label:'Khách mua', cp:'CP/Khách' },
     ] },
