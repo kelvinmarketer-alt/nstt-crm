@@ -5,7 +5,7 @@
 
 /* Phiên bản app hiển thị (đối chiếu với CACHE_VERSION trong sw.js) — để user tự XÁC NHẬN
    đang chạy bản mới hay còn kẹt JS cũ (hiện ở góc sidebar + log console). */
-window.APP_VERSION = 'v326';
+window.APP_VERSION = 'v327';
 console.log('%c[NSTT] App ' + window.APP_VERSION, 'color:#339B21;font-weight:bold');
 
 /* Gom NGUỒN khách về 3 nhóm chuẩn: 'mkt' / 'sales' / 'sep-gioi-thieu'.
@@ -408,6 +408,44 @@ window.custDebt = function (custId) {
 /* Số ngày quá hạn thực của KH (0 nếu chưa quá hạn) — wrapper gọn của debtOverdueInfo cho báo cáo. */
 window.debtOverdueDays = function (custId) { const i = window.debtOverdueInfo ? window.debtOverdueInfo(custId) : null; return i ? i.days : 0; };
 window.custDebtOverdue = function (custId) { const i = window.debtOverdueInfo ? window.debtOverdueInfo(custId) : null; return i ? i.amount : 0; };
+
+/* ============ SỐ DƯ QUỸ ĐỘNG (1 nguồn sự thật) ============
+   Số dư TK = opening (số dư gốc lúc tạo) + (Σ thu − Σ chi từ cashEntries của TK đó).
+   Sửa: (a) auto-out Ads/Lương trước KHÔNG trừ số dư → "phồng vô hạn"; nay tự trừ.
+   (b) cộng dồn field acc.balance kiểu RMW → mất delta khi 2 phiếu đồng thời; nay tính lại từ sổ.
+   opening lưu KV 'accountOpenings' {accId:number} (bảng paymentAccounts không có cột opening). */
+window.accountNet = function (accName) {
+  if (!accName || !window.STORE) return 0;
+  let net = 0;
+  (window.STORE.get('cashEntries', []) || []).forEach(e => { if (e.account === accName) net += (e.type === 'in' ? 1 : -1) * (+e.amount || 0); });
+  return net;
+};
+window.accountOpening = function (accId) {
+  const m = (window.STORE && window.STORE.get('accountOpenings', {})) || {};
+  return (accId != null && m[accId] != null) ? (+m[accId] || 0) : null;
+};
+window.setAccountOpening = function (accId, val) {
+  if (accId == null || !window.STORE) return;
+  const m = { ...((window.STORE.get('accountOpenings', {})) || {}) };
+  m[accId] = Math.round(+val || 0);
+  window.STORE.set('accountOpenings', m);
+};
+window.accountBalance = function (acc) {
+  if (!acc) return 0;
+  const op = window.accountOpening(acc.id);
+  return op != null ? (op + window.accountNet(acc.name)) : (+acc.balance || 0);   /* chưa migrate → dùng balance lưu, KHÔNG lệch */
+};
+/* Migrate 1 lần: opening = balance hiện tại − net → số dư động == số dư đang hiển thị (không nhảy).
+   CHỈ chạy khi cloud tải xong (tránh tính net trên sổ quỹ chưa đủ). Đã có opening thì bỏ qua. */
+window.migrateAccountOpenings = function () {
+  if (!window.STORE) return;
+  if (window.STORE.isPreloaded && (!window.STORE.isPreloaded('cashEntries') || !window.STORE.isPreloaded('paymentAccounts'))) return;
+  const accs = window.STORE.get('paymentAccounts', []) || [];
+  const m = { ...((window.STORE.get('accountOpenings', {})) || {}) };
+  let changed = false;
+  accs.forEach(a => { if (a && a.id != null && m[a.id] == null) { m[a.id] = Math.round((+a.balance || 0) - window.accountNet(a.name)); changed = true; } });
+  if (changed) window.STORE.set('accountOpenings', m);
+};
 
 /* Nhóm giá GÁN cho 1 KH — nguồn chuẩn = KV 'custPriceTiers' (sync đa máy),
    fallback field priceTier trên bản ghi KH (cache cũ/local). */

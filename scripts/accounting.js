@@ -38,10 +38,10 @@
       const bankList = document.getElementById('accBankList');
       if (bankList) {
         bankList.innerHTML = accts.length
-          ? accts.map(a => `<div class="acc-row"><div class="lab">${a.name}</div><div class="val">${window.fmt(a.balance||0)} ₫</div></div>`).join('')
+          ? accts.map(a => `<div class="acc-row"><div class="lab">${a.name}</div><div class="val">${window.fmt(window.accountBalance ? window.accountBalance(a) : (a.balance||0))} ₫</div></div>`).join('')
           : `<div class="acc-row"><div class="lab" style="color:var(--muted)">Chưa có tài khoản — bấm "⚙ Quản lý TK" để thêm</div></div>`;
       }
-      const bankTotal = accts.reduce((s,a)=>s+(+a.balance||0),0);
+      const bankTotal = accts.reduce((s,a)=>s+(window.accountBalance ? window.accountBalance(a) : (+a.balance||0)),0);
       set('accBankTotal', f(bankTotal) + ' ₫');
       set('accBankSub', `${accts.length} tài khoản`);
     })();
@@ -209,14 +209,8 @@
       staff: window.CURRENT_USER.name,
     };
     window.STORE.add('cashEntries', newEntry);
-
-    /* Cập nhật số dư account */
-    const acc = accounts.find(a => a.name === newEntry.account);
-    if (acc) {
-      const newBalance = acc.balance + (type === 'in' ? amount : -amount);
-      window.STORE.update('paymentAccounts', acc.id, { balance: newBalance });
-      accounts = window.STORE.get('paymentAccounts');
-    }
+    /* Số dư TÍNH ĐỘNG (opening + thu − chi) — chỉ cần thêm phiếu, KHÔNG cộng dồn field balance
+       (tránh mất delta khi 2 phiếu đồng thời + auto-out ads/lương giờ tự trừ). */
     window.closeModal();
     window.toast(`✓ Đã ${type==='in'?'thu':'chi'} ${window.fmt(amount)} ₫`, 'success');
   };
@@ -226,7 +220,7 @@
     accounts = window.STORE.get('paymentAccounts', INITIAL_ACCOUNTS);
     const kindIcon = { cash:'💵', bank:'🏦', ewallet:'📱' };
     const kindLabel = { cash:'Tiền mặt', bank:'Ngân hàng', ewallet:'Ví điện tử' };
-    const total = accounts.filter(a => a.active).reduce((s, a) => s + a.balance, 0);
+    const total = accounts.filter(a => a.active).reduce((s, a) => s + (window.accountBalance ? window.accountBalance(a) : (+a.balance||0)), 0);
     const activeCount = accounts.filter(a => a.active).length;
     const rows = accounts.map(a => `
       <div class="acc-card-row" data-id="${a.id}" style="display:flex;align-items:center;gap:12px;padding:12px 14px;border:1px solid var(--line);border-radius:8px;margin-bottom:8px;${a.active?'':'opacity:0.55'}">
@@ -236,7 +230,7 @@
           <div style="font-size:11.5px;color:var(--muted)">${a.detail} · Người giữ: ${a.keeper}</div>
         </div>
         <div style="text-align:right">
-          <div style="font-weight:800;color:var(--navy);font-variant-numeric:tabular-nums">${window.fmt(a.balance)} ₫</div>
+          <div style="font-weight:800;color:var(--navy);font-variant-numeric:tabular-nums">${window.fmt(window.accountBalance ? window.accountBalance(a) : a.balance)} ₫</div>
           <div style="font-size:11px;color:var(--muted)">${kindLabel[a.kind]}</div>
         </div>
         <label class="toggle"><input type="checkbox" ${a.active?'checked':''} data-toggle="${a.id}"><span class="slider"></span></label>
@@ -303,7 +297,7 @@
       <div class="form-row wide"><label>Mô tả / Chi tiết</label>
         <input id="aDetail" value="${a.detail}" placeholder="${kind==='cash'?'Vị trí cất':kind==='bank'?'Chi nhánh':'Số điện thoại / tài khoản'}"></div>
       <div class="form-row">
-        <div><label>Số dư hiện tại (₫)</label><input id="aBalance" type="number" value="${a.balance||0}"></div>
+        <div><label>Số dư hiện tại (₫)</label><input id="aBalance" type="number" value="${a.id && window.accountBalance ? window.accountBalance(a) : (a.balance||0)}"></div>
         <div><label>Người giữ / quản lý</label>
           <select id="aKeeper">
             <option ${a.keeper==='Tuấn Tú'?'selected':''}>Tuấn Tú</option>
@@ -332,6 +326,8 @@
     if (isEdit) window.STORE.update('paymentAccounts', id, data);
     else        window.STORE.add('paymentAccounts', data);
     accounts = window.STORE.get('paymentAccounts');
+    /* Số dư động: opening = "số dư hiện tại" nhập vào − (thu − chi đã có) → accountBalance = số nhập. */
+    if (window.setAccountOpening) window.setAccountOpening(id, data.balance - (window.accountNet ? window.accountNet(data.name) : 0));
     window.toast('✓ Đã ' + (isEdit?'cập nhật':'thêm') + ' TK', 'success');
     window.openAccountSettings();
   };
@@ -398,12 +394,12 @@
       <table class="mini-table" style="width:100%">
         <thead><tr><th>Tài khoản</th><th class="num">Số dư sổ (₫)</th><th class="num">Số dư thực tế (₫)</th><th class="num">Chênh lệch</th></tr></thead>
         <tbody>
-          ${accs.map(a => `<tr data-acc="${a.id}">
+          ${accs.map(a => { const _b = window.accountBalance ? window.accountBalance(a) : (a.balance||0); return `<tr data-acc="${a.id}">
             <td><b>${a.name}</b><div style="font-size:11px;color:var(--muted)">${a.detail || ''}</div></td>
-            <td class="num" id="bal_${a.id}" data-bal="${a.balance||0}">${(a.balance||0).toLocaleString('vi-VN')}</td>
-            <td class="num"><input type="number" class="bnk-actual" data-acc="${a.id}" placeholder="${(a.balance||0).toLocaleString('vi-VN')}" style="width:140px;text-align:right;padding:6px 8px;border:1px solid var(--line);border-radius:6px"></td>
+            <td class="num" id="bal_${a.id}" data-bal="${_b}">${_b.toLocaleString('vi-VN')}</td>
+            <td class="num"><input type="number" class="bnk-actual" data-acc="${a.id}" placeholder="${_b.toLocaleString('vi-VN')}" style="width:140px;text-align:right;padding:6px 8px;border:1px solid var(--line);border-radius:6px"></td>
             <td class="num" id="diff_${a.id}" style="font-weight:700">—</td>
-          </tr>`).join('')}
+          </tr>`; }).join('')}
         </tbody>
       </table>
       <div style="margin-top:12px;padding:10px 12px;background:#FEF3C7;border-radius:6px;font-size:11.5px;color:var(--warn)">
@@ -436,7 +432,7 @@
       const actual = parseInt(inp.value, 10);
       if (isNaN(actual)) return;
       const acc = accs.find(a => a.id === id); if (!acc) return;
-      const bal = acc.balance || 0;
+      const bal = window.accountBalance ? window.accountBalance(acc) : (acc.balance || 0);
       const diff = actual - bal;
       if (diff === 0) return;
       const isPlus = diff > 0;
@@ -452,7 +448,7 @@
         staff: (window.CURRENT_USER && window.CURRENT_USER.name) || 'Tôi',
       };
       window.STORE.add('cashEntries', entry);
-      window.STORE.update('paymentAccounts', id, { balance: actual });
+      /* Phiếu điều chỉnh 'diff' ở trên đã đưa số dư ĐỘNG về đúng 'actual' — KHÔNG cần ghi field balance. */
       changes++;
     });
     if (!changes) { window.toast('Không có thay đổi để đối soát', 'info'); window.closeModal(); return; }
@@ -482,6 +478,11 @@
   };
 
   window.STORE.subscribe('cashEntries', render);
+  window.STORE.subscribe('paymentAccounts', render);
+  /* Số dư ĐỘNG: migrate opening 1 lần khi cloud tải xong (opening = balance − net, không nhảy số),
+     rồi vẽ lại. accountBalance = opening + (thu−chi). */
+  if (window.migrateAccountOpenings) window.migrateAccountOpenings();
+  window.STORE.subscribe('__preloaded__', k => { if (k === 'cashEntries' || k === 'paymentAccounts') { if (window.migrateAccountOpenings) window.migrateAccountOpenings(); render(); } });
   window.renderAppShell('accounting', 'Kế toán');
   ['qSearch','fType','fAccount','fFrom','fTo'].forEach(id => document.getElementById(id)?.addEventListener('input', render));
   render();

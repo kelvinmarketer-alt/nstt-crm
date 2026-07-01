@@ -181,6 +181,7 @@
     'priceTiers',      /* Nhóm bảng giá theo nhóm KH (±% + override) — gửi báo giá riêng */
     'priceBaseMarkup', /* % giá gốc so giá nhập (link toàn hệ thống) — phải roaming đa máy */
     'priceAutoSend',   /* Cấu hình + lastSentDate auto-send bảng giá — sync tránh gửi Telegram trùng */
+    'accountOpenings', /* Số dư GỐC từng TK quỹ {accId:number} — số dư = opening + (thu−chi từ cashEntries) */
     'procurementRuns', /* Phiên gom hàng → đặt NCC (Kho) — CRITICAL */
     'supplierClaims',  /* Khoản đòi lại NCC khi hàng NCC giao hỏng (Trả hàng) */
     'supplierMeta',    /* Loại NCC (sỉ/lẻ/cả hai) — cloud suppliers không có cột này */

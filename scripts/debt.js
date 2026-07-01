@@ -645,10 +645,7 @@ Mong quý khách thu xếp thanh toán sớm. Cảm ơn!
       desc: desc + (appliedInvoices.length ? ' (' + appliedInvoices.length + ' HĐ)' : ''),
     });
 
-    /* Cập nhật số dư TK */
-    const accounts = window.STORE.get('paymentAccounts', []);
-    const acc = accounts.find(a => a.name === account);
-    if (acc) window.STORE.update('paymentAccounts', acc.id, { balance: acc.balance + amount });
+    /* Số dư TK tính ĐỘNG từ cashEntries (phiếu thu 'in' đã ghi ở trên) — KHÔNG cộng dồn field balance. */
 
     const printAfter = document.getElementById('rPrintAfter')?.checked;
     window.closeModal();
