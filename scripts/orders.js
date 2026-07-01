@@ -987,7 +987,7 @@
           <div style="flex:1"></div>
           ${nUnconf?`<button type="button" class="btn btn-primary btn-sm" onclick="window.confirmAllPrices()">✓ Xác nhận tất cả giá (${nUnconf})</button>`:''}
         </div>`;
-      box.innerHTML = bulkBar + `<table class="mini-table" style="margin:0">
+      box.innerHTML = bulkBar + `<table class="mini-table oi-table" style="margin:0">
         <thead><tr>
           <th style="width:40px" class="num">STT</th>
           <th>Sản phẩm</th>
@@ -1206,6 +1206,11 @@
       <div style="font-size:12px;color:var(--muted);margin-bottom:10px;line-height:1.55">
         KH: <b>${(o.custName || '').replace(/</g, '')}</b> · Sửa <b>số lượng</b>, <b>đơn giá</b>, đơn vị, hoặc thêm/bớt mặt hàng.
         <br>🔒 <b style="color:#15803D">Phiếu báo hàng vẫn KHÔNG hiện giá</b> — đây chỉ là khu vực quản trị nội bộ.
+      </div>
+      <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap;margin-bottom:10px;padding:8px 11px;background:#F0FDF4;border:1px solid #BBF7D0;border-radius:8px">
+        <label style="font-size:12.5px;font-weight:700;color:#15803D;white-space:nowrap">💲 Nhóm giá đơn này:</label>
+        <select id="oPriceTier" onchange="window.onOrderTierChange(this.value)" style="border:1px solid var(--line);border-radius:6px;padding:6px 9px;font-size:12.5px;background:#fff">${window.priceTierOptions ? window.priceTierOptions(orderTier) : '<option value="">— Giá gốc —</option>'}</select>
+        <span id="oTierNote" style="font-size:11px;color:var(--muted);flex:1;min-width:140px">Đổi nhóm để tính lại giá toàn bộ mặt hàng theo bảng giá.</span>
       </div>
       <div style="display:flex;gap:8px;align-items:flex-end;flex-wrap:wrap;margin-bottom:8px">
         <div style="flex:2;min-width:200px"><label style="font-size:11px;color:var(--muted);display:block;margin-bottom:3px">Thêm sản phẩm</label>

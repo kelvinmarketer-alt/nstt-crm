@@ -756,11 +756,26 @@ td.num, td.hide-md {
   .table-card table { table-layout: fixed; }
   .table-card td, .table-card th { overflow: hidden; text-overflow: ellipsis; }
   .table-card td .name-clamp, .table-card td .cust-info { min-width: 0; }
-  /* Bảng trong DRAWER/MODAL (vd sửa mặt hàng đơn) — cho cuộn trong khung để không lệch */
-  .drawer table:not(.cn-tbl):not(.pay-table):not(.att-table),
-  .modal table:not(.cn-tbl):not(.pay-table):not(.att-table) {
+  /* Bảng trong DRAWER/MODAL — cho cuộn ngang trong khung (TRỪ .oi-table: xếp thẻ dọc) */
+  .drawer table:not(.cn-tbl):not(.pay-table):not(.att-table):not(.oi-table),
+  .modal table:not(.cn-tbl):not(.pay-table):not(.att-table):not(.oi-table) {
     display: block; max-width: 100%; overflow-x: auto; -webkit-overflow-scrolling: touch;
   }
+  /* Bảng SỬA MẶT HÀNG trong đơn (oi-table) → mỗi SP = 1 THẺ DỌC.
+     Hết kẹt: trước đây cuộn-ngang lồng trong modal nuốt thao tác vuốt DỌC → không xem/sửa
+     được hết SP. Nay xếp dọc, cuộn theo modal-body bình thường. */
+  .oi-table{display:block!important;overflow-x:visible!important;min-width:0!important;width:100%!important}
+  .oi-table thead{display:none}
+  .oi-table tbody,.oi-table tbody tr,.oi-table tbody td{display:block}
+  .oi-table tbody tr{position:relative;border:1px solid var(--line);border-radius:10px;margin:0 0 8px;padding:9px 11px;background:#fff}
+  .oi-table tbody td{border:none!important;padding:2px 0!important;text-align:left!important}
+  .oi-table tbody td:nth-child(1){display:none}                                   /* STT ẩn */
+  .oi-table tbody td:nth-child(2){font-weight:600;padding-right:96px!important}    /* tên SP, chừa chỗ tiền */
+  .oi-table tbody td:nth-child(6){position:absolute!important;top:9px;right:11px;font-weight:800;color:var(--red)}  /* thành tiền ghim phải */
+  .oi-table tbody td:nth-child(3),.oi-table tbody td:nth-child(4),.oi-table tbody td:nth-child(5),.oi-table tbody td:nth-child(7){display:inline-block!important;margin:6px 12px 0 0;vertical-align:middle}
+  .oi-table tbody td:nth-child(3)::before{content:"SL ";color:var(--muted);font-size:11px}
+  .oi-table tbody td:nth-child(4)::before{content:"Giá ";color:var(--muted);font-size:11px}
+  .oi-table tfoot,.oi-table tfoot tr,.oi-table tfoot td{display:block;text-align:left!important;padding:3px 0!important}
   #supKpis, #purKpis, #ldKpis, #qtKpis, #funnel, .aging {
     grid-template-columns: repeat(auto-fit, minmax(120px, 1fr)) !important;
   }

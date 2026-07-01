@@ -342,6 +342,16 @@
        • GIỮ flag '_' (cờ chống-lặp per-device) của bản ghi local hiện có.
        • Baseline (_synced) chỉ cập nhật ĐÚNG record này — KHÔNG nuốt record
          local-only chưa kịp đẩy lên cloud (tránh bug mất dữ liệu sau refresh). */
+  /* PERF: gộp ghi localStorage + notify subscriber (mỗi cái = stringify + re-render CẢ bảng,
+     rất nặng với orders ~ngàn dòng) vào 1 lần / ~300ms cho mỗi bảng. Nhiều người tạo đơn
+     cùng lúc → hàng loạt realtime event; nếu stringify + re-render trên TỪNG event → đơ. */
+  const _rtFlush = {};
+  function _flushUpsert(key) {
+    const arr = _data[key];
+    if (!Array.isArray(arr)) return;
+    try { localStorage.setItem(PREFIX + key, JSON.stringify(arr)); } catch (e) {}
+    (_subs[key] || []).forEach(fn => { try { fn(arr); } catch (e) {} });
+  }
   function _applyRealtimeUpsert(key, row) {
     const idCol = ID_COLUMN[key] || 'id';
     const keyOf = (it) => it && (it[idCol] != null ? it[idCol]
@@ -349,33 +359,24 @@
     const rid = keyOf(row);
     if (rid == null) return false;   /* không khớp được id → full-merge */
 
-    const arr = Array.isArray(_data[key]) ? _data[key].slice() : (_load(key, []) || []);
+    /* Cập nhật in-memory NGAY (rẻ: findIndex + gán 1 phần tử) */
+    const arr = Array.isArray(_data[key]) ? _data[key] : (_load(key, []) || []);
     const idx = arr.findIndex(it => keyOf(it) === rid);
-    let merged;
     if (idx >= 0) {
       const lr = arr[idx];
       const flags = {};
-      for (const k of Object.keys(lr)) if (k.charAt(0) === '_') flags[k] = lr[k];
-      merged = Object.assign({}, row, flags);
-      arr[idx] = merged;
+      for (const k of Object.keys(lr)) if (k.charAt(0) === '_') flags[k] = lr[k];   /* giữ cờ '_' per-device */
+      arr[idx] = Object.assign({}, row, flags);
     } else {
-      merged = row;
-      arr.push(merged);
+      arr.push(row);
     }
     _data[key] = arr;
-    try { localStorage.setItem(PREFIX + key, JSON.stringify(arr)); } catch (e) {}
 
-    /* Cập nhật baseline CHỈ cho record này (không stringify cả _data → né nuốt local-only) */
-    let baseArr = [];
-    try { if (_synced[key] != null) baseArr = JSON.parse(_synced[key]); } catch (e) { baseArr = []; }
-    if (Array.isArray(baseArr)) {
-      const bidx = baseArr.findIndex(it => keyOf(it) === rid);
-      if (bidx >= 0) baseArr[bidx] = merged; else baseArr.push(merged);
-      _synced[key] = JSON.stringify(baseArr);
-      _persistSyncedIds(key, baseArr);
-    }
-
-    (_subs[key] || []).forEach(fn => { try { fn(arr); } catch (e) {} });
+    /* Ghi localStorage + notify → GỘP debounce 300ms (bỏ stringify/re-render trên mỗi event).
+       KHÔNG đụng baseline (_synced) ở đây: record vừa nhận ĐÃ ở cloud → poll/merge định kỳ
+       dựng lại baseline đúng (không coi là local-only, không nuốt, không hồi sinh). */
+    clearTimeout(_rtFlush[key]);
+    _rtFlush[key] = setTimeout(() => _flushUpsert(key), 300);
     return true;
   }
 
