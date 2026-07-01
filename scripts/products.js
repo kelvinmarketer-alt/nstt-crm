@@ -135,12 +135,28 @@
     saveTiers(tiers); boardTier = id; renderBoard();
     window.toast('✓ Đã thêm nhóm ' + (name.trim() || id), 'success');
   };
+  /* NHÂN BẢN 1 nhóm giá → nhóm mới (copy nguyên % + toàn bộ giá override), rồi user chỉnh vài SP. */
+  window.tierClone = function (id) {
+    const tiers = getTiers();
+    if (tiers.length >= 8) { window.toast('Tối đa 8 nhóm — xóa bớt rồi nhân bản', 'warn'); return; }
+    const src = tiers.find(t => t.id === +id);
+    if (!src) return;
+    const nOv = Object.keys(src.overrides || {}).length;
+    const name = prompt(`Nhân bản "${src.name}" (copy % + ${nOv} giá riêng). Tên nhóm mới:`, src.name + ' (bản sao)');
+    if (name == null) return;
+    const newId = (tiers.reduce((m, t) => Math.max(m, t.id), 0) || 0) + 1;
+    tiers.push({ id: newId, name: name.trim() || (src.name + ' (bản sao)'), markup: src.markup, overrides: Object.assign({}, src.overrides || {}) });
+    saveTiers(tiers); boardTier = newId;
+    window.closeModal(); renderBoard();
+    window.toast(`✓ Đã nhân bản "${src.name}" → nhóm mới. Giờ chỉnh vài SP là xong.`, 'success');
+  };
   window.tierManage = function () {
     const tiers = getTiers();
     const rows = tiers.map(t => `<div style="display:flex;align-items:center;gap:8px;margin-bottom:8px">
         <span style="font-size:16px">${tierIcon(t)}</span>
         <input value="${(t.name || '').replace(/"/g, '&quot;')}" data-tid="${t.id}" class="tm-name" style="flex:1;border:1px solid var(--line);border-radius:6px;padding:6px 8px;font-size:13px">
         <input type="number" value="${t.markup}" data-tid="${t.id}" class="tm-mk" style="width:70px;text-align:right;border:1px solid var(--line);border-radius:6px;padding:6px" title="% so giá gốc"> %
+        <button class="btn btn-ghost btn-sm" onclick="window.tierClone(${t.id})" title="Nhân bản nhóm này (copy toàn bộ giá) rồi chỉnh vài SP">⧉ Nhân bản</button>
         <button class="btn btn-ghost btn-sm" style="color:var(--danger)" onclick="window.tierDelete(${t.id})" title="Xóa nhóm">🗑</button>
       </div>`).join('');
     window.openModal('⚙ Quản lý nhóm bảng giá', `

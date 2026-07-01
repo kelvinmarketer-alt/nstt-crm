@@ -166,6 +166,12 @@
     orders.forEach(o => { if (o && o.status === 'new') { o.status = 'confirmed'; _migrated = true; } });
     if (_migrated) window.STORE.set('orders', orders);
     const rows = orders.filter(match);
+    /* SẮP XẾP ỔN ĐỊNH: mới tạo lên đầu; SỬA đơn KHÔNG làm nhảy vị trí
+       (createdAt + mã đơn không đổi khi sửa → thứ tự giữ nguyên, hết hiểu lầm "chưa sửa"). */
+    rows.sort((a, b) =>
+      (b.createdAt || '').localeCompare(a.createdAt || '')
+      || String(b.code || '').localeCompare(String(a.code || ''), undefined, { numeric: true })
+    );
     document.getElementById('rowCount').textContent =
       `${rows.length} / ${orders.length} đơn`
       + (currentStatus ? ` · ${STATUS[currentStatus].label}` : '')
@@ -311,9 +317,17 @@
     }
   }
 
+  /* Ngày của đơn dạng ISO yyyy-mm-dd (ưu tiên ngày GIAO deliverDate, fallback ngày đặt dd/mm/yyyy) */
+  function orderDateISO(o) {
+    if (o.deliverDate && /^\d{4}-\d{2}-\d{2}/.test(o.deliverDate)) return o.deliverDate.slice(0, 10);
+    const m = String(o.date || '').match(/(\d{1,2})\/(\d{1,2})\/(\d{4})/);
+    return m ? `${m[3]}-${m[2].padStart(2, '0')}-${m[1].padStart(2, '0')}` : '';
+  }
   function match(o) {
     if (currentStatus && o.status !== currentStatus) return false;
     if (currentService && !svcIdsOf(o).includes(currentService)) return false;
+    const fd = document.getElementById('fDate') && document.getElementById('fDate').value;
+    if (fd && orderDateISO(o) !== fd) return false;   /* lọc theo NGÀY: chỉ hiện đơn đúng ngày chọn */
     const q = document.getElementById('qSearch').value.trim().toLowerCase();
     if (q && ![o.code, o.custName, o.driverName, o.vehicle, o.cust].some(x => (x||'').toLowerCase().includes(q))) return false;
     const tm = document.getElementById('fMode').value;
@@ -326,13 +340,13 @@
   }
 
   window.clearOrderFilters = function() {
-    ['fMode','fDriver','fStaff'].forEach(id => document.getElementById(id).value = '');
+    ['fMode','fDriver','fStaff','fDate'].forEach(id => { const el = document.getElementById(id); if (el) el.value = ''; });
     document.getElementById('qSearch').value = '';
     currentStatus = null;
     currentService = null;
     render();
   };
-  ['qSearch','fMode','fDriver','fStaff'].forEach(id => {
+  ['qSearch','fMode','fDriver','fStaff','fDate'].forEach(id => {
     document.getElementById(id)?.addEventListener('input', render);
   });
 
