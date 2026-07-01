@@ -85,6 +85,26 @@
      trường hợp caller mutate mảng TẠI CHỖ rồi set cùng reference. */
   const _synced = {};
 
+  /* === RMW-KV (read-modify-write) — CHỐNG ĐÈ NHAU cho KV blob NHIỀU NGƯỜI sửa (vd priceTiers:
+     2 nhóm × ~660 giá). Trước đây STORE.set('priceTiers') ghi đè CẢ khối (last-write-wins) →
+     NV B (bản cũ) lưu đè mất edit của NV A; realtime máy khác cũng nuốt → "sửa xong 1 lúc load lại mất".
+     Nay: mỗi thao tác = 1 `mutate(arr)→arr` áp lên bản CLOUD MỚI NHẤT rồi ghi lại (không đè phần
+     của người khác). Local đổi NGAY (optimistic), cloud ghi GỘP debounce 1.2s (đỡ round-trip). */
+  const _rmwQueue = {}; const _rmwTimer = {};
+  async function _flushRmw(key) {
+    const mutates = _rmwQueue[key] || []; _rmwQueue[key] = [];
+    if (!mutates.length || !isSupabaseMode() || !window.SB_DATA || !window.SB_DATA.setKv) return;
+    let base;
+    try { const cloud = await window.SB_DATA.getKv(key); base = Array.isArray(cloud) ? cloud : (Array.isArray(_data[key]) ? _data[key] : []); }
+    catch (e) { base = Array.isArray(_data[key]) ? _data[key] : []; }
+    let cur = JSON.parse(JSON.stringify(base));
+    mutates.forEach(m => { try { cur = m(cur) || cur; } catch (e) {} });   /* áp lại mọi thay đổi lên bản cloud mới */
+    _data[key] = cur;
+    try { localStorage.setItem(PREFIX + key, JSON.stringify(cur)); } catch (e) {}
+    (_subs[key] || []).forEach(fn => { try { fn(cur); } catch (e) {} });
+    window.SB_DATA.setKv(key, cur).catch(e => console.warn(`[STORE rmwKv flush ${key}]`, e));
+  }
+
   /* === Baseline ID-set (BỀN qua reload) — để phân biệt record bị XOÁ ở máy khác
      với record mới tạo offline. Chỉ lưu danh sách id (nhẹ), per table key.
      - record có ở local, KHÔNG có trên cloud, NHƯNG có trong baseline cũ → đã bị xoá → BỎ
@@ -341,6 +361,7 @@
       window.SB_DATA.subscribeKv(({ key, value }) => {
         if (!KV_KEYS.has(key)) return;            /* chỉ nhận key app quan tâm */
         if (value == null) return;
+        if (_rmwQueue[key] && _rmwQueue[key].length) return;   /* còn edit chưa flush → bỏ qua, tránh nuốt (flush sẽ merge lên cloud) */
         const nextJson = JSON.stringify(value);
         if (nextJson === JSON.stringify(_data[key])) return;  /* không đổi → bỏ (né echo của chính mình) */
         _data[key] = value;
@@ -693,6 +714,18 @@
 
     subscribe(key, fn) {
       (_subs[key] = _subs[key] || []).push(fn);
+    },
+
+    /* Read-Modify-Write cho KV blob nhiều người sửa (priceTiers, mktPrices…): mutate(arr)→arr.
+       Local đổi NGAY; cloud ghi gộp lên bản MỚI NHẤT (debounce) → không đè phần của NV khác.
+       ⚠ mutate phải IDEMPOTENT (áp 2 lần cùng kết quả): set/xoá theo id, đừng dùng random/push-không-guard. */
+    rmwKv(key, mutate) {
+      if (!(key in _data)) _data[key] = _load(key, []);
+      try { _data[key] = mutate(_data[key]) || _data[key]; } catch (e) { console.warn('[STORE rmwKv]', e); }
+      _save(key);   /* optimistic local + notify subscriber (KHÔNG push cloud ở đây) */
+      (_rmwQueue[key] = _rmwQueue[key] || []).push(mutate);
+      clearTimeout(_rmwTimer[key]);
+      _rmwTimer[key] = setTimeout(() => _flushRmw(key), 1200);
     },
 
     /* Dữ liệu cloud của key đã tải XONG chưa? (localStorage mode → luôn true).

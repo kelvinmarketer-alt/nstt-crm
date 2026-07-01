@@ -114,16 +114,16 @@
     if (!boardTier) return;
     const v = parseFloat(document.getElementById('tierMarkup').value);
     if (isNaN(v)) { window.toast('Nhập % hợp lệ', 'warn'); return; }
-    const tiers = getTiers(); const t = tiers.find(x => x.id === boardTier); if (!t) return;
-    t.markup = v; saveTiers(tiers);
+    const t = getTiers().find(x => x.id === boardTier); if (!t) return;
+    window.STORE.rmwKv('priceTiers', arr => { const tt = arr.find(x => x.id === boardTier); if (tt) tt.markup = v; return arr; });
     window.toast(`✓ ${t.name}: giá gốc ${v >= 0 ? '+' : ''}${v}%`, 'success');
     renderBoard();
   };
   window.tierResetOverride = function (pid) {
     if (!boardTier) return;
-    const tiers = getTiers(); const t = tiers.find(x => x.id === boardTier); if (!t) return;
-    if (t.overrides) delete t.overrides[pid];
-    saveTiers(tiers); renderBoard();
+    if (!getTiers().find(x => x.id === boardTier)) return;
+    window.STORE.rmwKv('priceTiers', arr => { const t = arr.find(x => x.id === boardTier); if (t && t.overrides) delete t.overrides[pid]; return arr; });
+    renderBoard();
   };
   window.tierAdd = function () {
     const tiers = getTiers();
@@ -131,9 +131,10 @@
     const id = (tiers.reduce((m, t) => Math.max(m, t.id), 0) || 0) + 1;
     const name = prompt('Tên nhóm bảng giá mới:', 'Nhóm ' + id);
     if (name == null) return;
-    tiers.push({ id, name: name.trim() || ('Nhóm ' + id), markup: 0, overrides: {} });
-    saveTiers(tiers); boardTier = id; renderBoard();
-    window.toast('✓ Đã thêm nhóm ' + (name.trim() || id), 'success');
+    const nm = name.trim() || ('Nhóm ' + id);
+    window.STORE.rmwKv('priceTiers', arr => { if (!arr.find(t => t.id === id)) arr.push({ id, name: nm, markup: 0, overrides: {} }); return arr; });
+    boardTier = id; renderBoard();
+    window.toast('✓ Đã thêm nhóm ' + nm, 'success');
   };
   /* NHÂN BẢN 1 nhóm giá → nhóm mới (copy nguyên % + toàn bộ giá override), rồi user chỉnh vài SP. */
   window.tierClone = function (id) {
@@ -145,8 +146,9 @@
     const name = prompt(`Nhân bản "${src.name}" (copy % + ${nOv} giá riêng). Tên nhóm mới:`, src.name + ' (bản sao)');
     if (name == null) return;
     const newId = (tiers.reduce((m, t) => Math.max(m, t.id), 0) || 0) + 1;
-    tiers.push({ id: newId, name: name.trim() || (src.name + ' (bản sao)'), markup: src.markup, overrides: Object.assign({}, src.overrides || {}) });
-    saveTiers(tiers); boardTier = newId;
+    const snap = { id: newId, name: name.trim() || (src.name + ' (bản sao)'), markup: src.markup, overrides: Object.assign({}, src.overrides || {}) };
+    window.STORE.rmwKv('priceTiers', arr => { if (!arr.find(t => t.id === newId)) arr.push(JSON.parse(JSON.stringify(snap))); return arr; });
+    boardTier = newId;
     window.closeModal(); renderBoard();
     window.toast(`✓ Đã nhân bản "${src.name}" → nhóm mới. Giờ chỉnh vài SP là xong.`, 'success');
   };
@@ -169,16 +171,18 @@
     });
   };
   window.tierSaveManage = function () {
-    const tiers = getTiers();
-    document.querySelectorAll('.tm-name').forEach(inp => { const t = tiers.find(x => x.id === +inp.dataset.tid); if (t) t.name = inp.value.trim() || t.name; });
-    document.querySelectorAll('.tm-mk').forEach(inp => { const t = tiers.find(x => x.id === +inp.dataset.tid); if (t) { const v = parseFloat(inp.value); if (!isNaN(v)) t.markup = v; } });
-    saveTiers(tiers); window.closeModal(); renderBoard();
+    /* Chỉ đổi TÊN + % theo id (KHÔNG đụng overrides) → merge lên bản cloud mới, giữ giá NV khác vừa sửa */
+    const upd = {};
+    document.querySelectorAll('.tm-name').forEach(inp => { const id = +inp.dataset.tid; (upd[id] = upd[id] || {}).name = inp.value.trim(); });
+    document.querySelectorAll('.tm-mk').forEach(inp => { const id = +inp.dataset.tid; const v = parseFloat(inp.value); if (!isNaN(v)) (upd[id] = upd[id] || {}).markup = v; });
+    window.STORE.rmwKv('priceTiers', arr => { arr.forEach(t => { const u = upd[t.id]; if (u) { if (u.name) t.name = u.name; if (u.markup != null) t.markup = u.markup; } }); return arr; });
+    window.closeModal(); renderBoard();
     window.toast('✓ Đã lưu nhóm bảng giá', 'success');
   };
   window.tierDelete = function (id) {
     if (!confirm('Xóa nhóm bảng giá này? (giá gốc + nhóm khác không ảnh hưởng)')) return;
-    let tiers = getTiers().filter(t => t.id !== +id);
-    saveTiers(tiers); if (boardTier === +id) boardTier = 0;
+    window.STORE.rmwKv('priceTiers', arr => arr.filter(t => t.id !== +id));
+    if (boardTier === +id) boardTier = 0;
     window.closeModal(); renderBoard();
   };
 
@@ -402,10 +406,10 @@
     document.querySelectorAll('.tprice').forEach(inp => {
       inp.addEventListener('change', () => {
         if (!boardTier) return;
-        const tiers = getTiers(); const t = tiers.find(x => x.id === boardTier); if (!t) return;
-        t.overrides = t.overrides || {};
-        t.overrides[inp.dataset.id] = _pmoney(inp.value);
-        saveTiers(tiers); renderBoard();
+        if (!getTiers().find(x => x.id === boardTier)) return;
+        const pid = inp.dataset.id, price = _pmoney(inp.value);
+        window.STORE.rmwKv('priceTiers', arr => { let t = arr.find(x => x.id === boardTier); if (!t) { t = { id: boardTier, name: 'Nhóm ' + boardTier, markup: 0, overrides: {} }; arr.push(t); } t.overrides = t.overrides || {}; t.overrides[pid] = price; return arr; });
+        renderBoard();
         window.toast('✓ Đã ghi đè giá nhóm cho SP', 'success');
       });
     });
@@ -722,10 +726,8 @@
     const v = parseInt(String(val).replace(/[^\d]/g, ''), 10);
     if (isNaN(v) || v < 0) { window.toast('Nhập số hợp lệ', 'warn'); return; }
     if (tier) {
-      const tiers = getTiers(); const t = tiers.find(x => x.id === boardTier); if (!t) return;
-      t.overrides = t.overrides || {};
-      ids.forEach(id => { t.overrides[id] = v; });
-      saveTiers(tiers);
+      if (!getTiers().find(x => x.id === boardTier)) return;
+      window.STORE.rmwKv('priceTiers', arr => { const t = arr.find(x => x.id === boardTier); if (t) { t.overrides = t.overrides || {}; ids.forEach(id => { t.overrides[id] = v; }); } return arr; });
     } else {
       ids.forEach(id => {
         const p = window.productById(id); if (!p) return;
