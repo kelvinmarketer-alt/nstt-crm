@@ -10,9 +10,14 @@
 
   let objective = (OBJS[0] || {}).id || 'ban-hang';
   let channel = 'all';
-  /* Mặc định tháng HIỆN TẠI (không hardcode) — để data import tháng này hiện ngay */
-  let month = (window.todayDate ? window.todayDate() : new Date()).toISOString().slice(0, 7);
-  window.setAdsMonth = function (m) { if (m) { month = m; render(); } };
+  /* Tháng đang xem: NHỚ tháng chọn gần nhất (localStorage) → reload KHÔNG nhảy về tháng hiện tại
+     làm "mất" data tháng vừa nhập khỏi màn hình. Chưa có lưu → tháng hiện tại. */
+  const _MONTH_KEY = 'vty_adsMonth';
+  let month = (function () {
+    try { const s = localStorage.getItem(_MONTH_KEY); if (s && /^\d{4}-\d{2}$/.test(s)) return s; } catch (e) {}
+    return (window.todayDate ? window.todayDate() : new Date()).toISOString().slice(0, 7);
+  })();
+  window.setAdsMonth = function (m) { if (m) { month = m; try { localStorage.setItem(_MONTH_KEY, m); } catch (e) {} render(); } };
 
   const all = () => window.STORE.get('adspend', window.ADSPEND || []);
   const fmtD = iso => { const [y, m, d] = iso.split('-'); return `${d}/${m}`; };
@@ -226,6 +231,7 @@
     });
     if (jumpMonth && jumpMonth !== month) {
       month = jumpMonth;
+      try { localStorage.setItem(_MONTH_KEY, month); } catch (e) {}
       const el = document.getElementById('adsMonth'); if (el) el.value = month;
     }
     window.toast(`🤖 AI đã nhập ${n} ngày chi phí (${obj.label} · ${ch.toUpperCase()})${jumpMonth ? ' · xem tháng ' + jumpMonth.slice(5) + '/' + jumpMonth.slice(0,4) : ''}.`, n ? 'success' : 'warn');
@@ -481,6 +487,7 @@
     /* Nhảy tới tháng của data vừa nhập để user thấy ngay */
     if (jumpMonth && jumpMonth !== month) {
       month = jumpMonth;
+      try { localStorage.setItem(_MONTH_KEY, month); } catch (e) {}
       const el = document.getElementById('adsMonth'); if (el) el.value = month;
     }
     window.closeModal();

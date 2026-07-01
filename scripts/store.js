@@ -443,7 +443,8 @@
     for (const it of local) {
       const id = keyOf(it);
       if (id == null || !_isPending(key, id) || !cloudIds.has(id)) continue;
-      window.SB_DATA.update(table, id, it, idCol).then(() => _clearPending(key, id)).catch(() => {});
+      /* Chỉ hết pending khi đẩy lại THÀNH CÔNG (saved != null); hỏng → giữ pending, lần merge sau đẩy tiếp. */
+      window.SB_DATA.update(table, id, it, idCol).then(saved => { if (saved != null) _clearPending(key, id); }).catch(() => {});
     }
     if (deletedOnCloud.length) {
       console.log(`[STORE] ${key}: bỏ ${deletedOnCloud.length} record đã bị xoá trên cloud (KHÔNG hồi sinh)`);
@@ -622,7 +623,9 @@
               _clearPending(key, old); _markPending(key, saved[idCol]); _clearPending(key, saved[idCol]);
               _save(key);
               if (key === 'orders') window.toast?.(`Mã đơn ${old} trùng — đã tự đổi thành ${saved[idCol]} ✓`, 'info');
-            } else { _clearPending(key, item[idCol]); }
+            } else if (saved) { _clearPending(key, item[idCol]); }
+            /* saved == null = INSERT HỎNG → GIỮ pending: merge (neverSynced) sẽ chèn LẠI + giữ
+               record trên máy, KHÔNG để mất. Trước đây xoá pending ở đây kể cả khi hỏng. */
             /* ⚠️ CHỐNG MẤT DỮ LIỆU: CHỈ ghi baseline khi insert THÀNH CÔNG (saved != null =
                record đã CHẮC CHẮN ở cloud). Trước đây ghi baseline ĐỒNG BỘ ngay lúc add →
                nếu insert lỗi/chưa kịp xong mà user reload → merge tưởng "đã sync rồi bị xoá
@@ -632,7 +635,7 @@
               _synced[key] = JSON.stringify(_data[key]); _persistSyncedIds(key, _data[key]);
             }
           })
-          .catch(e => { _clearPending(key, item[idCol]); console.warn(`[STORE add ${key} → SB]`, e); });
+          .catch(e => { console.warn(`[STORE add ${key} → SB]`, e); });   /* GIỮ pending khi lỗi → merge tự đẩy lại */
       }
       return item;
     },
@@ -651,13 +654,16 @@
           const idCol = ID_COLUMN[key] || 'id';
           _markPending(key, identifier);
           window.SB_DATA.update(TABLE_MAP[key], identifier, patch, idCol)
-            .then(() => {
+            .then(saved => {
+              /* ⚠️ SB_DATA.update KHÔNG reject — lỗi (RLS/mạng/cột NOT NULL) trả về NULL.
+                 CHỈ coi là XONG khi saved != null (cloud thật sự đã ghi). Nếu null = GHI HỎNG →
+                 GIỮ pending: merge sẽ đẩy LẠI bản local lên cloud (không revert về giá trị cũ),
+                 tránh "sửa xong, F5 là mất". */
+              if (saved == null) return;
               _clearPending(key, identifier);
-              /* Chỉ ghi baseline khi cloud XÁC NHẬN update xong → trong lúc chờ, merge giữ bản local
-                 (pending) nên F5 KHÔNG bị quay về giá trị cũ trên cloud. */
               if (TABLE_MAP[key] && Array.isArray(_data[key])) { _synced[key] = JSON.stringify(_data[key]); _persistSyncedIds(key, _data[key]); }
             })
-            .catch(e => { _clearPending(key, identifier); console.warn(`[STORE update ${key} → SB]`, e); });
+            .catch(e => { console.warn(`[STORE update ${key} → SB]`, e); });
         }
         return arr[i];
       }

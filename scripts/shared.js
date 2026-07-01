@@ -3,6 +3,11 @@
    Dùng chung cho mọi trang.
    ========================================================= */
 
+/* Phiên bản app hiển thị (đối chiếu với CACHE_VERSION trong sw.js) — để user tự XÁC NHẬN
+   đang chạy bản mới hay còn kẹt JS cũ (hiện ở góc sidebar + log console). */
+window.APP_VERSION = 'v319';
+console.log('%c[NSTT] App ' + window.APP_VERSION, 'color:#339B21;font-weight:bold');
+
 /* ============ PWA setup =============
    Tự register service worker + inject manifest vào mọi page
    ===================================================== */
@@ -124,8 +129,23 @@
 
   /* Register service worker (chỉ trên HTTPS / localhost) */
   if ('serviceWorker' in navigator && (location.protocol === 'https:' || location.hostname === 'localhost')) {
+    /* ⚠️ TỰ ÁP DỤNG BẢN MỚI — hết cảnh "sửa xong mà app vẫn lỗi":
+       SW dùng stale-while-revalidate → lần reload ĐẦU sau khi deploy vẫn chạy JS CŨ
+       (phải F5 lần 2 / đóng hết tab mới có code mới). Nay: khi SW MỚI (bản deploy mới)
+       giành quyền điều khiển → TỰ reload 1 lần để trang chạy ngay code mới.
+       hadController: chỉ reload khi ĐÃ có SW trước đó (bản cập nhật), bỏ qua lần cài đầu. */
+    const _hadController = !!navigator.serviceWorker.controller;
+    let _swReloaded = false;
+    navigator.serviceWorker.addEventListener('controllerchange', () => {
+      if (_swReloaded || !_hadController) return;
+      _swReloaded = true;
+      console.log('[PWA] ⬆ Đã có bản cập nhật — tự tải lại để áp dụng ngay.');
+      location.reload();
+    });
     window.addEventListener('load', () => {
-      navigator.serviceWorker.register('/sw.js').catch(err => console.warn('[PWA] SW register failed:', err));
+      navigator.serviceWorker.register('/sw.js')
+        .then(reg => { try { reg.update(); } catch (e) {} })   /* chủ động kiểm tra bản mới mỗi lần mở app */
+        .catch(err => console.warn('[PWA] SW register failed:', err));
     });
   }
 })();
@@ -1264,7 +1284,7 @@ window.renderAppShell = function(activeId, breadcrumbText) {
         <div class="avatar" style="background:${window.avatarColor(window.CURRENT_USER.name)}">${window.CURRENT_USER.initials}</div>
         <div class="user-block">
           <div class="u1">${window.CURRENT_USER.name}</div>
-          <div class="u2">${window.CURRENT_USER.role}</div>
+          <div class="u2">${window.CURRENT_USER.role} <span style="opacity:.55;font-size:10px">· ${window.APP_VERSION || ''}</span></div>
         </div>
         <button class="icon-btn" title="Đăng xuất" onclick="window.AUTH && window.AUTH.logout()"
                 style="color:rgba(255,255,255,0.6)">⏻</button>
