@@ -561,9 +561,13 @@
         console.warn(`[STORE set ${key}] BỎ QUA ${omitted.length} record vắng mặt (không auto-xoá — dùng STORE.remove nếu muốn xoá thật):`,
           omitted.map(keyOf));
       }
-      /* Baseline = HỢP của value (vừa đẩy) + record bị bỏ qua (vẫn còn trên cloud) →
-         lần set() sau không hiểu nhầm các record đó là "mới" rồi push lặp. */
-      const baseline = omitted.length ? value.concat(omitted) : value;
+      /* ⚠️ CHỐNG MẤT DỮ LIỆU: baseline CHỈ gồm record ĐÃ TỪNG CÓ (đã sync trước) + record
+         cloud giữ lại (omitted). Record MỚI (chưa từng có, insert vừa fire ASYNC) KHÔNG cho
+         vào baseline — nếu insert lỗi/chưa xong mà reload, merge sẽ coi là "mới chưa sync" →
+         tự đẩy lại + GIỮ, thay vì tưởng "đã xoá trên cloud" rồi XOÁ MẤT. Record cũ (đã ở
+         cloud) vẫn trong baseline nên không bị đẩy lặp. */
+      const confirmedExisting = value.filter(it => oldMap.has(keyOf(it)));
+      const baseline = omitted.length ? confirmedExisting.concat(omitted) : confirmedExisting;
       _synced[key] = JSON.stringify(baseline);
       _persistSyncedIds(key, baseline);
     },
@@ -578,17 +582,23 @@
         const idCol = ID_COLUMN[key] || 'id';
         window.SB_DATA.insert(TABLE_MAP[key], item)
           .then(saved => {
-            /* Insert đổi MÃ (vd đơn trùng mã → cấp mã mới) → cập nhật lại cache + UI + baseline */
+            /* Insert đổi MÃ (vd đơn trùng mã → cấp mã mới) → cập nhật lại cache + UI */
             if (saved && saved[idCol] && item[idCol] !== saved[idCol]) {
               const old = item[idCol]; item[idCol] = saved[idCol];
               _save(key);
-              if (Array.isArray(_data[key])) { _synced[key] = JSON.stringify(_data[key]); _persistSyncedIds(key, _data[key]); }
               if (key === 'orders') window.toast?.(`Mã đơn ${old} trùng — đã tự đổi thành ${saved[idCol]} ✓`, 'info');
+            }
+            /* ⚠️ CHỐNG MẤT DỮ LIỆU: CHỈ ghi baseline khi insert THÀNH CÔNG (saved != null =
+               record đã CHẮC CHẮN ở cloud). Trước đây ghi baseline ĐỒNG BỘ ngay lúc add →
+               nếu insert lỗi/chưa kịp xong mà user reload → merge tưởng "đã sync rồi bị xoá
+               trên cloud" → XOÁ MẤT record. Nay: chưa vào baseline = merge coi "mới chưa sync"
+               → tự ĐẨY LẠI lên cloud + GIỮ trên máy (self-heal, không mất). */
+            if (saved && TABLE_MAP[key] && Array.isArray(_data[key])) {
+              _synced[key] = JSON.stringify(_data[key]); _persistSyncedIds(key, _data[key]);
             }
           })
           .catch(e => console.warn(`[STORE add ${key} → SB]`, e));
       }
-      if (TABLE_MAP[key] && Array.isArray(_data[key])) _synced[key] = JSON.stringify(_data[key]); if (TABLE_MAP[key] && Array.isArray(_data[key])) _persistSyncedIds(key, _data[key]);
       return item;
     },
 
