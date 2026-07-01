@@ -24,6 +24,11 @@
     return startDate;
   }
 
+  /* === Shipper mặc định của mẫu định kỳ — lưu KV (roaming đa máy; recurring_orders không có cột driver) === */
+  const _roDrvMap = () => (window.STORE.get('recurringDrivers', {}) || {});
+  function roDriverOf(ro) { const kv = _roDrvMap()[ro.id]; return kv || { id: ro.driver || '', name: ro.driverName || '' }; }
+  function setRoDriver(roId, id, name) { const m = { ..._roDrvMap() }; if (id) m[roId] = { id, name: name || '' }; else delete m[roId]; window.STORE.set('recurringDrivers', m); }
+
   /* === Auto-assign: tìm shipper rảnh nhất (ít đơn confirmed/pickup/transit hôm nay nhất) === */
   function findFreeShipper() {
     const drivers = window.STORE.get('shippers', window.DRIVERS || []) || [];
@@ -78,9 +83,10 @@
       const freight = items.reduce((s,i) => s + i.total, 0);
       const c = getCust(ro.custId);
 
-      /* === AUTO-ASSIGN shipper nếu mẫu chưa gán === */
-      let driver = ro.driver || '';
-      let driverName = ro.driverName || '';
+      /* === AUTO-ASSIGN shipper nếu mẫu chưa gán (đọc shipper mặc định từ KV roaming) === */
+      const _rd = roDriverOf(ro);
+      let driver = _rd.id || '';
+      let driverName = _rd.name || '';
       let isAutoAssigned = false;
       if (!driver) {
         const auto = findFreeShipper();
@@ -155,11 +161,12 @@
       const more = r.items.length > 6 ? `<span class="ro-item-pill" style="background:#F1F5F9;color:#475569">+${r.items.length-6} mặt nữa</span>` : '';
       const freqLabel = { daily:'Hàng ngày', weekly:'Hàng tuần', biweekly:'2 tuần/lần', monthly:'Hàng tháng' };
 
-      /* Inline shipper dropdown */
+      /* Inline shipper dropdown — shipper mặc định đọc từ KV roaming */
+      const _rdrv = roDriverOf(r);
       const driverOpts = `<option value="">🤖 Auto-assign (chưa gán)</option>` +
-        drivers.map(d => `<option value="${d.id}" data-name="${d.name}" ${r.driver===d.id?'selected':''}>${d.freelancer?'🤝':'👨‍💼'} ${d.name}${d.primaryPlate?' · '+d.primaryPlate:''}</option>`).join('');
-      const driverLabel = r.driver
-        ? `🛵 <b style="color:#15803D">${r.driverName||r.driver}</b>`
+        drivers.map(d => `<option value="${d.id}" data-name="${d.name}" ${_rdrv.id===d.id?'selected':''}>${d.freelancer?'🤝':'👨‍💼'} ${d.name}${d.primaryPlate?' · '+d.primaryPlate:''}</option>`).join('');
+      const driverLabel = _rdrv.id
+        ? `🛵 <b style="color:#15803D">${_rdrv.name||_rdrv.id}</b>`
         : `<span style="color:#D97706;font-weight:600">🤖 Auto-assign khi sinh đơn</span>`;
 
       return `<div class="ro-card ${r.active?'':'paused'}">
@@ -201,6 +208,7 @@
     list[i].driver = driverId || '';
     list[i].driverName = driverId ? driverName : '';
     window.STORE.set('recurring_orders', list);
+    setRoDriver(roId, driverId, driverName);   /* KV roaming — bảng recurring_orders không có cột driver */
     window.audit && window.audit.log('recurring.changeDriver', `${roId}: ${driverId || 'Auto-assign'} (${driverName||'?'})`);
     window.toast(`✓ Cập nhật shipper cho mẫu ${roId}`, 'success');
   };
@@ -474,6 +482,7 @@ CHỈ TRẢ JSON.`,
       list.push(obj);
     }
     window.STORE.set('recurring_orders', list);
+    setRoDriver(obj.id, driverId, driverName);   /* shipper mặc định roaming qua KV */
     window.audit && window.audit.log(isEdit ? 'recurring.update' : 'recurring.create', `${obj.id} · ${obj.custName}`);
     window.toast('✓ Đã lưu mẫu', 'success');
     window.closeModal();
