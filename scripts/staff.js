@@ -567,7 +567,7 @@
 
   /* Helpers cho popup tạo tài khoản */
   window.copyAuthInfo = function(email, pass, name) {
-    const text = `Nông Sản Tuấn Tú Hà Nội — Thông tin đăng nhập của ${name}\n\n🌐 URL: https://vty-logistics.onrender.com\n📧 Email: ${email}\n🔑 Mật khẩu: ${pass}\n\nVui lòng đổi mật khẩu sau khi login lần đầu.`;
+    const text = `Nông Sản Tuấn Tú Hà Nội — Thông tin đăng nhập của ${name}\n\n🌐 URL: https://app.nongsantuantuhanoi.vn\n📧 Email: ${email}\n🔑 Mật khẩu: ${pass}\n\nVui lòng đổi mật khẩu sau khi login lần đầu.`;
     navigator.clipboard.writeText(text).then(() => window.toast('✓ Đã copy vào clipboard', 'success'));
   };
   window.sendAuthZalo = function(phone, email, pass) {
