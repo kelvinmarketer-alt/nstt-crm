@@ -373,6 +373,21 @@
             continue;
           }
         }
+        /* MỌI BẢNG KHÁC (adspend, inventory, customers…): trùng PK = bản ghi NÀY đã có trên
+           cloud (self-heal/realtime echo chèn trước, hoặc import chạy lại) → IDEMPOTENT:
+           lấy bản cloud trả về, KHÔNG spam toast "duplicate key". (Trước đây chỉ orders được
+           xử lý → mọi import khác nổ hàng loạt toast lỗi.) */
+        if (error.code === '23505' || /duplicate key/i.test(error.message || '')) {
+          const pkCol = mapped.id != null ? 'id' : (mapped.no != null ? 'no' : (mapped.code != null ? 'code' : null));
+          if (pkCol && mapped[pkCol] != null) {
+            try {
+              const ex = await client.from(table).select('*').eq(pkCol, mapped[pkCol]).maybeSingle();
+              if (ex && ex.data) { console.warn(`[SB insert] ${table}: '${mapped[pkCol]}' đã có trên cloud → coi như đã lưu`); return mapFrom(table, ex.data); }
+            } catch (e) { /* đọc lỗi → bỏ qua im lặng */ }
+          }
+          console.warn(`[SB insert] ${table}: trùng PK, dữ liệu đã ở cloud — bỏ qua`, error.message);
+          return null;
+        }
         console.error('[SB insert]', table, error);
         window.toast?.('⚠ Lưu cloud lỗi ' + table + ': ' + (error.message||'unknown'), 'warn');
         return null;

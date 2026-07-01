@@ -198,7 +198,7 @@
       if (obj.hasRevenue) rec.revenue = toInt(it.revenue);
       const ex = cur.find(x => x.date === date && x.objective === objective && x.channel === ch);
       if (ex) window.STORE.update('adspend', ex.id, rec);
-      else { rec.id = 'AD-' + Date.now() + '-' + n; window.STORE.add('adspend', rec); }
+      else { rec.id = 'AD-' + Date.now() + '-' + n + '-' + Math.random().toString(36).slice(2, 6); window.STORE.add('adspend', rec); }
       n++;
     });
     if (jumpMonth && jumpMonth !== month) {
