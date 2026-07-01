@@ -68,6 +68,7 @@
   }
   let currentStatus = null;
   let currentService = null;
+  let _showN = 150;   /* PERF: chỉ render tối đa 150 dòng/lần — DOM 872 dòng (kèm <select> mỗi dòng) làm kéo/lướt bị lag. "Xem thêm" để nạp tiếp. */
   let orderItems = [];   // mặt hàng của đơn đang tạo (sản phẩm + giá ngày)
   let orderTier = '';    // nhóm giá áp dụng cho đơn đang tạo ('' = giá gốc; theo nhóm giá của KH)
   let _pendingSample = null;  // ảnh đơn vừa đọc bằng AI → lưu thành mẫu "nhớ nét chữ" khi lưu đơn
@@ -152,12 +153,14 @@
 
   window.filterStatus = function(k) {
     currentStatus = currentStatus === k ? null : k;
-    renderPipeline(); render();
+    _showN = 150; renderPipeline(); render();
   };
   window.filterService = function(id) {
     currentService = id;
-    renderServiceChips(); render();
+    _showN = 150; renderServiceChips(); render();
   };
+  /* Nạp thêm 150 đơn nữa vào danh sách (giữ vị trí, không reset) */
+  window.orderShowMore = function () { _showN += 150; render(); };
 
   function render() {
     orders = window.STORE.get('orders', window.ORDERS || []);
@@ -186,7 +189,8 @@
       return;
     }
 
-    document.getElementById('tbody').innerHTML = rows.map(o => {
+    const _shown = rows.slice(0, _showN);
+    document.getElementById('tbody').innerHTML = _shown.map(o => {
       try {
         /* Chuẩn hoá status: đơn web cũ dùng 'new' → coi như 'confirmed' (Mới) */
         const statusKey = STATUS[o.status] ? o.status : 'confirmed';
@@ -240,7 +244,11 @@
         console.warn('[orders render] bỏ qua đơn lỗi:', o.code, err.message);
         return ''; /* skip đơn lỗi, không break cả map */
       }
-    }).join('');
+    }).join('') + (rows.length > _showN
+      ? `<tr class="ord-more"><td colspan="11" style="text-align:center;padding:14px;background:#F8FAF8">
+           <button class="btn btn-ghost btn-sm" onclick="window.orderShowMore()">▾ Xem thêm ${Math.min(_showN, rows.length - _showN)} đơn (còn ${rows.length - _showN})</button>
+         </td></tr>`
+      : '');
 
     document.querySelectorAll('#tbody tr[data-code]').forEach(tr => {
       tr.onclick = () => openOrder(tr.dataset.code);
@@ -342,12 +350,13 @@
   window.clearOrderFilters = function() {
     ['fMode','fDriver','fStaff','fDate'].forEach(id => { const el = document.getElementById(id); if (el) el.value = ''; });
     document.getElementById('qSearch').value = '';
+    _showN = 150;
     currentStatus = null;
     currentService = null;
     render();
   };
   ['qSearch','fMode','fDriver','fStaff','fDate'].forEach(id => {
-    document.getElementById(id)?.addEventListener('input', render);
+    document.getElementById(id)?.addEventListener('input', () => { _showN = 150; render(); });
   });
 
   /* === Status flow === */
