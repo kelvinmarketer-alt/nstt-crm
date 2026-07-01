@@ -221,9 +221,13 @@
             ${has ? `<div style="font-size:11.5px;color:var(--ok);margin-bottom:8px;padding:6px 10px;background:#F0FDF4;border-radius:6px">🤖 Đang dùng: <b>${pickedLabel}</b>${taskId ? ` cho task <code>${taskId}</code>` : ''} <span style="color:var(--muted);font-weight:400">· đổi ở Cài đặt → AI Form Filler</span></div>`
                   : `<div style="background:var(--warn-bg);color:var(--warn);padding:10px 12px;border-radius:8px;font-size:12.5px;margin-bottom:10px">⚠️ Chưa cấu hình AI. Vào <b>Cài đặt → Tích hợp → AI Form Filler</b> dán API key (Gemini FREE 1.500 lượt/ngày).</div>`}
             <div id="aiDrop" style="border:2px dashed var(--line);border-radius:10px;padding:22px 14px;text-align:center;cursor:pointer;background:#FAFBFA">
-              <input type="file" id="aiFile" accept="image/*" capture="environment" style="display:none">
-              <div id="aiDropText" style="color:var(--muted);font-size:13px;line-height:1.6">📷 Bấm chọn ảnh · kéo-thả · hoặc dán (Ctrl+V)<br><span style="font-size:11px">Chụp bảng giá / tin nhắn khách / danh thiếp / đơn viết tay</span></div>
+              <input type="file" id="aiFile" accept="image/*" style="display:none">
+              <div id="aiDropText" style="color:var(--muted);font-size:13px;line-height:1.6">📷 Bấm để chọn ảnh <b>(máy ảnh / thư viện)</b><br><span style="font-size:11px">Chụp bảng giá / tin nhắn khách / đơn viết tay · hoặc <b>dán ảnh đã copy</b></span></div>
               <img id="aiPreview" style="display:none;max-width:100%;max-height:240px;border-radius:8px;margin:0 auto">
+            </div>
+            <div style="display:flex;gap:8px;margin-top:8px">
+              <button type="button" class="btn btn-ghost" style="flex:1;justify-content:center" onclick="document.getElementById('aiFile').click()">🖼 Chọn ảnh</button>
+              <button type="button" class="btn btn-ghost" style="flex:1;justify-content:center" onclick="window.AI._pasteFromClipboard()">📋 Dán ảnh</button>
             </div>
             <div style="margin-top:10px">
               <label style="font-size:12px;font-weight:600;color:var(--navy);display:block;margin-bottom:4px">📝 Ghi chú cho AI <span style="font-weight:400;color:var(--muted)">— giải thích cách đọc (không bắt buộc)</span></label>
@@ -261,6 +265,29 @@
         const t = document.getElementById('aiDropText'); if (t) t.style.display = 'none';
         const st = document.getElementById('aiStatus'); if (st) st.innerHTML = '✓ Đã chọn ảnh — bấm "Xử lý bằng AI"';
       } catch (e) { window.toast(e.message, 'warn'); }
+    },
+
+    /* Dán ảnh từ clipboard bằng nút bấm — dùng Clipboard API (điện thoại không có Ctrl+V).
+       Cần HTTPS + cử chỉ người dùng (click nút) → đọc được ảnh vừa copy. */
+    async _pasteFromClipboard() {
+      try {
+        if (navigator.clipboard && navigator.clipboard.read) {
+          const items = await navigator.clipboard.read();
+          for (const it of items) {
+            const type = (it.types || []).find(t => t.indexOf('image/') === 0);
+            if (type) {
+              const blob = await it.getType(type);
+              this._setImg(new File([blob], 'clipboard.png', { type: blob.type || 'image/png' }));
+              return;
+            }
+          }
+          window.toast('Clipboard chưa có ảnh — copy 1 ảnh rồi bấm Dán lại', 'warn');
+          return;
+        }
+        window.toast('Máy không hỗ trợ dán ảnh — bấm "Chọn ảnh" để lấy từ thư viện', 'warn');
+      } catch (e) {
+        window.toast('Không dán được (' + (e.message || e) + '). Thử "🖼 Chọn ảnh" từ thư viện.', 'warn');
+      }
     },
 
     _closeOverlay() {
