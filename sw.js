@@ -1,7 +1,7 @@
 /* =========================================================
    Nông Sản Tuấn Tú Hà Nội — Service Worker (PWA offline + cache)
    ========================================================= */
-const CACHE_VERSION = "nstt-v309";
+const CACHE_VERSION = "nstt-v310";
 const CORE_ASSETS = [
   '/',
   '/index.html',
@@ -50,16 +50,23 @@ self.addEventListener('fetch', e => {
   const isCode = /\.(js|json|css)$/.test(url.pathname);
 
   if (isCode) {
-    /* JS/CSS/JSON: network-first, cache fallback offline */
+    /* JS/CSS/JSON: STALE-WHILE-REVALIDATE — trả CACHE ngay (mở app tức thì, KHÔNG chờ ~20
+       file JS qua mạng mỗi lần vào), đồng thời tải bản mới ở NỀN để cập nhật cache lần sau.
+       An toàn vì cache đánh version theo CACHE_VERSION + activate xoá cache cũ → không kẹt
+       bản cũ lâu; bản mới propagate ngay lần load kế tiếp. (Trước đây network-first no-cache
+       → mỗi lần vào app đều chờ mạng tải hết JS/CSS = chậm, nhất là 3G/4G.) */
     e.respondWith(
-      fetch(e.request.url, { cache: 'no-cache', credentials: 'same-origin', redirect: 'follow' }).then(res => {
-        /* CHỈ cache response 2xx có body — bỏ qua 3xx/4xx/5xx/opaque */
-        if (res.ok && res.type === 'basic' && res.status >= 200 && res.status < 300) {
-          const clone = res.clone();
-          caches.open(CACHE_VERSION).then(c => c.put(e.request, clone));
-        }
-        return res;
-      }).catch(() => caches.match(e.request))
+      caches.match(e.request).then(cached => {
+        const fetching = fetch(e.request.url, { cache: 'no-cache', credentials: 'same-origin', redirect: 'follow' })
+          .then(res => {
+            if (res.ok && res.type === 'basic' && res.status >= 200 && res.status < 300) {
+              const clone = res.clone();
+              caches.open(CACHE_VERSION).then(c => c.put(e.request, clone));
+            }
+            return res;
+          }).catch(() => cached);
+        return cached || fetching;   /* có cache → trả NGAY + revalidate nền; chưa có → chờ mạng */
+      })
     );
   } else if (/\.(jpg|jpeg|png|gif|webp|svg|ico|woff2?)$/.test(url.pathname)) {
     /* Static assets (ảnh, font): cache-first cho nhanh */
