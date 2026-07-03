@@ -82,7 +82,7 @@ ${FAV ? `<link rel="icon" type="image/svg+xml" href="${FAV}">` : ''}
     background:#fff;font-size:12.5px;line-height:1.45;padding:14mm 12mm}
 
   /* === HEADER (3 cột: logo | thông tin DN | QR chuyển khoản) === */
-  .head{display:grid;grid-template-columns:104px 1fr 152px;gap:14px;align-items:flex-start;border-bottom:2px solid #1B5E20;padding-bottom:8px}
+  .head{display:grid;grid-template-columns:104px 1fr 152px;gap:14px;align-items:flex-start;padding-bottom:6px}
   .logo-wrap{text-align:center}
   .logo-wrap img{width:92px;height:92px;object-fit:contain;display:block;margin:0 auto}
   .logo-wrap .tag{font-size:9px;color:#1B5E20;font-weight:700;margin-top:4px;line-height:1.25}
@@ -99,7 +99,7 @@ ${FAV ? `<link rel="icon" type="image/svg+xml" href="${FAV}">` : ''}
 
   /* === TITLE (to, căn trái) + Người báo hàng === */
   .titlerow{display:flex;justify-content:space-between;align-items:center;gap:12px;
-    border-top:2px solid #1B5E20;border-bottom:1px solid #1B5E20;padding:7px 4px;margin-top:9px}
+    border-bottom:1px solid #1B5E20;padding:2px 4px 7px;margin-top:6px}
   .ptitle{font-size:23px;font-weight:800;color:#C00000;text-align:left;letter-spacing:0.3px;line-height:1.08}
   .reporter{background:#FFFF00;padding:4px 12px;border:1px solid #000;text-align:center;flex:0 0 auto}
   .reporter .lbl{display:block;font-size:10.5px;font-weight:700;margin-bottom:1px}
@@ -141,13 +141,13 @@ ${FAV ? `<link rel="icon" type="image/svg+xml" href="${FAV}">` : ''}
     <div class="logo-wrap">
       <img src="${getLogo()}" alt="Tuấn Tú Farm">
       <div class="tag">Nông Sản Sạch Bảo Vệ Con Người Và Thiên Nhiên</div>
-      <div class="tag2">Uy Tín Làm Nên Thương Hiệu</div>
     </div>
     <div class="comp-info">
-      <h1>${(comp.name || 'Công Ty TNHH XNK Nông Sản Tuấn Tú Hà Nội').toUpperCase()}</h1>
+      <h1>${(comp.name || 'Công Ty TNHH XNK Nông Sản Tuấn Tú Hà Nội').toUpperCase().replace(/\s*[-–—]\s*/, '<br>')}</h1>
       <div class="row"><b>Mã Số Thuế:</b> ${comp.tax || '0110302211'}</div>
       <div class="row"><b>Địa Chỉ:</b> ${comp.address || '36/147A Tân Mai, Hoàng Mai, Hà Nội'}</div>
-      <div class="row"><b>Số Tài Khoản:</b> ${comp.bank || 'Techcombank 6699399999'} — <b>Chủ TK:</b> ${comp.bankOwner || 'Nguyễn Tuấn Anh'}</div>
+      <div class="row"><b>Số Tài Khoản:</b> ${comp.bank || 'Techcombank 6699399999'}</div>
+      <div class="row"><b>Chủ TK:</b> ${comp.bankOwner || 'Nguyễn Tuấn Anh'}</div>
       <div class="row"><b>Email:</b> ${comp.email || 'nongsantuantuhanoi@gmail.com'} &nbsp;·&nbsp; <b>GĐĐH:</b> ${comp.director || comp.hotline || '0836676086'}</div>
     </div>
     <div class="qrbox">
@@ -169,9 +169,9 @@ ${FAV ? `<link rel="icon" type="image/svg+xml" href="${FAV}">` : ''}
     <div><b>Khách Hàng:</b> ${c.name || o.custName || '—'}${(c.address || o.drop) ? ` &nbsp;·&nbsp; <b>Địa Chỉ:</b> ${c.address || o.drop}` : ''}</div>
     <div><b>SĐT:</b> ${c.phone || o.custPhone || '—'} &nbsp;·&nbsp; <b>TG Nhận:</b> ${o.deliveryTime || 'Sáng'}</div>
   </div>
-  <div style="text-align:right;font-style:italic;font-size:11.5px;margin-top:5px">
-    <i>Chuyên Sỉ Rau Củ Quả Đà Lạt Và Rau Vùng Miền.</i> &nbsp;&nbsp;&nbsp;
-    Ngày: <b>${fmtDate(o.date || o.deliveredAt)}</b>
+  <div style="display:flex;justify-content:space-between;align-items:baseline;font-style:italic;font-size:11.5px;margin-top:5px">
+    <i>Chuyên Sỉ Rau Củ Quả Đà Lạt Và Rau Vùng Miền.</i>
+    <span>Ngày: <b>${fmtDate(o.date || o.deliveredAt)}</b></span>
   </div>
 
   <!-- ============ ITEMS TABLE ============ -->
