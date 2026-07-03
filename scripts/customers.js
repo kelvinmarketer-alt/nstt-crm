@@ -161,9 +161,14 @@
     });
     return Math.round(overdue);
   }
+  let _lastOrdersRef = null, _lastLedgerRef = null;
   function rebuildCustStats() {
     const orders = window.STORE.get('orders', window.ORDERS || []) || [];
     const ledger = window.STORE.get('debtLedger', []) || [];
+    /* MEMO: chỉ duyệt lại 900+ đơn khi mảng orders/ledger THỰC SỰ đổi (merge cloud thay reference).
+       Render do tìm/lọc/phân trang KHÔNG đổi data → dùng lại _cstats (khỏi lặp nặng → hết giật/chậm). */
+    if (orders === _lastOrdersRef && ledger === _lastLedgerRef && _cstats && Object.keys(_cstats).length) return;
+    _lastOrdersRef = orders; _lastLedgerRef = ledger;
     const m = {};
     const g = id => m[id] || (m[id] = { orders: 0, revenue: 0, charge: 0, paid: 0, credits: [] });
     orders.forEach(o => {
@@ -182,6 +187,10 @@
   }
   /* Ghi đè (trong RAM) số liệu hiển thị của KH = số tính từ đơn, RỒI ghi ngược cloud nếu lệch */
   function enrichCustomerStats() {
+    /* orders CHƯA về (đang preload) → GIỮ số đã lưu trên KH (từ cloud), ĐỪNG ghi đè 0.
+       → danh sách KH + số liệu hiện NGAY khi customers về, không phải chờ tải hết 900 đơn. */
+    const ordersReady = !window.STORE.isPreloaded || window.STORE.isPreloaded('orders');
+    if (!ordersReady) return;
     rebuildCustStats();
     (customers || []).forEach(c => {
       const s = _cstats[c.id];
@@ -1308,16 +1317,27 @@
     window.location.href = 'quotes.html';
   };
 
+  /* Gộp nhiều lần re-render (customers/orders/debtLedger về gần nhau) thành 1 khung hình → hết giật */
+  let _rafPending = false;
+  function scheduleRender() {
+    if (_rafPending) return;
+    _rafPending = true;
+    const run = () => { _rafPending = false; render(); };
+    if (window.requestAnimationFrame) requestAnimationFrame(run); else setTimeout(run, 16);
+  }
   /* Subscribe re-render when STORE.customers changes */
-  window.STORE.subscribe('customers', render);
+  window.STORE.subscribe('customers', scheduleRender);
   /* Đơn hàng / sổ công nợ đổi → tính lại số đơn·doanh thu·công nợ trên trang KH */
-  window.STORE.subscribe('orders', render);
-  window.STORE.subscribe('debtLedger', render);
-  window.STORE.subscribe('__preloaded__', k => { if (k === 'orders' || k === 'debtLedger') render(); });
+  window.STORE.subscribe('orders', scheduleRender);
+  window.STORE.subscribe('debtLedger', scheduleRender);
+  window.STORE.subscribe('__preloaded__', k => { if (k === 'orders' || k === 'debtLedger' || k === 'customers') scheduleRender(); });
 
   /* Init */
   window.renderAppShell('customers', 'Quản lý khách hàng');
   window.bindTabs();
   render();
+  /* Nạp orders + sổ công nợ (cho cột số đơn/doanh thu/công nợ) HOÃN 1 nhịp để danh sách KH
+     hiện TRƯỚC — customers (nhẹ, ~vài chục dòng) không phải tranh DB/CPU với ~900 đơn (nặng). */
+  setTimeout(() => { window.STORE.get('orders', window.ORDERS || []); window.STORE.get('debtLedger', []); }, 350);
   setTimeout(() => { sortAndReorderTbody(); applyColPrefs(); }, 100);
 })();
