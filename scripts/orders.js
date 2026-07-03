@@ -69,6 +69,8 @@
   let currentStatus = null;
   let currentService = null;
   let currentAcct = null;   /* Tab nấc kế toán: null=tất cả · 'wait-qty' · 'wait-price' · 'done' */
+  let currentPeriod = null; /* Thẻ số đơn: null=tất cả · 'today' · 'week' · 'month' */
+  let _pb = null;           /* mốc thời gian tính 1 lần/render (today/weekStart/month) */
   let _showN = 150;   /* PERF: chỉ render tối đa 150 dòng/lần — DOM 872 dòng (kèm <select> mỗi dòng) làm kéo/lướt bị lag. "Xem thêm" để nạp tiếp. */
   let orderItems = [];   // mặt hàng của đơn đang tạo (sản phẩm + giá ngày)
   /* Chế độ bộ soạn item: 'edit'=sửa tất cả · 'priceOnly'=SL đã chốt, chỉ sửa giá · 'view'=đã báo giá, chỉ xem */
@@ -122,20 +124,47 @@
   /* Trạng thái chọn được trong dropdown — bao gồm cả off-pipeline */
   const ALL_STATUSES = [...STEPS, 'returned', 'cancelled'];
 
-  function renderPipeline() {
-    const counts = {};
-    orders.forEach(o => counts[o.status] = (counts[o.status]||0) + 1);
-    const total = orders.length;
-    document.getElementById('pipeline').innerHTML = Object.entries(STATUS).map(([k, v]) => {
-      const cnt = counts[k] || 0;
-      const pct = total ? Math.round(cnt/total*100) : 0;
-      return `<div class="pipe-card s-${k} ${currentStatus===k?'active':''}" onclick="filterStatus('${k}')">
-        <div class="lab">${v.icon} ${v.label}</div>
-        <div class="val">${cnt}</div>
-        <div class="sub">${v.sub} · ${pct}%</div>
-      </div>`;
-    }).join('');
+  /* Mốc thời gian (hôm nay / đầu tuần thứ 2 / tháng) — tính theo NGÀY ĐƠN (orderDateISO) */
+  function computePeriodBounds() {
+    const today = (window.todayISO && window.todayISO()) || new Date().toISOString().slice(0, 10);
+    const dd = new Date(today + 'T00:00:00');
+    const dow = (dd.getDay() + 6) % 7;   /* 0 = Thứ Hai */
+    dd.setDate(dd.getDate() - dow);
+    const iso = x => `${x.getFullYear()}-${String(x.getMonth() + 1).padStart(2, '0')}-${String(x.getDate()).padStart(2, '0')}`;
+    return { today, weekStart: iso(dd), month: today.slice(0, 7) };
   }
+  /* Đơn thuộc mốc nào? dùng chung cho đếm + lọc */
+  function _inPeriod(o, key, pb) {
+    const d = orderDateISO(o); if (!d) return false;
+    if (key === 'today') return d === pb.today;
+    if (key === 'week') return d >= pb.weekStart && d <= pb.today;
+    if (key === 'month') return d.slice(0, 7) === pb.month;
+    return true;
+  }
+
+  /* Thay 7 thẻ trạng thái = 3 thẻ SỐ ĐƠN: Hôm nay · Tuần này · Tháng này (bấm để lọc theo mốc) */
+  function renderPipeline() {
+    const box = document.getElementById('pipeline'); if (!box) return;
+    const pb = _pb || computePeriodBounds();
+    let nToday = 0, nWeek = 0, nMonth = 0;
+    orders.forEach(o => {
+      if (_inPeriod(o, 'today', pb)) nToday++;
+      if (_inPeriod(o, 'week', pb)) nWeek++;
+      if (_inPeriod(o, 'month', pb)) nMonth++;
+    });
+    const dm = s => (s || '').split('-').reverse().join('/');   /* YYYY-MM-DD → DD/MM/YYYY */
+    const card = (key, icon, label, val, sub, color) =>
+      `<div class="pipe-card ${currentPeriod === key ? 'active' : ''}" onclick="window.filterPeriod('${key}')" title="Bấm để chỉ xem đơn ${label.toLowerCase()}" style="border-left-color:${color}${currentPeriod === key ? ';box-shadow:0 0 0 2px ' + color + '33' : ''}">
+        <div class="lab">${icon} ${label}</div>
+        <div class="val" style="color:${color}">${val}</div>
+        <div class="sub">${sub}</div>
+      </div>`;
+    box.innerHTML =
+      card('today', '📅', 'Đơn hôm nay', nToday, dm(pb.today), '#3B82F6') +
+      card('week', '🗓', 'Đơn tuần này', nWeek, 'từ ' + dm(pb.weekStart).slice(0, 5), '#8B5CF6') +
+      card('month', '📆', 'Đơn tháng này', nMonth, 'tháng ' + pb.month.split('-').reverse().join('/'), '#16A34A');
+  }
+  window.filterPeriod = function (k) { currentPeriod = currentPeriod === k ? null : k; _showN = 150; render(); };
 
   function renderServiceChips() {
     const counts = { all: orders.length };
@@ -167,6 +196,7 @@
 
   function render() {
     orders = window.STORE.get('orders', window.ORDERS || []);
+    _pb = computePeriodBounds();   /* mốc hôm nay/tuần/tháng — tính 1 lần cho cả match + thẻ đếm */
     /* Migration 1 lần: đơn web cũ status 'new' → 'confirmed' (đồng nhất với đơn tự tạo) */
     let _migrated = false;
     orders.forEach(o => { if (o && o.status === 'new') { o.status = 'confirmed'; _migrated = true; } });
@@ -180,6 +210,7 @@
     );
     document.getElementById('rowCount').textContent =
       `${rows.length} / ${orders.length} đơn`
+      + (currentPeriod ? ` · ${ { today: 'Hôm nay', week: 'Tuần này', month: 'Tháng này' }[currentPeriod] }` : '')
       + (currentStatus ? ` · ${STATUS[currentStatus].label}` : '')
       + (currentService ? ` · ${SVC[currentService].label}` : '');
     document.getElementById('footCount').textContent = rows.length;
@@ -383,6 +414,7 @@
     if (currentStatus && o.status !== currentStatus) return false;
     if (currentService && !svcIdsOf(o).includes(currentService)) return false;
     if (currentAcct && window.orderAcctStage && window.orderAcctStage(o.code) !== currentAcct) return false;
+    if (currentPeriod && !_inPeriod(o, currentPeriod, _pb || computePeriodBounds())) return false;
     const fd = document.getElementById('fDate') && document.getElementById('fDate').value;
     if (fd && orderDateISO(o) !== fd) return false;   /* lọc theo NGÀY: chỉ hiện đơn đúng ngày chọn */
     const q = document.getElementById('qSearch').value.trim().toLowerCase();
@@ -401,6 +433,7 @@
     currentStatus = null;
     currentService = null;
     currentAcct = null;
+    currentPeriod = null;
     render();
   };
   ['qSearch','fDriver','fStaff','fDate'].forEach(id => {
