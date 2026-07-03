@@ -553,7 +553,8 @@ ${FAV2 ? `<link rel="icon" type="image/svg+xml" href="${FAV2}">` : ''}
 
     const ifr = document.createElement('iframe');
     ifr.setAttribute('aria-hidden', 'true');
-    ifr.style.cssText = 'position:fixed;left:-10000px;top:0;width:900px;height:2200px;border:0;opacity:0;pointer-events:none';
+    /* Khung rộng ĐÚNG khổ giấy (210mm/148mm) → phiếu lấp đầy, không lệch trái, không dư mép phải */
+    ifr.style.cssText = 'position:fixed;left:-10000px;top:0;width:' + pageW + ';height:2200px;border:0;opacity:0;pointer-events:none';
     document.body.appendChild(ifr);
     const cleanup = () => setTimeout(() => { try { ifr.remove(); } catch (e) {} }, 300);
 
