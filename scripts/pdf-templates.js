@@ -58,7 +58,7 @@
   /* ============================================================
      TEMPLATE 1 — PHIẾU XÁC NHẬN ĐƠN cho KHÁCH HÀNG (A5 portrait)
      ============================================================ */
-  window.printOrderForCustomer = async function (code) {
+  window.printOrderForCustomer = async function (code, win) {
     /* Lazy-load PRODUCT_IMAGES (3.8MB) nếu chưa có — chỉ khi user thực sự export PDF */
     if (window.loadProductImages && !window.PRODUCT_IMAGES) {
       window.toast && window.toast('⏳ Đang nạp ảnh SP cho PDF...', 'info');
@@ -251,14 +251,14 @@ ${FAV ? `<link rel="icon" type="image/svg+xml" href="${FAV}">` : ''}
   <script>window.onload=function(){setTimeout(function(){window.print()},200)}<\/script>
 </body></html>`;
 
-    openPrintWindow(html, 'Phiếu xác nhận ' + o.code);
+    window.openReceiptImageWindow(html, 'Phiếu xác nhận ' + o.code, 'phieu-xac-nhan-' + o.code, win);
   };
 
   /* ============================================================
      TEMPLATE 2 — PHIẾU GIAO HÀNG cho SHIPPER (A5 portrait)
      Tối ưu cho cầm trên xe — font to, địa chỉ to, có ô tick
      ============================================================ */
-  window.printOrderForShipper = async function (code) {
+  window.printOrderForShipper = async function (code, win) {
     if (window.loadProductImages && !window.PRODUCT_IMAGES) {
       window.toast && window.toast('⏳ Đang nạp ảnh SP cho PDF...', 'info');
       await window.loadProductImages();
@@ -398,7 +398,7 @@ ${FAV2 ? `<link rel="icon" type="image/svg+xml" href="${FAV2}">` : ''}
   <script>window.onload=function(){setTimeout(function(){window.print()},200)}<\/script>
 </body></html>`;
 
-    openPrintWindow(html, 'Phiếu giao ' + o.code);
+    window.openReceiptImageWindow(html, 'Phiếu giao ' + o.code, 'phieu-giao-' + o.code, win);
   };
 
   /* ============================================================
@@ -478,5 +478,47 @@ ${FAV2 ? `<link rel="icon" type="image/svg+xml" href="${FAV2}">` : ''}
     window.toast && window.toast('🖨 Mở hộp in — bỏ tick "Headers and footers" để ẩn ngày/URL', 'info');
     if (window.audit) window.audit.log('order.print', title);
   }
+
+  /* === XEM & COPY ẢNH phiếu (thay cho in PDF) — dán thẳng vào Zalo/Messenger gửi khách ===
+     Mở popup hiện phiếu + thanh nút [Copy ảnh][Tải ảnh][In][Đóng]. Dùng html2canvas (như cong-nợ). */
+  window.openReceiptImageWindow = function (fullHtml, title, fileName, win) {
+    /* win = cửa sổ đã mở SẴN trong cú click (giữ user-gesture, né chặn popup); nếu không có thì mở mới */
+    const w = win || window.open('', '_blank', 'width=960,height=1000');
+    if (!w) { window.toast && window.toast('Trình duyệt CHẶN popup — cho phép popup để copy ảnh phiếu', 'warn'); return; }
+    /* bỏ auto-print có sẵn trong template (nếu có) */
+    let html = String(fullHtml).replace(/<script>[\s\S]*?window\.print\(\)[\s\S]*?<\/script>/gi, '');
+    const fn = String(fileName || 'phieu').normalize('NFD').replace(/[̀-ͯ]/g, '').replace(/đ/gi, 'd')
+      .replace(/[^a-zA-Z0-9]+/g, '-').replace(/^-+|-+$/g, '').toLowerCase() || 'phieu';
+    const inject = `
+      <style>
+        #rcpBar{position:sticky;top:0;z-index:99999;display:flex;gap:8px;justify-content:center;flex-wrap:wrap;padding:10px;background:#0f172a;box-shadow:0 2px 10px rgba(0,0,0,.28)}
+        #rcpBar button{border:0;border-radius:8px;padding:9px 15px;font-size:13px;font-weight:700;cursor:pointer;color:#fff}
+        .noprint{display:none!important}   /* ẩn nút In/Đóng có sẵn trong template — #rcpBar đã thay thế */
+        @media print{#rcpBar,.rcp-no-cap{display:none!important}}
+      </style>
+      <div id="rcpBar" class="rcp-no-cap">
+        <button style="background:#16a34a" onclick="rcpCopy()">📸 Copy ảnh gửi khách</button>
+        <button style="background:#0ea5e9" onclick="rcpDl()">⬇ Tải ảnh .png</button>
+        <button style="background:#64748b" onclick="window.print()">🖨 In giấy</button>
+        <button style="background:#334155" onclick="window.close()">✕ Đóng</button>
+      </div>
+      <script src="https://cdn.jsdelivr.net/npm/html2canvas@1.4.1/dist/html2canvas.min.js"><\/script>
+      <script>
+        var _fn=${JSON.stringify(fn)};
+        async function _snap(){
+          if(!window.html2canvas){ alert('Thư viện ảnh đang tải, đợi 1-2 giây rồi bấm lại.'); return null; }
+          return await window.html2canvas(document.body,{scale:2,useCORS:true,backgroundColor:'#ffffff',logging:false,
+            ignoreElements:function(el){ return el.id==='rcpBar' || (el.classList&&(el.classList.contains('rcp-no-cap')||el.classList.contains('noprint'))); }});
+        }
+        function _dl(b){ var a=document.createElement('a'); a.href=URL.createObjectURL(b); a.download=_fn+'.png'; document.body.appendChild(a); a.click(); a.remove(); setTimeout(function(){URL.revokeObjectURL(a.href)},3000); }
+        async function rcpCopy(){ try{ var cv=await _snap(); if(!cv)return; cv.toBlob(async function(b){ try{ await navigator.clipboard.write([new ClipboardItem({'image/png':b})]); alert('✓ Đã copy ẢNH phiếu — dán vào Zalo/Messenger gửi khách (Ctrl+V / Cmd+V).'); }catch(e){ _dl(b); alert('Trình duyệt không cho copy trực tiếp → đã TẢI ảnh .png về máy. Gửi file ảnh đó cho khách.'); } },'image/png'); }catch(e){ alert('Lỗi tạo ảnh: '+(e&&e.message||e)); } }
+        async function rcpDl(){ try{ var cv=await _snap(); if(!cv)return; cv.toBlob(function(b){ _dl(b); },'image/png'); }catch(e){ alert('Lỗi tạo ảnh: '+(e&&e.message||e)); } }
+      <\/script>`;
+    if (/<body[^>]*>/i.test(html)) html = html.replace(/(<body[^>]*>)/i, '$1' + inject);
+    else html = inject + html;
+    w.document.open(); w.document.write(html); w.document.close();
+    window.toast && window.toast('📸 Mở phiếu — bấm "Copy ảnh gửi khách" rồi dán vào Zalo', 'info');
+    if (window.audit) window.audit.log('order.receiptImage', title);
+  };
 
 })();

@@ -193,6 +193,8 @@
     'custPriceTiers',  /* Nhóm giá gán cho từng KH {custId:tierId} — cloud customers không có cột price_tier */
     'custCreditDays',  /* Hạn công nợ (số ngày) theo từng KH {custId:days} — chính sách 3/7/15 */
     'custBrands',      /* Nhãn THƯƠNG HIỆU gom nhiều cơ sở {custId:'BIA ƠI'} — cùng thương hiệu = gộp công nợ + in phiếu ma trận */
+    'orderQtyLocks',   /* Chốt SẢN LƯỢNG đơn {code:{by,byId,at}} — KT1 khớp SL khách nhận với đơn sale lên (bước trước báo giá) */
+    'orderQuoteLocks', /* Chốt báo giá đơn {code:{by,byId,at}} — KT2 chốt giá (sau khi SL đã chốt), 5 kế toán đồng bộ để không sửa nhầm */
     'debtLedger',      /* Sổ công nợ theo ngày {custId,date,type,amount,ref} — phát sinh/trả nợ từng dòng */
     'autoRecurring',   /* Cấu hình tự tạo đơn định kỳ {enabled,time} — cron GitHub Actions đọc qua master_data */
     'audit_log',       /* Truy vết NV — HIGH */

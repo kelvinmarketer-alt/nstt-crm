@@ -68,8 +68,11 @@
   }
   let currentStatus = null;
   let currentService = null;
+  let currentAcct = null;   /* Tab nấc kế toán: null=tất cả · 'wait-qty' · 'wait-price' · 'done' */
   let _showN = 150;   /* PERF: chỉ render tối đa 150 dòng/lần — DOM 872 dòng (kèm <select> mỗi dòng) làm kéo/lướt bị lag. "Xem thêm" để nạp tiếp. */
   let orderItems = [];   // mặt hàng của đơn đang tạo (sản phẩm + giá ngày)
+  /* Chế độ bộ soạn item: 'edit'=sửa tất cả · 'priceOnly'=SL đã chốt, chỉ sửa giá · 'view'=đã báo giá, chỉ xem */
+  let _itemsMode = 'edit';
   let orderTier = '';    // nhóm giá áp dụng cho đơn đang tạo ('' = giá gốc; theo nhóm giá của KH)
   let _pendingSample = null;  // ảnh đơn vừa đọc bằng AI → lưu thành mẫu "nhớ nét chữ" khi lưu đơn
 
@@ -182,6 +185,7 @@
     document.getElementById('footCount').textContent = rows.length;
     renderPipeline();
     renderServiceChips();
+    renderQuoteTabs();
 
     if (!rows.length) {
       document.getElementById('tbody').innerHTML =
@@ -206,7 +210,14 @@
           <td class="ocell-code"><b style="color:var(--navy)">${o.code || '—'}</b>
               <div style="margin-top:2px">
                 <span class="tag" style="background:${src.color}1a;color:${src.color};font-weight:600;font-size:10.5px">${src.icon} ${src.label}</span>
-              </div></td>
+              </div>
+              ${(() => {
+                const ql = window.orderQuoteLock && window.orderQuoteLock(o.code);
+                const tl = window.orderQtyLock && window.orderQtyLock(o.code);
+                if (ql) return `<div style="margin-top:3px"><span class="tag" title="KT2 đã chốt báo giá" style="background:#DCFCE7;color:#15803D;font-weight:700;font-size:10px">🔒 Giá: ${_escOpt(ql.by || 'Đã chốt')}</span></div>`;
+                if (tl) return `<div style="margin-top:3px"><span class="tag" title="KT1 đã chốt sản lượng — chờ KT2 báo giá" style="background:#FFEDD5;color:#B45309;font-weight:700;font-size:10px">📦 SL: ${_escOpt(tl.by || '')} · chờ giá</span></div>`;
+                return `<div style="margin-top:3px"><span class="tag" title="Chưa chốt sản lượng — KT1 cần khớp SL khách nhận" style="background:#FEE2E2;color:#DC2626;font-weight:600;font-size:10px">⏳ Chờ chốt SL</span></div>`;
+              })()}</td>
           <td class="hide-sm" data-field="date" title="Giờ tạo đơn (chính xác)" style="font-size:12px;color:var(--muted)">${orderWhen(o)}</td>
           <td class="cust-col">
             <div class="name-clamp" data-field="custName" title="Click để sửa tên KH">${o.custName || '—'}</div>
@@ -371,12 +382,11 @@
   function match(o) {
     if (currentStatus && o.status !== currentStatus) return false;
     if (currentService && !svcIdsOf(o).includes(currentService)) return false;
+    if (currentAcct && window.orderAcctStage && window.orderAcctStage(o.code) !== currentAcct) return false;
     const fd = document.getElementById('fDate') && document.getElementById('fDate').value;
     if (fd && orderDateISO(o) !== fd) return false;   /* lọc theo NGÀY: chỉ hiện đơn đúng ngày chọn */
     const q = document.getElementById('qSearch').value.trim().toLowerCase();
     if (q && ![o.code, o.custName, o.driverName, o.vehicle, o.cust].some(x => (x||'').toLowerCase().includes(q))) return false;
-    const tm = document.getElementById('fMode').value;
-    if (tm && o.transportMode !== tm) return false;
     const dr = document.getElementById('fDriver').value;
     if (dr && o.driverName !== dr) return false;
     const stf = document.getElementById('fStaff').value;
@@ -385,16 +395,57 @@
   }
 
   window.clearOrderFilters = function() {
-    ['fMode','fDriver','fStaff','fDate'].forEach(id => { const el = document.getElementById(id); if (el) el.value = ''; });
+    ['fDriver','fStaff','fDate'].forEach(id => { const el = document.getElementById(id); if (el) el.value = ''; });
     document.getElementById('qSearch').value = '';
     _showN = 150;
     currentStatus = null;
     currentService = null;
+    currentAcct = null;
     render();
   };
-  ['qSearch','fMode','fDriver','fStaff','fDate'].forEach(id => {
+  ['qSearch','fDriver','fStaff','fDate'].forEach(id => {
     document.getElementById(id)?.addEventListener('input', () => { _showN = 150; render(); });
   });
+
+  /* Bộ lọc Shipper + NV phụ trách LẤY DỮ LIỆU THẬT (module nhân sự) — thay danh sách mock cứng.
+     Gộp roster (staff/shippers) + tên đang có trong đơn để không đơn nào lọt lọc. */
+  function _distinctNames(arr) {
+    return [...new Set((arr || []).filter(Boolean).map(x => String(x).trim()).filter(Boolean))];
+  }
+  function _escOpt(s) { return String(s).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;'); }
+  function populateFilterDropdowns() {
+    const ords = window.STORE.get('orders', window.ORDERS || []) || [];
+    const fD = document.getElementById('fDriver');
+    if (fD) {
+      const roster = (window.STORE.get('shippers', window.DRIVERS || []) || []).filter(s => s && s.name).map(s => s.name);
+      const names = _distinctNames([...roster, ...ords.map(o => o.driverName)]).sort((a, b) => a.localeCompare(b, 'vi'));
+      const cur = fD.value;
+      fD.innerHTML = '<option value="">Shipper (tất cả)</option>' + names.map(n => `<option>${_escOpt(n)}</option>`).join('');
+      if (names.includes(cur)) fD.value = cur;
+    }
+    const fS = document.getElementById('fStaff');
+    if (fS) {
+      const roster = (window.STORE.get('staff', window.STAFFS || []) || []).filter(s => s && s.name).map(s => s.name);
+      const names = _distinctNames([...roster, ...ords.map(o => o.staff)]).sort((a, b) => a.localeCompare(b, 'vi'));
+      const cur = fS.value;
+      fS.innerHTML = '<option value="">NV phụ trách (tất cả)</option>' + names.map(n => `<option>${_escOpt(n)}</option>`).join('');
+      if (names.includes(cur)) fS.value = cur;
+    }
+  }
+
+  /* Tabs quy trình kế toán 2 nấc — đếm theo orderAcctStage */
+  window.filterAcct = function (k) { currentAcct = currentAcct === k ? null : k; _showN = 150; render(); };
+  function renderQuoteTabs() {
+    const el = document.getElementById('quoteTabs'); if (!el) return;
+    const cnt = { 'wait-qty': 0, 'wait-price': 0, 'done': 0 };
+    orders.forEach(o => { const s = window.orderAcctStage ? window.orderAcctStage(o.code) : 'wait-qty'; cnt[s] = (cnt[s] || 0) + 1; });
+    const tab = (key, icon, label, n, color) =>
+      `<button class="chip ${currentAcct === key ? 'active' : ''}" onclick="window.filterAcct(${key === null ? 'null' : `'${key}'`})" style="${currentAcct === key ? 'background:' + color + ';color:#fff;border-color:' + color : ''}">${icon} ${label} <span class="cnt">${n}</span></button>`;
+    el.innerHTML = tab(null, '🗂', 'Tất cả', orders.length, '#334155')
+      + tab('wait-qty', '⏳', 'Chờ chốt sản lượng', cnt['wait-qty'], '#DC2626')
+      + tab('wait-price', '📦', 'Chờ báo giá', cnt['wait-price'], '#B45309')
+      + tab('done', '🔒', 'Đã chốt báo giá', cnt['done'], '#15803D');
+  }
 
   /* === Status flow === */
   function advanceStatus(code) {
@@ -872,6 +923,7 @@
     const prodList = window.STORE.get('products', window.PRODUCTS || []);
     orderItems = [];
     orderTier = '';
+    _itemsMode = 'edit';   /* form tạo đơn LUÔN sửa được (dù trước đó vừa xem 1 đơn đã khoá) */
     _pendingSample = null;
     const tierOpts = window.priceTierOptions ? window.priceTierOptions('') : '<option value="">— Mặc định (Giá gốc) —</option>';
     const nextCode = window.STORE.nextOrderCode();
@@ -1192,6 +1244,18 @@
     const w = document.getElementById('oWeight');
     if (w && w.dataset.auto !== '0') w.value = totalKg > 0 ? totalKg.toFixed(2) : '';
     if (typeof updateProfit === 'function') updateProfit();
+    /* Khoá theo NẤC KẾ TOÁN:
+       'view' (đã báo giá) → khoá hết · 'priceOnly' (SL đã chốt) → khoá SL/đơn vị/xoá, chỉ sửa GIÁ · 'edit' → mở hết */
+    if (_itemsMode === 'view') {
+      box.querySelectorAll('input, select, button').forEach(el => { el.disabled = true; });
+      box.style.opacity = '0.9';
+    } else if (_itemsMode === 'priceOnly') {
+      box.querySelectorAll('.oi-qty, .oi-unit').forEach(el => { el.disabled = true; });
+      box.querySelectorAll('button').forEach(b => { if (/removeOrderItem/.test(b.getAttribute('onclick') || '')) b.disabled = true; });
+      box.style.opacity = '';
+    } else {
+      box.style.opacity = '';
+    }
   }
 
   /* addOrderItem(): đọc từ ô gõ-tìm #oProd (dataset.pid) + #oProdQty.
@@ -1275,31 +1339,66 @@
     const custId = o.cust || o.custId || '';
     _curOrderCust = custId;   /* để lastCustPrice tra đúng giá đối tác khi đổi đơn vị */
     orderTier = (typeof window.custPriceTier === 'function' && custId) ? (window.custPriceTier(custId) || '') : '';
+
+    /* QUY TRÌNH KẾ TOÁN 2 NẤC → xác định chế độ soạn:
+       'edit' chưa chốt gì (KT1 kiểm SL) · 'priceOnly' SL đã chốt (KT2 sửa GIÁ) · 'view' đã báo giá (chỉ xem). */
+    const qtyLock = window.orderQtyLock && window.orderQtyLock(code);
+    const quoteLock = window.orderQuoteLock && window.orderQuoteLock(code);
+    const meName = (window.CURRENT_USER || {}).name || '';
+    _itemsMode = quoteLock ? 'view' : (qtyLock ? 'priceOnly' : 'edit');
+    if (quoteLock) {
+      const when = quoteLock.at ? new Date(quoteLock.at).toLocaleString('vi-VN') : '';
+      const ok = confirm(`🔒 Đơn ${code} ĐÃ CHỐT BÁO GIÁ bởi "${quoteLock.by}"${when ? ' lúc ' + when : ''}.\n\n• OK = MỞ KHOÁ để sửa lại giá (ghi tên bạn: ${meName || 'kế toán'})\n• Cancel = chỉ XEM (tránh sửa nhầm giá đã chốt)`);
+      if (ok) { window.setOrderQuoteLock(code, false); logOrderEdit(code, `🔓 Mở khoá báo giá để sửa — ${meName || '?'}`); _itemsMode = (window.orderQtyLock && window.orderQtyLock(code)) ? 'priceOnly' : 'edit'; }
+    }
+    const mode = _itemsMode;
+    const codeEsc = (code || '').replace(/'/g, "\\'");
+    const _when = l => l && l.at ? ' · ' + new Date(l.at).toLocaleString('vi-VN') : '';
+    let banner = '';
+    if (mode === 'view') {
+      banner = `<div style="margin-bottom:10px;padding:8px 11px;background:#FEF2F2;border:1px solid #FECACA;border-radius:8px;font-size:12px;color:#B91C1C;font-weight:600">🔒 ĐÃ CHỐT BÁO GIÁ bởi <b>${(quoteLock.by || '').replace(/</g, '')}</b>${_when(quoteLock)} — đang CHỈ XEM. Bấm “Mở khoá báo giá” nếu cần sửa lại.</div>`;
+    } else if (mode === 'priceOnly') {
+      banner = `<div style="margin-bottom:10px;padding:8px 11px;background:#FFF7ED;border:1px solid #FED7AA;border-radius:8px;font-size:12px;color:#B45309;font-weight:600">📦 Sản lượng đã chốt bởi <b>${(qtyLock.by || '').replace(/</g, '')}</b>${_when(qtyLock)} — SL đã KHOÁ. Bước 2: KT2 kiểm & sửa <b>GIÁ</b> rồi “Chốt báo giá”. (Cần sửa lại SL → “Sửa lại sản lượng”.)</div>`;
+    } else {
+      banner = `<div style="margin-bottom:10px;padding:8px 11px;background:#EFF6FF;border:1px solid #BFDBFE;border-radius:8px;font-size:12px;color:#1D4ED8;font-weight:600">🧮 Bước 1 — KT1 kiểm <b>SẢN LƯỢNG</b>: khớp SL khách nhận với đơn sale lên. Sửa SL nếu lệch rồi bấm “Chốt sản lượng”.</div>`;
+    }
+
     window.openModal('✏️ Sửa mặt hàng & giá — ' + code, `
       <div style="font-size:12px;color:var(--muted);margin-bottom:10px;line-height:1.55">
-        KH: <b>${(o.custName || '').replace(/</g, '')}</b> · Sửa <b>số lượng</b>, <b>đơn giá</b>, đơn vị, hoặc thêm/bớt mặt hàng.
+        KH: <b>${(o.custName || '').replace(/</g, '')}</b> · ${mode === 'priceOnly' ? 'Kiểm & sửa <b>đơn giá</b> (SL đã chốt, khoá sửa).' : 'Sửa <b>số lượng</b>, <b>đơn giá</b>, đơn vị, hoặc thêm/bớt mặt hàng.'}
         <br>🔒 <b style="color:#15803D">Phiếu báo hàng vẫn KHÔNG hiện giá</b> — đây chỉ là khu vực quản trị nội bộ.
       </div>
-      <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap;margin-bottom:10px;padding:8px 11px;background:#F0FDF4;border:1px solid #BBF7D0;border-radius:8px">
+      ${banner}
+      ${mode === 'view' ? '' : `<div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap;margin-bottom:10px;padding:8px 11px;background:#F0FDF4;border:1px solid #BBF7D0;border-radius:8px">
         <label style="font-size:12.5px;font-weight:700;color:#15803D;white-space:nowrap">💲 Nhóm giá đơn này:</label>
         <select id="oPriceTier" onchange="window.onOrderTierChange(this.value)" style="border:1px solid var(--line);border-radius:6px;padding:6px 9px;font-size:12.5px;background:#fff">${window.priceTierOptions ? window.priceTierOptions(orderTier) : '<option value="">— Giá gốc —</option>'}</select>
         <span id="oTierNote" style="font-size:11px;color:var(--muted);flex:1;min-width:140px">Đổi nhóm để tính lại giá toàn bộ mặt hàng theo bảng giá.</span>
-      </div>
-      <div style="display:flex;gap:8px;align-items:flex-end;flex-wrap:wrap;margin-bottom:8px">
+      </div>`}
+      ${mode === 'edit' ? `<div style="display:flex;gap:8px;align-items:flex-end;flex-wrap:wrap;margin-bottom:8px">
         <div style="flex:2;min-width:200px"><label style="font-size:11px;color:var(--muted);display:block;margin-bottom:3px">Thêm sản phẩm</label>
           <input class="prodpick" id="oProd" data-pid="" placeholder="Gõ tên/mã SP… (↑↓ chọn · Enter thêm)" style="width:100%;border:1px solid var(--line);border-radius:7px;padding:8px 11px;font-size:13px"></div>
         <div><label style="font-size:11px;color:var(--muted);display:block;margin-bottom:3px">SL</label>
           <input id="oProdQty" type="number" value="1" min="0" step="0.1" style="width:78px;border:1px solid var(--line);border-radius:7px;padding:8px"></div>
         <button type="button" class="btn btn-primary btn-sm" onclick="window.addOrderItem()">+ Thêm</button>
-      </div>
+      </div>` : ''}
       <div id="orderItemsBox" style="margin:4px 0"></div>
       <input type="hidden" id="oGoods"><input type="hidden" id="oWeight"><input type="hidden" id="oOtherUnits"><input type="hidden" id="oFreight">
     `, {
-      footer: `<button class="btn btn-ghost" onclick="window.closeModal()">Hủy</button>
-               <button class="btn btn-primary" onclick="window.submitEditOrderItems('${(code || '').replace(/'/g, "\\'")}')">💾 Lưu mặt hàng & giá</button>`,
+      footer: mode === 'view'
+        ? `<button class="btn btn-ghost" onclick="window.closeModal()">Đóng (chỉ xem)</button>
+           <button class="btn btn-primary" onclick="window._unlockOrderQuote('${codeEsc}')">🔓 Mở khoá báo giá</button>`
+        : mode === 'priceOnly'
+        ? `<button class="btn btn-ghost" onclick="window.closeModal()">Đóng</button>
+           <button class="btn btn-ghost" onclick="window._unlockOrderQty('${codeEsc}')" title="Cần chỉnh lại số lượng → mở khoá sản lượng (báo giá đang chờ sẽ bỏ)">🔓 Sửa lại sản lượng</button>
+           <button class="btn btn-ghost" onclick="window.submitEditOrderItems('${codeEsc}', 'draft')" title="Lưu giá nhưng CHƯA chốt báo giá">💾 Lưu giá (chưa chốt)</button>
+           <button class="btn btn-primary" onclick="window.submitEditOrderItems('${codeEsc}', 'price')" title="Chốt báo giá — khoá + ghi tên bạn (KT2)">✅ Chốt báo giá</button>`
+        : `<button class="btn btn-ghost" onclick="window.closeModal()">Hủy</button>
+           <button class="btn btn-ghost" onclick="window.submitEditOrderItems('${codeEsc}', 'draft')" title="Lưu nháp — chưa chốt sản lượng">💾 Lưu nháp</button>
+           <button class="btn btn-primary" onclick="window.submitEditOrderItems('${codeEsc}', 'qty')" title="Chốt sản lượng — khoá SL + ghi tên bạn (KT1), chuyển sang chờ báo giá">📦 Chốt sản lượng</button>`,
       width: '780px', stack: true
     });
     renderOrderItems();
+    if (mode !== 'edit') return;
     setTimeout(() => {
       const oProdEl = document.getElementById('oProd');
       const oQtyEl = document.getElementById('oProdQty');
@@ -1319,9 +1418,11 @@
     }, 40);
   };
 
-  window.submitEditOrderItems = function (code) {
+  /* action: 'draft' = lưu không chốt · 'qty' = chốt SẢN LƯỢNG (KT1) · 'price' = chốt BÁO GIÁ (KT2) */
+  window.submitEditOrderItems = function (code, action) {
     const o = orders.find(x => x.code === code);
     if (!o) return;
+    if (_itemsMode === 'view') { window.toast && window.toast('Đơn đã chốt báo giá — bấm “Mở khoá báo giá” trước', 'warn'); return; }
     const blank = orderItems.filter(x => x.custom && !(x.name || '').trim());
     if (blank.length) { window.toast && window.toast('Còn ' + blank.length + ' SP ngoài DM chưa gõ tên — nhập hoặc xoá dòng đó', 'warn'); return; }
     if (!orderItems.length) { window.toast && window.toast('Đơn phải có ít nhất 1 mặt hàng', 'warn'); return; }
@@ -1330,16 +1431,44 @@
     const weight = parseFloat((document.getElementById('oWeight') || {}).value) || 0;
     window.STORE.update('orders', code, { items: orderItems.slice(), freight, goods, weight });
     logOrderEdit(code, `✏️ Sửa mặt hàng & giá — ${orderItems.length} mã · tổng ${window.fmt(freight)}₫`);
-    /* FIX #18: sửa items khi đơn đã 'delivered'/'reconciled' → nhắc kiểm kho tay.
-       CHỈ cảnh báo, KHÔNG tự điều chỉnh tồn kho. */
+    const me = (window.CURRENT_USER || {}).name || 'Kế toán';
+    if (action === 'qty') {
+      window.setOrderQtyLock(code, true);
+      logOrderEdit(code, `📦 Chốt sản lượng — ${me}`);
+      window.toast && window.toast('📦 Đã CHỐT sản lượng ' + code + ' — ' + me + ' · chuyển sang chờ báo giá', 'success');
+    } else if (action === 'price') {
+      window.setOrderQuoteLock(code, true);
+      logOrderEdit(code, `✅ Chốt báo giá — ${me}`);
+      window.toast && window.toast('✅ Đã CHỐT báo giá ' + code + ' — ' + me, 'success');
+    } else {
+      window.toast && window.toast('✓ Đã lưu (chưa chốt) cho ' + code, 'success');
+    }
+    /* FIX #18: sửa items khi đơn đã 'delivered'/'reconciled' → nhắc kiểm kho tay. */
     if (o.status === 'delivered' || o.status === 'reconciled') {
       window.toast && window.toast('⚠️ Đơn đã giao — tồn kho KHÔNG tự điều chỉnh, kiểm tra kho thủ công', 'warn');
     }
-    orderItems = []; orderTier = ''; _editItemsCode = null;
+    orderItems = []; orderTier = ''; _editItemsCode = null; _itemsMode = 'edit';
     window.closeModal();
-    window.toast && window.toast('✓ Đã cập nhật mặt hàng & giá cho ' + code, 'success');
     if (typeof renderOrders === 'function') { try { renderOrders(); } catch (e) {} }
     setTimeout(() => { if (window.openOrder) window.openOrder(code); }, 60);
+  };
+
+  /* Mở khoá BÁO GIÁ (giữ chốt sản lượng) → mở lại form ở chế độ sửa giá */
+  window._unlockOrderQuote = function (code) {
+    window.setOrderQuoteLock(code, false);
+    logOrderEdit(code, `🔓 Mở khoá báo giá để sửa — ${(window.CURRENT_USER || {}).name || '?'}`);
+    _itemsMode = 'edit';
+    window.closeModal && window.closeModal();
+    setTimeout(() => window.editOrderItems(code), 60);
+  };
+  /* Mở khoá SẢN LƯỢNG → BỎ luôn báo giá (vì giá phụ thuộc SL) → mở lại form sửa đầy đủ */
+  window._unlockOrderQty = function (code) {
+    window.setOrderQtyLock(code, false);
+    if (window.orderQuoteLock && window.orderQuoteLock(code)) window.setOrderQuoteLock(code, false);
+    logOrderEdit(code, `🔓 Mở khoá sản lượng để sửa lại — ${(window.CURRENT_USER || {}).name || '?'}`);
+    _itemsMode = 'edit';
+    window.closeModal && window.closeModal();
+    setTimeout(() => window.editOrderItems(code), 60);
   };
 
   /* Xác nhận giá hàng loạt — tick hết các mã còn '!' */
@@ -2419,8 +2548,16 @@ ${o.note ? `\n📝 Ghi chú: ${o.note}` : ''}
 
   /* Subscribe + init */
   window.STORE.subscribe('orders', render);
+  /* Khoá chốt SL / báo giá đổi ở máy khác → cập nhật badge/tab realtime */
+  window.STORE.subscribe('orderQtyLocks', render);
+  window.STORE.subscribe('orderQuoteLocks', render);
+  /* Bộ lọc Shipper/NV bám dữ liệu nhân sự thật — cập nhật khi roster/đơn đổi */
+  window.STORE.subscribe('shippers', populateFilterDropdowns);
+  window.STORE.subscribe('staff', populateFilterDropdowns);
+  window.STORE.subscribe('orders', populateFilterDropdowns);
   window.renderAppShell('orders', 'Đơn hàng');
   window.bindTabs();
+  populateFilterDropdowns();
   render();
   setTimeout(applyOrdColPrefs, 100);
   if (prefillCust) setTimeout(() => window.openCreateOrder(prefillCust), 200);

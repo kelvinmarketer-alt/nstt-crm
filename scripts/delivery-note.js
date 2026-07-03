@@ -50,7 +50,7 @@
   /* ============================================================
      TEMPLATE — PHIẾU XUẤT KHO (A4 portrait, khớp mẫu ĐƠN HẠNH)
      ============================================================ */
-  window.printDeliveryNote = function (code) {
+  window.printDeliveryNote = function (code, win) {
     const o = getOrder(code);
     if (!o) { window.toast && window.toast('Không tìm thấy đơn ' + code, 'warn'); return; }
     const c = getCust(o);
@@ -232,21 +232,25 @@ ${FAV ? `<link rel="icon" type="image/svg+xml" href="${FAV}">` : ''}
 
 </body></html>`;
 
-    /* In qua iframe cùng origin — không cần cho phép popup */
-    const cleaned = html.replace(/<script>[\s\S]*?window\.print\(\)[\s\S]*?<\/script>/gi, '');
-    const old = document.getElementById('dnPrintFrame'); if (old) old.remove();
-    const f = document.createElement('iframe');
-    f.id = 'dnPrintFrame';
-    f.style.cssText = 'position:fixed;right:0;bottom:0;width:0;height:0;border:0;visibility:hidden';
-    document.body.appendChild(f);
-    const doc = f.contentWindow.document;
-    doc.open(); doc.write(cleaned); doc.close();
-    const fire = () => { try { f.contentWindow.focus(); f.contentWindow.print(); } catch (e) {} };
-    const imgs = [...doc.images];
-    if (imgs.length) { let left = imgs.filter(im => !im.complete).length; if (!left) setTimeout(fire, 250); else imgs.forEach(im => { if (!im.complete) { const d = () => { if (--left <= 0) setTimeout(fire, 150); }; im.onload = d; im.onerror = d; } }); }
-    else setTimeout(fire, 250);
+    /* XEM & COPY ẢNH (thay in PDF) — popup có nút Copy ảnh/Tải ảnh/In */
+    if (window.openReceiptImageWindow) {
+      window.openReceiptImageWindow(html, 'Phiếu xuất kho ' + o.code, 'phieu-xuat-kho-' + o.code, win);
+    } else {
+      /* fallback: in qua iframe nếu helper chưa nạp */
+      const cleaned = html.replace(/<script>[\s\S]*?window\.print\(\)[\s\S]*?<\/script>/gi, '');
+      const old = document.getElementById('dnPrintFrame'); if (old) old.remove();
+      const f = document.createElement('iframe');
+      f.id = 'dnPrintFrame';
+      f.style.cssText = 'position:fixed;right:0;bottom:0;width:0;height:0;border:0;visibility:hidden';
+      document.body.appendChild(f);
+      const doc = f.contentWindow.document;
+      doc.open(); doc.write(cleaned); doc.close();
+      const fire = () => { try { f.contentWindow.focus(); f.contentWindow.print(); } catch (e) {} };
+      const imgs = [...doc.images];
+      if (imgs.length) { let left = imgs.filter(im => !im.complete).length; if (!left) setTimeout(fire, 250); else imgs.forEach(im => { if (!im.complete) { const d = () => { if (--left <= 0) setTimeout(fire, 150); }; im.onload = d; im.onerror = d; } }); }
+      else setTimeout(fire, 250);
+    }
     if (window.audit) window.audit.log('order.deliveryNote', 'Xuất phiếu kho ' + o.code + ' cho ' + (c.name || o.custName));
-    window.toast && window.toast('🖨 Phiếu xuất kho ' + o.code + ' — bỏ tick "Headers and footers", Save as PDF', 'info');
   };
 
   /* === Mở rộng modal in của printOrder() để có 3 lựa chọn === */
@@ -263,8 +267,8 @@ ${FAV ? `<link rel="icon" type="image/svg+xml" href="${FAV}">` : ''}
         <div style="flex:1"><div style="font-weight:700;color:${color};font-size:13px">${icon} ${title}</div>
         <div style="font-size:11px;color:var(--muted);margin-top:2px">${desc}</div></div>
       </label>`;
-    window.openModal('🖨 In phiếu đơn ' + code, `
-      <div style="font-size:12.5px;color:var(--muted);margin-bottom:12px">Tick (các) phiếu cần in theo giai đoạn — in 1 cái hoặc cả 3 tuỳ ý:</div>
+    window.openModal('📸 Phiếu đơn ' + code + ' — Copy ảnh gửi khách', `
+      <div style="font-size:12.5px;color:var(--muted);margin-bottom:12px">Tick phiếu cần → mở ra bấm <b>“Copy ảnh gửi khách”</b> dán vào Zalo/Messenger (vẫn có nút In giấy nếu cần):</div>
       ${row('prt_cust', true,  '📄', '#1B5E20', 'Phiếu xác nhận đơn (Khách)', 'Đơn giá + tổng tiền · công nợ · đối chiếu trước khi giao')}
       ${row('prt_ship', false, '🛵', '#D97706', 'Phiếu giao cho Shipper', 'Địa chỉ + SĐT to · tick mặt hàng · khung COD · ô POD')}
       ${row('prt_wh',   false, '🧾', '#C00000', 'Phiếu báo hàng / xuất kho (Kho)', 'Mặt hàng + số lượng cho Kho chuẩn bị')}
@@ -275,20 +279,30 @@ ${FAV ? `<link rel="icon" type="image/svg+xml" href="${FAV}">` : ''}
       </div>
     `, {
       footer: `<button class="btn btn-ghost" onclick="window.closeModal()">Đóng</button>
-               <button class="btn btn-primary" onclick="window._printSelectedPhieu('${code}')">🖨 In phiếu đã chọn</button>`,
+               <button class="btn btn-primary" onclick="window._printSelectedPhieu('${code}')">📸 Mở phiếu (Copy ảnh)</button>`,
       width: '440px',
     });
   };
 
-  /* In các phiếu được tick — tuần tự */
+  /* Mở các phiếu được tick — MỞ CỬA SỔ NGAY trong cú click (giữ user-gesture → né chặn popup),
+     rồi build phiếu (async, chờ ảnh) ghi vào cửa sổ đã mở. */
   window._printSelectedPhieu = function (code) {
-    const seq = [];
-    if (document.getElementById('prt_cust')?.checked) seq.push(() => window.printOrderForCustomer && window.printOrderForCustomer(code));
-    if (document.getElementById('prt_ship')?.checked) seq.push(() => window.printOrderForShipper && window.printOrderForShipper(code));
-    if (document.getElementById('prt_wh')?.checked) seq.push(() => window.printDeliveryNote && window.printDeliveryNote(code));
-    if (!seq.length) { window.toast && window.toast('Tick ít nhất 1 phiếu để in', 'warn'); return; }
+    const picks = [];
+    if (document.getElementById('prt_cust')?.checked) picks.push('cust');
+    if (document.getElementById('prt_ship')?.checked) picks.push('ship');
+    if (document.getElementById('prt_wh')?.checked) picks.push('wh');
+    if (!picks.length) { window.toast && window.toast('Tick ít nhất 1 phiếu', 'warn'); return; }
+    const wins = picks.map(() => window.open('', '_blank', 'width=960,height=1000'));
+    if (!wins[0]) { window.toast && window.toast('Trình duyệt CHẶN popup — cho phép popup rồi mở lại', 'warn'); return; }
+    if (wins.some(w => !w)) window.toast && window.toast('1 số phiếu bị chặn popup — mở lại từng phiếu nếu thiếu', 'info');
+    wins.forEach(w => { if (w) { try { w.document.write('<!doctype html><meta charset="utf-8"><body style="margin:0;font:15px system-ui;padding:26px;color:#334155">Đang tạo phiếu…</body>'); } catch (e) {} } });
     window.closeModal && window.closeModal();
-    seq.forEach((fn, i) => setTimeout(fn, i * 800));
+    picks.forEach((kind, i) => {
+      const w = wins[i]; if (!w) return;
+      if (kind === 'cust') window.printOrderForCustomer && window.printOrderForCustomer(code, w);
+      else if (kind === 'ship') window.printOrderForShipper && window.printOrderForShipper(code, w);
+      else if (kind === 'wh') window.printDeliveryNote && window.printDeliveryNote(code, w);
+    });
   };
 
   /* Gửi phiếu báo hàng cho Kho (Telegram) → chuyển sang Gom hàng */

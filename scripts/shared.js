@@ -5,7 +5,7 @@
 
 /* Phiên bản app hiển thị (đối chiếu với CACHE_VERSION trong sw.js) — để user tự XÁC NHẬN
    đang chạy bản mới hay còn kẹt JS cũ (hiện ở góc sidebar + log console). */
-window.APP_VERSION = 'v332';
+window.APP_VERSION = 'v333';
 console.log('%c[NSTT] App ' + window.APP_VERSION, 'color:#339B21;font-weight:bold');
 
 /* Gom NGUỒN khách về 3 nhóm chuẩn: 'mkt' / 'sales' / 'sep-gioi-thieu'.
@@ -497,6 +497,43 @@ window.setCustCreditDays = function (custId, days) {
     return m;
   });
 };
+/* ============ QUY TRÌNH KẾ TOÁN 2 NẤC (sau khi ship giao) ============
+   Nấc 1 — KT1 CHỐT SẢN LƯỢNG: khớp SL khách nhận với đơn sale lên  → KV 'orderQtyLocks'.
+   Nấc 2 — KT2 CHỐT BÁO GIÁ: chốt giá → công nợ (chỉ khi SL đã chốt) → KV 'orderQuoteLocks'.
+   Mỗi KV {code:{by,byId,at}} — đồng bộ 5 kế toán đa máy (kv_store + rmwKv chống đè, ghi TÊN người chốt). */
+function _mkLockApi(kvKey) {
+  return {
+    get: function (code) {
+      if (!code || !window.STORE) return null;
+      const m = window.STORE.get(kvKey, {}) || {};
+      const v = m[code];
+      return (v && typeof v === 'object') ? v : null;
+    },
+    set: function (code, on) {
+      if (!code || !window.STORE) return;
+      const u = window.CURRENT_USER || {};
+      window.STORE.rmwKv(kvKey, m => {
+        m = (m && typeof m === 'object' && !Array.isArray(m)) ? m : {};
+        if (on) m[code] = { by: u.name || 'Kế toán', byId: u.staffId || '', at: new Date().toISOString() };
+        else delete m[code];
+        return m;
+      });
+    },
+  };
+}
+const _qtyApi = _mkLockApi('orderQtyLocks');
+const _quoteApi = _mkLockApi('orderQuoteLocks');
+window.orderQtyLock = _qtyApi.get;
+window.setOrderQtyLock = _qtyApi.set;
+window.orderQuoteLock = _quoteApi.get;
+window.setOrderQuoteLock = _quoteApi.set;
+/* Nấc kế toán hiện tại của đơn: 'wait-qty' (chưa chốt SL) · 'wait-price' (SL xong, chờ giá) · 'done' (đã báo giá) */
+window.orderAcctStage = function (code) {
+  if (window.orderQuoteLock(code)) return 'done';
+  if (window.orderQtyLock(code)) return 'wait-price';
+  return 'wait-qty';
+};
+
 /* Quá hạn THẬT: lấy charge cũ nhất CHƯA trả (FIFO) trong sổ nợ, so với hạn nợ KH.
    Trả {days, amount, term, sinceDate}. days=0 nếu chưa quá hạn / chưa đủ dữ liệu. */
 window.debtOverdueInfo = function (custId) {
@@ -1019,7 +1056,8 @@ window.NAV = [
   { section: 'Vận hành', items: [
     { id: 'dashboard',  label: 'Dashboard',   icon: '📊', href: 'dashboard.html' },
     { id: 'orders',     label: 'Đơn hàng',    icon: '📦', href: 'orders.html', badgeKey: 'orders' },
-    { id: 'recurring',  label: 'Đơn định kỳ', icon: '🔁', href: 'recurring.html' },
+    /* Ẩn theo yêu cầu: Đơn định kỳ (file + auto-gen vẫn giữ, chỉ gỡ khỏi sidebar)
+    { id: 'recurring',  label: 'Đơn định kỳ', icon: '🔁', href: 'recurring.html' }, */
     { id: 'order-samples', label: 'Mẫu đơn AI (nhớ nét chữ)', icon: '🧠', href: 'order-samples.html' },
     { id: 'customers',  label: 'Khách hàng',  icon: '👥', href: 'customers.html', badgeKey: 'customers' },
     /* Ẩn theo yêu cầu: Chân dung KH 360° + Lead/Tiềm năng

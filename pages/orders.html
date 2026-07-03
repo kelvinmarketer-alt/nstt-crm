@@ -175,9 +175,12 @@
     <!-- Status pipeline -->
     <div class="pipeline" id="pipeline"></div>
 
-    <!-- Service chips (desktop) + dropdown (mobile) -->
-    <div class="quick-chips" id="serviceChips"></div>
-    <select id="svcSelect" onchange="window.filterService(this.value||null)"></select>
+    <!-- Service chips (desktop) + dropdown (mobile) — ẨN theo yêu cầu (giữ element để render không lỗi) -->
+    <div class="quick-chips" id="serviceChips" style="display:none"></div>
+    <select id="svcSelect" onchange="window.filterService(this.value||null)" style="display:none"></select>
+
+    <!-- Chốt báo giá tabs (Kế toán) -->
+    <div class="quick-chips" id="quoteTabs" style="margin-top:2px"></div>
 
     <!-- Filter -->
     <div class="filter-bar">
@@ -185,12 +188,6 @@
         <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="7"/><path d="m21 21-4.3-4.3"/></svg>
         <input id="qSearch" placeholder="Tìm mã đơn / KH / shipper / xe...">
       </div>
-      <select id="fMode">
-        <option value="">Hình thức giao (tất cả)</option>
-        <option value="giao-ngay">🛵 Giao trong ngày</option>
-        <option value="dat-truoc">📅 Đặt trước / định kỳ</option>
-        <option value="tan-bep">🍽 Giao tận bếp</option>
-      </select>
       <select id="fDriver">
         <option value="">Shipper (tất cả)</option>
         <option>Lê Văn B</option>
