@@ -310,15 +310,28 @@
     /* Lấy TẤT CẢ records của 1 bảng — PHÂN TRANG theo lô 1000 (Supabase giới hạn
        1000 dòng/lần; nếu không lặp range sẽ tự RỚT đơn cũ khi >1000 → lệch dữ liệu). */
     async getAll(table) {
-      const PAGE = 1000;
+      /* Bảng NẶNG (orders kèm items JSONB ~5.8MB/900 đơn): kéo full trong 1 câu dễ chạm
+         statement_timeout khi DB đang tải → CHIA LÔ NHỎ (mỗi câu ~1.2MB) để câu nào cũng
+         chạy nhanh, qua được timeout. Bảng nhẹ giữ lô 1000 (1 round-trip). */
+      const HEAVY = new Set(['orders']);
+      let PAGE = HEAVY.has(table) ? 200 : 1000;
+      /* Phân trang PHẢI sắp theo cột DUY NHẤT, nếu không các dòng trùng created_at
+         (700 đơn lịch sử cùng created_at 13/6) sẽ nhảy giữa các lô → trùng/sót.
+         orders: dùng 'code' (unique + tăng dần theo thời gian = mới trước, ổn định). */
+      const ORDER_COL = HEAVY.has(table) ? 'code' : 'created_at';
       let from = 0, out = [], lastErr = null;
-      for (let guard = 0; guard < 200; guard++) {   /* tối đa 200k dòng */
+      for (let guard = 0; guard < 600; guard++) {   /* lô nhỏ → nhiều vòng hơn; 600×200 = 120k dòng */
         const { data, error } = await client.from(table).select('*')
-          .order('created_at', { ascending: false }).range(from, from + PAGE - 1);
-        if (error) { lastErr = error; break; }
+          .order(ORDER_COL, { ascending: false }).range(from, from + PAGE - 1);
+        if (error) {
+          /* Lô này timeout → thử THU NHỎ lô 1 lần (100) rồi lặp lại từ vị trí hiện tại;
+             vẫn lỗi → bỏ cuộc (trả null, merge giữ local). */
+          if (/timeout|statement/i.test(error.message || '') && PAGE > 100) { PAGE = 100; continue; }
+          lastErr = error; break;
+        }
         out = out.concat(data || []);
         if (!data || data.length < PAGE) break;       /* lô cuối → xong */
-        from += PAGE;
+        from += data.length;
       }
       if (lastErr) {
         console.error('[SB getAll]', table, lastErr);
