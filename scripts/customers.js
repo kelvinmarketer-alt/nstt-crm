@@ -314,9 +314,26 @@
       return;
     }
 
+    /* ⚠️ Cảnh báo NGHI TRÙNG ĐỊA CHỈ — tính ĐỘNG từ địa chỉ, KHÔNG ghi gì vào dữ liệu.
+       Quét toàn bộ KH (không theo scope) để bắt cả trùng chéo giữa các NV. */
+    const _allC = window.STORE.get('customers', []) || [];
+    const _dupMap = {};
+    for (let i = 0; i < _allC.length; i++) {
+      for (let j = i + 1; j < _allC.length; j++) {
+        if (_addrLooksSame(_allC[i].address, _allC[j].address)) {
+          (_dupMap[_allC[i].id] || (_dupMap[_allC[i].id] = [])).push(_allC[j].code || _allC[j].id);
+          (_dupMap[_allC[j].id] || (_dupMap[_allC[j].id] = [])).push(_allC[i].code || _allC[i].id);
+        }
+      }
+    }
+
     tbody.innerHTML = slice.map(c => {
       const ava = window.initials(c.name);
       const col = window.avatarColor(c.id);
+      const _twins = _dupMap[c.id];
+      const dupBadge = _twins
+        ? ` <span onclick="event.stopPropagation()" title="Nghi trùng địa chỉ với: ${_twins.join(', ')} — kiểm tra kỹ trước khi tạo đơn / ghi công nợ" style="display:inline-block;margin-left:4px;padding:0 6px;border-radius:8px;background:#FEF3C7;color:#B45309;font-size:10px;font-weight:700;vertical-align:middle;cursor:help;white-space:nowrap">⚠️ nghi trùng</span>`
+        : '';
       const groupTag = c.group === 'VIP' ? 'tag-vip'
                       : c.group === 'Mới' ? 'tag-moi'
                       : c.group === 'Inactive' ? 'tag-inact' : 'tag-thuong';
@@ -332,7 +349,7 @@
           <div class="cust-cell">
             <div class="cust-ava" style="background:${col}">${ava}</div>
             <div class="cust-info">
-              <div class="n1">${c.name}</div>
+              <div class="n1">${c.name}${dupBadge}</div>
               <div class="n2">${c.code} · ${c.phone}</div>
             </div>
           </div>
