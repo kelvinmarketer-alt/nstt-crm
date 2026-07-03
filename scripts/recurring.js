@@ -62,6 +62,10 @@
 
   /* Generator: sinh đơn nếu nextRun ≤ TODAY */
   function runGenerator() {
+    /* DỪNG HẲN theo yêu cầu: CHỈ tự sinh đơn khi autoRecurring.enabled === true (mặc định TẮT).
+       Bật lại: vào cấu hình "Tự tạo đơn định kỳ" bật enabled (hoặc setAutoCfg(true, giờ)). */
+    const _autoCfg = window.STORE.get('autoRecurring', { enabled: false }) || {};
+    if (!_autoCfg.enabled) return;
     if (!window.STORE.isPreloaded('recurring_orders') || !window.STORE.isPreloaded('orders')) return;
     const ros = getRO();
     const orders = window.STORE.get('orders', window.ORDERS || []) || [];
