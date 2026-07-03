@@ -318,10 +318,7 @@
       /* Bảng table-mapped: customers, orders, products, ... */
       const table = TABLE_MAP[key];
       if (!table) return;
-      await _mergeTableFromCloud(key, table);
-      /* orders: đặt mốc delta ngay sau khi preload FULL → vòng poll ĐẦU đã chạy delta (nhẹ),
-         khỏi kéo lại cả bảng ở lần poll đầu. */
-      if (key === 'orders') await _refreshCursor(key, table);
+      await _mergeTableFromCloud(key, table);   /* orders: hàm này TỰ đặt mốc delta từ snapshot → vòng poll đầu đã nhẹ */
       /* Bật Realtime — đổi ở máy khác → máy này thấy ngay (<1s) */
       _subscribeRealtime(key, table);
     } catch (e) {
@@ -440,6 +437,14 @@
     if (!window.SB_DATA) return;
     const cloud = await window.SB_DATA.getAll(table);
     if (!Array.isArray(cloud)) return;
+    /* orders: đặt MỐC DELTA ngay từ chính snapshot vừa kéo (KHÔNG query max() riêng sau đó).
+       Tránh khe đua: nếu máy khác sửa 1 đơn CHEN GIỮA getAll và max() → max() đẩy cursor
+       vượt qua bản đó → delta dùng .gt sẽ không bao giờ kéo lại (mất cập nhật đến FULL kế). */
+    if (key === 'orders') {
+      let _mx = _cursor[key] || '';
+      for (const _c of cloud) { const _u = _c && _c.updated_at; if (_u && _u > _mx) _mx = _u; }
+      if (_mx) _cursor[key] = _mx;
+    }
     const idCol = ID_COLUMN[key] || 'id';
     const keyOf = (it) => it && (it[idCol] || it.id || it.code || it.no);
     const local = Array.isArray(_data[key]) ? _data[key] : (_load(key, []) || []);
@@ -527,30 +532,22 @@
      - _cursor[key] = updated_at lớn nhất đã thấy (ISO thô DB). Tăng đơn điệu.
      - UPSERT giữ NGUYÊN THỨ TỰ local (ổn định → không re-render vô cớ) + giữ cờ '_' + pending.
      - KHÔNG xử lý xoá / KHÔNG tự đẩy local-only ở đây (để merge FULL định kỳ/refocus lo). */
-  const _cursor = {};
+  const _cursor = {};   /* _cursor[key] = updated_at (ISO thô DB) LỚN NHẤT đã merge — đặt từ snapshot getAll (orders) */
   let _pollTick = 0;
-
-  async function _refreshCursor(key, table) {
-    try {
-      if (window.SB_DATA && window.SB_DATA.maxUpdated) {
-        const mx = await window.SB_DATA.maxUpdated(table);
-        if (mx && (!_cursor[key] || mx > _cursor[key])) _cursor[key] = mx;
-      }
-    } catch (e) {}
-  }
 
   async function _mergeDeltaFromCloud(key, table) {
     if (!window.SB_DATA || !window.SB_DATA.getChangedSince) { return _mergeTableFromCloud(key, table); }
     let since = _cursor[key];
-    if (since == null) {                               /* chưa có mốc → merge FULL 1 lần rồi đặt mốc */
+    if (since == null) {                               /* chưa có mốc → merge FULL 1 lần (tự đặt mốc từ snapshot) */
       await _mergeTableFromCloud(key, table);
-      await _refreshCursor(key, table);
       return;
     }
     const res = await window.SB_DATA.getChangedSince(table, since, 500);
     if (!res || !Array.isArray(res.rows)) return;      /* lỗi → giữ mốc, poll sau thử lại */
-    if (res.cursor && res.cursor > since) _cursor[key] = res.cursor;
-    if (!res.rows.length) return;                      /* KHÔNG có gì đổi → cực nhẹ, xong */
+    if (!res.rows.length) {                            /* KHÔNG có gì đổi → nhích mốc, xong */
+      if (res.cursor && res.cursor > since) _cursor[key] = res.cursor;
+      return;
+    }
 
     const idCol = ID_COLUMN[key] || 'id';
     const keyOf = (it) => it && (it[idCol] || it.id || it.code || it.no);
@@ -558,21 +555,27 @@
     const idxById = new Map(local.map((it, i) => [keyOf(it), i]));
     const merged = local.slice();
     let changed = false;
-    for (const c of res.rows) {
+    /* Cursor CHỈ nhích tới record đã ÁP; khi gặp record đang PENDING (local ghi dở) thì DỪNG
+       nhích cursor (rows sort updated_at tăng dần) — nếu không .gt sẽ bỏ qua bản MỚI của máy
+       khác cùng record đó ở vòng sau. Vẫn tiếp tục áp các record khác trong lô. */
+    let adv = since, blocked = false;
+    for (const c of res.rows) {                        /* rows đã sort updated_at TĂNG DẦN */
       const id = keyOf(c); if (id == null) continue;
-      if (_isPending(key, id)) continue;               /* bản local đang ghi dở → giữ local */
+      if (_isPending(key, id)) { blocked = true; continue; }   /* giữ local + chặn cursor vượt qua record này */
       const at = idxById.get(id);
       if (at != null) {
         const lr = merged[at];
         const flags = {};
         for (const k of Object.keys(lr)) if (k.charAt(0) === '_') flags[k] = lr[k];   /* giữ cờ chống-lặp */
         const rec = Object.keys(flags).length ? { ...c, ...flags } : c;
-        if (JSON.stringify(lr) === JSON.stringify(rec)) continue;  /* không đổi thực sự → bỏ */
-        merged[at] = rec; changed = true;
+        if (JSON.stringify(lr) !== JSON.stringify(rec)) { merged[at] = rec; changed = true; }
       } else {
         merged.push(c); idxById.set(id, merged.length - 1); changed = true;   /* record mới từ máy khác */
       }
+      if (!blocked && c.updated_at) adv = c.updated_at;   /* chỉ nhích cursor khi CHƯA gặp pending */
     }
+    if (!blocked && res.cursor && res.cursor > adv) adv = res.cursor;
+    if (adv && adv > since) _cursor[key] = adv;
     if (!changed) return;
     _data[key] = merged;
     const nj = JSON.stringify(merged);
@@ -995,10 +998,8 @@
         if (key === 'orders' && window.SB_DATA && window.SB_DATA.getChangedSince && !fullReconcile) {
           _mergeDeltaFromCloud(key, table).catch(() => {});
         } else {
-          /* Merge FULL + self-heal (đẩy local-only lên + pull cloud về) */
-          _mergeTableFromCloud(key, table)
-            .then(() => { if (key === 'orders') return _refreshCursor(key, table); })
-            .catch(() => {});
+          /* Merge FULL + self-heal (đẩy local-only lên + pull cloud về); orders TỰ đặt mốc delta bên trong */
+          _mergeTableFromCloud(key, table).catch(() => {});
         }
       });
     }, _pollSec * 1000);
