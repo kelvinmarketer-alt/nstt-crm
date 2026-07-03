@@ -495,10 +495,13 @@
       names.map(n => `<option${n === cur ? ' selected' : ''}>${n}</option>`).join('');
   }
   function searchMatch(c) {
-    const q = document.getElementById('qSearch').value.trim().toLowerCase();
-    if (!q) return true;
-    return [c.name, c.code, c.phone, c.email, c.contact, c.company]
-      .filter(Boolean).some(x => x.toLowerCase().includes(q));
+    const raw = document.getElementById('qSearch').value.trim();
+    if (!raw) return true;
+    /* bỏ dấu + đ→d để gõ "le dai hanh" vẫn khớp "Lê Đại Hành" (broaden, không phá match cũ) */
+    const strip = s => String(s || '').normalize('NFD').replace(/[̀-ͯ]/g, '').toLowerCase().replace(/đ/g, 'd');
+    const q = strip(raw);
+    return [c.name, c.code, c.phone, c.email, c.contact, c.company, c.address]
+      .filter(Boolean).some(x => strip(x).includes(q));
   }
 
   /* ============ DRAWER ============ */
