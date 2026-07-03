@@ -1340,4 +1340,8 @@
      hiện TRƯỚC — customers (nhẹ, ~vài chục dòng) không phải tranh DB/CPU với ~900 đơn (nặng). */
   setTimeout(() => { window.STORE.get('orders', window.ORDERS || []); window.STORE.get('debtLedger', []); }, 350);
   setTimeout(() => { sortAndReorderTbody(); applyColPrefs(); }, 100);
+  /* WATCHDOG: chuyển module mà getAll lỗi → khách KHÔNG hiện; ép nạp lại từ cloud vài lần (hết phải F5) */
+  [1500, 4000, 8000].forEach(t => setTimeout(() => {
+    if (window.STORE.reloadIfStale) window.STORE.reloadIfStale('customers', 1).then(did => { if (did) scheduleRender(); });
+  }, t));
 })();

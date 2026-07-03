@@ -253,6 +253,7 @@
   /* Đã tải XONG (hoàn tất, không chỉ "đã bắt đầu") dữ liệu cloud cho key — dùng gate
      cho các hook side-effect (trừ kho/cộng nợ) để KHÔNG chạy trên cache rỗng/cũ. */
   const _preloadDone = new Set();
+  const _preloadOk = new Set();   /* getAll THÀNH CÔNG (khác _preloadDone: done kể cả khi lỗi) */
 
   /* Async load from Supabase, replace cache nếu DB có data */
   async function _preloadFromSupabase(key) {
@@ -340,15 +341,17 @@
       if (!table) return;
       /* orders: hàm này TỰ đặt mốc delta từ snapshot → vòng poll đầu đã nhẹ */
       let _ok = await _mergeTableFromCloud(key, table);
-      /* RETRY khi getAll trả null (timeout/mạng/client chưa sẵn ở nhịp load đầu) → tránh trang
-         KẸT RỖNG tới poll 180s / phải bấm lại lần 2. Chỉ retry khi thật sự chưa có data. */
-      if (_ok === false && !(Array.isArray(_data[key]) && _data[key].length)) {
-        for (const d of [600, 1500, 3000]) {
+      /* RETRY khi getAll trả null (timeout/mạng/client chưa sẵn ở nhịp load đầu). Retry khi
+         merge THẤT BẠI (kể cả khi local đang có DATA CŨ — vd orders kẹt 6 dòng cần refresh 900).
+         Trước đây chặn retry khi đã có data → máy kẹt data cũ không bao giờ được làm tươi. */
+      if (_ok === false) {
+        for (const d of [500, 1200, 2500, 5000]) {
           await new Promise(r => setTimeout(r, d));
           _ok = await _mergeTableFromCloud(key, table);
-          if (_ok !== false || (Array.isArray(_data[key]) && _data[key].length)) break;
+          if (_ok !== false) break;
         }
       }
+      if (_ok !== false) _preloadOk.add(key);   /* đánh dấu cloud load OK để watchdog biết khỏi ép lại */
       /* Bật Realtime — đổi ở máy khác → máy này thấy ngay (<1s) */
       _subscribeRealtime(key, table);
     } catch (e) {
@@ -1172,6 +1175,18 @@
     return cloud.length;
   };
   window.resyncOrders = () => window.STORE.resyncFromCloud('orders');
+
+  /* WATCHDOG: nếu bảng CHƯA load OK từ cloud (getAll lỗi/nhịp đầu) HOẶC quá ít record so với kỳ
+     vọng (vd orders kẹt 6 dòng) → ÉP preload lại (có retry bên trong). Trang KH/Đơn gọi sau vài
+     giây để hết cảnh "chuyển module ra data cũ/rỗng, phải F5". An toàn: chỉ ĐỌC cloud + re-merge. */
+  window.STORE.reloadIfStale = async function (key, minCount) {
+    if (!isSupabaseMode() || !TABLE_MAP[key]) return false;
+    const n = Array.isArray(_data[key]) ? _data[key].length : 0;
+    if (_preloadOk.has(key) && n >= (minCount || 1)) return false;   /* đã OK + đủ → thôi */
+    _preloaded.delete(key); _preloadDone.delete(key); _preloadOk.delete(key);
+    await _preloadFromSupabase(key);
+    return true;
+  };
 
   /* Expose clear helpers as top-level shortcut */
   window.clearDemoCache = () => window.STORE.clearDemoCache();

@@ -2637,6 +2637,11 @@ ${o.note ? `\n📝 Ghi chú: ${o.note}` : ''}
   window.renderAppShell('orders', 'Đơn hàng');
   window.bindTabs();
   render();
+  /* WATCHDOG: chuyển module mà getAll lỗi → đơn kẹt data cũ/ít (vd 6 dòng); ép nạp lại từ cloud (hết phải F5).
+     minCount 20 = mốc "quá ít cho tổ chức này" (kho đơn ~900); load OK thật thì n>=20 → bỏ qua. */
+  [1800, 4500, 9000].forEach(t => setTimeout(() => {
+    if (window.STORE.reloadIfStale) window.STORE.reloadIfStale('orders', 20).then(did => { if (did) scheduleRender(); });
+  }, t));
   /* Warm html2canvas khi trình duyệt RẢNH (né tranh băng thông với tải dữ liệu ban đầu → vào trang nhanh hơn) */
   const _warmH2C = () => {
     if (document.getElementById('h2c-preload')) return;
