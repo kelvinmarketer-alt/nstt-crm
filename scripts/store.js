@@ -66,6 +66,7 @@
      (2) mỗi lần merge sẽ ĐẨY LẠI record pending lên cloud (write trước bị F5 cắt) đến khi thành công.
      → "vừa nhập/sửa xong, F5" không còn mất / quay về data cũ. Xoá pending khi cloud xác nhận. */
   const PENDING_PREFIX = 'vty__pending_';
+  const TOMB_PREFIX = 'vty__tomb_';
   const _pendingCache = {};
   function _loadPending(key) {
     if (!_pendingCache[key]) {
@@ -78,6 +79,25 @@
   function _markPending(key, id) { if (id == null) return; _loadPending(key).add(String(id)); _savePending(key); }
   function _clearPending(key, id) { if (id == null) return; _loadPending(key).delete(String(id)); _savePending(key); }
   function _isPending(key, id) { return id != null && _loadPending(key).has(String(id)); }
+
+  /* === TOMBSTONE (bia mộ) — CHỐNG HỒI SINH record vừa XOÁ ===
+     Bug gốc: SB_DATA.remove là fire-and-forget + trả false khi lỗi (KHÔNG throw) → xoá cloud
+     hỏng ÂM THẦM (nhất là lúc DB timeout); mọi merge/realtime sau lại kéo record về =
+     "xoá xong tự hiện lại LIÊN TỤC". Fix: đánh dấu id đã xoá (bền qua reload); merge/delta/
+     realtime BỎ QUA + XOÁ LẠI cho tới khi cloud sạch rồi mới gỡ bia mộ. */
+  const _tombCache = {};
+  function _loadTomb(key) {
+    if (!_tombCache[key]) {
+      try { _tombCache[key] = new Set((JSON.parse(localStorage.getItem(TOMB_PREFIX + key) || '[]') || []).map(String)); }
+      catch (e) { _tombCache[key] = new Set(); }
+    }
+    return _tombCache[key];
+  }
+  function _saveTomb(key) { try { localStorage.setItem(TOMB_PREFIX + key, JSON.stringify([...(_tombCache[key] || [])])); } catch (e) {} }
+  function _addTomb(key, id) { if (id == null) return; _loadTomb(key).add(String(id)); _saveTomb(key); }
+  function _clearTomb(key, id) { if (id == null) return; if (_loadTomb(key).delete(String(id))) _saveTomb(key); }
+  function _isTomb(key, id) { return id != null && _loadTomb(key).has(String(id)); }
+
   const _subs = {};
   const _preloaded = new Set();
   /* Snapshot (JSON) bản đã đồng bộ cloud gần nhất, per table key.
@@ -409,6 +429,13 @@
     const rid = keyOf(row);
     if (rid == null) return false;   /* không khớp được id → full-merge */
 
+    /* TOMBSTONE: record đã xoá cục bộ nhưng máy khác/echo còn đẩy INSERT/UPDATE về → XOÁ LẠI,
+       KHÔNG hồi sinh (mã đơn/KH không tái dùng nên bia mộ luôn đúng). */
+    if (_isTomb(key, rid)) {
+      window.SB_DATA.remove(TABLE_MAP[key], rid, idCol).then(ok => { if (ok) _clearTomb(key, rid); }).catch(() => {});
+      return true;
+    }
+
     /* Cập nhật in-memory NGAY (rẻ: findIndex + gán 1 phần tử) */
     const arr = Array.isArray(_data[key]) ? _data[key] : (_load(key, []) || []);
     const idx = arr.findIndex(it => keyOf(it) === rid);
@@ -435,8 +462,25 @@
      → browser khác pull về thấy. Merge thay vì replace để KHÔNG mất record chưa sync. */
   async function _mergeTableFromCloud(key, table) {
     if (!window.SB_DATA) return;
-    const cloud = await window.SB_DATA.getAll(table);
+    let cloud = await window.SB_DATA.getAll(table);
     if (!Array.isArray(cloud)) return;
+    const idCol = ID_COLUMN[key] || 'id';
+    const keyOf = (it) => it && (it[idCol] || it.id || it.code || it.no);
+    /* TOMBSTONE: loại record vừa XOÁ khỏi snapshot cloud (chống hồi sinh) + XOÁ LẠI nếu cloud còn.
+       Khi cloud đã sạch id đó → gỡ bia mộ. Làm TRƯỚC khi tính cursor/merge để mọi bước dưới không thấy nó. */
+    const _tomb = _loadTomb(key);
+    if (_tomb.size) {
+      const _inCloud = new Set(cloud.map(c => String(keyOf(c))));
+      for (const id of [..._tomb]) if (!_inCloud.has(id)) _clearTomb(key, id);   /* cloud đã sạch → gỡ */
+      cloud = cloud.filter(c => {
+        const id = String(keyOf(c));
+        if (_isTomb(key, id)) {   /* còn trên cloud mà đang bia mộ → xoá lại, loại khỏi merge */
+          window.SB_DATA.remove(table, keyOf(c), idCol).then(ok => { if (ok) _clearTomb(key, id); }).catch(() => {});
+          return false;
+        }
+        return true;
+      });
+    }
     /* orders: đặt MỐC DELTA ngay từ chính snapshot vừa kéo (KHÔNG query max() riêng sau đó).
        Tránh khe đua: nếu máy khác sửa 1 đơn CHEN GIỮA getAll và max() → max() đẩy cursor
        vượt qua bản đó → delta dùng .gt sẽ không bao giờ kéo lại (mất cập nhật đến FULL kế). */
@@ -445,9 +489,12 @@
       for (const _c of cloud) { const _u = _c && _c.updated_at; if (_u && _u > _mx) _mx = _u; }
       if (_mx) _cursor[key] = _mx;
     }
-    const idCol = ID_COLUMN[key] || 'id';
-    const keyOf = (it) => it && (it[idCol] || it.id || it.code || it.no);
-    const local = Array.isArray(_data[key]) ? _data[key] : (_load(key, []) || []);
+    let local = Array.isArray(_data[key]) ? _data[key] : (_load(key, []) || []);
+    if (_tomb.size) {   /* DỌN record hồi sinh còn sót trong local → không để self-heal (neverSynced) đẩy lại lên cloud */
+      const _n = local.length;
+      local = local.filter(it => !_isTomb(key, keyOf(it)));
+      if (local.length !== _n) _data[key] = local;
+    }
     const cloudIds = new Set(cloud.map(keyOf));
     const localOnly = local.filter(it => keyOf(it) && !cloudIds.has(keyOf(it)));
     const localById = new Map(local.map(it => [keyOf(it), it]));
@@ -582,6 +629,11 @@
     let adv = since, blocked = false;
     for (const c of res.rows) {                        /* rows đã sort updated_at TĂNG DẦN */
       const id = keyOf(c); if (id == null) continue;
+      if (_isTomb(key, id)) {   /* đã xoá cục bộ → xoá lại cloud, KHÔNG hồi sinh */
+        window.SB_DATA.remove(table, id, idCol).then(ok => { if (ok) _clearTomb(key, id); }).catch(() => {});
+        if (!blocked && c.updated_at) adv = c.updated_at;
+        continue;
+      }
       if (_isPending(key, id)) { blocked = true; continue; }   /* giữ local + chặn cursor vượt qua record này */
       const at = idxById.get(id);
       if (at != null) {
@@ -806,7 +858,9 @@
       /* Push to Supabase */
       if (isSupabaseMode() && TABLE_MAP[key] && item) {
         const idCol = ID_COLUMN[key] || 'id';   /* mặc định 'id'; code/no khai báo trong ID_COLUMN */
+        _addTomb(key, identifier);   /* BIA MỘ: chặn merge/realtime hồi sinh + đánh dấu cần xoá cloud */
         window.SB_DATA.remove(TABLE_MAP[key], identifier, idCol)
+          .then(ok => { if (ok) _clearTomb(key, identifier); /* hỏng (false) → GIỮ bia mộ, merge/poll sẽ xoá lại */ })
           .catch(e => console.warn(`[STORE remove ${key} → SB]`, e));
       }
       if (TABLE_MAP[key] && Array.isArray(_data[key])) _synced[key] = JSON.stringify(_data[key]); if (TABLE_MAP[key] && Array.isArray(_data[key])) _persistSyncedIds(key, _data[key]);
