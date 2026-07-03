@@ -425,12 +425,20 @@
     }
     const fS = document.getElementById('fStaff');
     if (fS) {
-      const roster = (window.STORE.get('staff', window.STAFFS || []) || []).filter(s => s && s.name).map(s => s.name);
-      const names = _distinctNames([...roster, ...ords.map(o => o.staff)]).sort((a, b) => a.localeCompare(b, 'vi'));
+      /* NV phụ trách đơn = CHỈ nhân viên phòng SALE (đơn do sale lên) */
+      const roster = (window.STORE.get('staff', window.STAFFS || []) || []).filter(s => s && s.name && _isSaleDept(s.dept)).map(s => s.name);
+      const names = _distinctNames(roster).sort((a, b) => a.localeCompare(b, 'vi'));
       const cur = fS.value;
-      fS.innerHTML = '<option value="">NV phụ trách (tất cả)</option>' + names.map(n => `<option>${_escOpt(n)}</option>`).join('');
-      if (names.includes(cur)) fS.value = cur;
+      const opts = names.slice();
+      if (cur && !opts.includes(cur)) opts.unshift(cur);   /* giữ lựa chọn cũ dù không thuộc sale */
+      fS.innerHTML = '<option value="">NV phụ trách (tất cả)</option>' + opts.map(n => `<option>${_escOpt(n)}</option>`).join('');
+      fS.value = cur && opts.includes(cur) ? cur : '';
     }
+  }
+  /* Phòng Sale? (chuẩn hoá dept giống staff.js _normDept: sale/sales/kinh doanh/cskh) */
+  function _isSaleDept(d) {
+    const s = String(d || '').toLowerCase().normalize('NFD').replace(/[̀-ͯ]/g, '').replace(/đ/g, 'd').replace(/\s+/g, ' ').trim();
+    return s === 'sale' || s === 'sales' || s === 'kinh doanh' || s === 'cskh' || s.indexOf('cham soc khach hang') >= 0;
   }
 
   /* Tabs quy trình kế toán 2 nấc — đếm theo orderAcctStage */
