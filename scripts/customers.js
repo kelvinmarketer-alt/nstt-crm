@@ -284,7 +284,14 @@
   function render() {
     customers = scopeCustomers(window.STORE.get('customers', initialData));
     updateChipCounts();
-    const rows = customers.filter(c => quickMatch(c) && filterMatch(c) && searchMatch(c));
+    populateStaffFilter();
+    const rows = customers.filter(c => quickMatch(c) && filterMatch(c) && searchMatch(c))
+      /* SẮP XẾP: khách thêm gần nhất LÊN ĐẦU (mã KH lớn = tạo sau, cloud-aware tăng dần) */
+      .sort((a, b) => {
+        const na = parseInt(String(a.id || a.code || '').replace(/\D/g, ''), 10) || 0;
+        const nb = parseInt(String(b.id || b.code || '').replace(/\D/g, ''), 10) || 0;
+        return nb - na;
+      });
     rowCount.textContent = `Đang hiển thị ${rows.length} / ${customers.length} khách hàng`;
 
     /* Phân trang */
@@ -450,16 +457,23 @@
     }
   }
   function filterMatch(c) {
-    const g  = document.getElementById('fGroup').value;
-    const p  = document.getElementById('fProvince').value;
-    const s  = document.getElementById('fService').value;
-    const st = document.getElementById('fStatus').value;
-    if (g && c.group !== g) return false;
-    if (p && c.province !== p) return false;
-    if (s && c.type !== s) return false;
-    if (st === 'active' && !c.active) return false;
-    if (st === 'inactive' && c.active) return false;
+    const el = document.getElementById('fStaff');
+    const nv = el ? el.value : '';
+    if (nv && (c.staffOwner || '') !== nv) return false;
     return true;
+  }
+  /* Đổ danh sách NV phụ trách vào bộ lọc (chỉ NV thực sự có khách) — giữ lựa chọn hiện tại */
+  function populateStaffFilter() {
+    const el = document.getElementById('fStaff'); if (!el) return;
+    const names = [...new Set((window.STORE.get('customers', []) || [])
+      .map(c => (c.staffOwner || '').trim()).filter(Boolean))]
+      .sort((a, b) => a.localeCompare(b, 'vi'));
+    const key = names.join('|');
+    if (el._key === key) return;   /* danh sách không đổi → khỏi dựng lại (giữ lựa chọn) */
+    el._key = key;
+    const cur = el.value;
+    el.innerHTML = '<option value="">NV phụ trách (tất cả)</option>' +
+      names.map(n => `<option${n === cur ? ' selected' : ''}>${n}</option>`).join('');
   }
   function searchMatch(c) {
     const q = document.getElementById('qSearch').value.trim().toLowerCase();
@@ -942,12 +956,13 @@
   document.querySelectorAll('.chip').forEach(ch => {
     ch.addEventListener('click', () => window.setQuickFilter(ch.dataset.quick));
   });
-  ['qSearch', 'fGroup', 'fProvince', 'fService', 'fStatus'].forEach(id => {
+  ['qSearch', 'fStaff'].forEach(id => {
     document.getElementById(id)?.addEventListener('input', () => { curPage = 1; render(); });
+    document.getElementById(id)?.addEventListener('change', () => { curPage = 1; render(); });
   });
   document.getElementById('custPageSize')?.addEventListener('change', () => { curPage = 1; render(); });
   window.clearFilters = function () {
-    ['fGroup', 'fProvince', 'fService', 'fStatus'].forEach(id => {
+    ['fStaff'].forEach(id => {
       const el = document.getElementById(id); if (el) el.value = '';
     });
     const q = document.getElementById('qSearch'); if (q) q.value = '';

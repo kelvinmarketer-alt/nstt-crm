@@ -41,17 +41,10 @@
     .table-card tbody td[data-field="debt"]{display:block!important;margin-top:3px;font-weight:700;white-space:normal!important;overflow:visible!important}
     .table-card tbody td[data-field="debt"]::before{content:"💰 Công nợ: "}
 
-    /* ===== BỘ LỌC: gom 3 hàng → 2 hàng × 3 ô (ĐT) =====
-       DOM order: search-in, fGroup, fProvince, fService, fStatus, btn-xóa-lọc.
-       Dùng flex + order để xếp lại: hàng 1 = fGroup/fProvince/fService, hàng 2 = tìm kiếm/fStatus/xóa lọc */
-    .filter-bar{gap:8px;align-items:stretch}
-    .filter-bar > *{flex:1 1 calc(33.33% - 6px);min-width:0!important;margin:0}
-    .filter-bar .search-in{order:1}
-    .filter-bar #fGroup{order:-3}
-    .filter-bar #fProvince{order:-2}
-    .filter-bar #fService{order:-1}
-    .filter-bar #fStatus{order:2}
-    .filter-bar .btn[onclick*="clearFilters"]{order:3}
+    /* ===== BỘ LỌC: chỉ còn Tìm kiếm + NV phụ trách + Xoá lọc ===== */
+    .filter-bar{gap:8px;align-items:stretch;flex-wrap:wrap}
+    .filter-bar .search-in{flex:1 1 260px;min-width:0}
+    .filter-bar #fStaff{flex:0 1 220px}
     .filter-bar .search-in input{padding:8px 10px 8px 30px;font-size:12.5px}
     .filter-bar .search-in svg{left:8px}
     .filter-bar select,.filter-bar input{font-size:12.5px;padding:8px 8px}
@@ -169,32 +162,8 @@
         <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="7"/><path d="m21 21-4.3-4.3"/></svg>
         <input id="qSearch" placeholder="Tìm theo tên / SĐT / mã KH / công ty...">
       </div>
-      <select id="fGroup">
-        <option value="">Nhóm KH (tất cả)</option>
-        <option value="VIP">VIP</option>
-        <option value="Thường">Thường</option>
-        <option value="Mới">Mới</option>
-      </select>
-      <select id="fProvince">
-        <option value="">Tỉnh/TP (tất cả)</option>
-        <option>Hà Nội</option><option>Hải Phòng</option><option>TP.HCM</option>
-        <option>Đà Nẵng</option><option>Hải Dương</option><option>Quảng Ninh</option>
-        <option>Nam Định</option><option>Thanh Hóa</option><option>Bắc Ninh</option>
-      </select>
-      <select id="fService">
-        <option value="">Loại hình (tất cả)</option>
-        <option value="nha-hang">🍽 Nhà hàng</option>
-        <option value="quan-an">🍜 Quán ăn / Bún phở</option>
-        <option value="khach-san">🏨 Khách sạn</option>
-        <option value="canteen">🏭 Bếp ăn / Canteen</option>
-        <option value="cafe">☕ Quán cafe</option>
-        <option value="cua-hang">🏪 Cửa hàng / Đại lý</option>
-        <option value="ca-nhan">👤 Cá nhân / Hộ GĐ</option>
-      </select>
-      <select id="fStatus">
-        <option value="">Tình trạng (tất cả)</option>
-        <option value="active">Đang hoạt động</option>
-        <option value="inactive">Không hoạt động</option>
+      <select id="fStaff" style="min-width:190px">
+        <option value="">NV phụ trách (tất cả)</option>
       </select>
       <button class="btn btn-ghost btn-sm" onclick="clearFilters()">↺ Xóa lọc</button>
     </div>
