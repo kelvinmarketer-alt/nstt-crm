@@ -44,6 +44,10 @@
       } else {
         P('getAll(customers)', 'KHÔNG chạy được (SB_DATA thiếu)');
       }
+      /* AI nào ghi vty_customers rỗng (xoá cache khách)? */
+      const w = window.__wipes || [];
+      P('⚠ GHI vty_customers RỖNG', w.length + ' lần');
+      w.slice(0, 4).forEach((x, i) => P('  #' + (i + 1) + ' (n=' + x.n + ', ' + x.at + 'ms)', x.stack));
     } catch (e) { P('DIAG-ERR', e && e.message); }
 
     let box = document.getElementById('__diagbox');
@@ -57,5 +61,5 @@
     box.onclick = () => box.remove();
   }
   window.__runDiag = run;
-  (window.requestIdleCallback ? requestIdleCallback(() => setTimeout(run, 2200)) : setTimeout(run, 2500));
+  [2500, 6000, 10000].forEach(t => setTimeout(run, t));   /* chạy lại để bắt cả wipe muộn */
 })();
