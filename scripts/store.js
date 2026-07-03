@@ -338,7 +338,17 @@
       /* Bảng table-mapped: customers, orders, products, ... */
       const table = TABLE_MAP[key];
       if (!table) return;
-      await _mergeTableFromCloud(key, table);   /* orders: hàm này TỰ đặt mốc delta từ snapshot → vòng poll đầu đã nhẹ */
+      /* orders: hàm này TỰ đặt mốc delta từ snapshot → vòng poll đầu đã nhẹ */
+      let _ok = await _mergeTableFromCloud(key, table);
+      /* RETRY khi getAll trả null (timeout/mạng/client chưa sẵn ở nhịp load đầu) → tránh trang
+         KẸT RỖNG tới poll 180s / phải bấm lại lần 2. Chỉ retry khi thật sự chưa có data. */
+      if (_ok === false && !(Array.isArray(_data[key]) && _data[key].length)) {
+        for (const d of [600, 1500, 3000]) {
+          await new Promise(r => setTimeout(r, d));
+          _ok = await _mergeTableFromCloud(key, table);
+          if (_ok !== false || (Array.isArray(_data[key]) && _data[key].length)) break;
+        }
+      }
       /* Bật Realtime — đổi ở máy khác → máy này thấy ngay (<1s) */
       _subscribeRealtime(key, table);
     } catch (e) {
@@ -461,9 +471,9 @@
      Giải quyết: đơn tạo lúc lỗi (FK/RLS) kẹt local → tự đẩy lên khi load/poll
      → browser khác pull về thấy. Merge thay vì replace để KHÔNG mất record chưa sync. */
   async function _mergeTableFromCloud(key, table) {
-    if (!window.SB_DATA) return;
+    if (!window.SB_DATA) return false;
     let cloud = await window.SB_DATA.getAll(table);
-    if (!Array.isArray(cloud)) return;
+    if (!Array.isArray(cloud)) return false;   /* getAll lỗi/null → báo caller RETRY (không kẹt rỗng) */
     const idCol = ID_COLUMN[key] || 'id';
     const keyOf = (it) => it && (it[idCol] || it.id || it.code || it.no);
     /* TOMBSTONE: loại record vừa XOÁ khỏi snapshot cloud (chống hồi sinh) + XOÁ LẠI nếu cloud còn.
@@ -601,6 +611,7 @@
       (_subs[key] || []).forEach(fn => fn(merged));
       console.log(`[STORE] Synced ${key}: ${cloud.length} cloud + ${keep.length} đẩy lên`);
     }
+    return true;   /* cloud là mảng hợp lệ → merge OK (caller khỏi retry) */
   }
 
   /* ===== DELTA SYNC cho bảng NẶNG (orders) — chỉ kéo record ĐỔI kể từ mốc updated_at =====
