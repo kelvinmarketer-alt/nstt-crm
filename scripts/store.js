@@ -235,6 +235,7 @@
     'loyalty_rules',   /* Rules tích điểm — MED */
     'marketing_tpls',  /* Template marketing — MED */
     'cust_prefs',      /* Thói quen mua KH — MED */
+    'addrDupOk',       /* Cặp KH trùng địa chỉ ĐÃ XÁC NHẬN "không phải trùng" ["KH001|KH060"] — bỏ badge, không cảnh báo lại */
     'pod_photos',      /* Ảnh giao hàng — MED (base64 lớn) */
     'telegramChannels', /* Cấu hình routing (legacy, deprecated) */
     /* usage_stats: KHÔNG sync — tracker theo per-machine (deviceId) */

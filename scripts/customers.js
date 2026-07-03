@@ -314,12 +314,15 @@
       return;
     }
 
-    /* ⚠️ Cảnh báo NGHI TRÙNG ĐỊA CHỈ — tính ĐỘNG từ địa chỉ, KHÔNG ghi gì vào dữ liệu.
-       Quét toàn bộ KH (không theo scope) để bắt cả trùng chéo giữa các NV. */
+    /* ⚠️ Cảnh báo TRÙNG ĐỊA CHỈ — tính ĐỘNG từ địa chỉ, KHÔNG ghi gì vào dữ liệu KH.
+       Quét toàn bộ KH (không theo scope) để bắt cả trùng chéo giữa các NV.
+       Bỏ qua các cặp ĐÃ XÁC NHẬN "không trùng" (KV addrDupOk) → xác nhận 1 lần, không hỏi lại. */
+    const _okSet = new Set(window.STORE.get('addrDupOk', []) || []);
     const _allC = window.STORE.get('customers', []) || [];
     const _dupMap = {};
     for (let i = 0; i < _allC.length; i++) {
       for (let j = i + 1; j < _allC.length; j++) {
+        if (_okSet.has(_pairKey(_allC[i].id, _allC[j].id))) continue;   /* đã xác nhận → bỏ */
         if (_addrLooksSame(_allC[i].address, _allC[j].address)) {
           (_dupMap[_allC[i].id] || (_dupMap[_allC[i].id] = [])).push(_allC[j].code || _allC[j].id);
           (_dupMap[_allC[j].id] || (_dupMap[_allC[j].id] = [])).push(_allC[i].code || _allC[i].id);
@@ -332,7 +335,7 @@
       const col = window.avatarColor(c.id);
       const _twins = _dupMap[c.id];
       const dupBadge = _twins
-        ? ` <span onclick="event.stopPropagation()" title="Nghi trùng địa chỉ với: ${_twins.join(', ')} — kiểm tra kỹ trước khi tạo đơn / ghi công nợ" style="display:inline-block;margin-left:4px;padding:0 6px;border-radius:8px;background:#FEF3C7;color:#B45309;font-size:10px;font-weight:700;vertical-align:middle;cursor:help;white-space:nowrap">⚠️ nghi trùng</span>`
+        ? ` <span onclick="event.stopPropagation();window.reviewAddrDup('${c.id}')" title="Trùng địa chỉ với: ${_twins.join(', ')} — bấm để xem / xác nhận không trùng" style="display:inline-block;margin-left:4px;padding:0 6px;border-radius:8px;background:#FEF3C7;color:#B45309;font-size:10px;font-weight:700;vertical-align:middle;cursor:pointer;white-space:nowrap">⚠️ nghi trùng</span>`
         : '';
       const groupTag = c.group === 'VIP' ? 'tag-vip'
                       : c.group === 'Mới' ? 'tag-moi'
@@ -797,6 +800,58 @@
       ` — cân nhắc tạo đơn cho khách cũ thay vì tạo trùng.`;
   };
 
+  /* ===== XÁC NHẬN cặp trùng địa chỉ "không phải trùng" → lưu KV addrDupOk (sync đa máy).
+     Xác nhận 1 lần thì badge biến mất vĩnh viễn cho cặp đó, không cảnh báo lại. ===== */
+  function _pairKey(a, b) { return a < b ? a + '|' + b : b + '|' + a; }
+  window._ackDupPair = function (a, b) {
+    if (!a || !b || a === b) return;
+    const k = _pairKey(a, b);
+    if (window.STORE.rmwKv) window.STORE.rmwKv('addrDupOk', arr => { if (!arr.includes(k)) arr.push(k); return arr; });
+    else { const arr = window.STORE.get('addrDupOk', []) || []; if (!arr.includes(k)) { arr.push(k); window.STORE.set('addrDupOk', arr); } }
+  };
+  /* Twin CHƯA xác nhận của 1 KH (đã lọc addrDupOk) */
+  function _unconfirmedTwins(custId) {
+    const all = window.STORE.get('customers', []) || [];
+    const c = all.find(x => x.id === custId); if (!c) return [];
+    const ok = new Set(window.STORE.get('addrDupOk', []) || []);
+    return all.filter(x => x.id !== custId && !ok.has(_pairKey(custId, x.id)) && _addrLooksSame(c.address, x.address));
+  }
+  window.reviewAddrDup = function (custId) {
+    const all = window.STORE.get('customers', []) || [];
+    const c = all.find(x => x.id === custId); if (!c) return;
+    const twins = _unconfirmedTwins(custId);
+    if (!twins.length) { window.closeModal && window.closeModal(); render(); return; }
+    const rows = twins.map(t => `
+      <div style="display:flex;align-items:center;justify-content:space-between;gap:10px;border:1px solid var(--line);border-radius:9px;padding:9px 11px;margin-bottom:7px">
+        <div style="min-width:0">
+          <div style="font-weight:700">${t.name} <span style="color:var(--muted);font-weight:400;font-size:11px">· ${t.code}</span></div>
+          <div style="font-size:11.5px;color:var(--muted)">📍 ${t.address || '—'} · nợ ${window.fmt(t.debt || 0)} · NV: ${t.staffOwner || '—'}</div>
+        </div>
+        <button class="btn btn-ghost btn-sm" style="flex:0 0 auto" onclick="window._ackDup('${custId}','${t.id}')">✓ Không trùng</button>
+      </div>`).join('');
+    window.openModal('⚠️ Trùng địa chỉ — ' + c.name + ' (' + c.code + ')', `
+      <div style="font-size:12.5px;color:var(--muted);margin-bottom:10px">Địa chỉ: <b style="color:var(--text)">${c.address || '—'}</b><br>
+      Các khách dưới đây CÙNG địa chỉ. Nếu đúng là <b>1 nhà hàng</b> → nên gộp về 1 mã; nếu đúng là <b>khách KHÁC</b> (toà nhà/nhiều hộ) → bấm <b>“✓ Không trùng”</b> để bỏ cảnh báo (sẽ không hỏi lại).</div>
+      ${rows}
+    `, {
+      footer: `<button class="btn btn-ghost" onclick="window.closeModal()">Đóng</button>
+               <button class="btn btn-primary" onclick="window._ackDupAll('${custId}')">✓ Tất cả không trùng — bỏ cảnh báo</button>`,
+      width: '560px',
+    });
+  };
+  window._ackDup = function (a, b) {
+    window._ackDupPair(a, b);
+    window.toast && window.toast('✓ Đã bỏ cảnh báo trùng cặp này', 'success');
+    render();
+    window.reviewAddrDup(a);   /* làm mới modal — tự đóng nếu hết twin */
+  };
+  window._ackDupAll = function (custId) {
+    _unconfirmedTwins(custId).forEach(t => window._ackDupPair(custId, t.id));
+    window.closeModal && window.closeModal();
+    window.toast && window.toast('✓ Đã bỏ cảnh báo trùng cho khách này', 'success');
+    render();
+  };
+
   function _readAddForm() {
     return {
       name: window.formVal('#addName'), phone: window.formVal('#addPhone'),
@@ -856,6 +911,10 @@
       orders: 0, revenue: 0, debt: 0, debtOverdue: 0, ordersList: [], notes: [],
     });
     window.STORE.add('customers', newCust);
+    /* NV cố ý "Vẫn tạo khách mới" dù trùng địa chỉ → tự XÁC NHẬN các cặp (không cảnh báo lại) */
+    if (forced && f.address && window._ackDupPair) {
+      _custsSameAddr(f.address, code).forEach(t => window._ackDupPair(code, t.id || t.code));
+    }
     /* Nhóm giá KH → KV custPriceTiers (sync đa máy; cloud customers không có cột price_tier) */
     if (window.setCustPriceTier) window.setCustPriceTier(code, f.priceTier);
     if (window.setCustCreditDays) window.setCustCreditDays(code, f.creditDays);
