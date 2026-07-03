@@ -581,8 +581,11 @@
     });
     /* GIỮ lại record mới chưa sync (neverSynced) — KHÔNG giữ record đã bị xoá trên cloud.
        LUÔN giữ (kể cả >200): chỉ auto-PUSH bị hoãn khi >200 (ở trên), còn record vẫn phải
-       nằm trong local — trước đây keep=[] khi >200 làm MẤT record local (import offline lớn). */
-    const keep = neverSynced;
+       nằm trong local — trước đây keep=[] khi >200 làm MẤT record local (import offline lớn).
+       NGOẠI LỆ DESYNC: local << cloud → local-only nhiều khả năng là SEED CŨ / rác (vd SP029 ớt
+       chuông từ data/products.js) → BỎ hẳn (cloud là nguồn chuẩn) → hết hiện SP phantom + không
+       đẩy lên. (Máy desync muốn giữ đơn/SP tạo offline thì bấm "Đồng bộ lại" sau khi mạng ổn.) */
+    const keep = _desync ? [] : neverSynced;
     const merged = cloudMerged.concat(keep);
     const newJson = JSON.stringify(merged);
     /* PERF: so với BASELINE cloud lần trước (_synced[key]) thay vì stringify lại _data[key].
