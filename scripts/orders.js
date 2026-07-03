@@ -284,6 +284,7 @@
             <div class="row-actions">
               <button title="In/Copy phiếu (khách · shipper · xuất kho)" data-act="print" data-code="${o.code}">🖨</button>
               <button title="📸 Copy ảnh PHIẾU XUẤT KHO (gửi luôn, không cần chọn)" data-act="deliveryNote" data-code="${o.code}" style="color:#C00000">🧾</button>
+              <button title="📊 Tải Excel (.xlsx) đơn này — mẫu phiếu xuất kho" data-act="excel" data-code="${o.code}" style="color:#008000">📊</button>
               <button title="Xem thông tin đơn" data-act="edit" data-code="${o.code}">👁</button>
             </div>
           </td>
@@ -309,6 +310,7 @@
         const act = btn.dataset.act;
         if (act === 'print') window.printOrder(code);
         else if (act === 'deliveryNote') window.printDeliveryNote && window.printDeliveryNote(code, null, 'copy');
+        else if (act === 'excel') window.exportOrderExcel && window.exportOrderExcel(code);
         else if (act === 'edit') openOrder(code);
       };
     });
