@@ -78,9 +78,9 @@
       };
       const list = window.STORE.get('snapshots', []) || [];
       list.unshift(snap);
-      /* Giữ 6 cái mới nhất — mỗi bản copy toàn bộ data nên không giữ quá nhiều
-         (tránh vượt quota localStorage). */
-      while (list.length > 6) list.pop();
+      /* Giữ 2 cái mới nhất — mỗi bản copy TOÀN BỘ data (rất nặng ~MB) nên KHÔNG giữ nhiều
+         (đã gây ĐẦY quota localStorage → gãy nạp KH/đơn). Backup thật đã có ở cloud. */
+      while (list.length > 2) list.pop();
       window.STORE.set('snapshots', list);
       window.audit.log('backup.create', `Snapshot "${snap.label}" (${(json.length/1024).toFixed(1)} KB)`);
       return snap;

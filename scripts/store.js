@@ -242,9 +242,33 @@
     return fallback != null ? JSON.parse(JSON.stringify(fallback)) : [];
   }
 
+  /* === CHỐNG TRÀN localStorage (Chrome ~5MB) === */
+  /* orders kèm items ~4.6MB → tràn quota làm GÃY nạp KH/SP. Lưu localStorage BỎ items (giữ items
+     trong RAM; list dùng o.weight fallback + _itemN đếm mã; chi tiết/in đọc items từ RAM sau getAll). */
+  function _lsStrip(key, arr) {
+    if (key === 'orders' && Array.isArray(arr)) {
+      return arr.map(o => {
+        if (o && o.items != null) { const c = Object.assign({}, o); c._itemN = Array.isArray(o.items) ? o.items.length : 0; delete c.items; return c; }
+        return o;
+      });
+    }
+    return arr;
+  }
+  function _lsJson(key, arr) { try { return JSON.stringify(_lsStrip(key, arr)); } catch (e) { return null; } }
+  const _LOW_PRIORITY = ['snapshots', 'audit_log', 'pod_photos', 'marketing_tpls', 'budget_2026', 'inv_movements', 'usage_stats'];
+  function _safeSet(lsKey, json) {
+    if (json == null) return false;
+    try { localStorage.setItem(lsKey, json); return true; }
+    catch (e) {
+      /* QUOTA đầy → XOÁ key ít quan trọng (backup/log, không đồng bộ cloud) rồi thử lại → cache lại được */
+      _LOW_PRIORITY.forEach(k => { try { localStorage.removeItem(PREFIX + k); } catch (e2) {} });
+      try { localStorage.setItem(lsKey, json); return true; }
+      catch (e3) { console.warn('[STORE] localStorage đầy — bỏ cache', lsKey); return false; }
+    }
+  }
+
   function _save(key) {
-    try { localStorage.setItem(PREFIX + key, JSON.stringify(_data[key])); }
-    catch (e) { console.warn('[STORE _save]', e); }
+    _safeSet(PREFIX + key, _lsJson(key, _data[key]));
     (_subs[key] || []).forEach(fn => {
       try { fn(_data[key]); } catch (e) { console.warn('[STORE subscriber]', e); }
     });
@@ -432,7 +456,7 @@
   function _flushUpsert(key) {
     const arr = _data[key];
     if (!Array.isArray(arr)) return;
-    try { localStorage.setItem(PREFIX + key, JSON.stringify(arr)); } catch (e) {}
+    _safeSet(PREFIX + key, _lsJson(key, arr));
     (_subs[key] || []).forEach(fn => { try { fn(arr); } catch (e) {} });
   }
   function _applyRealtimeUpsert(key, row) {
@@ -563,7 +587,7 @@
           console.warn(`[STORE] customers: mã '${id}' trên cloud là KH KHÁC ("${cc.name}") — KHÔNG ghi đè; insert cấp mã mới cho "${it.name}"`);
           window.SB_DATA.insert(table, it).then(saved => {
             if (saved) {
-              if (saved[idCol] && saved[idCol] !== id) { it[idCol] = saved[idCol]; try { localStorage.setItem(PREFIX + key, JSON.stringify(_data[key])); } catch (e) {} }
+              if (saved[idCol] && saved[idCol] !== id) { it[idCol] = saved[idCol]; _safeSet(PREFIX + key, _lsJson(key, _data[key])); }
               _clearPending(key, id); _clearPending(key, it[idCol]);
               window.toast?.(`KH "${it.name}" trùng mã ${id} → đã cấp mã mới ${it[idCol]} (không ghi đè KH khác)`, 'success');
             }
@@ -610,7 +634,7 @@
     _persistSyncedIds(key, merged);  /* lưu id-set bền qua reload để lần sau biết record nào bị xoá */
     if (newJson !== prevBaseline) {
       _data[key] = merged;
-      try { localStorage.setItem(PREFIX + key, newJson); } catch (e) {}
+      _safeSet(PREFIX + key, _lsJson(key, merged));
       (_subs[key] || []).forEach(fn => fn(merged));
       console.log(`[STORE] Synced ${key}: ${cloud.length} cloud + ${keep.length} đẩy lên`);
     }
@@ -677,7 +701,7 @@
     _data[key] = merged;
     const nj = JSON.stringify(merged);
     _synced[key] = nj; _persistSyncedIds(key, merged);
-    try { localStorage.setItem(PREFIX + key, nj); } catch (e) {}
+    _safeSet(PREFIX + key, _lsJson(key, merged));
     (_subs[key] || []).forEach(fn => fn(merged));
     console.log(`[STORE] Δ ${key}: +${res.rows.length} record đổi (delta, không kéo cả bảng)`);
   }
@@ -1161,8 +1185,7 @@
     const cloud = await window.SB_DATA.getAll(table);
     if (!Array.isArray(cloud)) { window.toast?.('Cloud chưa phản hồi — thử lại sau', 'warn'); return; }
     _data[key] = cloud;
-    try { localStorage.setItem(PREFIX + key, JSON.stringify(cloud)); }
-    catch (e) { window.toast?.('⚠ Bộ nhớ trình duyệt đầy — phiên này hiện đúng nhưng tải lại có thể chưa lưu hết', 'warn'); }
+    _safeSet(PREFIX + key, _lsJson(key, cloud));
     _synced[key] = JSON.stringify(cloud); _persistSyncedIds(key, cloud);
     try { localStorage.removeItem(PENDING_PREFIX + key); } catch (e) {}
     _pendingCache[key] = new Set();
