@@ -59,6 +59,16 @@
     }
   } catch (e) {}
 
+  /* DỌN snapshots phình (mỗi bản copy TOÀN BỘ data ~MB) → giải phóng quota localStorage cho KH/đơn
+     cache được. Backup thật đã ở cloud; giữ tối đa 1 bản gần nhất. */
+  try {
+    const _sn = JSON.parse(localStorage.getItem(PREFIX + 'snapshots') || '[]');
+    if (Array.isArray(_sn) && _sn.length > 1) {
+      try { localStorage.setItem(PREFIX + 'snapshots', JSON.stringify(_sn.slice(0, 1))); }
+      catch (e2) { localStorage.removeItem(PREFIX + 'snapshots'); }
+    }
+  } catch (e) {}
+
   const _data = {};
   /* ⚠️ CHỐNG MẤT DỮ LIỆU: id đang có write GỬI DỞ lên cloud (insert/update) — LƯU RA localStorage
      để BỀN qua F5 (F5 huỷ write đang bay + reset RAM). Tác dụng:

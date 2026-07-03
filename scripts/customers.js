@@ -57,12 +57,9 @@
   /* Load qua STORE (auto persist) */
   const initialData = (window.CUSTOMERS || []).map(decorate);
   let customers = window.STORE.get('customers', initialData);
-  /* Migration: localStorage còn dữ liệu KH theo schema cũ (logistics B2B/B2C, service/route)
-     → seed lại bộ KH nông sản mới */
-  if (customers.some(c => c.type === 'B2B' || c.type === 'B2C' || c.service || c.route)) {
-    window.STORE.set('customers', initialData);
-    customers = initialData;
-  }
+  /* ❌ ĐÃ BỎ migration cũ (v369): nó XOÁ SẠCH danh sách khi thấy type='B2B'/'B2C' — nhưng nay
+     có 42 KH thật để type 'B2B' + seed rỗng (window.CUSTOMERS=[]) → mỗi lần vào trang KH bị ghi
+     đè về [] = "0 khách, phải bấm nhiều lần". Cloud là nguồn chuẩn, KHÔNG re-seed/wipe nữa. */
   /* Nếu đã từng load thì decorate lại đề phòng schema thay đổi */
   customers.forEach((c, i) => customers[i] = decorate(c));
 
