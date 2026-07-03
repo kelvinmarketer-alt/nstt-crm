@@ -382,6 +382,17 @@
       } catch (e) { return null; }
     },
 
+    /* Mã KH kế tiếp THEO CLOUD (chống trùng khi máy tạo mã KHxxx từ max CỤC BỘ lỗi thời —
+       máy đứng sau lúc DB nghẽn sẽ cấp trùng mã của KH đã có → nếu không đổi mã sẽ bị NUỐT). */
+    async nextCloudCustCode() {
+      try {
+        const { data } = await client.from('customers').select('id').order('id', { ascending: false }).limit(5);
+        let max = 0;
+        (data || []).forEach(r => { const m = String(r.id || '').match(/KH0*(\d+)/); if (m) max = Math.max(max, +m[1]); });
+        return 'KH' + String(max + 1).padStart(3, '0');
+      } catch (e) { return null; }
+    },
+
     /* Insert 1 record — auto-strip cột lạ + retry (chống schema mismatch mọi bảng) */
     async insert(table, record) {
       const mapped = mapTo(table, record);
@@ -417,7 +428,27 @@
             continue;
           }
         }
-        /* MỌI BẢNG KHÁC (adspend, inventory, customers…): trùng PK = bản ghi NÀY đã có trên
+        /* KHÁCH HÀNG trùng mã KHxxx (máy đứng sau lúc DB nghẽn cấp trùng mã của KH KHÁC).
+           Giống orders: nếu mã đó trên cloud là KH KHÁC (khác tên) → cấp mã mới rồi thử lại
+           (KHÔNG để bị nuốt); nếu trùng tên → đúng KH này rồi → trả về (idempotent). */
+        if (table === 'customers' && (error.code === '23505' || /duplicate key/i.test(error.message || ''))) {
+          const norm = s => String(s || '').trim().toLowerCase().replace(/\s+/g, ' ');
+          try {
+            const ex = await client.from('customers').select('*').eq('id', mapped.id).maybeSingle();
+            const e = ex && ex.data;
+            if (e && norm(e.name) === norm(mapped.name)) {
+              console.warn(`[SB insert] customers: '${mapped.id}' đã là KH này trên cloud → không tạo trùng`);
+              return mapFrom(table, e);
+            }
+          } catch (e) { /* đọc lỗi → rơi xuống cấp mã mới */ }
+          const nc = await this.nextCloudCustCode();
+          if (nc && nc !== mapped.id) {
+            console.warn(`[SB insert] customers: mã '${mapped.id}' trùng KH khác → đổi '${nc}' rồi thử lại (chống nuốt KH)`);
+            mapped.id = nc;
+            continue;
+          }
+        }
+        /* MỌI BẢNG KHÁC (adspend, inventory…): trùng PK = bản ghi NÀY đã có trên
            cloud (self-heal/realtime echo chèn trước, hoặc import chạy lại) → IDEMPOTENT:
            lấy bản cloud trả về, KHÔNG spam toast "duplicate key". (Trước đây chỉ orders được
            xử lý → mọi import khác nổ hàng loạt toast lỗi.) */

@@ -5,7 +5,7 @@
 
 /* Phiên bản app hiển thị (đối chiếu với CACHE_VERSION trong sw.js) — để user tự XÁC NHẬN
    đang chạy bản mới hay còn kẹt JS cũ (hiện ở góc sidebar + log console). */
-window.APP_VERSION = 'v352';
+window.APP_VERSION = 'v353';
 console.log('%c[NSTT] App ' + window.APP_VERSION, 'color:#339B21;font-weight:bold');
 
 /* Gom NGUỒN khách về 3 nhóm chuẩn: 'mkt' / 'sales' / 'sep-gioi-thieu'.

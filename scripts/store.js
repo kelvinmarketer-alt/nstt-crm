@@ -725,6 +725,7 @@
               _clearPending(key, old); _markPending(key, saved[idCol]); _clearPending(key, saved[idCol]);
               _save(key);
               if (key === 'orders') window.toast?.(`Mã đơn ${old} trùng — đã tự đổi thành ${saved[idCol]} ✓`, 'info');
+              else if (key === 'customers') window.toast?.(`Mã KH ${old} trùng — đã tự đổi thành ${saved[idCol]} ✓ (không mất khách)`, 'success');
             } else if (saved) { _clearPending(key, item[idCol]); }
             /* saved == null = INSERT HỎNG → GIỮ pending: merge (neverSynced) sẽ chèn LẠI + giữ
                record trên máy, KHÔNG để mất. Trước đây xoá pending ở đây kể cả khi hỏng. */
