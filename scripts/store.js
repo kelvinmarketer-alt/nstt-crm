@@ -319,6 +319,9 @@
       const table = TABLE_MAP[key];
       if (!table) return;
       await _mergeTableFromCloud(key, table);
+      /* orders: đặt mốc delta ngay sau khi preload FULL → vòng poll ĐẦU đã chạy delta (nhẹ),
+         khỏi kéo lại cả bảng ở lần poll đầu. */
+      if (key === 'orders') await _refreshCursor(key, table);
       /* Bật Realtime — đổi ở máy khác → máy này thấy ngay (<1s) */
       _subscribeRealtime(key, table);
     } catch (e) {
@@ -515,6 +518,68 @@
       (_subs[key] || []).forEach(fn => fn(merged));
       console.log(`[STORE] Synced ${key}: ${cloud.length} cloud + ${keep.length} đẩy lên`);
     }
+  }
+
+  /* ===== DELTA SYNC cho bảng NẶNG (orders) — chỉ kéo record ĐỔI kể từ mốc updated_at =====
+     Vì sao: poll kéo cả 900+ đơn kèm items JSONB = ~5.8MB/lần × mỗi tab × mỗi 3' → pin CPU/IO
+     Supabase (đã gây treo 522). Realtime websocket vẫn đẩy delta tức thì; poll chỉ là lưới
+     an toàn. Delta poll chỉ tải vài record vừa đổi (~KB) thay vì cả bảng.
+     - _cursor[key] = updated_at lớn nhất đã thấy (ISO thô DB). Tăng đơn điệu.
+     - UPSERT giữ NGUYÊN THỨ TỰ local (ổn định → không re-render vô cớ) + giữ cờ '_' + pending.
+     - KHÔNG xử lý xoá / KHÔNG tự đẩy local-only ở đây (để merge FULL định kỳ/refocus lo). */
+  const _cursor = {};
+  let _pollTick = 0;
+
+  async function _refreshCursor(key, table) {
+    try {
+      if (window.SB_DATA && window.SB_DATA.maxUpdated) {
+        const mx = await window.SB_DATA.maxUpdated(table);
+        if (mx && (!_cursor[key] || mx > _cursor[key])) _cursor[key] = mx;
+      }
+    } catch (e) {}
+  }
+
+  async function _mergeDeltaFromCloud(key, table) {
+    if (!window.SB_DATA || !window.SB_DATA.getChangedSince) { return _mergeTableFromCloud(key, table); }
+    let since = _cursor[key];
+    if (since == null) {                               /* chưa có mốc → merge FULL 1 lần rồi đặt mốc */
+      await _mergeTableFromCloud(key, table);
+      await _refreshCursor(key, table);
+      return;
+    }
+    const res = await window.SB_DATA.getChangedSince(table, since, 500);
+    if (!res || !Array.isArray(res.rows)) return;      /* lỗi → giữ mốc, poll sau thử lại */
+    if (res.cursor && res.cursor > since) _cursor[key] = res.cursor;
+    if (!res.rows.length) return;                      /* KHÔNG có gì đổi → cực nhẹ, xong */
+
+    const idCol = ID_COLUMN[key] || 'id';
+    const keyOf = (it) => it && (it[idCol] || it.id || it.code || it.no);
+    const local = Array.isArray(_data[key]) ? _data[key] : (_load(key, []) || []);
+    const idxById = new Map(local.map((it, i) => [keyOf(it), i]));
+    const merged = local.slice();
+    let changed = false;
+    for (const c of res.rows) {
+      const id = keyOf(c); if (id == null) continue;
+      if (_isPending(key, id)) continue;               /* bản local đang ghi dở → giữ local */
+      const at = idxById.get(id);
+      if (at != null) {
+        const lr = merged[at];
+        const flags = {};
+        for (const k of Object.keys(lr)) if (k.charAt(0) === '_') flags[k] = lr[k];   /* giữ cờ chống-lặp */
+        const rec = Object.keys(flags).length ? { ...c, ...flags } : c;
+        if (JSON.stringify(lr) === JSON.stringify(rec)) continue;  /* không đổi thực sự → bỏ */
+        merged[at] = rec; changed = true;
+      } else {
+        merged.push(c); idxById.set(id, merged.length - 1); changed = true;   /* record mới từ máy khác */
+      }
+    }
+    if (!changed) return;
+    _data[key] = merged;
+    const nj = JSON.stringify(merged);
+    _synced[key] = nj; _persistSyncedIds(key, merged);
+    try { localStorage.setItem(PREFIX + key, nj); } catch (e) {}
+    (_subs[key] || []).forEach(fn => fn(merged));
+    console.log(`[STORE] Δ ${key}: +${res.rows.length} record đổi (delta, không kéo cả bảng)`);
   }
 
   window.STORE = {
@@ -920,10 +985,19 @@
     _pollIntervalId = setInterval(() => {
       if (!isSupabaseMode()) return;
       if (document.hidden) return;
+      _pollTick++;
+      /* Bảng NẶNG (orders): dùng DELTA (chỉ record đổi) để khỏi kéo ~5.8MB/lần.
+         Cứ mỗi 10 vòng (~30') mới merge FULL 1 lần để đối soát xoá + đẩy local-only + làm tươi mốc. */
+      const fullReconcile = (_pollTick % 10 === 0);
       _preloaded.forEach(key => {
-        if (TABLE_MAP[key]) {
-          /* Merge + self-heal (đẩy local-only lên + pull cloud về) */
-          _mergeTableFromCloud(key, TABLE_MAP[key]).catch(() => {});
+        const table = TABLE_MAP[key]; if (!table) return;
+        if (key === 'orders' && window.SB_DATA && window.SB_DATA.getChangedSince && !fullReconcile) {
+          _mergeDeltaFromCloud(key, table).catch(() => {});
+        } else {
+          /* Merge FULL + self-heal (đẩy local-only lên + pull cloud về) */
+          _mergeTableFromCloud(key, table)
+            .then(() => { if (key === 'orders') return _refreshCursor(key, table); })
+            .catch(() => {});
         }
       });
     }, _pollSec * 1000);

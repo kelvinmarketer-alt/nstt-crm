@@ -330,6 +330,35 @@
       return out.map(r => mapFrom(table, r));
     },
 
+    /* === DELTA SYNC — chỉ kéo record ĐỔI kể từ mốc `sinceISO` (theo updated_at) ===
+       Dùng cho poll bảng nặng (orders ~5.8MB/lần nếu kéo cả bảng). Trả về:
+         { rows: [mapped...], cursor: <updated_at LỚN NHẤT trong lô, dạng ISO thô của DB> }
+       hoặc null nếu lỗi (caller giữ nguyên mốc, poll sau thử lại).
+       - Sắp xếp updated_at TĂNG DẦN + limit → nếu đổi nhiều hơn `limitRows`, cursor
+         nhích tới record cuối lô, poll kế tiếp chạy tiếp (không mất, chỉ chia nhiều lô).
+       - cursor lấy từ updated_at THÔ của DB (trước mapFrom) → không phụ thuộc DATE_FIELDS. */
+    async getChangedSince(table, sinceISO, limitRows) {
+      try {
+        let q = client.from(table).select('*').order('updated_at', { ascending: true }).limit(limitRows || 500);
+        if (sinceISO) q = q.gt('updated_at', sinceISO);
+        const { data, error } = await q;
+        if (error) { console.warn('[SB getChangedSince]', table, error.message); return null; }
+        const rows = data || [];
+        let cursor = sinceISO || null;
+        for (const r of rows) { const u = r && r.updated_at; if (u && (!cursor || u > cursor)) cursor = u; }
+        return { rows: rows.map(r => mapFrom(table, r)), cursor };
+      } catch (e) { console.warn('[SB getChangedSince]', table, e.message); return null; }
+    },
+
+    /* Mốc updated_at lớn nhất của bảng (1 dòng ~50B) — đặt mốc delta sau khi merge FULL. */
+    async maxUpdated(table) {
+      try {
+        const { data, error } = await client.from(table).select('updated_at').order('updated_at', { ascending: false }).limit(1);
+        if (error || !data || !data.length) return null;
+        return data[0].updated_at || null;
+      } catch (e) { return null; }
+    },
+
     /* Lấy mã đơn kế tiếp THEO CLOUD (chống trùng khi nhiều máy tạo đơn cùng lúc) */
     async nextCloudOrderCode() {
       try {
