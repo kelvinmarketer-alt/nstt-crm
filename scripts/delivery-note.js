@@ -35,7 +35,7 @@
   }
   function getLogo() {
     return window.BRAND_LOGO_DATAURL ||
-      'data:image/svg+xml,' + encodeURIComponent(`<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 100"><circle cx="50" cy="50" r="48" fill="#1B5E20"/><text x="50" y="62" text-anchor="middle" font-family="Arial Black" font-size="32" fill="#fff" font-weight="900">TT</text></svg>`);
+      'data:image/svg+xml,' + encodeURIComponent(`<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 100"><circle cx="50" cy="50" r="48" fill="#008000"/><text x="50" y="62" text-anchor="middle" font-family="Arial Black" font-size="32" fill="#fff" font-weight="900">TT</text></svg>`);
   }
   function fmt(n) { return (n || 0).toLocaleString('vi-VN'); }
   function fmtDate(s) {
@@ -85,21 +85,21 @@ ${FAV ? `<link rel="icon" type="image/svg+xml" href="${FAV}">` : ''}
   .head{display:grid;grid-template-columns:104px 1fr 152px;gap:14px;align-items:flex-start;padding-bottom:6px}
   .logo-wrap{text-align:center}
   .logo-wrap img{width:92px;height:92px;object-fit:contain;display:block;margin:0 auto}
-  .logo-wrap .tag{font-size:9px;color:#1B5E20;font-weight:700;margin-top:4px;line-height:1.25}
+  .logo-wrap .tag{font-size:9px;color:#008000;font-weight:700;margin-top:4px;line-height:1.25}
   .logo-wrap .tag2{font-size:8px;color:#2c8a48;margin-top:2px;font-style:italic}
 
   .comp-info{padding-top:2px}
-  .comp-info h1{font-size:17px;font-weight:800;text-align:left;color:#1B5E20;letter-spacing:0.2px;margin-bottom:5px;line-height:1.2}
+  .comp-info h1{font-size:17px;font-weight:800;text-align:left;color:#008000;letter-spacing:0.2px;margin-bottom:5px;line-height:1.2}
   .comp-info .row{font-size:11.5px;line-height:1.55;color:#000;text-align:left}
   .comp-info .row b{font-weight:700}
   .qrbox{text-align:center}
-  .qrbox img{width:134px;height:134px;object-fit:contain;border:1px solid #1B5E20;border-radius:8px;padding:3px;background:#fff;display:block;margin:0 auto}
-  .qrbox .cap{font-size:9.5px;color:#1B5E20;font-weight:700;margin-top:3px}
+  .qrbox img{width:134px;height:134px;object-fit:contain;border:1px solid #008000;border-radius:8px;padding:3px;background:#fff;display:block;margin:0 auto}
+  .qrbox .cap{font-size:9.5px;color:#008000;font-weight:700;margin-top:3px}
   .qrbox .acc{font-size:9px;color:#555}
 
   /* === TITLE (to, căn trái) + Người báo hàng === */
   .titlerow{display:flex;justify-content:space-between;align-items:center;gap:12px;
-    border-bottom:1px solid #1B5E20;padding:2px 4px 7px;margin-top:6px}
+    border-bottom:1px solid #008000;padding:2px 4px 7px;margin-top:6px}
   .ptitle{font-size:23px;font-weight:800;color:#C00000;text-align:left;letter-spacing:0.3px;line-height:1.08}
   .reporter{background:#FFFF00;padding:4px 12px;border:1px solid #000;text-align:center;flex:0 0 auto}
   .reporter .lbl{display:block;font-size:10.5px;font-weight:700;margin-bottom:1px}
@@ -110,8 +110,8 @@ ${FAV ? `<link rel="icon" type="image/svg+xml" href="${FAV}">` : ''}
   /* === TABLE === */
   table.it{width:100%;border-collapse:collapse;margin-top:8px;font-size:11.5px}
   table.it th, table.it td{border:1px solid #000;padding:4px 6px;vertical-align:middle}
-  table.it thead th{background:#2FAE3A;color:#fff;font-weight:700;text-align:center;font-size:11px;line-height:1.3}
-  table.it th.thbig{background:#2FAE3A;color:#fff}
+  table.it thead th{background:#008000;color:#fff;font-weight:700;text-align:center;font-size:11px;line-height:1.3}
+  table.it th.thbig{background:#008000;color:#fff}
   table.it td.c{text-align:center}
   table.it td.r{text-align:right;font-variant-numeric:tabular-nums}
   table.it td.l{text-align:left}
@@ -130,7 +130,7 @@ ${FAV ? `<link rel="icon" type="image/svg+xml" href="${FAV}">` : ''}
   /* === Print/Close buttons (ẩn khi in) === */
   .noprint{position:fixed;bottom:18px;right:18px;display:flex;gap:8px;z-index:1000}
   .noprint button{padding:10px 18px;border-radius:8px;border:0;cursor:pointer;font-weight:700;font-size:13px;box-shadow:0 4px 12px rgba(0,0,0,0.25)}
-  .noprint .btn-print{background:#1B5E20;color:#fff}
+  .noprint .btn-print{background:#008000;color:#fff}
   .noprint .btn-close{background:#fff;color:#475569;border:1px solid #CBD5E1}
   @media print { .noprint{display:none !important} body{padding:0} }
 </style></head>
@@ -140,7 +140,7 @@ ${FAV ? `<link rel="icon" type="image/svg+xml" href="${FAV}">` : ''}
   <div class="head">
     <div class="logo-wrap">
       <img src="${getLogo()}" alt="Tuấn Tú Farm">
-      <div class="tag">Uy Tín Làm Nên Thương Hiệu</div>
+      <div class="tag">Uy Tín Làm Nên Thương&nbsp;Hiệu</div>
     </div>
     <div class="comp-info">
       <h1>${(comp.name || 'Công Ty TNHH XNK Nông Sản Tuấn Tú Hà Nội').toUpperCase().replace(/\s*[-–—]\s*/, '<br>')}</h1>
@@ -285,7 +285,7 @@ ${FAV ? `<link rel="icon" type="image/svg+xml" href="${FAV}">` : ''}
       </label>`;
     window.openModal('📸 Phiếu đơn ' + code + ' — Copy ảnh gửi khách', `
       <div style="font-size:12.5px;color:var(--muted);margin-bottom:12px">Tick phiếu cần → mở ra bấm <b>“Copy ảnh gửi khách”</b> dán vào Zalo/Messenger (vẫn có nút In giấy nếu cần):</div>
-      ${row('prt_cust', true,  '📄', '#1B5E20', 'Phiếu xác nhận đơn (Khách)', 'Đơn giá + tổng tiền · công nợ · đối chiếu trước khi giao')}
+      ${row('prt_cust', true,  '📄', '#008000', 'Phiếu xác nhận đơn (Khách)', 'Đơn giá + tổng tiền · công nợ · đối chiếu trước khi giao')}
       ${row('prt_ship', false, '🛵', '#D97706', 'Phiếu giao cho Shipper', 'Địa chỉ + SĐT to · tick mặt hàng · khung COD · ô POD')}
       ${row('prt_wh',   false, '🧾', '#C00000', 'Phiếu báo hàng / xuất kho (Kho)', 'Mặt hàng + số lượng cho Kho chuẩn bị')}
       <div style="margin-top:6px;padding:11px 12px;background:#F0FDF4;border:1px solid #BBF7D0;border-radius:9px">

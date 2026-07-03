@@ -78,32 +78,32 @@
 ${FAV ? `<link rel="icon" type="image/svg+xml" href="${FAV}">` : ''}
 <style>${SHARED_CSS}
   body{padding:14mm 12mm}
-  .header{display:flex;justify-content:space-between;align-items:flex-start;border-bottom:2.5px solid #1B5E20;padding-bottom:10px;margin-bottom:12px}
+  .header{display:flex;justify-content:space-between;align-items:flex-start;border-bottom:2.5px solid #008000;padding-bottom:10px;margin-bottom:12px}
   .logo{display:flex;align-items:center;gap:9px}
   .logo .icon{width:42px;height:42px;border-radius:50%;background:#E8F5E2;display:grid;place-items:center;font-size:22px}
-  .logo .txt h1{font-size:15px;color:#1B5E20;font-weight:800;letter-spacing:0.3px}
+  .logo .txt h1{font-size:15px;color:#008000;font-weight:800;letter-spacing:0.3px}
   .logo .txt .sub{font-size:9.5px;color:#475569;margin-top:1px}
   .doc-meta{text-align:right;font-size:10px;color:#6B7280}
-  .doc-meta .num{font-size:14px;color:#1B5E20;font-weight:800;letter-spacing:0.3px;margin-bottom:2px}
+  .doc-meta .num{font-size:14px;color:#008000;font-weight:800;letter-spacing:0.3px;margin-bottom:2px}
 
-  .title{text-align:center;font-size:18px;font-weight:800;color:#1B5E20;letter-spacing:1.5px;margin:8px 0 4px}
+  .title{text-align:center;font-size:18px;font-weight:800;color:#008000;letter-spacing:1.5px;margin:8px 0 4px}
   .subtitle{text-align:center;font-size:10.5px;color:#6B7280;margin-bottom:14px;letter-spacing:0.5px}
 
   .info-grid{display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:12px;font-size:11.5px}
-  .info-block{background:#FAFBFC;padding:9px 11px;border-radius:6px;border-left:3px solid #1B5E20}
+  .info-block{background:#FAFBFC;padding:9px 11px;border-radius:6px;border-left:3px solid #008000}
   .info-block .lab{font-size:9px;color:#6B7280;text-transform:uppercase;letter-spacing:0.6px;font-weight:700;margin-bottom:3px}
   .info-block .val{font-weight:600;color:#1F2937;line-height:1.45}
 
   table.items{width:100%;border-collapse:collapse;font-size:10.5px;margin-bottom:10px}
-  table.items th{background:#1B5E20;color:#fff;padding:6px 7px;text-align:left;font-weight:700;font-size:9.5px;text-transform:uppercase;letter-spacing:0.4px}
+  table.items th{background:#008000;color:#fff;padding:6px 7px;text-align:left;font-weight:700;font-size:9.5px;text-transform:uppercase;letter-spacing:0.4px}
   table.items th.num{text-align:right}
   table.items td{padding:6px 7px;border-bottom:1px solid #E5E7EB;vertical-align:top}
   table.items td.num{text-align:right;font-variant-numeric:tabular-nums}
   table.items tr:nth-child(even) td{background:#FAFBFC}
-  table.items tfoot td{font-weight:800;background:#F0FDF4;color:#1B5E20;padding:8px 7px;border-top:2px solid #1B5E20;font-size:11.5px}
+  table.items tfoot td{font-weight:800;background:#F0FDF4;color:#008000;padding:8px 7px;border-top:2px solid #008000;font-size:11.5px}
 
   .totals{display:flex;justify-content:flex-end;margin-top:8px;margin-bottom:14px}
-  .totals-box{background:#1B5E20;color:#fff;padding:8px 16px;border-radius:6px;text-align:right;min-width:200px}
+  .totals-box{background:#008000;color:#fff;padding:8px 16px;border-radius:6px;text-align:right;min-width:200px}
   .totals-box .lab{font-size:9.5px;text-transform:uppercase;letter-spacing:0.5px;opacity:0.9}
   .totals-box .val{font-size:18px;font-weight:800;font-variant-numeric:tabular-nums;margin-top:1px}
 
@@ -278,33 +278,33 @@ ${FAV ? `<link rel="icon" type="image/svg+xml" href="${FAV}">` : ''}
 ${FAV2 ? `<link rel="icon" type="image/svg+xml" href="${FAV2}">` : ''}
 <style>${SHARED_CSS}
   body{padding:8mm 7mm;font-size:14px}
-  .header{display:flex;justify-content:space-between;align-items:center;background:#1B5E20;color:#fff;padding:8px 12px;border-radius:6px;margin-bottom:10px}
+  .header{display:flex;justify-content:space-between;align-items:center;background:#008000;color:#fff;padding:8px 12px;border-radius:6px;margin-bottom:10px}
   .header h1{font-size:18px;font-weight:800;letter-spacing:1px}
   .header .code{font-family:'JetBrains Mono',monospace;font-size:14px;background:rgba(255,255,255,0.2);padding:3px 10px;border-radius:5px}
 
   .qr-note{background:#FEF3C7;border:1px dashed #D97706;padding:5px 8px;border-radius:4px;font-size:10px;color:#92400E;text-align:center;margin-bottom:10px}
 
-  .addr-box{background:#1B5E20;color:#fff;padding:14px 16px;border-radius:8px;margin-bottom:11px;text-align:center}
+  .addr-box{background:#008000;color:#fff;padding:14px 16px;border-radius:8px;margin-bottom:11px;text-align:center}
   .addr-box .lab{font-size:11px;text-transform:uppercase;letter-spacing:0.8px;opacity:0.85;font-weight:600}
   .addr-box .name{font-size:18px;font-weight:800;margin:4px 0 3px;line-height:1.25}
   .addr-box .addr{font-size:16px;font-weight:600;line-height:1.35;margin:6px 0}
-  .addr-box .phone{display:inline-block;background:#fff;color:#1B5E20;padding:5px 14px;border-radius:99px;font-size:17px;font-weight:800;margin-top:5px;letter-spacing:0.5px}
+  .addr-box .phone{display:inline-block;background:#fff;color:#008000;padding:5px 14px;border-radius:99px;font-size:17px;font-weight:800;margin-top:5px;letter-spacing:0.5px}
 
   .meta-row{display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:10px;font-size:11px}
   .meta-cell{background:#F1F5F9;padding:7px 10px;border-radius:5px}
   .meta-cell .lab{font-size:9px;color:#475569;text-transform:uppercase;font-weight:700}
   .meta-cell .val{font-weight:700;color:#0F172A;margin-top:1px}
 
-  .section-title{font-size:11px;font-weight:800;color:#1B5E20;text-transform:uppercase;letter-spacing:0.6px;margin:8px 0 5px;padding-bottom:3px;border-bottom:1.5px solid #1B5E20}
+  .section-title{font-size:11px;font-weight:800;color:#008000;text-transform:uppercase;letter-spacing:0.6px;margin:8px 0 5px;padding-bottom:3px;border-bottom:1.5px solid #008000}
 
   table.items{width:100%;border-collapse:collapse;font-size:12px}
   table.items th{background:#F1F5F9;padding:6px 6px;text-align:left;font-weight:700;font-size:9.5px;color:#475569;text-transform:uppercase;letter-spacing:0.3px;border-bottom:2px solid #94A3B8}
   table.items th.num{text-align:right}
   table.items td{padding:7px 6px;border-bottom:1px solid #E5E7EB;vertical-align:middle}
   table.items td.num{text-align:right;font-variant-numeric:tabular-nums;font-weight:600}
-  .tick-box{display:inline-block;width:16px;height:16px;border:2px solid #1B5E20;border-radius:3px;vertical-align:middle}
+  .tick-box{display:inline-block;width:16px;height:16px;border:2px solid #008000;border-radius:3px;vertical-align:middle}
   .item-name{font-weight:600;font-size:13px}
-  .item-qty{font-weight:800;color:#1B5E20;font-size:14px}
+  .item-qty{font-weight:800;color:#008000;font-size:14px}
 
   .cod-box{margin-top:10px;background:#FEF3C7;border:3px solid #D97706;border-radius:7px;padding:10px 14px;display:flex;justify-content:space-between;align-items:center}
   .cod-box .lab{font-size:11px;color:#92400E;text-transform:uppercase;letter-spacing:0.6px;font-weight:800}
@@ -416,7 +416,7 @@ ${FAV2 ? `<link rel="icon" type="image/svg+xml" href="${FAV2}">` : ''}
       </label>`;
     window.openModal('🖨 In phiếu đơn ' + code, `
       <div style="font-size:12.5px;color:var(--muted);margin-bottom:12px">Tick (các) phiếu cần in theo giai đoạn — in 1 cái hoặc cả 3 tuỳ ý:</div>
-      ${row('prt_cust', true,  '📄', '#1B5E20', 'Phiếu xác nhận đơn (Khách)', 'Đơn giá + tổng tiền · công nợ · TK ngân hàng · ô ký 2 bên')}
+      ${row('prt_cust', true,  '📄', '#008000', 'Phiếu xác nhận đơn (Khách)', 'Đơn giá + tổng tiền · công nợ · TK ngân hàng · ô ký 2 bên')}
       ${row('prt_ship', false, '🛵', '#D97706', 'Phiếu giao cho Shipper', 'Địa chỉ + SĐT to · tick mặt hàng · khung COD · ô POD')}
       ${row('prt_wh',   false, '🧾', '#C00000', 'Phiếu báo hàng / xuất kho (Kho)', 'Mặt hàng + số lượng cho Kho chuẩn bị — không có giá')}
       <div style="margin-top:6px;padding:11px 12px;background:#F0FDF4;border:1px solid #BBF7D0;border-radius:9px">
