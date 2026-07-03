@@ -508,8 +508,15 @@
     const deletedOnCloud = prevIds ? localOnly.filter(it => prevIds.has(keyOf(it)) && !_isPending(key, keyOf(it))) : [];
     const neverSynced    = prevIds ? localOnly.filter(it => !prevIds.has(keyOf(it)) || _isPending(key, keyOf(it))) : localOnly;
 
+    /* CHỐNG HỒI SINH / UNDO-XOÁ khi máy DESYNC: nếu local ít hơn cloud RẤT NHIỀU (vd máy chỉ
+       giữ được vài đơn do lỗi/quota trong khi cloud ~900) thì các "local-only" nhiều khả năng là
+       RÁC / đã bị xoá ở nơi khác → KHÔNG tự đẩy lên cloud (nếu không máy desync sẽ đẩy NGƯỢC đơn
+       cũ/đã-xoá lên, làm việc xoá của người khác bị hoàn tác — đúng triệu chứng user gặp). */
+    const _desync = cloud.length >= 50 && local.length < cloud.length * 0.5;
     /* Self-heal: CHỈ đẩy record chưa từng lên cloud (guard ≤200 tránh mass-push nhầm) */
-    if (neverSynced.length > 0 && neverSynced.length <= 200) {
+    if (_desync && neverSynced.length > 0) {
+      console.warn(`[STORE] ${key}: DESYNC (local ${local.length} << cloud ${cloud.length}) — BỎ auto-push ${neverSynced.length} record local-only (chống hồi sinh / undo xoá). Đồng bộ lại từ cloud để sửa.`);
+    } else if (neverSynced.length > 0 && neverSynced.length <= 200) {
       console.log(`[STORE] ${key}: tự đẩy ${neverSynced.length} record mới (chưa sync) lên cloud`);
       for (const it of neverSynced) {
         const oid = keyOf(it);
@@ -1125,6 +1132,32 @@
     window.toast?.('🔄 Đã đồng bộ ' + n + ' bảng với cloud', 'success');
   };
   window.syncNow = () => window.STORE.syncNow();
+
+  /* ĐỒNG BỘ LẠI 1 bảng TỪ CLOUD (sửa máy DESYNC: local ít hơn cloud, hoặc "xoá xong tự về").
+     An toàn: CHỈ thay local KHI cloud phản hồi OK; đặt baseline = cloud (KHÔNG đẩy local-only lên);
+     xoá pending/tombstone/cursor của bảng → hết vòng lặp đẩy-ngược. */
+  window.STORE.resyncFromCloud = async function (key) {
+    key = key || 'orders';
+    const table = TABLE_MAP[key];
+    if (!isSupabaseMode() || !table) { window.toast?.('Chưa bật cloud', 'warn'); return; }
+    window.toast?.('Đang kéo lại ' + key + ' từ cloud…', 'info');
+    const cloud = await window.SB_DATA.getAll(table);
+    if (!Array.isArray(cloud)) { window.toast?.('Cloud chưa phản hồi — thử lại sau', 'warn'); return; }
+    _data[key] = cloud;
+    try { localStorage.setItem(PREFIX + key, JSON.stringify(cloud)); }
+    catch (e) { window.toast?.('⚠ Bộ nhớ trình duyệt đầy — phiên này hiện đúng nhưng tải lại có thể chưa lưu hết', 'warn'); }
+    _synced[key] = JSON.stringify(cloud); _persistSyncedIds(key, cloud);
+    try { localStorage.removeItem(PENDING_PREFIX + key); } catch (e) {}
+    _pendingCache[key] = new Set();
+    try { localStorage.removeItem(TOMB_PREFIX + key); } catch (e) {}
+    _tombCache[key] = new Set();
+    delete _cursor[key];
+    _preloaded.add(key); _preloadDone.add(key);
+    (_subs[key] || []).forEach(fn => { try { fn(cloud); } catch (e) {} });
+    window.toast?.('✓ Đã đồng bộ lại ' + cloud.length + ' ' + key + ' từ cloud', 'success');
+    return cloud.length;
+  };
+  window.resyncOrders = () => window.STORE.resyncFromCloud('orders');
 
   /* Expose clear helpers as top-level shortcut */
   window.clearDemoCache = () => window.STORE.clearDemoCache();
