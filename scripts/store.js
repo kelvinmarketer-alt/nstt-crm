@@ -957,6 +957,29 @@
       }, 526052);
       return 'NSTT-' + (max + 1);
     },
+
+    /* Mã KH kế tiếp AN TOÀN (chống trùng tận gốc): lấy MAX của cả CLOUD lẫn LOCAL rồi +1.
+       Vì nextId() chỉ nhìn local → máy tụt lại (chưa sync / lúc DB nghẽn) cấp trùng mã KH đã có
+       → nuốt/đè khách (vụ KH001). Hàm này hỏi cloud (nextCloudCustCode) nên mã LUÔN vượt cloud.
+       - offset: cấp nhiều mã liên tiếp trong 1 lô import (0,1,2...) mà chỉ hỏi cloud 1 lần ở offset 0.
+       - Offline / lỗi cloud → fallback local nextId (v353 insert-retry + v355 guard vẫn đỡ hậu quả). */
+    async nextCustCodeSafe(offset) {
+      offset = offset || 0;
+      const local = this.get('customers', []) || [];
+      let mx = 0;
+      for (const c of local) { const n = parseInt(String(c.id || c.code || '').replace(/\D/g, ''), 10); if (n > mx) mx = n; }
+      if (isSupabaseMode() && window.SB_DATA && window.SB_DATA.nextCloudCustCode) {
+        try {
+          const cc = await window.SB_DATA.nextCloudCustCode();   /* = cloudMax + 1 */
+          const m = cc && String(cc).match(/(\d+)/);
+          if (m) mx = Math.max(mx, parseInt(m[1], 10) - 1);      /* -1 → cloudMax thực */
+        } catch (e) {}
+      }
+      let n = mx + 1 + offset;
+      const has = id => local.some(x => (x.id || x.code) === id);
+      while (has('KH' + String(n).padStart(3, '0'))) n++;        /* né mã đã có cục bộ */
+      return 'KH' + String(n).padStart(3, '0');
+    },
   };
 
   /* === Helpers === */

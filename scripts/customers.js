@@ -724,12 +724,13 @@
     return `<option value="">— Mặc định (Giá gốc) —</option>` + tiers.map(t => `<option value="${t.id}" ${String(sel) === String(t.id) ? 'selected' : ''}>${ic[(t.id - 1) % 8] || ''} ${t.name}</option>`).join('');
   };
 
-  window.submitAddCustomer = function(thenCreateOrder) {
+  window.submitAddCustomer = async function(thenCreateOrder) {
     const name = window.formVal('#addName');
     const phone = window.formVal('#addPhone');
     if (!name) { window.toast('Tên KH là bắt buộc', 'warn'); return; }
 
-    const code = window.formVal('#addCode');
+    /* Mã KH lấy CLOUD-AWARE tại lúc LƯU (né trùng nếu danh sách local tụt lại) — ô readonly chỉ để xem */
+    const code = (window.STORE.nextCustCodeSafe ? await window.STORE.nextCustCodeSafe() : null) || window.formVal('#addCode');
     const newCust = decorate({
       id: code, code,
       type: window.formVal('#addType'),

@@ -93,7 +93,7 @@
     if (cust) {
       custId = cust.id;
     } else {
-      custId = window.STORE.nextId('customers', 'KH');
+      custId = (window.STORE.nextCustCodeSafe ? await window.STORE.nextCustCodeSafe() : null) || window.STORE.nextId('customers', 'KH');
       window.STORE.add('customers', {
         id: custId, code: custId, type: '', group: 'Mới',
         name: r.cust_name, contact: r.cust_name,

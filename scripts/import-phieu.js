@@ -372,7 +372,7 @@
   };
 
   let _committing = false;   /* khóa chống bấm "Tạo đơn" 2 lần → tạo trùng */
-  window._phieuCommit = function () {
+  window._phieuCommit = async function () {
     if (_committing) return;                      /* đang ghi → bỏ qua click thứ 2 */
     const rows = _parsed.filter(p => p.pick && p.date && p.total);
     if (!rows.length) { window.toast('Không có phiếu nào để tạo', 'warn'); return; }
@@ -395,11 +395,23 @@
     );
     let nCust = 0, nOrder = 0, nSkip = 0;
 
+    /* Seed mã KH CLOUD-AWARE 1 lần cho cả lô (chống trùng khi tạo nhiều KH mới lúc import) */
+    let _custSeq = null;
+    if (window.STORE.nextCustCodeSafe) {
+      try { const base = await window.STORE.nextCustCodeSafe(); _custSeq = parseInt(String(base).replace(/\D/g, ''), 10) || null; } catch (e) {}
+    }
+
     rows.forEach(p => {
       const mm = resolveCust(p, liveCustomers);   /* tôn trọng lựa chọn tay → tự động khớp */
       let custId = mm ? mm.c.id : null;
       if (!custId) {
-        custId = window.STORE.nextId('customers', 'KH', 3);
+        if (_custSeq != null) {   /* dùng bộ đếm cloud-aware, né mã đã có trong lô */
+          let idc = 'KH' + String(_custSeq).padStart(3, '0');
+          while (liveCustomers.some(c => (c.id || c.code) === idc)) { _custSeq++; idc = 'KH' + String(_custSeq).padStart(3, '0'); }
+          custId = idc; _custSeq++;
+        } else {
+          custId = window.STORE.nextId('customers', 'KH', 3);
+        }
         const newCust = {
           id: custId, code: custId, type: 'B2B', group: 'Mới',
           name: p.custName, contact: p.custName, phone: '', email: '',
