@@ -29,10 +29,8 @@
     /* doanh thu: ghim góc trên phải, navy đậm */
     .table-card tbody td[data-field="revenue"]{position:absolute!important;top:11px;right:13px;width:auto;text-align:right!important;font-weight:800;color:var(--navy);font-size:15px}
     /* khối thông tin phụ: gạch ngang phía trên, mỗi dòng 1 icon, KHÔNG cắt cụt */
-    .table-card tbody td[data-field="province"]{display:block!important;margin-top:7px;padding-top:7px;border-top:1px dashed var(--line)!important;color:var(--text);white-space:normal!important;overflow:visible!important}
-    .table-card tbody td[data-field="province"]::before{content:"📍 "}
-    .table-card tbody td[data-field="orderFreq"]{display:block!important;margin-top:3px;color:var(--muted);white-space:normal!important;overflow:visible!important}
-    .table-card tbody td[data-field="orderFreq"]::before{content:"🔁 "}
+    .table-card tbody td[data-field="address"]{display:block!important;margin-top:7px;padding-top:7px;border-top:1px dashed var(--line)!important;color:var(--text);white-space:normal!important;overflow:visible!important}
+    .table-card tbody td[data-field="address"]::before{content:"📍 "}
     .table-card tbody td[data-field="staffOwner"]{display:block!important;margin-top:3px;white-space:normal!important;overflow:visible!important}
     .table-card tbody td[data-field="staffOwner"]::before{content:"👤 NV: "}
     .table-card tbody td[data-field="orders"]{display:block!important;margin-top:4px;color:var(--muted);white-space:normal!important;overflow:visible!important}
@@ -154,13 +152,11 @@
             <tr>
               <th style="width:30px" class="hide-xs"></th>
               <th>Khách hàng</th>
-              <th class="hide-md">Tỉnh/TP</th>
-              <th class="hide-md">Tần suất đặt</th>
+              <th class="hide-md">Địa chỉ</th>
               <th class="hide-md">NV phụ trách</th>
               <th class="num">Số đơn</th>
               <th class="num">Doanh thu (₫)</th>
               <th class="num hide-xs">Công nợ (₫)</th>
-              <th class="hide-md">Liên hệ cuối</th>
               <th class="num hide-xs">Hành động</th>
             </tr>
           </thead>

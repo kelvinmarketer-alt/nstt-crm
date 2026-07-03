@@ -357,13 +357,11 @@
             </div>
           </div>
         </td>
-        <td class="hide-md" data-field="province">${c.province}</td>
-        <td class="hide-md" data-field="orderFreq" style="font-size:12px;color:var(--muted)">${freqLabel(c.orderFreq)}</td>
+        <td class="hide-md" data-field="address" title="Click để sửa địa chỉ" style="font-size:12px;color:var(--muted);max-width:280px;white-space:normal;line-height:1.35">${c.address || '—'}</td>
         <td class="hide-md" data-field="staffOwner"><span class="staff-pill">${c.staffOwner}</span></td>
         <td class="num" data-field="orders">${c.orders}</td>
         <td class="num" data-field="revenue">${window.fmt(c.revenue)}</td>
         <td class="num debt-cell ${debtCls}" data-field="debt">${debtVal}${overdueBadge}</td>
-        <td class="hide-md hide-xs" style="font-size:12px;color:var(--muted)">${c.lastContact}</td>
         <td class="hide-xs" onclick="event.stopPropagation()">
           <div class="row-actions">
             <button class="ra-zalo" title="Nhắn Zalo: ${c.phone}" data-act="zalo" data-id="${c.id}"><span style="font-size:13px;font-weight:700">Z</span></button>
@@ -416,12 +414,7 @@
             group:      { type: 'select',
                           options: () => window.MD.get('custGroups').map(g => ({ value: g.id, label: g.label || g.id })),
                           format: v => { const cls = v==='VIP'?'tag-vip':v==='Mới'?'tag-moi':v==='Inactive'?'tag-inact':'tag-thuong'; return `<span class="tag ${cls}">${v}</span>`; } },
-            province:   { type: 'select',
-                          options: () => (window.MD.get('provinces')||[]).map(p => typeof p==='string'?p:p.label||p.id),
-                          format: v => v || '—' },
-            orderFreq:  { type: 'select',
-                          options: () => window.MD.get('orderFreq').map(o => ({ value: o.id, label: o.label })),
-                          format: v => freqLabel(v) },
+            address:    { type: 'text', format: v => v || '—' },
             staffOwner: { type: 'text', format: v => `<span class="staff-pill">${v||'—'}</span>` },
           }
         });
@@ -1132,13 +1125,11 @@
 
   /* ============ CỘT HIỂN THỊ ============ */
   const COL_DEFS = [
-    { idx: 2, key: 'province',  label: 'Tỉnh/TP' },
-    { idx: 3, key: 'freq',      label: 'Tần suất đặt' },
-    { idx: 4, key: 'staff',     label: 'NV phụ trách' },
-    { idx: 5, key: 'orders',    label: 'Số đơn' },
-    { idx: 6, key: 'revenue',   label: 'Doanh thu' },
-    { idx: 7, key: 'debt',      label: 'Công nợ' },
-    { idx: 8, key: 'lastContact', label: 'Liên hệ cuối' },
+    { idx: 2, key: 'address',   label: 'Địa chỉ' },
+    { idx: 3, key: 'staff',     label: 'NV phụ trách' },
+    { idx: 4, key: 'orders',    label: 'Số đơn' },
+    { idx: 5, key: 'revenue',   label: 'Doanh thu' },
+    { idx: 6, key: 'debt',      label: 'Công nợ' },
   ];
   function getColPrefs() {
     const p = window.STORE.get('custColPrefs', null);
