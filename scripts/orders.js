@@ -1103,7 +1103,7 @@
     if (oProdEl && window.wireProductSearch) {
       window.wireProductSearch(oProdEl, {
         priceFn: priceForOrder,
-        onPick: () => window.addOrderItem(),   /* chọn SP = thêm vào list NGAY (SL mặc định 1, sửa lại trong dòng) */
+        onPick: _focusQty,   /* chọn SP → nhảy sang ô SỐ LƯỢNG (chỉnh SL rồi Enter mới thêm) */
         onEnterNoList: () => {
           /* Gõ tên nhưng không có gợi ý khớp → coi là SP ngoài DM: tô vàng + sang ô SL để Enter thêm */
           if (!(oProdEl.value || '').trim()) return;
@@ -1461,7 +1461,7 @@
       const _focusQty = () => { if (oQtyEl) { oQtyEl.focus(); try { oQtyEl.select(); } catch (e) {} } };
       if (oProdEl && window.wireProductSearch) {
         window.wireProductSearch(oProdEl, {
-          priceFn: priceForOrder, onPick: () => window.addOrderItem(),   /* chọn SP = thêm vào list NGAY */
+          priceFn: priceForOrder, onPick: _focusQty,   /* chọn SP → nhảy sang ô SỐ LƯỢNG (chỉnh SL rồi Enter mới thêm) */
           onEnterNoList: () => { if (!(oProdEl.value || '').trim()) return; oProdEl.dataset.pid = ''; oProdEl.style.background = '#FEF9C3'; oProdEl.style.fontWeight = '600'; _focusQty(); }
         });
       }
