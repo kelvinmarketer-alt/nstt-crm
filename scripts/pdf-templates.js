@@ -507,7 +507,8 @@ ${FAV2 ? `<link rel="icon" type="image/svg+xml" href="${FAV2}">` : ''}
         var _fn=${JSON.stringify(fn)};
         async function _snap(){
           if(!window.html2canvas){ alert('Thư viện ảnh đang tải, đợi 1-2 giây rồi bấm lại.'); return null; }
-          return await window.html2canvas(document.body,{scale:2,useCORS:true,backgroundColor:'#ffffff',logging:false,
+          /* scale 3 = ảnh NÉT như in PDF (chữ nhỏ vẫn sắc, ~2.25× điểm ảnh so với scale 2) */
+          return await window.html2canvas(document.body,{scale:3,useCORS:true,backgroundColor:'#ffffff',logging:false,
             ignoreElements:function(el){ return el.id==='rcpBar' || (el.classList&&(el.classList.contains('rcp-no-cap')||el.classList.contains('noprint'))); }});
         }
         function _dl(b){ var a=document.createElement('a'); a.href=URL.createObjectURL(b); a.download=_fn+'.png'; document.body.appendChild(a); a.click(); a.remove(); setTimeout(function(){URL.revokeObjectURL(a.href)},3000); }
