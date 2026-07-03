@@ -511,8 +511,9 @@ ${FAV2 ? `<link rel="icon" type="image/svg+xml" href="${FAV2}">` : ''}
         var _fn=${JSON.stringify(fn)};
         async function _snap(){
           if(!window.html2canvas){ alert('Thư viện ảnh đang tải, đợi 1-2 giây rồi bấm lại.'); return null; }
-          /* scale 3 = ảnh NÉT như in PDF (chữ nhỏ vẫn sắc, ~2.25× điểm ảnh so với scale 2) */
-          return await window.html2canvas(document.body,{scale:3,useCORS:true,backgroundColor:'#ffffff',logging:false,
+          /* scale 3 = NÉT như in PDF; height=scrollHeight → cắt đúng nội dung, không dư trắng */
+          var H = Math.ceil(document.body.scrollHeight);
+          return await window.html2canvas(document.body,{scale:3,useCORS:true,backgroundColor:'#ffffff',logging:false,height:H,windowHeight:H,
             ignoreElements:function(el){ return el.id==='rcpBar' || (el.classList&&(el.classList.contains('rcp-no-cap')||el.classList.contains('noprint'))); }});
         }
         function _dl(b){ var a=document.createElement('a'); a.href=URL.createObjectURL(b); a.download=_fn+'.png'; document.body.appendChild(a); a.click(); a.remove(); setTimeout(function(){URL.revokeObjectURL(a.href)},3000); }
@@ -542,7 +543,9 @@ ${FAV2 ? `<link rel="icon" type="image/svg+xml" href="${FAV2}">` : ''}
           await new Promise(function(r){ if(document.readyState==='complete')r(); else window.addEventListener('load',r); });
           for(var i=0;i<80 && !window.html2canvas;i++){ await new Promise(function(r){setTimeout(r,60)}); }
           if(!window.html2canvas) throw new Error('html2canvas chưa tải');
-          var cv = await window.html2canvas(document.body,{scale:3,useCORS:true,backgroundColor:'#ffffff',logging:false});
+          /* CẮT đúng chiều cao NỘI DUNG (không lấy cả chiều cao khung ẩn → hết khoảng trắng thừa) */
+          var H = Math.ceil(document.body.scrollHeight);
+          var cv = await window.html2canvas(document.body,{scale:3,useCORS:true,backgroundColor:'#ffffff',logging:false,height:H,windowHeight:H});
           return await new Promise(function(res){ cv.toBlob(res,'image/png'); });
         })();
       <\/script>`;
