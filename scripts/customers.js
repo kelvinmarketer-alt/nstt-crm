@@ -681,7 +681,8 @@
         <div><label>Zalo <span style="color:var(--muted);font-weight:400;font-size:11px">(SĐT hoặc link)</span></label><input id="addZalo" placeholder="0912… hoặc https://zalo.me/..."></div>
         <div><label>Facebook <span style="color:var(--muted);font-weight:400;font-size:11px">(link)</span></label><input id="addFb" placeholder="https://facebook.com/..."></div>
       </div>
-      <div class="form-row wide"><label>Địa chỉ</label><input id="addAddress" placeholder="Số nhà, đường, phường, quận, tỉnh"></div>
+      <div class="form-row wide"><label>Địa chỉ</label><input id="addAddress" placeholder="Số nhà, đường, phường, quận, tỉnh" oninput="window._checkAddrDup&&window._checkAddrDup()">
+        <div id="addAddrDupHint" style="font-size:11.5px;margin-top:5px;line-height:1.45"></div></div>
       <div class="form-row">
         <div><label>Tỉnh/TP</label>
           <select id="addProvince"><option value="">— Chọn —</option>${(window.MD.get('provinces')||[]).map(p=>{const v=(typeof p==='string'?p:(p.label||p.id||''));return `<option value="${v}">${v}</option>`;}).join('')}</select></div>
@@ -724,48 +725,108 @@
     return `<option value="">— Mặc định (Giá gốc) —</option>` + tiers.map(t => `<option value="${t.id}" ${String(sel) === String(t.id) ? 'selected' : ''}>${ic[(t.id - 1) % 8] || ''} ${t.name}</option>`).join('');
   };
 
-  window.submitAddCustomer = async function(thenCreateOrder) {
-    const name = window.formVal('#addName');
-    const phone = window.formVal('#addPhone');
-    if (!name) { window.toast('Tên KH là bắt buộc', 'warn'); return; }
+  /* ===== CHỐNG NHIỀU TÊN KH CÙNG 1 ĐỊA CHỈ ===== */
+  function _normAddr(s) {
+    return String(s || '').normalize('NFD').replace(/[̀-ͯ]/g, '')
+      .toLowerCase().replace(/đ/g, 'd')
+      .replace(/[^a-z0-9]+/g, ' ')
+      .replace(/\b(so|nha|ngo|ngach|duong|pho|thon|xom|to|hn|ha noi)\b/g, ' ')   /* bỏ từ đệm */
+      .replace(/\s+/g, ' ').trim();
+  }
+  function _addrLooksSame(a, b) {
+    a = _normAddr(a); b = _normAddr(b);
+    if (!a || !b || a.length < 6) return false;
+    if (a === b) return true;
+    const [sh, lo] = a.length <= b.length ? [a, b] : [b, a];
+    if (sh.length >= 8 && lo.indexOf(sh) >= 0) return true;    /* 1 địa chỉ chứa trọn cái kia */
+    const ta = new Set(a.split(' ').filter(w => w.length > 1));
+    const common = b.split(' ').filter(w => w.length > 1 && ta.has(w)).length;
+    const nA = a.match(/\d+/g) || [], nB = b.match(/\d+/g) || [];
+    return common >= 3 && nA.some(n => nB.includes(n));        /* ≥3 từ chung + trùng SỐ nhà */
+  }
+  function _custsSameAddr(addr, excludeId) {
+    if (!_normAddr(addr)) return [];
+    return (window.STORE.get('customers', []) || []).filter(c =>
+      (c.id || c.code) !== excludeId && _addrLooksSame(addr, c.address));
+  }
+  /* Cảnh báo LIVE ngay khi gõ địa chỉ trong form thêm KH */
+  window._checkAddrDup = function () {
+    const el = document.getElementById('addAddrDupHint'); if (!el) return;
+    const dup = _custsSameAddr(window.formVal('#addAddress'));
+    if (!dup.length) { el.innerHTML = ''; return; }
+    el.innerHTML = `<span style="color:#B45309">⚠️ Địa chỉ này đã có: </span>` +
+      dup.slice(0, 4).map(c => `<b>${c.name}</b> (${c.code})`).join(', ') +
+      (dup.length > 4 ? ` +${dup.length - 4}` : '') +
+      ` — cân nhắc tạo đơn cho khách cũ thay vì tạo trùng.`;
+  };
 
-    /* Mã KH lấy CLOUD-AWARE tại lúc LƯU (né trùng nếu danh sách local tụt lại) — ô readonly chỉ để xem */
-    const code = (window.STORE.nextCustCodeSafe ? await window.STORE.nextCustCodeSafe() : null) || window.formVal('#addCode');
+  function _readAddForm() {
+    return {
+      name: window.formVal('#addName'), phone: window.formVal('#addPhone'),
+      type: window.formVal('#addType'), group: window.formVal('#addGroup'),
+      priceTier: window.formVal('#addPriceTier'), email: window.formVal('#addEmail'),
+      zalo: window.formVal('#addZalo'), fb: window.formVal('#addFb'),
+      address: window.formVal('#addAddress'), province: window.formVal('#addProvince'),
+      orderFreq: window.formVal('#addFreq'), staff: window.formVal('#addStaff'),
+      source: window.formVal('#addSource'), creditDays: window.formVal('#addCreditDays'),
+    };
+  }
+  let _addCap = null;   /* dữ liệu form đã bắt trước khi modal cảnh báo THAY thế form */
+
+  window.submitAddCustomer = async function (thenCreateOrder, forced) {
+    const f = (forced && _addCap) ? _addCap : _readAddForm();
+    if (!f.name) { window.toast('Tên KH là bắt buộc', 'warn'); return; }
+
+    /* CẢNH BÁO TRÙNG ĐỊA CHỈ — tránh nhiều tên KH chung 1 địa chỉ (như vụ KH001) */
+    if (!forced && f.address) {
+      const dup = _custsSameAddr(f.address);
+      if (dup.length) {
+        _addCap = f;   /* modal cảnh báo sẽ thay form → phải lưu dữ liệu để nút "Vẫn tạo" dùng lại */
+        const list = dup.slice(0, 6).map(c => `
+          <div style="display:flex;align-items:center;justify-content:space-between;gap:10px;border:1px solid var(--line);border-radius:9px;padding:9px 11px;margin-bottom:7px">
+            <div style="min-width:0"><div style="font-weight:700">${c.name} <span style="color:var(--muted);font-weight:400;font-size:11px">· ${c.code}</span></div>
+              <div style="font-size:11.5px;color:var(--muted);white-space:nowrap;overflow:hidden;text-overflow:ellipsis">📍 ${c.address || ''}${c.phone ? ' · ☎ ' + c.phone : ''}</div></div>
+            <button class="btn btn-primary btn-sm" style="flex:0 0 auto" onclick="window.location.href='orders.html?createFor=${c.id || c.code}'">🚚 Tạo đơn</button>
+          </div>`).join('');
+        window.openModal('⚠️ Địa chỉ này đã có khách hàng', `
+          <div style="font-size:13px;margin-bottom:12px">Đã có <b>${dup.length}</b> khách ở địa chỉ <b>“${f.address}”</b>. Có phải bạn muốn <b>tạo đơn cho khách này</b> thay vì tạo một khách mới trùng địa chỉ không?</div>
+          ${list}
+          <div style="font-size:11.5px;color:var(--muted);margin-top:4px">Nếu đúng là khách KHÁC (vd toà nhà/chung cư nhiều hộ) thì bấm “Vẫn tạo khách mới”.</div>
+        `, {
+          footer: `<button class="btn btn-ghost" onclick="window.closeModal()">Huỷ</button>
+                   <button class="btn btn-ghost" onclick="window.submitAddCustomer(${thenCreateOrder ? 'true' : 'false'}, true)">Vẫn tạo khách mới</button>`,
+          width: '540px',
+        });
+        return;
+      }
+    }
+    _addCap = null;
+
+    /* Mã KH CLOUD-AWARE tại lúc LƯU (né trùng nếu danh sách local tụt lại) */
+    const code = (window.STORE.nextCustCodeSafe ? await window.STORE.nextCustCodeSafe() : null) || window.STORE.nextId('customers', 'KH');
     const newCust = decorate({
       id: code, code,
-      type: window.formVal('#addType'),
-      group: window.formVal('#addGroup'),
-      priceTier: window.formVal('#addPriceTier'),
-      name, contact: name,
-      phone, email: window.formVal('#addEmail'),
-      zalo: window.formVal('#addZalo'), fb: window.formVal('#addFb'),
-      address: window.formVal('#addAddress'),
-      province: window.formVal('#addProvince'),
-      orderFreq: window.formVal('#addFreq'),
-      mainCats: [],
+      type: f.type, group: f.group, priceTier: f.priceTier,
+      name: f.name, contact: f.name,
+      phone: f.phone, email: f.email, zalo: f.zalo, fb: f.fb,
+      address: f.address, province: f.province, orderFreq: f.orderFreq, mainCats: [],
       /* Sale tạo KH → BẮT BUỘC chủ sở hữu = chính mình (nếu không sẽ không thấy lại KH vừa tạo) */
-      staffOwner: isScoped() ? myName() : window.formVal('#addStaff'),
-      source: window.formVal('#addSource'),
+      staffOwner: isScoped() ? myName() : f.staff,
+      source: f.source,
       created: new Date().toLocaleDateString('vi-VN'),
       lastContact: new Date().toLocaleDateString('vi-VN'),
-      lastOrder: '—',
-      active: true,
-      orders: 0, revenue: 0, debt: 0, debtOverdue: 0,
-      ordersList: [], notes: [],
+      lastOrder: '—', active: true,
+      orders: 0, revenue: 0, debt: 0, debtOverdue: 0, ordersList: [], notes: [],
     });
     window.STORE.add('customers', newCust);
     /* Nhóm giá KH → KV custPriceTiers (sync đa máy; cloud customers không có cột price_tier) */
-    if (window.setCustPriceTier) window.setCustPriceTier(code, window.formVal('#addPriceTier'));
-    if (window.setCustCreditDays) window.setCustCreditDays(code, window.formVal('#addCreditDays'));
+    if (window.setCustPriceTier) window.setCustPriceTier(code, f.priceTier);
+    if (window.setCustCreditDays) window.setCustCreditDays(code, f.creditDays);
     window.closeModal();
     window.toast('✓ Đã thêm khách hàng ' + code, 'success');
 
     /* Nếu user bấm "Lưu & Tạo đơn ngay" → nhảy sang Orders với prefill */
-    if (thenCreateOrder) {
-      setTimeout(() => {
-        window.location.href = 'orders.html?createFor=' + code;
-      }, 500);
-    }
+    if (thenCreateOrder) setTimeout(() => { window.location.href = 'orders.html?createFor=' + code; }, 500);
   };
 
   /* ============ Edit Customer ============ */
