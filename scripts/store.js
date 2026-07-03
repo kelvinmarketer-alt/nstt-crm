@@ -451,6 +451,7 @@
     const cloudIds = new Set(cloud.map(keyOf));
     const localOnly = local.filter(it => keyOf(it) && !cloudIds.has(keyOf(it)));
     const localById = new Map(local.map(it => [keyOf(it), it]));
+    const cloudById = (key === 'customers') ? new Map(cloud.map(c => [keyOf(c), c])) : null;
 
     /* Phân biệt: record local-only TỪNG có trên cloud (baseline) = đã bị XOÁ ở nơi khác → bỏ;
        record CHƯA từng lên cloud = mới tạo offline / sync lỗi → tự đẩy lên. */
@@ -483,6 +484,26 @@
     for (const it of local) {
       const id = keyOf(it);
       if (id == null || !_isPending(key, id) || !cloudIds.has(id)) continue;
+      /* CHỐNG GHI ĐÈ NHẦM KHÁCH (như vụ KH001 Hằng Vy bị Panda Chef đè): nếu record cloud CÙNG
+         MÃ là KH HOÀN TOÀN KHÁC (khác cả TÊN + SĐT + ĐỊA CHỈ) → đây là TRÙNG MÃ (2 KH khác nhau
+         cùng KHxxx do sinh mã cục bộ lúc DB nghẽn), KHÔNG được PATCH đè (sẽ XOÁ KH cloud). Thay
+         vào đó INSERT để (v353) cấp MÃ MỚI, giữ cả 2 KH. Đổi TÊN bình thường vẫn giữ SĐT/địa chỉ
+         nên KHÔNG lọt guard (chỉ chặn khi CẢ 3 trường đều khác). */
+      if (key === 'customers' && cloudById) {
+        const cc = cloudById.get(id);
+        const nz = s => String(s == null ? '' : s).trim().toLowerCase().replace(/\s+/g, ' ');
+        if (cc && nz(cc.name) !== nz(it.name) && nz(cc.phone) !== nz(it.phone) && nz(cc.address) !== nz(it.address)) {
+          console.warn(`[STORE] customers: mã '${id}' trên cloud là KH KHÁC ("${cc.name}") — KHÔNG ghi đè; insert cấp mã mới cho "${it.name}"`);
+          window.SB_DATA.insert(table, it).then(saved => {
+            if (saved) {
+              if (saved[idCol] && saved[idCol] !== id) { it[idCol] = saved[idCol]; try { localStorage.setItem(PREFIX + key, JSON.stringify(_data[key])); } catch (e) {} }
+              _clearPending(key, id); _clearPending(key, it[idCol]);
+              window.toast?.(`KH "${it.name}" trùng mã ${id} → đã cấp mã mới ${it[idCol]} (không ghi đè KH khác)`, 'success');
+            }
+          }).catch(() => {});
+          continue;
+        }
+      }
       /* Chỉ hết pending khi đẩy lại THÀNH CÔNG (saved != null); hỏng → giữ pending, lần merge sau đẩy tiếp. */
       window.SB_DATA.update(table, id, it, idCol).then(saved => { if (saved != null) _clearPending(key, id); }).catch(() => {});
     }

@@ -74,7 +74,8 @@
   /* PERF: cache 2 map khoá 1 lần/render (thay vì gọi orderQuoteLock/QtyLock ~1800 lần/render) */
   let _qtyLockMap = {}, _quoteLockMap = {};
   const _stageOf = code => (_quoteLockMap[code] ? 'done' : (_qtyLockMap[code] ? 'wait-price' : 'wait-qty'));
-  let _showN = 150;   /* PERF: chỉ render tối đa 150 dòng/lần — DOM 872 dòng (kèm <select> mỗi dòng) làm kéo/lướt bị lag. "Xem thêm" để nạp tiếp. */
+  let _page = 1;            /* phân trang danh sách đơn */
+  const _perPage = 50;      /* 50 đơn/trang — DOM nhẹ, render nhanh (trước render 150 dòng/lần kèm <select> mỗi dòng gây lag) */
   let orderItems = [];   // mặt hàng của đơn đang tạo (sản phẩm + giá ngày)
   /* Chế độ bộ soạn item: 'edit'=sửa tất cả · 'priceOnly'=SL đã chốt, chỉ sửa giá · 'view'=đã báo giá, chỉ xem */
   let _itemsMode = 'edit';
@@ -167,7 +168,7 @@
       card('week', '🗓', 'Đơn tuần này', nWeek, 'từ ' + dm(pb.weekStart).slice(0, 5), '#8B5CF6') +
       card('month', '📆', 'Đơn tháng này', nMonth, 'tháng ' + pb.month.split('-').reverse().join('/'), '#16A34A');
   }
-  window.filterPeriod = function (k) { currentPeriod = currentPeriod === k ? null : k; _showN = 150; render(); };
+  window.filterPeriod = function (k) { currentPeriod = currentPeriod === k ? null : k; _page = 1; render(); };
 
   function renderServiceChips() {
     const counts = { all: orders.length };
@@ -188,14 +189,19 @@
 
   window.filterStatus = function(k) {
     currentStatus = currentStatus === k ? null : k;
-    _showN = 150; renderPipeline(); render();
+    _page = 1; renderPipeline(); render();
   };
   window.filterService = function(id) {
     currentService = id;
-    _showN = 150; renderServiceChips(); render();
+    _page = 1; renderServiceChips(); render();
   };
-  /* Nạp thêm 150 đơn nữa vào danh sách (giữ vị trí, không reset) */
-  window.orderShowMore = function () { _showN += 150; render(); };
+  /* Chuyển trang danh sách đơn (50 đơn/trang) */
+  window.orderGotoPage = function (p) {
+    _page = Math.max(1, p | 0);
+    render();
+    const t = document.getElementById('tbody');
+    if (t && t.scrollIntoView) t.scrollIntoView({ block: 'start', behavior: 'smooth' });
+  };
 
   function render() {
     orders = window.STORE.get('orders', window.ORDERS || []);
@@ -230,7 +236,11 @@
       return;
     }
 
-    const _shown = rows.slice(0, _showN);
+    const _totalPages = Math.max(1, Math.ceil(rows.length / _perPage));
+    if (_page > _totalPages) _page = _totalPages;
+    if (_page < 1) _page = 1;
+    const _from = (_page - 1) * _perPage;
+    const _shown = rows.slice(_from, _from + _perPage);
     document.getElementById('tbody').innerHTML = _shown.map(o => {
       try {
         /* Chuẩn hoá status: đơn web cũ dùng 'new' → coi như 'confirmed' (Mới) */
@@ -293,11 +303,17 @@
         console.warn('[orders render] bỏ qua đơn lỗi:', o.code, err.message);
         return ''; /* skip đơn lỗi, không break cả map */
       }
-    }).join('') + (rows.length > _showN
-      ? `<tr class="ord-more"><td colspan="11" style="text-align:center;padding:14px;background:#F8FAF8">
-           <button class="btn btn-ghost btn-sm" onclick="window.orderShowMore()">▾ Xem thêm ${Math.min(_showN, rows.length - _showN)} đơn (còn ${rows.length - _showN})</button>
-         </td></tr>`
-      : '');
+    }).join('') + (_totalPages > 1
+      ? `<tr class="ord-pager"><td colspan="11" style="padding:12px 14px;background:#F8FAF8">
+           <div style="display:flex;align-items:center;justify-content:center;gap:6px;flex-wrap:wrap;font-size:13px">
+             <button class="btn btn-ghost btn-sm" ${_page <= 1 ? 'disabled' : ''} onclick="window.orderGotoPage(1)">« Đầu</button>
+             <button class="btn btn-ghost btn-sm" ${_page <= 1 ? 'disabled' : ''} onclick="window.orderGotoPage(${_page - 1})">‹ Trước</button>
+             <span style="font-weight:700;padding:0 6px">Trang ${_page}/${_totalPages}</span>
+             <button class="btn btn-ghost btn-sm" ${_page >= _totalPages ? 'disabled' : ''} onclick="window.orderGotoPage(${_page + 1})">Sau ›</button>
+             <button class="btn btn-ghost btn-sm" ${_page >= _totalPages ? 'disabled' : ''} onclick="window.orderGotoPage(${_totalPages})">Cuối »</button>
+             <span style="color:var(--muted);margin-left:8px">${_from + 1}–${Math.min(_from + _perPage, rows.length)} / ${rows.length} đơn</span>
+           </div></td></tr>`
+      : `<tr><td colspan="11" style="padding:8px 14px;background:#F8FAF8;text-align:center;color:var(--muted);font-size:12px">${rows.length} đơn</td></tr>`);
 
     document.querySelectorAll('#tbody tr[data-code]').forEach(tr => {
       tr.onclick = () => openOrder(tr.dataset.code);
@@ -437,7 +453,7 @@
   window.clearOrderFilters = function() {
     ['fDriver','fStaff','fDate'].forEach(id => { const el = document.getElementById(id); if (el) el.value = ''; });
     document.getElementById('qSearch').value = '';
-    _showN = 150;
+    _page = 1;
     currentStatus = null;
     currentService = null;
     currentAcct = null;
@@ -445,7 +461,7 @@
     render();
   };
   ['qSearch','fDriver','fStaff','fDate'].forEach(id => {
-    document.getElementById(id)?.addEventListener('input', () => { _showN = 150; render(); });
+    document.getElementById(id)?.addEventListener('input', () => { _page = 1; render(); });
   });
 
   /* Bộ lọc Shipper + NV phụ trách LẤY DỮ LIỆU THẬT (module nhân sự) — thay danh sách mock cứng.
@@ -492,7 +508,7 @@
   }
 
   /* Tabs quy trình kế toán 2 nấc — đếm theo orderAcctStage */
-  window.filterAcct = function (k) { currentAcct = currentAcct === k ? null : k; _showN = 150; render(); };
+  window.filterAcct = function (k) { currentAcct = currentAcct === k ? null : k; _page = 1; render(); };
   function renderQuoteTabs() {
     const el = document.getElementById('quoteTabs'); if (!el) return;
     const cnt = { 'wait-qty': 0, 'wait-price': 0, 'done': 0 };
