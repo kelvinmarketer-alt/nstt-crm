@@ -293,7 +293,10 @@
               const nSku = its.length;
               const bd = unitBreakdownOf(its);   /* "38.5 kg · 0.5 gói · 4 hộp" — KHÔNG cộng khác đơn vị thành kg */
               if (bd) return `<b>${bd}</b>${nSku ? ` <span style="color:var(--muted)">· ${nSku} mã</span>` : ''}`;
-              return o.weight ? `${o.weight} kg` : `${o.qty || 0} ${unitStr}`;
+              /* Danh sách NHẸ (chưa kéo items) → hiện kg (weight) + số mã đếm từ `goods` (tên SP, phẩy) */
+              const nGoods = (o.goods || '').split(',').filter(s => s.trim()).length;
+              const kg = o.weight ? `<b>${o.weight} kg</b>` : `${o.qty || 0} ${unitStr}`;
+              return kg + (nGoods ? ` <span style="color:var(--muted)">· ${nGoods} mã</span>` : '');
             })()}</td>
           <td class="num" data-field="freight" title="Click để sửa tiền hàng">${window.fmt(o.freight || 0)}</td>
           <td class="hide-md ocol-x" style="font-size:12px">
@@ -847,9 +850,14 @@
       <div style="text-align:right;font-size:12px;color:var(--muted);margin-top:6px">Thành tiền hàng: <b style="color:var(--red)">${window.fmt(totalAmt)} ₫</b></div>`;
   }
 
-  window.openOrder = function(code) {
+  window.openOrder = async function(code) {
     const o = orders.find(x => x.code === code);
     if (!o) return;
+    /* Danh sách KHÔNG kéo items (nhẹ) → nạp items của ĐƠN NÀY từ cloud trước khi mở chi tiết
+       (lần đầu ~0.1-0.3s; lần sau tức thì vì đã ở RAM). */
+    if (window.STORE.ensureOrderItems && !(Array.isArray(o.items) && o.items.length)) {
+      try { await window.STORE.ensureOrderItems(code); } catch (e) {}
+    }
     window._currentOrderCode = code;   /* dùng cho action buttons trong tab Hành động */
     const svcList = svcIdsOf(o).map(id => SVC[id] || {icon:'❓', label:id, color:'#666'});
     if (!svcList.length && o.serviceType) svcList.push({icon:'❓', label:o.serviceType, color:'#666'});
@@ -1428,9 +1436,13 @@
      Tái dùng bộ soạn item (renderOrderItems) — sửa SL/đơn giá/đơn vị, thêm/bớt SP.
      Lưu lại order.items + freight + goods + weight. KHÔNG đụng phiếu in (vẫn giấu giá). */
   let _editItemsCode = null;
-  window.editOrderItems = function (code) {
+  window.editOrderItems = async function (code) {
     const o = orders.find(x => x.code === code);
     if (!o) { window.toast && window.toast('Không tìm thấy đơn ' + code, 'warn'); return; }
+    /* Nạp items từ cloud nếu chưa có (danh sách nhẹ không kéo items) trước khi sửa */
+    if (window.STORE.ensureOrderItems && !(Array.isArray(o.items) && o.items.length)) {
+      try { await window.STORE.ensureOrderItems(code); } catch (e) {}
+    }
     _editItemsCode = code;
     orderItems = (o.items || []).map(it => Object.assign({}, it));   /* clone — không sửa trực tiếp tới khi Lưu */
     const custId = o.cust || o.custId || '';

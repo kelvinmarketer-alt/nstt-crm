@@ -624,7 +624,14 @@
       if (_isPending(key, keyOf(c))) return lr;
       const flags = {};
       for (const k of Object.keys(lr)) if (k.charAt(0) === '_') flags[k] = lr[k];
-      return Object.keys(flags).length ? { ...c, ...flags } : c;
+      let rec = Object.keys(flags).length ? { ...c, ...flags } : c;
+      /* orders: getAll KHÔNG kéo `items` (nhẹ) → GIỮ items đã lazy-load trong RAM để khỏi fetch lại
+         mỗi lần full-merge/refocus (delta-merge của đơn ĐÃ ĐỔI vẫn tự bỏ items → mở lại fetch tươi). */
+      if (key === 'orders' && rec.items == null && Array.isArray(lr.items) && lr.items.length) {
+        if (rec === c) rec = { ...c };
+        rec.items = lr.items;
+      }
+      return rec;
     });
     /* GIỮ lại record mới chưa sync (neverSynced) — KHÔNG giữ record đã bị xoá trên cloud.
        LUÔN giữ (kể cả >200): chỉ auto-PUSH bị hoãn khi >200 (ở trên), còn record vẫn phải
@@ -1219,6 +1226,18 @@
     _preloaded.delete(key); _preloadDone.delete(key); _preloadOk.delete(key);
     await _preloadFromSupabase(key);
     return true;
+  };
+
+  /* NẠP items của 1 ĐƠN (lazy) — danh sách/poll KHÔNG kéo items (nhẹ 21×); mở/in/sửa/Excel gọi hàm
+     này để lấy items từ cloud + gắn vào _data['orders'] (lần sau khỏi gọi lại). */
+  window.STORE.ensureOrderItems = async function (code) {
+    const arr = Array.isArray(_data['orders']) ? _data['orders'] : (_load('orders', []) || []);
+    const o = arr.find(x => x && x.code === code);
+    if (o && Array.isArray(o.items) && o.items.length) return o.items;   /* đã có trong RAM */
+    if (!isSupabaseMode() || !window.SB_DATA || !window.SB_DATA.getOrderItems) return (o && o.items) || [];
+    const items = await window.SB_DATA.getOrderItems(code);
+    if (o && Array.isArray(items)) o.items = items;   /* gắn vào RAM (KHÔNG _save → localStorage vẫn nhẹ) */
+    return (o && o.items) || items || [];
   };
 
   /* Expose clear helpers as top-level shortcut */

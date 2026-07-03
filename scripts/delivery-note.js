@@ -50,9 +50,13 @@
   /* ============================================================
      TEMPLATE — PHIẾU XUẤT KHO (A4 portrait, khớp mẫu ĐƠN HẠNH)
      ============================================================ */
-  window.printDeliveryNote = function (code, win, mode) {
+  window.printDeliveryNote = async function (code, win, mode) {
     const o = getOrder(code);
     if (!o) { window.toast && window.toast('Không tìm thấy đơn ' + code, 'warn'); return; }
+    /* Danh sách nhẹ không kéo items → nạp items của đơn này trước khi in/copy phiếu */
+    if (window.STORE && window.STORE.ensureOrderItems && !(Array.isArray(o.items) && o.items.length)) {
+      try { await window.STORE.ensureOrderItems(code); } catch (e) {}
+    }
     const c = getCust(o);
     const comp = getCompany();
     const items = o.items || [];

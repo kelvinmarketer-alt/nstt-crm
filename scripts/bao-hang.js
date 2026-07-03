@@ -107,9 +107,10 @@
   };
 
   /* ====== In / xuất PDF — qua iframe cùng origin (không còn "about:blank") ====== */
-  window.printBaoHang = function (code) {
+  window.printBaoHang = async function (code) {
     const o = (window.STORE.get('orders', []) || []).find(x => x.code === code);
     if (!o) { window.toast?.('Không tìm thấy đơn ' + code, 'warn'); return; }
+    if (window.STORE.ensureOrderItems && !(Array.isArray(o.items) && o.items.length)) { try { await window.STORE.ensureOrderItems(code); } catch (e) {} }
     const html = window.buildBaoHangHTML(o);
     const old = document.getElementById('baoHangPrintFrame');
     if (old) old.remove();
@@ -154,6 +155,7 @@ ${lines || '(chưa có mặt hàng)'}
   window.sendBaoHangTelegram = async function (code, silent) {
     const o = (window.STORE.get('orders', []) || []).find(x => x.code === code);
     if (!o) return { ok: false };
+    if (window.STORE.ensureOrderItems && !(Array.isArray(o.items) && o.items.length)) { try { await window.STORE.ensureOrderItems(code); } catch (e) {} }
     if (!window.sendTgMessage) { if (!silent) window.toast?.('Chưa nạp Telegram', 'warn'); return { ok: false }; }
     const ch = window.getTgChannel && window.getTgChannel('bao_hang');
     if (!ch) {

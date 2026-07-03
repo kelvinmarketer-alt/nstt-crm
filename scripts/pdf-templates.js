@@ -66,6 +66,7 @@
     }
     const o = getOrder(code);
     if (!o) { window.toast && window.toast('Không tìm thấy đơn ' + code, 'warn'); return; }
+    if (window.STORE && window.STORE.ensureOrderItems && !(Array.isArray(o.items) && o.items.length)) { try { await window.STORE.ensureOrderItems(code); } catch (e) {} }
     const c = getCust(o);
     const comp = getCompany();
     const items = o.items || [];
@@ -265,6 +266,7 @@ ${FAV ? `<link rel="icon" type="image/svg+xml" href="${FAV}">` : ''}
     }
     const o = getOrder(code);
     if (!o) { window.toast && window.toast('Không tìm thấy đơn ' + code, 'warn'); return; }
+    if (window.STORE && window.STORE.ensureOrderItems && !(Array.isArray(o.items) && o.items.length)) { try { await window.STORE.ensureOrderItems(code); } catch (e) {} }
     const c = getCust(o);
     const comp = getCompany();
     const items = o.items || [];

@@ -305,6 +305,12 @@
     return result;
   }
 
+  /* === TỐI ƯU TẢI: orders KHÔNG kéo cột `items` (JSONB ~5.8MB/900 đơn) trong danh sách/poll.
+     Chỉ tải items khi MỞ/IN/SỬA từng đơn (getOrderItems). Danh sách hiện kg (weight) + số mã
+     (đếm từ `goods`). → mỗi lần vào trang Đơn: 0.28MB thay vì 5.8MB (~21× nhẹ). */
+  const ORDER_COLS = 'cod,code,created_at,cust_name,customer_id,deliver_date,delivered_at,delivery_time,driver_name,drop_addr,freight,goods,notes,order_date,pay_by,pickup_addr,qty,return_reason,service_type,ship_shift,ship_time,shipper_id,shortages,staff,status,taken_by,transport_mode,unit,updated_at,vehicle,weight,wh_status';
+  function _selectCols(table) { return table === 'orders' ? ORDER_COLS : '*'; }
+
   /* === Supabase data API === */
   window.SB_DATA = {
     /* Lấy TẤT CẢ records của 1 bảng — PHÂN TRANG theo lô 1000 (Supabase giới hạn
@@ -321,7 +327,7 @@
       const ORDER_COL = HEAVY.has(table) ? 'code' : 'created_at';
       let from = 0, out = [], lastErr = null;
       for (let guard = 0; guard < 600; guard++) {   /* lô nhỏ → nhiều vòng hơn; 600×200 = 120k dòng */
-        const { data, error } = await client.from(table).select('*')
+        const { data, error } = await client.from(table).select(_selectCols(table))
           .order(ORDER_COL, { ascending: false }).range(from, from + PAGE - 1);
         if (error) {
           /* Lô này timeout → thử THU NHỎ lô 1 lần (100) rồi lặp lại từ vị trí hiện tại;
@@ -352,7 +358,7 @@
        - cursor lấy từ updated_at THÔ của DB (trước mapFrom) → không phụ thuộc DATE_FIELDS. */
     async getChangedSince(table, sinceISO, limitRows) {
       try {
-        let q = client.from(table).select('*').order('updated_at', { ascending: true }).limit(limitRows || 500);
+        let q = client.from(table).select(_selectCols(table)).order('updated_at', { ascending: true }).limit(limitRows || 500);
         if (sinceISO) q = q.gt('updated_at', sinceISO);
         const { data, error } = await q;
         if (error) { console.warn('[SB getChangedSince]', table, error.message); return null; }
@@ -369,6 +375,15 @@
         const { data, error } = await client.from(table).select('updated_at').order('updated_at', { ascending: false }).limit(1);
         if (error || !data || !data.length) return null;
         return data[0].updated_at || null;
+      } catch (e) { return null; }
+    },
+
+    /* Lấy `items` của MỘT đơn (lazy) — danh sách/poll KHÔNG kéo items để nhẹ; mở/in/sửa đơn mới gọi. */
+    async getOrderItems(code) {
+      try {
+        const { data, error } = await client.from('orders').select('items').eq('code', code).maybeSingle();
+        if (error || !data) return null;
+        return Array.isArray(data.items) ? data.items : (data.items || []);
       } catch (e) { return null; }
     },
 
