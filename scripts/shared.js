@@ -5,7 +5,7 @@
 
 /* Phiên bản app hiển thị (đối chiếu với CACHE_VERSION trong sw.js) — để user tự XÁC NHẬN
    đang chạy bản mới hay còn kẹt JS cũ (hiện ở góc sidebar + log console). */
-window.APP_VERSION = 'v331';
+window.APP_VERSION = 'v332';
 console.log('%c[NSTT] App ' + window.APP_VERSION, 'color:#339B21;font-weight:bold');
 
 /* Gom NGUỒN khách về 3 nhóm chuẩn: 'mkt' / 'sales' / 'sep-gioi-thieu'.
@@ -644,7 +644,8 @@ window.wireProductSearch = function (input, opts) {
     });
     highlight(its.length ? 0 : -1);   /* tô sáng dòng đầu → chỉ cần Enter là chọn */
   }
-  input.addEventListener('focus', show);
+  /* focus mở gợi ý — TRỪ khi vừa thêm SP xong & chủ động refocus (né bung lại bảng gợi ý gây rối) */
+  input.addEventListener('focus', () => { if (input._ppSuppressOnce) { input._ppSuppressOnce = false; return; } show(); });
   input.addEventListener('input', () => { input.dataset.pid = ''; input.style.background = ''; input.style.fontWeight = ''; show(); });
   input.addEventListener('blur', () => setTimeout(close, 170));
   /* === ĐIỀU HƯỚNG BÀN PHÍM: ↑↓ chọn dòng · Enter chọn SP · Esc đóng === */

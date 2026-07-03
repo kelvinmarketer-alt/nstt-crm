@@ -995,7 +995,7 @@
     if (oProdEl && window.wireProductSearch) {
       window.wireProductSearch(oProdEl, {
         priceFn: priceForOrder,
-        onPick: _focusQty,
+        onPick: () => window.addOrderItem(),   /* chọn SP = thêm vào list NGAY (SL mặc định 1, sửa lại trong dòng) */
         onEnterNoList: () => {
           /* Gõ tên nhưng không có gợi ý khớp → coi là SP ngoài DM: tô vàng + sang ô SL để Enter thêm */
           if (!(oProdEl.value || '').trim()) return;
@@ -1222,7 +1222,7 @@
     if (fromInput && oProdEl) { oProdEl.value = ''; oProdEl.dataset.pid = ''; oProdEl.style.background = ''; oProdEl.style.fontWeight = ''; }
     document.getElementById('oProdQty').value = 1;
     renderOrderItems();
-    if (fromInput && oProdEl) oProdEl.focus();
+    if (fromInput && oProdEl) { oProdEl._ppSuppressOnce = true; oProdEl.focus(); }   /* refocus để gõ SP tiếp — KHÔNG bung lại bảng gợi ý */
   };
 
   /* Thêm SP THỦ CÔNG (khách đặt ngoài danh mục công ty) — gõ tên + giá tự do */
@@ -1306,7 +1306,7 @@
       const _focusQty = () => { if (oQtyEl) { oQtyEl.focus(); try { oQtyEl.select(); } catch (e) {} } };
       if (oProdEl && window.wireProductSearch) {
         window.wireProductSearch(oProdEl, {
-          priceFn: priceForOrder, onPick: _focusQty,
+          priceFn: priceForOrder, onPick: () => window.addOrderItem(),   /* chọn SP = thêm vào list NGAY */
           onEnterNoList: () => { if (!(oProdEl.value || '').trim()) return; oProdEl.dataset.pid = ''; oProdEl.style.background = '#FEF9C3'; oProdEl.style.fontWeight = '600'; _focusQty(); }
         });
       }
