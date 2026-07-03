@@ -71,6 +71,9 @@
   let currentAcct = null;   /* Tab nấc kế toán: null=tất cả · 'wait-qty' · 'wait-price' · 'done' */
   let currentPeriod = null; /* Thẻ số đơn: null=tất cả · 'today' · 'week' · 'month' */
   let _pb = null;           /* mốc thời gian tính 1 lần/render (today/weekStart/month) */
+  /* PERF: cache 2 map khoá 1 lần/render (thay vì gọi orderQuoteLock/QtyLock ~1800 lần/render) */
+  let _qtyLockMap = {}, _quoteLockMap = {};
+  const _stageOf = code => (_quoteLockMap[code] ? 'done' : (_qtyLockMap[code] ? 'wait-price' : 'wait-qty'));
   let _showN = 150;   /* PERF: chỉ render tối đa 150 dòng/lần — DOM 872 dòng (kèm <select> mỗi dòng) làm kéo/lướt bị lag. "Xem thêm" để nạp tiếp. */
   let orderItems = [];   // mặt hàng của đơn đang tạo (sản phẩm + giá ngày)
   /* Chế độ bộ soạn item: 'edit'=sửa tất cả · 'priceOnly'=SL đã chốt, chỉ sửa giá · 'view'=đã báo giá, chỉ xem */
@@ -197,6 +200,8 @@
   function render() {
     orders = window.STORE.get('orders', window.ORDERS || []);
     _pb = computePeriodBounds();   /* mốc hôm nay/tuần/tháng — tính 1 lần cho cả match + thẻ đếm */
+    _qtyLockMap = window.STORE.get('orderQtyLocks', {}) || {};        /* PERF: đọc 1 lần */
+    _quoteLockMap = window.STORE.get('orderQuoteLocks', {}) || {};
     /* Migration 1 lần: đơn web cũ status 'new' → 'confirmed' (đồng nhất với đơn tự tạo) */
     let _migrated = false;
     orders.forEach(o => { if (o && o.status === 'new') { o.status = 'confirmed'; _migrated = true; } });
@@ -217,6 +222,7 @@
     renderPipeline();
     renderServiceChips();
     renderQuoteTabs();
+    populateFilterDropdowns();   /* refresh bộ lọc shipper/NV (có change-detection, rẻ) */
 
     if (!rows.length) {
       document.getElementById('tbody').innerHTML =
@@ -243,8 +249,8 @@
                 <span class="tag" style="background:${src.color}1a;color:${src.color};font-weight:600;font-size:10.5px">${src.icon} ${src.label}</span>
               </div>
               ${(() => {
-                const ql = window.orderQuoteLock && window.orderQuoteLock(o.code);
-                const tl = window.orderQtyLock && window.orderQtyLock(o.code);
+                const ql = _quoteLockMap[o.code];
+                const tl = _qtyLockMap[o.code];
                 if (ql) return `<div style="margin-top:3px"><span class="tag" title="KT2 đã chốt báo giá" style="background:#DCFCE7;color:#15803D;font-weight:700;font-size:10px">🔒 Giá: ${_escOpt(ql.by || 'Đã chốt')}</span></div>`;
                 if (tl) return `<div style="margin-top:3px"><span class="tag" title="KT1 đã chốt sản lượng — chờ KT2 báo giá" style="background:#FFEDD5;color:#B45309;font-weight:700;font-size:10px">📦 SL: ${_escOpt(tl.by || '')} · chờ giá</span></div>`;
                 return `<div style="margin-top:3px"><span class="tag" title="Chưa chốt sản lượng — KT1 cần khớp SL khách nhận" style="background:#FEE2E2;color:#DC2626;font-weight:600;font-size:10px">⏳ Chờ chốt SL</span></div>`;
@@ -413,7 +419,7 @@
   function match(o) {
     if (currentStatus && o.status !== currentStatus) return false;
     if (currentService && !svcIdsOf(o).includes(currentService)) return false;
-    if (currentAcct && window.orderAcctStage && window.orderAcctStage(o.code) !== currentAcct) return false;
+    if (currentAcct && _stageOf(o.code) !== currentAcct) return false;
     if (currentPeriod && !_inPeriod(o, currentPeriod, _pb || computePeriodBounds())) return false;
     const fd = document.getElementById('fDate') && document.getElementById('fDate').value;
     if (fd && orderDateISO(o) !== fd) return false;   /* lọc theo NGÀY: chỉ hiện đơn đúng ngày chọn */
@@ -446,26 +452,35 @@
     return [...new Set((arr || []).filter(Boolean).map(x => String(x).trim()).filter(Boolean))];
   }
   function _escOpt(s) { return String(s).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;'); }
+  let _lastDriverKey = null, _lastStaffKey = null;   /* PERF: chỉ ghi lại <option> khi danh sách ĐỔI */
   function populateFilterDropdowns() {
     const ords = window.STORE.get('orders', window.ORDERS || []) || [];
     const fD = document.getElementById('fDriver');
     if (fD) {
       const roster = (window.STORE.get('shippers', window.DRIVERS || []) || []).filter(s => s && s.name).map(s => s.name);
       const names = _distinctNames([...roster, ...ords.map(o => o.driverName)]).sort((a, b) => a.localeCompare(b, 'vi'));
-      const cur = fD.value;
-      fD.innerHTML = '<option value="">Shipper (tất cả)</option>' + names.map(n => `<option>${_escOpt(n)}</option>`).join('');
-      if (names.includes(cur)) fD.value = cur;
+      const key = names.join('|');
+      if (key !== _lastDriverKey) {
+        _lastDriverKey = key;
+        const cur = fD.value;
+        fD.innerHTML = '<option value="">Shipper (tất cả)</option>' + names.map(n => `<option>${_escOpt(n)}</option>`).join('');
+        if (names.includes(cur)) fD.value = cur;
+      }
     }
     const fS = document.getElementById('fStaff');
     if (fS) {
       /* NV phụ trách đơn = CHỈ nhân viên phòng SALE (đơn do sale lên) */
       const roster = (window.STORE.get('staff', window.STAFFS || []) || []).filter(s => s && s.name && _isSaleDept(s.dept)).map(s => s.name);
       const names = _distinctNames(roster).sort((a, b) => a.localeCompare(b, 'vi'));
-      const cur = fS.value;
-      const opts = names.slice();
-      if (cur && !opts.includes(cur)) opts.unshift(cur);   /* giữ lựa chọn cũ dù không thuộc sale */
-      fS.innerHTML = '<option value="">NV phụ trách (tất cả)</option>' + opts.map(n => `<option>${_escOpt(n)}</option>`).join('');
-      fS.value = cur && opts.includes(cur) ? cur : '';
+      const key = names.join('|');
+      if (key !== _lastStaffKey) {
+        _lastStaffKey = key;
+        const cur = fS.value;
+        const opts = names.slice();
+        if (cur && !opts.includes(cur)) opts.unshift(cur);   /* giữ lựa chọn cũ dù không thuộc sale */
+        fS.innerHTML = '<option value="">NV phụ trách (tất cả)</option>' + opts.map(n => `<option>${_escOpt(n)}</option>`).join('');
+        fS.value = cur && opts.includes(cur) ? cur : '';
+      }
     }
   }
   /* Phòng Sale? (chuẩn hoá dept giống staff.js _normDept: sale/sales/kinh doanh/cskh) */
@@ -479,7 +494,7 @@
   function renderQuoteTabs() {
     const el = document.getElementById('quoteTabs'); if (!el) return;
     const cnt = { 'wait-qty': 0, 'wait-price': 0, 'done': 0 };
-    orders.forEach(o => { const s = window.orderAcctStage ? window.orderAcctStage(o.code) : 'wait-qty'; cnt[s] = (cnt[s] || 0) + 1; });
+    orders.forEach(o => { cnt[_stageOf(o.code)]++; });
     const tab = (key, icon, label, n, color) =>
       `<button class="chip ${currentAcct === key ? 'active' : ''}" onclick="window.filterAcct(${key === null ? 'null' : `'${key}'`})" style="${currentAcct === key ? 'background:' + color + ';color:#fff;border-color:' + color : ''}">${icon} ${label} <span class="cnt">${n}</span></button>`;
     el.innerHTML = tab(null, '🗂', 'Tất cả', orders.length, '#334155')
@@ -2587,26 +2602,32 @@ ${o.note ? `\n📝 Ghi chú: ${o.note}` : ''}
   const _origRenderFn = render;
   window.STORE.subscribe('orders', () => setTimeout(applyOrdColPrefs, 0));
 
+  /* PERF: GỘP render — cloud tải xong nhiều bảng/realtime bắn liên tiếp → chỉ render 1 lần/khung hình
+     (trước đây mỗi subscribe gọi render() ngay → 5-10 lần render lúc mới vào = giật). */
+  let _renderRaf = 0;
+  function scheduleRender() {
+    if (_renderRaf) return;
+    const cb = () => { _renderRaf = 0; render(); };
+    _renderRaf = window.requestAnimationFrame ? requestAnimationFrame(cb) : setTimeout(cb, 16);
+  }
   /* Subscribe + init */
-  window.STORE.subscribe('orders', render);
-  /* Khoá chốt SL / báo giá đổi ở máy khác → cập nhật badge/tab realtime */
-  window.STORE.subscribe('orderQtyLocks', render);
-  window.STORE.subscribe('orderQuoteLocks', render);
-  /* Bộ lọc Shipper/NV bám dữ liệu nhân sự thật — cập nhật khi roster/đơn đổi */
-  window.STORE.subscribe('shippers', populateFilterDropdowns);
-  window.STORE.subscribe('staff', populateFilterDropdowns);
-  window.STORE.subscribe('orders', populateFilterDropdowns);
+  window.STORE.subscribe('orders', scheduleRender);
+  window.STORE.subscribe('orderQtyLocks', scheduleRender);   /* khoá SL/báo giá đổi máy khác → badge/tab realtime */
+  window.STORE.subscribe('orderQuoteLocks', scheduleRender);
+  window.STORE.subscribe('shippers', scheduleRender);        /* bộ lọc shipper/NV refresh trong render() */
+  window.STORE.subscribe('staff', scheduleRender);
   window.renderAppShell('orders', 'Đơn hàng');
   window.bindTabs();
-  populateFilterDropdowns();
   render();
-  /* Nạp sẵn html2canvas (warm cache) để nút 🧾 copy ảnh phiếu nhanh ngay lần đầu */
-  if (!document.getElementById('h2c-preload')) {
-    const _h2c = document.createElement('script');
-    _h2c.id = 'h2c-preload'; _h2c.async = true;
-    _h2c.src = 'https://cdn.jsdelivr.net/npm/html2canvas@1.4.1/dist/html2canvas.min.js';
-    document.head.appendChild(_h2c);
-  }
+  /* Warm html2canvas khi trình duyệt RẢNH (né tranh băng thông với tải dữ liệu ban đầu → vào trang nhanh hơn) */
+  const _warmH2C = () => {
+    if (document.getElementById('h2c-preload')) return;
+    const s = document.createElement('script');
+    s.id = 'h2c-preload'; s.async = true;
+    s.src = 'https://cdn.jsdelivr.net/npm/html2canvas@1.4.1/dist/html2canvas.min.js';
+    document.head.appendChild(s);
+  };
+  (window.requestIdleCallback ? window.requestIdleCallback(_warmH2C, { timeout: 6000 }) : setTimeout(_warmH2C, 4000));
   setTimeout(applyOrdColPrefs, 100);
   if (prefillCust) setTimeout(() => window.openCreateOrder(prefillCust), 200);
   /* Mở thẳng chi tiết 1 đơn khi tới từ trang khác (vd Gom hàng → ✏️ Sửa) */
