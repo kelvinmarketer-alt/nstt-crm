@@ -271,7 +271,7 @@
         const code = btn.dataset.code;
         const act = btn.dataset.act;
         if (act === 'print') window.printOrder(code);
-        else if (act === 'deliveryNote') window.printDeliveryNote && window.printDeliveryNote(code);
+        else if (act === 'deliveryNote') window.printDeliveryNote && window.printDeliveryNote(code, null, 'copy');
         else if (act === 'edit') openOrder(code);
       };
     });
@@ -2567,6 +2567,13 @@ ${o.note ? `\n📝 Ghi chú: ${o.note}` : ''}
   window.bindTabs();
   populateFilterDropdowns();
   render();
+  /* Nạp sẵn html2canvas (warm cache) để nút 🧾 copy ảnh phiếu nhanh ngay lần đầu */
+  if (!document.getElementById('h2c-preload')) {
+    const _h2c = document.createElement('script');
+    _h2c.id = 'h2c-preload'; _h2c.async = true;
+    _h2c.src = 'https://cdn.jsdelivr.net/npm/html2canvas@1.4.1/dist/html2canvas.min.js';
+    document.head.appendChild(_h2c);
+  }
   setTimeout(applyOrdColPrefs, 100);
   if (prefillCust) setTimeout(() => window.openCreateOrder(prefillCust), 200);
   /* Mở thẳng chi tiết 1 đơn khi tới từ trang khác (vd Gom hàng → ✏️ Sửa) */

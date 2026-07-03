@@ -526,4 +526,62 @@ ${FAV2 ? `<link rel="icon" type="image/svg+xml" href="${FAV2}">` : ''}
     if (window.audit) window.audit.log('order.receiptImage', title);
   };
 
+  /* === COPY ẢNH TRỰC TIẾP vào clipboard (1 CLICK, không mở popup) ===
+     Render phiếu trong iframe ẩn + html2canvas → clipboard.write dùng ClipboardItem(Promise)
+     để GIỮ đúng cú click (né lỗi "cần thao tác người dùng"). Không hỗ trợ → trả unsupported để mở popup. */
+  window.copyReceiptImageDirect = function (fullHtml, fileName) {
+    if (!(navigator.clipboard && window.ClipboardItem)) return { unsupported: true };
+    window.toast && window.toast('📸 Đang tạo ảnh phiếu…', 'info');
+    const pageW = /size\s*:\s*a5/i.test(fullHtml) ? '148mm' : '210mm';
+    let html = String(fullHtml).replace(/<script>[\s\S]*?window\.print\(\)[\s\S]*?<\/script>/gi, '');
+    const inj = `
+      <style>.noprint{display:none!important} html,body{background:#fff!important} body{width:${pageW}!important;margin:0!important;box-sizing:border-box}</style>
+      <script src="https://cdn.jsdelivr.net/npm/html2canvas@1.4.1/dist/html2canvas.min.js"><\/script>
+      <script>
+        window.__rcpBlob = (async function(){
+          await new Promise(function(r){ if(document.readyState==='complete')r(); else window.addEventListener('load',r); });
+          for(var i=0;i<80 && !window.html2canvas;i++){ await new Promise(function(r){setTimeout(r,60)}); }
+          if(!window.html2canvas) throw new Error('html2canvas chưa tải');
+          var cv = await window.html2canvas(document.body,{scale:3,useCORS:true,backgroundColor:'#ffffff',logging:false});
+          return await new Promise(function(res){ cv.toBlob(res,'image/png'); });
+        })();
+      <\/script>`;
+    html = /<\/body>/i.test(html) ? html.replace(/<\/body>/i, inj + '</body>') : (html + inj);
+
+    const ifr = document.createElement('iframe');
+    ifr.setAttribute('aria-hidden', 'true');
+    ifr.style.cssText = 'position:fixed;left:-10000px;top:0;width:900px;height:2200px;border:0;opacity:0;pointer-events:none';
+    document.body.appendChild(ifr);
+    const cleanup = () => setTimeout(() => { try { ifr.remove(); } catch (e) {} }, 300);
+
+    const blobPromise = new Promise((resolve, reject) => {
+      const to = setTimeout(() => reject(new Error('timeout tạo ảnh')), 15000);
+      ifr.onload = async () => {
+        try {
+          const w = ifr.contentWindow;
+          let n = 0; while (!w.__rcpBlob && n++ < 120) await new Promise(r => setTimeout(r, 60));
+          if (!w.__rcpBlob) throw new Error('không render được');
+          const blob = await w.__rcpBlob;
+          clearTimeout(to); resolve(blob);
+        } catch (e) { clearTimeout(to); reject(e); }
+      };
+    });
+    try { ifr.srcdoc = html; } catch (e) { ifr.remove(); return { unsupported: true }; }
+
+    navigator.clipboard.write([new ClipboardItem({ 'image/png': blobPromise })])
+      .then(() => { window.toast && window.toast('✅ Đã COPY ảnh phiếu — dán vào Zalo/Messenger (Ctrl/Cmd+V)', 'success'); })
+      .catch(() => {
+        /* clipboard bị chặn → tải ảnh về máy để vẫn gửi được */
+        blobPromise.then(b => {
+          const a = document.createElement('a'); a.href = URL.createObjectURL(b);
+          a.download = (fileName || 'phieu') + '.png'; document.body.appendChild(a); a.click(); a.remove();
+          setTimeout(() => URL.revokeObjectURL(a.href), 3000);
+          window.toast && window.toast('Clipboard bị chặn → đã TẢI ảnh .png về máy', 'info');
+        }).catch(() => window.toast && window.toast('Lỗi tạo ảnh phiếu — thử nút 🖨', 'warn'));
+      })
+      .finally(cleanup);
+    if (window.audit) window.audit.log('order.receiptCopy', fileName || '');
+    return { ok: true };
+  };
+
 })();

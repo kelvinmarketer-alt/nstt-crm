@@ -50,7 +50,7 @@
   /* ============================================================
      TEMPLATE — PHIẾU XUẤT KHO (A4 portrait, khớp mẫu ĐƠN HẠNH)
      ============================================================ */
-  window.printDeliveryNote = function (code, win) {
+  window.printDeliveryNote = function (code, win, mode) {
     const o = getOrder(code);
     if (!o) { window.toast && window.toast('Không tìm thấy đơn ' + code, 'warn'); return; }
     const c = getCust(o);
@@ -231,6 +231,13 @@ ${FAV ? `<link rel="icon" type="image/svg+xml" href="${FAV}">` : ''}
 
 
 </body></html>`;
+
+    /* mode='copy' → COPY ẢNH THẲNG vào clipboard, KHÔNG mở popup (nút 🧾 ở bảng đơn) */
+    if (mode === 'copy' && window.copyReceiptImageDirect) {
+      const r = window.copyReceiptImageDirect(html, 'phieu-xuat-kho-' + o.code);
+      if (!(r && r.unsupported)) { if (window.audit) window.audit.log('order.deliveryNote', 'Copy phiếu kho ' + o.code); return; }
+      /* trình duyệt không hỗ trợ clipboard ảnh → rơi xuống mở popup như thường */
+    }
 
     /* XEM & COPY ẢNH (thay in PDF) — popup có nút Copy ảnh/Tải ảnh/In */
     if (window.openReceiptImageWindow) {
