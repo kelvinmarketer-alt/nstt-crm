@@ -41,6 +41,10 @@
     .table-card tbody td[data-field="debt"]{display:block!important;margin-top:3px;font-weight:700;white-space:normal!important;overflow:visible!important}
     .table-card tbody td[data-field="debt"]::before{content:"💰 Công nợ: "}
 
+    /* KPI: chỉ còn 3 thẻ (Tổng KH · Mới tháng này · Đang nợ) → 3 cột */
+    .kpis{grid-template-columns:repeat(3,1fr)}
+    @media (max-width:700px){.kpis{grid-template-columns:1fr}}
+
     /* ===== BỘ LỌC: chỉ còn Tìm kiếm + NV phụ trách + Xoá lọc ===== */
     .filter-bar{gap:8px;align-items:stretch;flex-wrap:wrap}
     .filter-bar .search-in{flex:1 1 260px;min-width:0}
@@ -121,40 +125,7 @@
         <div class="kpi-trend down" id="kpiCustDebtSum">↓ Tổng 0 ₫</div>
         <div class="kpi-icon">⚠️</div>
       </div>
-      <div class="kpi k-4 hide-xs">
-        <div class="kpi-label">Khách VIP</div>
-        <div class="kpi-value" id="kpiCustVip">0</div>
-        <div class="kpi-trend">nhóm VIP</div>
-        <div class="kpi-icon">⭐</div>
-      </div>
-      <div class="kpi k-5 hide-xs">
-        <div class="kpi-label">Không hoạt động</div>
-        <div class="kpi-value" id="kpiCustInact">0</div>
-        <div class="kpi-trend">&gt; 90 ngày không phát sinh</div>
-        <div class="kpi-icon">💤</div>
-      </div>
     </section>
-
-    <!-- Quick chips (số đếm tự cập nhật từ data thật) -->
-    <div class="quick-chips" id="quickChips">
-      <button class="chip active" data-quick="all">Tất cả <span class="cnt" data-cnt="all">0</span></button>
-      <button class="chip" data-quick="b2b">🍽 Cơ sở KD <span class="cnt" data-cnt="b2b">0</span></button>
-      <button class="chip" data-quick="b2c">👤 Cá nhân <span class="cnt" data-cnt="b2c">0</span></button>
-      <button class="chip" data-quick="vip">⭐ VIP <span class="cnt" data-cnt="vip">0</span></button>
-      <button class="chip" data-quick="debt">⚠️ Có công nợ <span class="cnt" data-cnt="debt">0</span></button>
-      <button class="chip" data-quick="new">✨ Mới 30 ngày <span class="cnt" data-cnt="new">0</span></button>
-      <button class="chip" data-quick="inact">💤 Không hoạt động <span class="cnt" data-cnt="inact">0</span></button>
-    </div>
-    <!-- MOBILE: lọc loại khách hàng dạng dropdown (thay cụm chip cuộn ngang) -->
-    <select id="quickSelect" onchange="window.setQuickFilter(this.value)">
-      <option value="all">Tất cả</option>
-      <option value="b2b">🍽 Cơ sở KD</option>
-      <option value="b2c">👤 Cá nhân</option>
-      <option value="vip">⭐ VIP</option>
-      <option value="debt">⚠️ Có công nợ</option>
-      <option value="new">✨ Mới 30 ngày</option>
-      <option value="inact">💤 Không hoạt động</option>
-    </select>
 
     <!-- Filter -->
     <div class="filter-bar">
