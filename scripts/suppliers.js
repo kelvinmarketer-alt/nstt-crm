@@ -44,9 +44,12 @@
     `;
   }
 
+  /* Thứ tự hiển thị = thứ tự trong file NCC gốc (mã NCC001..NCC0xx tăng dần) để rà soát cho dễ.
+     Lấy phần số trong mã; NCC không theo mã số thì xếp cuối (giữ thứ tự tương đối). */
+  function supOrder(s) { const m = String(s && s.id || '').match(/(\d+)/); return m ? +m[1] : 1e9; }
   function render() {
     renderKpis();
-    const list = getSup();
+    const list = getSup().slice().sort((a, b) => supOrder(a) - supOrder(b));
     const q = (document.getElementById('supQ').value || '').toLowerCase();
     const cat = document.getElementById('supCat').value;
     const st = document.getElementById('supStatus').value;
