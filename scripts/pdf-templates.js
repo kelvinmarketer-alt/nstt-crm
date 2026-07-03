@@ -489,12 +489,16 @@ ${FAV2 ? `<link rel="icon" type="image/svg+xml" href="${FAV2}">` : ''}
     let html = String(fullHtml).replace(/<script>[\s\S]*?window\.print\(\)[\s\S]*?<\/script>/gi, '');
     const fn = String(fileName || 'phieu').normalize('NFD').replace(/[̀-ͯ]/g, '').replace(/đ/gi, 'd')
       .replace(/[^a-zA-Z0-9]+/g, '-').replace(/^-+|-+$/g, '').toLowerCase() || 'phieu';
+    /* Khổ giấy DỌC theo @page trong template (A5 148mm / A4 210mm) → khoá bề rộng thân phiếu
+       để MÀN HÌNH + ẢNH nhìn đúng dạng dọc như in PDF (không bị kéo ngang đầy cửa sổ). */
+    const pageW = /size\s*:\s*a5/i.test(html) ? '148mm' : '210mm';
     const inject = `
       <style>
         #rcpBar{position:sticky;top:0;z-index:99999;display:flex;gap:8px;justify-content:center;flex-wrap:wrap;padding:10px;background:#0f172a;box-shadow:0 2px 10px rgba(0,0,0,.28)}
         #rcpBar button{border:0;border-radius:8px;padding:9px 15px;font-size:13px;font-weight:700;cursor:pointer;color:#fff}
         .noprint{display:none!important}   /* ẩn nút In/Đóng có sẵn trong template — #rcpBar đã thay thế */
-        @media print{#rcpBar,.rcp-no-cap{display:none!important}}
+        @media screen{ html{background:#e5e7eb} body{width:${pageW}!important;margin:0 auto!important;box-sizing:border-box} }
+        @media print{#rcpBar,.rcp-no-cap{display:none!important} html{background:#fff} body{width:auto!important;margin:0!important}}
       </style>
       <div id="rcpBar" class="rcp-no-cap">
         <button style="background:#16a34a" onclick="rcpCopy()">📸 Copy ảnh gửi khách</button>
