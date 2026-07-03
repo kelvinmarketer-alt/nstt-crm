@@ -60,6 +60,15 @@
     const totalAmt = items.reduce((s, it) => s + (+it.total || (+it.price||0) * (+it.qty||0) || 0), 0);
 
     const FAV = window.NSTT_FAVICON_DATAURL || '';
+    /* VietQR chuyển khoản theo ĐÚNG SỐ TIỀN đơn — tách mã NH + STK từ comp.bank (vd "MB 228666669999") */
+    const _noDia = s => String(s || '').normalize('NFD').replace(/[̀-ͯ]/g, '').replace(/đ/gi, 'd');
+    const _bp = String(comp.bank || '').trim().match(/^(\S+)[\s:]+(\d[\d\s]*\d|\d)$/);
+    const bankCode = comp.bankCode || (_bp && _bp[1]) || 'MB';
+    const bankAcc = comp.bankAcc || (_bp && _bp[2].replace(/\s/g, '')) || '228666669999';
+    const qrAmt = Math.max(0, Math.round(totalAmt || 0));
+    const qrNote = _noDia((o.code || '') + ' ' + (c.name || o.custName || '')).slice(0, 50);
+    const qrUrl = `https://img.vietqr.io/image/${encodeURIComponent(bankCode)}-${encodeURIComponent(bankAcc)}-qr_only.png`
+      + `?amount=${qrAmt}&addInfo=${encodeURIComponent(qrNote)}&accountName=${encodeURIComponent(_noDia(comp.name || 'NONG SAN TUAN TU'))}`;
     const html = `<!doctype html><html><head><meta charset="utf-8">
 <title>Phiếu xuất kho ${o.code} — ${c.name || o.custName}</title>
 ${FAV ? `<link rel="icon" type="image/svg+xml" href="${FAV}">` : ''}
@@ -72,33 +81,37 @@ ${FAV ? `<link rel="icon" type="image/svg+xml" href="${FAV}">` : ''}
   body{font-family:'Times New Roman','Liberation Serif',serif;color:#000;
     background:#fff;font-size:12.5px;line-height:1.45;padding:14mm 12mm}
 
-  /* === HEADER (2 cột: logo + thông tin DN, KHÔNG còn QR) === */
-  .head{display:grid;grid-template-columns:140px 1fr;gap:16px;align-items:flex-start;padding-bottom:8px}
+  /* === HEADER (3 cột: logo | thông tin DN | QR chuyển khoản) === */
+  .head{display:grid;grid-template-columns:104px 1fr 152px;gap:14px;align-items:flex-start;border-bottom:2px solid #1B5E20;padding-bottom:8px}
   .logo-wrap{text-align:center}
-  .logo-wrap img{width:100px;height:100px;object-fit:contain;display:block;margin:0 auto}
-  .logo-wrap .tag{font-size:9.5px;color:#1B5E20;font-weight:700;margin-top:4px;line-height:1.3}
-  .logo-wrap .tag2{font-size:8.5px;color:#2c8a48;margin-top:2px;font-style:italic}
+  .logo-wrap img{width:92px;height:92px;object-fit:contain;display:block;margin:0 auto}
+  .logo-wrap .tag{font-size:9px;color:#1B5E20;font-weight:700;margin-top:4px;line-height:1.25}
+  .logo-wrap .tag2{font-size:8px;color:#2c8a48;margin-top:2px;font-style:italic}
 
   .comp-info{padding-top:2px}
-  .comp-info h1{font-size:16px;font-weight:800;text-align:center;color:#000;letter-spacing:0.2px;margin-bottom:6px}
-  .comp-info .row{font-size:11.5px;line-height:1.55;color:#000}
+  .comp-info h1{font-size:17px;font-weight:800;text-align:left;color:#1B5E20;letter-spacing:0.2px;margin-bottom:5px;line-height:1.2}
+  .comp-info .row{font-size:11.5px;line-height:1.55;color:#000;text-align:left}
   .comp-info .row b{font-weight:700}
+  .qrbox{text-align:center}
+  .qrbox img{width:134px;height:134px;object-fit:contain;border:1px solid #1B5E20;border-radius:8px;padding:3px;background:#fff;display:block;margin:0 auto}
+  .qrbox .cap{font-size:9.5px;color:#1B5E20;font-weight:700;margin-top:3px}
+  .qrbox .acc{font-size:9px;color:#555}
 
-  /* === BUYER + TITLE === */
-  .buyer{display:grid;grid-template-columns:1.25fr 2fr 1fr;gap:10px;align-items:start;
-    border-top:1px solid #000;border-bottom:1px solid #000;
-    padding:6px 4px;margin-top:6px}
-  .buyer .lbl{font-weight:700;color:#000;font-size:11.5px}
-  .buyer .v  {font-size:11.5px;color:#000;line-height:1.4}
-  .buyer .red{color:#C00000;font-weight:800;font-size:15px;text-align:center;letter-spacing:0.5px}
-  .buyer .reporter{background:#FFFF00;padding:3px 8px;border:1px solid #000;text-align:center}
-  .buyer .reporter .lbl{display:block;margin-bottom:2px}
+  /* === TITLE (to, căn trái) + Người báo hàng === */
+  .titlerow{display:flex;justify-content:space-between;align-items:center;gap:12px;
+    border-top:2px solid #1B5E20;border-bottom:1px solid #1B5E20;padding:7px 4px;margin-top:9px}
+  .ptitle{font-size:23px;font-weight:800;color:#C00000;text-align:left;letter-spacing:0.3px;line-height:1.08}
+  .reporter{background:#FFFF00;padding:4px 12px;border:1px solid #000;text-align:center;flex:0 0 auto}
+  .reporter .lbl{display:block;font-size:10.5px;font-weight:700;margin-bottom:1px}
+  .reporter b{font-size:13px}
+  .buyer2{display:flex;justify-content:space-between;gap:14px;font-size:11.5px;padding:5px 4px;border-bottom:1px solid #000}
+  .buyer2 b{font-weight:700}
 
   /* === TABLE === */
   table.it{width:100%;border-collapse:collapse;margin-top:8px;font-size:11.5px}
   table.it th, table.it td{border:1px solid #000;padding:4px 6px;vertical-align:middle}
-  table.it thead th{background:#9DC3E6;color:#000;font-weight:700;text-align:center;font-size:11px;line-height:1.3}
-  table.it th.thbig{background:#FFFF00}
+  table.it thead th{background:#1B5E20;color:#fff;font-weight:700;text-align:center;font-size:11px;line-height:1.3}
+  table.it th.thbig{background:#FFFF00;color:#000}
   table.it td.c{text-align:center}
   table.it td.r{text-align:right;font-variant-numeric:tabular-nums}
   table.it td.l{text-align:left}
@@ -123,7 +136,7 @@ ${FAV ? `<link rel="icon" type="image/svg+xml" href="${FAV}">` : ''}
 </style></head>
 <body>
 
-  <!-- ============ HEADER (đã bỏ QR Profile) ============ -->
+  <!-- ============ HEADER (logo | thông tin DN | QR chuyển khoản) ============ -->
   <div class="head">
     <div class="logo-wrap">
       <img src="${getLogo()}" alt="Tuấn Tú Farm">
@@ -134,33 +147,29 @@ ${FAV ? `<link rel="icon" type="image/svg+xml" href="${FAV}">` : ''}
       <h1>${(comp.name || 'Công Ty TNHH XNK Nông Sản Tuấn Tú Hà Nội').toUpperCase()}</h1>
       <div class="row"><b>Mã Số Thuế:</b> ${comp.tax || '0110302211'}</div>
       <div class="row"><b>Địa Chỉ:</b> ${comp.address || '36/147A Tân Mai, Hoàng Mai, Hà Nội'}</div>
-      <div class="row"><b>Giám Đốc Điều Hành:</b> ${comp.director || comp.hotline || '0836676086'}</div>
       <div class="row"><b>Số Tài Khoản:</b> ${comp.bank || 'Techcombank 6699399999'} — <b>Chủ TK:</b> ${comp.bankOwner || 'Nguyễn Tuấn Anh'}</div>
-      <div class="row"><b>Email:</b> <a href="mailto:${comp.email||''}" style="color:#1565c0;text-decoration:underline">${comp.email || 'nongsantuantuhanoi@gmail.com'}</a></div>
+      <div class="row"><b>Email:</b> ${comp.email || 'nongsantuantuhanoi@gmail.com'} &nbsp;·&nbsp; <b>GĐĐH:</b> ${comp.director || comp.hotline || '0836676086'}</div>
+    </div>
+    <div class="qrbox">
+      <img src="${qrUrl}" alt="VietQR chuyển khoản" crossorigin="anonymous" onerror="this.style.opacity='0.12'">
+      <div class="cap">Quét QR chuyển khoản</div>
+      <div class="acc">${comp.bank || 'MB 228666669999'}</div>
     </div>
   </div>
 
-  <!-- ============ BUYER + TITLE BLOCK ============ -->
-  <div class="buyer">
-    <div>
-      <div><span class="lbl">Khách Hàng:</span></div>
-      <div><span class="lbl">Địa Chỉ:</span></div>
-    </div>
-    <div>
-      <div class="v" style="font-weight:700">${c.name || o.custName || ''}</div>
-      <div class="v">${c.address || o.drop || ''}</div>
-      <div class="red" style="margin-top:6px">Phiếu Xuất Kho - Hóa Đơn Bán Hàng</div>
-    </div>
-    <div>
-      <div class="v"><b>Số Điện Thoại:</b> ${c.phone || o.custPhone || ''}</div>
-      <div class="v"><b>TG Nhận Hàng:</b> ${o.deliveryTime || 'Sáng'}</div>
-      <div class="reporter" style="margin-top:6px">
-        <span class="lbl">Người báo hàng</span>
-        <b style="font-size:13px">${(o.staff || o.takenBy || '').toUpperCase()}</b>
-      </div>
+  <!-- ============ TIÊU ĐỀ (to, căn trái) + Người báo hàng ============ -->
+  <div class="titlerow">
+    <div class="ptitle">PHIẾU XUẤT KHO – HÓA ĐƠN BÁN HÀNG</div>
+    <div class="reporter">
+      <span class="lbl">Người báo hàng</span>
+      <b>${(o.staff || o.takenBy || '').toUpperCase()}</b>
     </div>
   </div>
-  <div style="text-align:right;font-style:italic;font-size:11.5px;margin-top:4px">
+  <div class="buyer2">
+    <div><b>Khách Hàng:</b> ${c.name || o.custName || '—'}${(c.address || o.drop) ? ` &nbsp;·&nbsp; <b>Địa Chỉ:</b> ${c.address || o.drop}` : ''}</div>
+    <div><b>SĐT:</b> ${c.phone || o.custPhone || '—'} &nbsp;·&nbsp; <b>TG Nhận:</b> ${o.deliveryTime || 'Sáng'}</div>
+  </div>
+  <div style="text-align:right;font-style:italic;font-size:11.5px;margin-top:5px">
     <i>Chuyên Sỉ Rau Củ Quả Đà Lạt Và Rau Vùng Miền.</i> &nbsp;&nbsp;&nbsp;
     Ngày: <b>${fmtDate(o.date || o.deliveredAt)}</b>
   </div>
