@@ -110,8 +110,8 @@ ${FAV ? `<link rel="icon" type="image/svg+xml" href="${FAV}">` : ''}
   /* === TABLE === */
   table.it{width:100%;border-collapse:collapse;margin-top:8px;font-size:11.5px}
   table.it th, table.it td{border:1px solid #000;padding:4px 6px;vertical-align:middle}
-  table.it thead th{background:#1B5E20;color:#fff;font-weight:700;text-align:center;font-size:11px;line-height:1.3}
-  table.it th.thbig{background:#FFFF00;color:#000}
+  table.it thead th{background:#2FAE3A;color:#fff;font-weight:700;text-align:center;font-size:11px;line-height:1.3}
+  table.it th.thbig{background:#2FAE3A;color:#fff}
   table.it td.c{text-align:center}
   table.it td.r{text-align:right;font-variant-numeric:tabular-nums}
   table.it td.l{text-align:left}
@@ -140,7 +140,7 @@ ${FAV ? `<link rel="icon" type="image/svg+xml" href="${FAV}">` : ''}
   <div class="head">
     <div class="logo-wrap">
       <img src="${getLogo()}" alt="Tuấn Tú Farm">
-      <div class="tag">Nông Sản Sạch Bảo Vệ Con Người Và Thiên Nhiên</div>
+      <div class="tag">Uy Tín Làm Nên Thương Hiệu</div>
     </div>
     <div class="comp-info">
       <h1>${(comp.name || 'Công Ty TNHH XNK Nông Sản Tuấn Tú Hà Nội').toUpperCase().replace(/\s*[-–—]\s*/, '<br>')}</h1>
