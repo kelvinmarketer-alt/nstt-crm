@@ -245,8 +245,8 @@
           </td>
           <td class="ocol-x" onclick="event.stopPropagation()">
             <div class="row-actions">
-              <button title="In phiếu giao hàng / xác nhận / xuất kho" data-act="print" data-code="${o.code}">🖨</button>
-              ${(o.status === 'delivered' || o.status === 'settled') ? `<button title="🧾 Phiếu xuất kho" data-act="deliveryNote" data-code="${o.code}" style="color:#C00000">🧾</button>` : ''}
+              <button title="In/Copy phiếu (khách · shipper · xuất kho)" data-act="print" data-code="${o.code}">🖨</button>
+              <button title="📸 Copy ảnh PHIẾU XUẤT KHO (gửi luôn, không cần chọn)" data-act="deliveryNote" data-code="${o.code}" style="color:#C00000">🧾</button>
               <button title="Xem thông tin đơn" data-act="edit" data-code="${o.code}">👁</button>
             </div>
           </td>
