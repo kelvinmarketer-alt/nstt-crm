@@ -756,7 +756,7 @@ Mong quý khách thu xếp thanh toán sớm. Cảm ơn!
   };
 
   /* Helper: số → chữ tiếng Việt (đơn giản) */
-  window.numberToWords = function(n) {
+  window.numberToWords = window.numberToWords || function(n) {
     if (!n) return 'Không đồng';
     const units = ['','một','hai','ba','bốn','năm','sáu','bảy','tám','chín'];
     function below1000(n) {

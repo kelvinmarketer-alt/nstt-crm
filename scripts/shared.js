@@ -5,7 +5,7 @@
 
 /* Phiên bản app hiển thị (đối chiếu với CACHE_VERSION trong sw.js) — để user tự XÁC NHẬN
    đang chạy bản mới hay còn kẹt JS cũ (hiện ở góc sidebar + log console). */
-window.APP_VERSION = 'v341';
+window.APP_VERSION = 'v342';
 console.log('%c[NSTT] App ' + window.APP_VERSION, 'color:#339B21;font-weight:bold');
 
 /* Gom NGUỒN khách về 3 nhóm chuẩn: 'mkt' / 'sales' / 'sep-gioi-thieu'.
@@ -236,6 +236,30 @@ window.AVATAR_COLORS = ['#339B21','#1B5E20','#E8A33D','#7C3AED','#0EA5E9','#1580
 /* ============ Format helpers ============ */
 window.fmt = function(n) { return (n ?? 0).toLocaleString('vi-VN'); };
 window.fmtVND = function(n) { return window.fmt(n) + ' ₫'; };
+/* Đọc SỐ TIỀN THÀNH CHỮ (tiếng Việt) — dùng cho phiếu/hoá đơn "Bằng chữ".
+   Chuẩn: 21→hai mươi MỐT, 25→hai mươi LĂM, mười lăm, lẻ. Định nghĩa 1 chỗ (shared) cho MỌI trang. */
+window.numberToWords = window.numberToWords || function (n) {
+  n = Math.round(+n || 0);
+  if (!n) return 'Không đồng';
+  const U = ['', 'một', 'hai', 'ba', 'bốn', 'năm', 'sáu', 'bảy', 'tám', 'chín'];
+  function below1000(x) {
+    const h = Math.floor(x / 100), t = Math.floor(x % 100 / 10), o = x % 10;
+    let s = '';
+    if (h) s += U[h] + ' trăm';
+    if (t > 1) { s += (s ? ' ' : '') + U[t] + ' mươi'; if (o === 1) s += ' mốt'; else if (o === 5) s += ' lăm'; else if (o) s += ' ' + U[o]; }
+    else if (t === 1) { s += (s ? ' ' : '') + 'mười'; if (o === 5) s += ' lăm'; else if (o) s += ' ' + U[o]; }
+    else if (t === 0 && o && s) { s += ' lẻ ' + U[o]; }
+    else if (o) { s += U[o]; }
+    return s;
+  }
+  const ty = Math.floor(n / 1e9), tr = Math.floor(n % 1e9 / 1e6), ng = Math.floor(n % 1e6 / 1e3), dv = n % 1e3;
+  let r = '';
+  if (ty) r += below1000(ty) + ' tỷ ';
+  if (tr) r += below1000(tr) + ' triệu ';
+  if (ng) r += below1000(ng) + ' nghìn ';
+  if (dv) r += below1000(dv);
+  return (r.trim() + ' đồng chẵn').replace(/^./, c => c.toUpperCase());
+};
 window.fmtShort = function(n) {
   if (n >= 1_000_000_000) return (n/1_000_000_000).toFixed(1).replace(/\.0$/,'') + ' tỷ';
   if (n >= 1_000_000) return (n/1_000_000).toFixed(1).replace(/\.0$/,'') + ' tr';
