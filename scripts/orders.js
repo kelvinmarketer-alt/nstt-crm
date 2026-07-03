@@ -70,6 +70,9 @@
   let currentService = null;
   let currentAcct = null;   /* Tab nấc kế toán: null=tất cả · 'wait-qty' · 'wait-price' · 'done' */
   let currentPeriod = null; /* Thẻ số đơn: null=tất cả · 'today' · 'week' · 'month' */
+  let currentDelivery = null; /* Thẻ giao hàng: null=tất cả · 'delivered' · 'undelivered' */
+  const _DELIVERED = ['delivered', 'done', 'completed', 'reconciled'];
+  const _CANCELLED = ['cancelled', 'canceled', 'huy'];
   let _pb = null;           /* mốc thời gian tính 1 lần/render (today/weekStart/month) */
   /* PERF: cache 2 map khoá 1 lần/render (thay vì gọi orderQuoteLock/QtyLock ~1800 lần/render) */
   let _qtyLockMap = {}, _quoteLockMap = {};
@@ -150,11 +153,14 @@
   function renderPipeline() {
     const box = document.getElementById('pipeline'); if (!box) return;
     const pb = _pb || computePeriodBounds();
-    let nToday = 0, nWeek = 0, nMonth = 0;
+    let nToday = 0, nWeek = 0, nMonth = 0, nDone = 0, nUndone = 0;
     orders.forEach(o => {
       if (_inPeriod(o, 'today', pb)) nToday++;
       if (_inPeriod(o, 'week', pb)) nWeek++;
       if (_inPeriod(o, 'month', pb)) nMonth++;
+      const st = (o.status || '').toLowerCase();
+      if (_DELIVERED.includes(st)) nDone++;
+      else if (!_CANCELLED.includes(st)) nUndone++;   /* chưa giao = không phải đã-giao & không phải hủy */
     });
     const dm = s => (s || '').split('-').reverse().join('/');   /* YYYY-MM-DD → DD/MM/YYYY */
     const card = (key, icon, label, val, sub, color) =>
@@ -163,12 +169,22 @@
         <div class="val" style="color:${color}">${val}</div>
         <div class="sub">${sub}</div>
       </div>`;
+    /* 2 thẻ theo TRẠNG THÁI GIAO (lọc riêng, không theo mốc ngày) */
+    const dcard = (dkey, icon, label, val, sub, color) =>
+      `<div class="pipe-card ${currentDelivery === dkey ? 'active' : ''}" onclick="window.filterDelivery('${dkey}')" title="Bấm để chỉ xem đơn ${label.toLowerCase()}" style="border-left-color:${color}${currentDelivery === dkey ? ';box-shadow:0 0 0 2px ' + color + '33' : ''}">
+        <div class="lab">${icon} ${label}</div>
+        <div class="val" style="color:${color}">${val}</div>
+        <div class="sub">${sub}</div>
+      </div>`;
     box.innerHTML =
       card('today', '📅', 'Đơn hôm nay', nToday, dm(pb.today), '#3B82F6') +
       card('week', '🗓', 'Đơn tuần này', nWeek, 'từ ' + dm(pb.weekStart).slice(0, 5), '#8B5CF6') +
-      card('month', '📆', 'Đơn tháng này', nMonth, 'tháng ' + pb.month.split('-').reverse().join('/'), '#16A34A');
+      card('month', '📆', 'Đơn tháng này', nMonth, 'tháng ' + pb.month.split('-').reverse().join('/'), '#16A34A') +
+      dcard('delivered', '✅', 'Đã giao', nDone, 'đã giao xong', '#0D9488') +
+      dcard('undelivered', '🚚', 'Chưa giao', nUndone, 'chưa giao / chốt', '#EA580C');
   }
   window.filterPeriod = function (k) { currentPeriod = currentPeriod === k ? null : k; _page = 1; render(); };
+  window.filterDelivery = function (k) { currentDelivery = currentDelivery === k ? null : k; _page = 1; render(); };
 
   function renderServiceChips() {
     const counts = { all: orders.length };
@@ -222,6 +238,7 @@
     document.getElementById('rowCount').textContent =
       `${rows.length} / ${orders.length} đơn`
       + (currentPeriod ? ` · ${ { today: 'Hôm nay', week: 'Tuần này', month: 'Tháng này' }[currentPeriod] }` : '')
+      + (currentDelivery ? ` · ${ { delivered: 'Đã giao', undelivered: 'Chưa giao' }[currentDelivery] }` : '')
       + (currentStatus ? ` · ${STATUS[currentStatus].label}` : '')
       + (currentService ? ` · ${SVC[currentService].label}` : '');
     document.getElementById('footCount').textContent = rows.length;
@@ -439,6 +456,11 @@
     if (currentService && !svcIdsOf(o).includes(currentService)) return false;
     if (currentAcct && _stageOf(o.code) !== currentAcct) return false;
     if (currentPeriod && !_inPeriod(o, currentPeriod, _pb || computePeriodBounds())) return false;
+    if (currentDelivery) {
+      const st = (o.status || '').toLowerCase();
+      if (currentDelivery === 'delivered' && !_DELIVERED.includes(st)) return false;
+      if (currentDelivery === 'undelivered' && (_DELIVERED.includes(st) || _CANCELLED.includes(st))) return false;
+    }
     const fd = document.getElementById('fDate') && document.getElementById('fDate').value;
     if (fd && orderDateISO(o) !== fd) return false;   /* lọc theo NGÀY: chỉ hiện đơn đúng ngày chọn */
     const q = document.getElementById('qSearch').value.trim().toLowerCase();
@@ -458,6 +480,7 @@
     currentService = null;
     currentAcct = null;
     currentPeriod = null;
+    currentDelivery = null;
     render();
   };
   ['qSearch','fDriver','fStaff','fDate'].forEach(id => {
