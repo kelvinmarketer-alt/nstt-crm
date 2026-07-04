@@ -859,11 +859,15 @@
       try {
         const buf = await f.arrayBuffer();
         const wb = window.XLSX.read(buf, { type: 'array', cellDates: false });
-        const ws = wb.Sheets[wb.SheetNames[0]];
-        const data = window.XLSX.utils.sheet_to_json(ws, { header: 1, defval: '' });
-        window._tsUploadData = data;
-        const rows = data.length, cols = data[0] ? data[0].length : 0;
-        document.getElementById('tsPreview').innerHTML = `✓ Đọc được <b>${rows}</b> dòng × <b>${cols}</b> cột.<br>Header: ${(data[0] || []).slice(0, 8).map(x => '<code>' + (x === '' ? '∅' : x) + '</code>').join(' ')}…`;
+        const det = _tsDetect(wb);
+        if (!det) {
+          document.getElementById('tsPreview').innerHTML = '<span style="color:var(--danger)">❌ Không tìm thấy sheet chấm công có cột Họ tên/Mã NV. File có ' + wb.SheetNames.length + ' sheet: ' + wb.SheetNames.slice(0, 6).join(', ') + '…</span>';
+          window._tsDet = null; document.getElementById('tsApply').disabled = true; return;
+        }
+        window._tsDet = det;
+        const nData = Math.max(0, det.grid.length - det.headerRow - 1);
+        const modeLbl = det.mode === 'summary' ? 'Tổng hợp (Có mặt/Thực tế)' : 'Lưới ngày (X/P/V)';
+        document.getElementById('tsPreview').innerHTML = `✓ Đọc sheet <b>“${det.sheetName}”</b> · ~${nData} dòng NV · kiểu <b>${modeLbl}</b>.<br>Cột nhận diện: ${det.nameCol >= 0 ? 'Họ tên ✓' : '<span style="color:#B45309">thiếu Họ tên</span>'}${det.codeCol >= 0 ? ' · Mã/STT ✓' : ''}${det.deptCol >= 0 ? ' · Bộ phận ✓' : ''}${det.presentCol >= 0 ? ' · Công thực tế ✓' : ''}`;
         document.getElementById('tsApply').disabled = false;
       } catch (err) {
         document.getElementById('tsPreview').innerHTML = '<span style="color:var(--danger)">❌ Lỗi đọc file: ' + err.message + '</span>';
@@ -891,37 +895,79 @@
     Object.keys(dayStat).forEach(k => { const di = +k; if (di >= last || sh.days[di] === '_') return; sh.days[di] = dayStat[k]; });
   }
 
+  const _tsHnorm = s => String(s || '').toLowerCase().normalize('NFD').replace(/[̀-ͯ]/g, '').replace(/đ/g, 'd').replace(/\s+/g, ' ').trim();
+  /* DÒ đúng SHEET + DÒNG TIÊU ĐỀ + KIỂU trong workbook máy chấm công.
+     Máy xuất nhiều sheet: "Bảng tổng hợp chấm công" (aggregate — ƯU TIÊN, có cột "Có mặt Thực tế"),
+     "Bảng thông tin xếp ca" (lịch ca), "Bản ghi chấm công"... Tiêu đề KHÔNG ở dòng 0 (trên có
+     dòng title + "Ngày tháng"). Trả về {grid, sheetName, headerRow, mode:'summary'|'daygrid', cols}. */
+  function _tsDetect(wb) {
+    const XU = window.XLSX.utils;
+    const names = wb.SheetNames.slice().sort((a, b) => {
+      const rank = n => /tong hop cham cong/.test(_tsHnorm(n)) ? 0 : (/xep ca/.test(_tsHnorm(n)) ? 2 : 1);
+      return rank(a) - rank(b);
+    });
+    for (const sn of names) {
+      const grid = XU.sheet_to_json(wb.Sheets[sn], { header: 1, defval: '' });
+      let hr = -1;
+      for (let r = 0; r < Math.min(14, grid.length); r++) {
+        const cells = (grid[r] || []).map(_tsHnorm);
+        if (cells.some(c => /ho ten|ho va ten|ten nv|ten nhan vien|ten viet tat/.test(c))) { hr = r; break; }
+      }
+      if (hr < 0) continue;
+      const H = (grid[hr] || []).map(_tsHnorm);
+      let nameCol = -1, codeCol = -1, deptCol = -1, presentCol = -1, vangCol = -1, phepCol = -1;
+      H.forEach((h, i) => {
+        if (nameCol < 0 && /(ho ten|ho va ten|ten nv|ten nhan|ten viet tat|^ten$|fullname|name)/.test(h)) nameCol = i;
+        if (codeCol < 0 && /(ma so|ma nv|ma nhan|^ma$|empid|code|^stt)/.test(h)) codeCol = i;
+        if (deptCol < 0 && /(bo phan|phong ban|dept|khu vuc)/.test(h)) deptCol = i;
+        if (presentCol < 0 && /(co mat|thuc te)/.test(h)) presentCol = i;
+        if (vangCol < 0 && /(vang mat|^vang)/.test(h)) vangCol = i;
+        if (phepCol < 0 && /(xin nghi|nghi phep|^phep)/.test(h)) phepCol = i;
+      });
+      const dayCols = {};
+      H.forEach((h, i) => { const n = parseInt(String((grid[hr][i]) || '').replace(/[^0-9.]/g, ''), 10); if (n >= 1 && n <= 31) dayCols[n] = i; });
+      const nDays = Object.keys(dayCols).length;
+      const mode = presentCol >= 0 ? 'summary' : (nDays >= 20 ? 'daygrid' : null);
+      if (!mode || (nameCol < 0 && codeCol < 0)) continue;
+      return { grid, sheetName: sn, headerRow: hr, mode, nameCol, codeCol, deptCol, presentCol, vangCol, phepCol, dayCols };
+    }
+    return null;
+  }
+
   /* Upload → PARSE + phân loại → mở bảng ĐỐI SOÁT (chưa ghi gì). Giống up đơn có SP ngoài danh mục. */
   window.applyUploadedTimesheet = function () {
-    const data = window._tsUploadData; if (!data || !data.length) { window.toast('Chưa chọn file', 'warn'); return; }
+    const det = window._tsDet;
+    if (!det) { window.toast('Chưa đọc được file chấm công', 'warn'); return; }
     const zone = (document.getElementById('tsZone') || {}).value || '';
-    const header = data[0].map(h => String(h || '').trim());
-    let nameCol = -1, codeCol = -1, deptCol = -1;
-    header.forEach((h, i) => {
-      if (nameCol < 0 && /(họ.*tên|tên.*nv|tên.*nhân|tên.*viết|viết.*tắt|^tên|fullname|name)/i.test(h)) nameCol = i;
-      if (codeCol < 0 && /(mã.*nv|mã.*nhân|^mã|empid|code)/i.test(h)) codeCol = i;
-      if (deptCol < 0 && /(bộ phận|phòng ban|dept|department|khu vực)/i.test(h)) deptCol = i;
-    });
-    const dayCols = {};
-    header.forEach((h, i) => { const n = parseInt(String(h).replace(/[^0-9]/g, ''), 10); if (n >= 1 && n <= 31) dayCols[n] = i; });
-    if (nameCol < 0 && codeCol < 0) { window.toast('Không tìm thấy cột Tên viết tắt / Họ tên / Mã NV', 'warn'); return; }
-    if (!Object.keys(dayCols).length) { window.toast('Không tìm thấy cột ngày (1..31) trong header', 'warn'); return; }
+    const { grid, headerRow, mode, nameCol, codeCol, deptCol, presentCol, vangCol, phepCol, dayCols } = det;
 
     const staffs = window.STORE.get('staff', window.STAFFS || []);
     const aliasMap = window.STORE.get('staffAliases', {}) || {};
     const aliasIdx = {};   /* normAlias → [staffId] (có thể trùng: "quang"→[NV001,NV063]) */
     Object.entries(aliasMap).forEach(([sid, al]) => { const k = _normAlias(al); if (!k) return; (aliasIdx[k] = aliasIdx[k] || []).push(sid); });
     const [y, mm] = month.split('-').map(Number); const last = new Date(y, mm, 0).getDate();
+    const _num = v => { const n = parseFloat(String(v == null ? '' : v).replace(/[^0-9.]/g, '')); return isNaN(n) ? 0 : n; };
 
     const rows = [];
-    for (let r = 1; r < data.length; r++) {
-      const row = data[r]; if (!row || !row.length) continue;
-      const rawName = String(row[nameCol] || '').trim();
+    for (let r = headerRow + 1; r < grid.length; r++) {
+      const row = grid[r]; if (!row || !row.length) continue;
+      const rawName = nameCol >= 0 ? String(row[nameCol] || '').trim() : '';
       const code = codeCol >= 0 ? String(row[codeCol] || '').trim() : '';
-      if (!rawName && !code) continue;
-      const days = {};
-      Object.keys(dayCols).forEach(d => { const st = _cellStatus(row[dayCols[d]]); if (st) days[parseInt(d, 10) - 1] = st; });
-      const work = Object.values(days).reduce((a, st) => a + (st === 'X' ? 1 : st === 'H' ? 0.5 : 0), 0);
+      if (!rawName) continue;   /* bỏ dòng tiêu đề phụ (Tiêu chuẩn/Thực tế) / dòng rỗng — không có tên */
+      let days = {}, work = 0;
+      if (mode === 'summary') {
+        /* Cột "Có mặt (Tiêu chuẩn/Thực tế)" = vd "30/28" → lấy THỰC TẾ (sau /). Dựng ngày để đếm đúng. */
+        const pv = String(row[presentCol] || '').trim();
+        const m = pv.match(/(\d+(?:\.\d+)?)\s*\/\s*(\d+(?:\.\d+)?)/);
+        work = m ? parseFloat(m[2]) : _num(pv);
+        const nP = phepCol >= 0 ? Math.round(_num(row[phepCol])) : 0;
+        const nV = vangCol >= 0 ? Math.round(_num(row[vangCol])) : 0;
+        let di = 0; const put = (n, st) => { for (let k = 0; k < n && di < last; k++, di++) days[di] = st; };
+        put(Math.round(work), 'X'); put(nP, 'P'); put(nV, 'V');
+      } else {
+        Object.keys(dayCols).forEach(d => { const st = _cellStatus(row[dayCols[d]]); if (st) days[parseInt(d, 10) - 1] = st; });
+        work = Object.values(days).reduce((a, st) => a + (st === 'X' ? 1 : st === 'H' ? 0.5 : 0), 0);
+      }
       const key = _normAlias(rawName);
       const wantZone = zone || (deptCol >= 0 ? _deptZone(row[deptCol]) : '');
       let cand = (aliasIdx[key] || []).map(id => staffs.find(x => x.id === id)).filter(Boolean);
