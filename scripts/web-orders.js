@@ -81,6 +81,7 @@
 
   /* ---- Duyệt: tạo KH (nếu mới) + Đơn chính thức ---- */
   window.woConfirm = async function (id) {
+    if (window.__busyWoConfirm) return; window.__busyWoConfirm = true; setTimeout(() => { window.__busyWoConfirm = false; }, 2500);   /* chống double-click duyệt đơn web → tạo trùng */
     const r = ROWS[id];
     if (!r) return;
     if (!confirm(`Duyệt đơn của "${r.cust_name}" → tạo Khách hàng (nếu mới) + Đơn hàng chính thức?`)) return;

@@ -862,6 +862,8 @@
   let _addCap = null;   /* dữ liệu form đã bắt trước khi modal cảnh báo THAY thế form */
 
   window.submitAddCustomer = async function (thenCreateOrder, forced) {
+    /* chống double-click → tạo 2 KH; forced ("Vẫn tạo khách mới" từ modal trùng địa chỉ) được đi tiếp */
+    if (window.__busyAddCust && !forced) return; window.__busyAddCust = true; setTimeout(() => { window.__busyAddCust = false; }, 2500);
     const f = (forced && _addCap) ? _addCap : _readAddForm();
     if (!f.name) { window.toast('Tên KH là bắt buộc', 'warn'); return; }
 

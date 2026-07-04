@@ -400,6 +400,14 @@
     if (window.STORE.nextCustCodeSafe) {
       try { const base = await window.STORE.nextCustCodeSafe(); _custSeq = parseInt(String(base).replace(/\D/g, ''), 10) || null; } catch (e) {}
     }
+    /* Seed mã ĐƠN CLOUD-AWARE 1 lần cho cả lô — TRƯỚC đây dùng nextOrderCode() (max CỤC BỘ) →
+       2 máy import cùng phiếu lúc danh sách lệch nhau ra 2 mã KHÁC → 2 đơn y hệt → CÔNG NỢ GẤP ĐÔI.
+       Nay lấy mốc từ cloud → 2 máy cùng mốc → trùng mã → nhánh 23505 (so nội dung) idempotent chặn. */
+    let _orderSeq = null;
+    if (window.SB_DATA && window.SB_DATA.nextCloudOrderCode) {
+      try { const base = await window.SB_DATA.nextCloudOrderCode(); const m = String(base).match(/NSTT-(\d+)/); _orderSeq = m ? +m[1] : null; } catch (e) {}
+    }
+    const _existCodes = new Set((window.STORE.get('orders', []) || []).map(o => o.code));
 
     rows.forEach(p => {
       const mm = resolveCust(p, liveCustomers);   /* tôn trọng lựa chọn tay → tự động khớp */
@@ -438,7 +446,13 @@
       if (seenOrders.has(osig) && !p.forceCreate) { nSkip++; return; }
       seenOrders.add(osig);
       const order = {
-        code: window.STORE.nextOrderCode(),
+        code: (function () {
+          if (_orderSeq == null) return window.STORE.nextOrderCode();
+          let c = 'NSTT-' + _orderSeq;
+          while (_existCodes.has(c)) { _orderSeq++; c = 'NSTT-' + _orderSeq; }
+          _existCodes.add(c); _orderSeq++;
+          return c;
+        })(),
         /* NGÀY đơn = ngày trên phiếu (đúng kỳ) + GIỜ UP THẬT (hết hiện 00:00) ·
            createdAt = thời điểm up thật để audit đúng */
         date: p.date.vn + ' ' + hhmm, createdAt: nowISO,

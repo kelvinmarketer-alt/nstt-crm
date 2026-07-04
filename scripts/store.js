@@ -554,7 +554,11 @@
     /* Record đang insert DỞ (pending) → LUÔN coi "chưa sync" (giữ + đẩy lại), KHÔNG bao giờ coi
        là "đã xoá trên cloud" (tránh reload giữa chừng làm mất record vừa thêm). */
     const deletedOnCloud = prevIds ? localOnly.filter(it => prevIds.has(keyOf(it)) && !_isPending(key, keyOf(it))) : [];
-    const neverSynced    = prevIds ? localOnly.filter(it => !prevIds.has(keyOf(it)) || _isPending(key, keyOf(it))) : localOnly;
+    /* baseline MẤT/HỎNG (prevIds=null) → CHỈ coi record đang PENDING là "chưa sync" (chắc chắn tạo tại
+       máy này). TRƯỚC đây lấy TOÀN BỘ localOnly → đẩy ngược cả record người khác ĐÃ XOÁ mà máy này
+       còn giữ = HỒI SINH (đúng triệu chứng user gặp). Baseline dựng lại ở cuối merge (_persistSyncedIds). */
+    const neverSynced    = prevIds ? localOnly.filter(it => !prevIds.has(keyOf(it)) || _isPending(key, keyOf(it)))
+                                   : localOnly.filter(it => _isPending(key, keyOf(it)));
 
     /* CHỐNG HỒI SINH / UNDO-XOÁ khi máy DESYNC: nếu local ít hơn cloud RẤT NHIỀU (vd máy chỉ
        giữ được vài đơn do lỗi/quota trong khi cloud ~900) thì các "local-only" nhiều khả năng là
@@ -563,7 +567,14 @@
     const _desync = cloud.length >= 50 && local.length < cloud.length * 0.5;
     /* Self-heal: CHỈ đẩy record chưa từng lên cloud (guard ≤200 tránh mass-push nhầm) */
     if (_desync && neverSynced.length > 0) {
-      console.warn(`[STORE] ${key}: DESYNC (local ${local.length} << cloud ${cloud.length}) — BỎ auto-push ${neverSynced.length} record local-only (chống hồi sinh / undo xoá). Đồng bộ lại từ cloud để sửa.`);
+      console.warn(`[STORE] ${key}: DESYNC (local ${local.length} << cloud ${cloud.length}) — BỎ auto-push record local-only (chống hồi sinh / undo xoá). Đồng bộ lại từ cloud để sửa.`);
+      /* NHƯNG record đang PENDING = đơn/KH mới tạo TẠI máy này (không phải rác/đã-xoá) → VẪN đẩy lên để KHÔNG MẤT. */
+      for (const it of neverSynced.filter(x => _isPending(key, keyOf(x)))) {
+        const oid = keyOf(it);
+        const saved = await window.SB_DATA.insert(table, it).catch(() => null);
+        if (saved) _clearPending(key, oid);
+        if (saved && idCol && saved[idCol] && it[idCol] !== saved[idCol]) { const old = it[idCol]; it[idCol] = saved[idCol]; _clearPending(key, saved[idCol]); console.log(`[STORE] ${key}: mã '${old}' đổi → '${saved[idCol]}' (desync-pending push)`); }
+      }
     } else if (neverSynced.length > 0 && neverSynced.length <= 200) {
       console.log(`[STORE] ${key}: tự đẩy ${neverSynced.length} record mới (chưa sync) lên cloud`);
       for (const it of neverSynced) {
@@ -640,7 +651,9 @@
        NGOẠI LỆ DESYNC: local << cloud → local-only nhiều khả năng là SEED CŨ / rác (vd SP029 ớt
        chuông từ data/products.js) → BỎ hẳn (cloud là nguồn chuẩn) → hết hiện SP phantom + không
        đẩy lên. (Máy desync muốn giữ đơn/SP tạo offline thì bấm "Đồng bộ lại" sau khi mạng ổn.) */
-    const keep = _desync ? [] : neverSynced;
+    /* NGOẠI LỆ DESYNC: bỏ local-only (seed cũ/rác) — NHƯNG GIỮ record đang PENDING (đơn mới tạo tại
+       máy này, chưa kịp lên cloud) → không để mất. Trước đây keep=[] loại CẢ pending = MẤT đơn mới. */
+    const keep = _desync ? neverSynced.filter(it => _isPending(key, keyOf(it))) : neverSynced;
     const merged = cloudMerged.concat(keep);
     const newJson = JSON.stringify(merged);
     /* PERF: so với BASELINE cloud lần trước (_synced[key]) thay vì stringify lại _data[key].

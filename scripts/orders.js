@@ -2285,6 +2285,7 @@ CHỈ TRẢ JSON, không giải thích gì thêm.`;
   };
 
   window.submitCreateOrder = async function(initStatus) {
+    if (window.__busyCreateOrder) return; window.__busyCreateOrder = true; setTimeout(() => { window.__busyCreateOrder = false; }, 2500);   /* chống double-click lúc mạng chậm → tạo 2 đơn */
     const custId = window.formVal('#oCust');
     const goods = window.formVal('#oGoods');
     const freight = _moneyVal('#oFreight');

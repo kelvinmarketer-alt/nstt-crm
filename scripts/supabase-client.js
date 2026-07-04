@@ -460,6 +460,9 @@
           if (nc && nc !== mapped.id) {
             console.warn(`[SB insert] customers: mã '${mapped.id}' trùng KH khác → đổi '${nc}' rồi thử lại (chống nuốt KH)`);
             mapped.id = nc;
+            /* ĐỔI CẢ code — customers.code là cột UNIQUE NOT NULL riêng, tạo KH id===code.
+               Trước đây chỉ đổi id → code cũ vẫn trùng customers_code_key → 23505 lặp mãi → KH KẸT local. */
+            if (mapped.code != null) mapped.code = nc;
             continue;
           }
         }

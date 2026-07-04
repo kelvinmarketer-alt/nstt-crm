@@ -214,7 +214,7 @@
   window.formHd = function() {
     const custs = window.STORE.get('customers', []).filter(c => c.type === 'B2B');
     const custOpts = custs.map(c => `<option value="${c.id}" data-tax="${c.tax||''}">${c.name}</option>`).join('');
-    const nextNo = '(nháp)';
+    const nextNo = 'NHAP-' + Date.now().toString(36).toUpperCase();
     return `
       <div class="form-row">
         <div><label>Số HĐ</label><input id="hNo" value="${nextNo}" readonly style="background:#FAFAFB"></div>
@@ -281,6 +281,7 @@
   };
 
   window.submitInvoice = function(status) {
+    if (window.__busyInvoice) return; window.__busyInvoice = true; setTimeout(() => { window.__busyInvoice = false; }, 2500);   /* chống double-click → nuốt HĐ */
     const custEl = document.getElementById('hCust');
     const custName = custEl.options[custEl.selectedIndex]?.text || '';
     const net = parseInt(window.formVal('#hNet'), 10) || 0;
@@ -291,7 +292,7 @@
 
     const rate = parseInt(window.formVal('#hVatRate'), 10) || 0;
     const vat = Math.round(net * rate / 100);
-    let no = '(nháp)';
+    let no = 'NHAP-' + Date.now().toString(36).toUpperCase();   /* số nháp DUY NHẤT — trước dùng '(nháp)' cố định → nhiều nháp trùng key nuốt nhau (local Map + cloud PK) */
     if (status === 'pending') {
       const max = invoices.reduce((m, x) => {
         const n = parseInt((x.no || '').split('-')[1], 10);

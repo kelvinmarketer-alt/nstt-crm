@@ -561,7 +561,7 @@ Mong quý khách thu xếp thanh toán sớm. Cảm ơn!
       <div class="check-grid" style="grid-template-columns:1fr;margin-bottom:14px">${invHtml}</div>
 
       <div class="form-row">
-        <div><label>Số phiếu</label><input id="rNo" value="PT-${526100+Math.floor(Math.random()*100)}" readonly style="background:#FAFAFB"></div>
+        <div><label>Số phiếu</label><input id="rNo" value="PT-${Date.now().toString(36).toUpperCase()}" readonly style="background:#FAFAFB"></div>
         <div><label>Ngày thu</label><input id="rDate" type="date" value="${new Date().toISOString().slice(0,10)}"></div>
       </div>
       <div class="form-row">
@@ -601,6 +601,7 @@ Mong quý khách thu xếp thanh toán sớm. Cảm ơn!
   };
 
   window.submitDebtReceipt = function(custId) {
+    if (window.__busyReceipt) return; window.__busyReceipt = true; setTimeout(() => { window.__busyReceipt = false; }, 2500);   /* chống double-click → nuốt phiếu */
     const amount = parseInt(window.formVal('#rAmount'), 10) || 0;
     if (!amount) { window.toast('Nhập số tiền', 'warn'); return; }
     const debtors = loadDebtors();
