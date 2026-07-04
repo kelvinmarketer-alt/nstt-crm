@@ -203,6 +203,18 @@
       ${data.days.map(d => `<th class="num">${ddmm(d)}</th>`).join('')}
       ${headRight}
     </tr></thead>`;
+    /* ⚠ Cảnh báo đối tác TRÙNG ĐỊA CHỈ — có thể là 1 điểm bán bị tách thành 2 dòng công nợ.
+       Dùng chung window.addrLooksSame (shared.js). CFO nhìn badge → soi & gộp cho đúng số nợ. */
+    const _dupAddr = new Set();
+    if (window.addrLooksSame) {
+      const L = data.list;
+      for (let i = 0; i < L.length; i++) for (let j = i + 1; j < L.length; j++) {
+        if (L[i].addr && L[j].addr && window.addrLooksSame(L[i].addr, L[j].addr)) { _dupAddr.add(L[i].key); _dupAddr.add(L[j].key); }
+      }
+    }
+    const _dupBadge = r => _dupAddr.has(r.key)
+      ? ` <span title="Trùng địa chỉ với đối tác khác — có thể cùng 1 điểm bán bị tách công nợ, kiểm tra để gộp" style="font-size:9px;background:#FEF3C7;color:#B45309;padding:0 4px;border-radius:6px;font-weight:700;white-space:nowrap">⚠ trùng ĐC</span>`
+      : '';
     let body;
     if (cnGroupBrand) {
       const groups = groupByBrand(data.list);
@@ -215,14 +227,14 @@
           ${data.days.map(d => { const v = dailyOf(g)[d] || 0; return `<td class="num ${v ? '' : 'z'}"><b>${v ? fmt(v) : '·'}</b></td>`; }).join('')}
           ${bodyRight(g)}</tr>`;
         const siteRows = multi ? g.sites.map(r => `<tr>
-          <td class="par" style="padding-left:18px;font-weight:400" title="${(r.addr || r.name).replace(/"/g, '&quot;')}"><a href="javascript:void(0)" onclick="window.cnShowNotice('${(r.key || '').replace(/'/g, "\\'")}')" style="color:#475569;text-decoration:none;border-bottom:1px dotted #94A3B8">↳ ${r.addr || r.name}</a></td>
+          <td class="par" style="padding-left:18px;font-weight:400" title="${(r.addr || r.name).replace(/"/g, '&quot;')}"><a href="javascript:void(0)" onclick="window.cnShowNotice('${(r.key || '').replace(/'/g, "\\'")}')" style="color:#475569;text-decoration:none;border-bottom:1px dotted #94A3B8">↳ ${r.addr || r.name}</a>${_dupBadge(r)}</td>
           ${data.days.map(d => { const v = dailyOf(r)[d] || 0; return `<td class="num ${v ? '' : 'z'}">${v ? fmt(v) : '·'}</td>`; }).join('')}
           ${bodyRight(r)}</tr>`).join('') : '';
         return brandRow + siteRows;
       }).join('')}</tbody>`;
     } else {
       body = `<tbody>${data.list.map(r => `<tr>
-        <td class="par" title="Bấm để xem Thông báo công nợ — in / copy gửi khách"><a href="javascript:void(0)" onclick="window.cnShowNotice('${(r.key || '').replace(/'/g, "\\'")}')" style="color:var(--navy);font-weight:700;text-decoration:none;border-bottom:1px dotted var(--navy)">${r.name}</a></td>
+        <td class="par" title="Bấm để xem Thông báo công nợ — in / copy gửi khách"><a href="javascript:void(0)" onclick="window.cnShowNotice('${(r.key || '').replace(/'/g, "\\'")}')" style="color:var(--navy);font-weight:700;text-decoration:none;border-bottom:1px dotted var(--navy)">${r.name}</a>${_dupBadge(r)}</td>
         ${data.days.map(d => { const v = dailyOf(r)[d] || 0; return `<td class="num ${v ? '' : 'z'}">${v ? fmt(v) : '·'}</td>`; }).join('')}
         ${bodyRight(r)}
       </tr>`).join('')}</tbody>`;
