@@ -373,13 +373,12 @@
        FALSE = chỉ thấy KH mình phụ trách (Sale, CSKH, và vai trò khác)
        Dùng cho customers list + chi tiết + dropdown chọn KH khi tạo đơn. */
     seesAllCustomers() {
-      const u = this.currentUser(); if (!u) return false;
-      const perms = u.permissions || [];
-      if (perms.includes('all') || perms.includes('Tất cả')) return true;   /* admin / CEO / sếp */
-      const r = ((u.role || '') + ' ' + (u.dept || '')).toLowerCase();
-      return ['kế toán', 'ke toan', 'nhân sự', 'nhan su', 'tuyển dụng', 'tuyen dung',
-              'hành chính', 'hanh chinh', 'marketing', 'mkt', 'digital', 'truyền thông', 'truyen thong']
-        .some(k => r.includes(k));
+      /* CHỐT của chủ DN: MỌI vai trò — KỂ CẢ Sale/CSKH — được XEM TẤT CẢ khách hàng
+         (danh sách + ô tìm khách khi tạo đơn/báo giá/định kỳ + dashboard + tìm kiếm chung).
+         Trước đây Sale chỉ thấy KH mình phụ trách → không tìm được KH của người khác up lên
+         (vd "Bia hơi Thu Hằng" của CFO) lúc tạo đơn. Người phụ trách VẪN được ghi qua staffOwner
+         (form thêm KH mặc định gán chính người tạo) — chỉ bỏ giới hạn HIỂN THỊ, không bỏ quy chủ. */
+      return true;
     },
 
     /* === MẬT KHẨU CÁ NHÂN === */
