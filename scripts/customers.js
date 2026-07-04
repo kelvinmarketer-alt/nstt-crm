@@ -963,9 +963,22 @@
     const orders = S.get('orders', []) || [];
     const toMove = orders.filter(o => lset.has(o.cust || o.custId));
 
-    /* 1) DỜI ĐƠN → keeper (pending-tracked; rớt mạng thì self-heal đẩy lại) */
-    window.toast?.(`Đang dời ${toMove.length} đơn...`, 'info');
-    toMove.forEach(o => S.update('orders', o.code, { cust: keeperId, custId: keeperId, custName: keeperName }));
+    /* 1) DỜI ĐƠN → keeper: AWAIT cloud PATCH TỪNG đơn (CHẮC CHẮN lên cloud TRƯỚC khi xoá + reload).
+       Trước fire-and-forget rồi reload NGAY → PATCH chưa land bị reload HUỶ → đơn kẹt ở loser (mồ côi)
+       → keeper không tăng. Giờ await theo lô 6 + retry 1 lần; đơn nào vẫn lỗi thì DỪNG, KHÔNG xoá khách. */
+    window.toast?.(`Đang dời ${toMove.length} đơn sang khách giữ...`, 'info');
+    const failed = [];
+    for (let i = 0; i < toMove.length; i += 6) {
+      const batch = toMove.slice(i, i + 6);
+      const rs = await Promise.all(batch.map(o => window.SB_DATA.update('orders', o.code, { cust: keeperId, custName: keeperName }, 'code').catch(() => null)));
+      rs.forEach((r, k) => { if (r == null) failed.push(batch[k].code); });
+    }
+    if (failed.length) {
+      const again = failed.splice(0);
+      for (const code of again) { const r = await window.SB_DATA.update('orders', code, { cust: keeperId, custName: keeperName }, 'code').catch(() => null); if (r == null) failed.push(code); }
+    }
+    if (failed.length) throw new Error(`${failed.length} đơn chưa dời được (mạng?) — ĐÃ DỪNG, chưa xoá khách nào để tránh mất đơn. Thử lại.`);
+    toMove.forEach(o => { o.cust = keeperId; o.custId = keeperId; o.custName = keeperName; });   /* đồng bộ cache local */
 
     /* 2) SỔ NỢ: đổi custId loser→keeper + DEDUP (custId,ref,type) tránh nhân đôi */
     if (S.rmwKv) S.rmwKv('debtLedger', arr => {
@@ -1004,10 +1017,8 @@
     /* 6) web_orders — bảng NGOÀI STORE → REST PATCH linked_cust */
     try { if (window.SB && window.SB.from) for (const lid of loserIds) await window.SB.from('web_orders').update({ linked_cust: keeperId }).eq('linked_cust', lid); } catch (e) {}
 
-    /* 7) đợi PATCH đơn kịp lên cloud TRƯỚC khi xoá KH (giảm cửa sổ đua FK; self-heal lo phần còn lại) */
-    await new Promise(r => setTimeout(r, 1500));
-
-    /* 8) XOÁ khách thừa — STORE.remove (tombstone chống hồi sinh) */
+    /* 7) XOÁ khách thừa — giờ MỌI đơn ĐÃ sang keeper trên cloud (await bước 1) → KHÔNG mồ côi.
+       STORE.remove (tombstone chống hồi sinh). */
     loserIds.forEach(lid => S.remove('customers', lid));
 
     /* 9) dọn addrDupOk chứa loser + flush KV lên cloud */
