@@ -215,10 +215,11 @@
         <div style="font-size:11px;color:var(--muted);margin-top:4px">VD: 5.000 ₫/phút × (phút muộn − grace) — cách cũ NSTT</div>
       </div>
     `;
-    window.openModal('⚙ Cấu hình phạt đi muộn', html, 'Lưu cài đặt', () => {
+    /* LƯU — đọc GIÁ TRỊ ô hiện tại (đã sửa), bỏ dấu phân cách; KHÔNG dùng data-raw (là giá trị lúc MỞ). */
+    window._saveLatePolicy = function () {
       const mode = document.getElementById('lpMode')?.value || 'tier';
       const graceMinutes = parseInt(document.getElementById('lpGrace')?.value, 10) || 0;
-      const parseRaw = (el) => parseInt((el?.dataset.raw ?? el?.value ?? '').toString().replace(/[^\d-]/g, ''), 10) || 0;
+      const parseRaw = (el) => parseInt((el?.value ?? '').toString().replace(/[^\d-]/g, ''), 10) || 0;
       const tiers = Array.from(document.querySelectorAll('.lp-tier')).map(el => ({
         thresholdMinutes: parseInt(el.querySelector('.lp-tier-min')?.value, 10) || 0,
         label: el.querySelector('.lp-tier-label')?.value || '',
@@ -229,8 +230,13 @@
       window.STORE.set('latePolicy', policy);
       window.toast?.('✓ Đã lưu khung phạt đi muộn — ' + tiers.length + ' mức', 'success');
       window.closeModal?.();
-      render();
-    }, 600);
+      if (typeof render === 'function') render();
+    };
+    window.openModal('⚙ Cấu hình phạt đi muộn', html, {
+      width: '620px',
+      footer: `<button class="btn btn-ghost" onclick="window.closeModal()">Đóng</button>
+               <button class="btn btn-primary" onclick="window._saveLatePolicy()">💾 Lưu cài đặt</button>`,
+    });
 
     /* Wire mode toggle */
     document.getElementById('lpMode')?.addEventListener('change', e => {
