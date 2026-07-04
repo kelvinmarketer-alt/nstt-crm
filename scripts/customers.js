@@ -394,9 +394,9 @@
                 {id:'Inactive', label:'⚫ Inactive'},
               ]
             },
-            buttons: [
+            buttons: _isBoardMember() ? [
               { label: '🔗 Gộp công nợ', handler: (ids) => window.bulkMergeCustomers(ids) },
-            ]
+            ] : []
           }
         });
       }
@@ -827,7 +827,7 @@
           <div style="font-size:11.5px;color:var(--muted)">📍 ${t.address || '—'} · nợ ${window.fmt(t.debt || 0)} · NV: ${t.staffOwner || '—'}</div>
         </div>
         <div style="display:flex;gap:6px;flex:0 0 auto">
-          <button class="btn btn-primary btn-sm" onclick="window.bulkMergeCustomers(['${custId}','${t.id}'])" title="Gộp 2 khách này thành 1 (dồn đơn + công nợ)">🔗 Gộp</button>
+          ${_isBoardMember() ? `<button class="btn btn-primary btn-sm" onclick="window.bulkMergeCustomers(['${custId}','${t.id}'])" title="Gộp 2 khách này thành 1 (dồn đơn + công nợ)">🔗 Gộp</button>` : ''}
           <button class="btn btn-ghost btn-sm" onclick="window._ackDup('${custId}','${t.id}')">✓ Không trùng</button>
         </div>
       </div>`).join('');
@@ -860,6 +860,15 @@
      sang KH GIỮ, RỒI STORE.remove các KH thừa (tombstone chống hồi sinh). THỨ TỰ: dời hết TRƯỚC,
      xoá SAU (FK ON DELETE SET NULL). Công nợ là DERIVED → reload để rebuildCustStats tính lại. */
   let _mergeIds = [], _mergeKeeper = null, _mergeSel = [], _mergeStat = {};
+  /* GỘP/xoá khách = thao tác nhạy cảm → CHỈ BAN GIÁM ĐỐC (quyền 'all' hoặc role/dept giám đốc) */
+  function _isBoardMember() {
+    const u = window.CURRENT_USER || {};
+    const perms = u.permissions || [];
+    if (perms.includes('all') || perms.includes('*')) return true;
+    const rd = ((u.role || '') + ' ' + (u.dept || '')).toLowerCase();
+    return /ban giám đốc|giám đốc|ceo|cfo|sếp|chủ doanh|tổng giám|admin/.test(rd);
+  }
+  window._nsttCanMergeCust = _isBoardMember;
   const _mFmt = v => (+v || 0).toLocaleString('vi-VN');
   const _mEsc = s => String(s == null ? '' : s).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/"/g, '&quot;');
 
@@ -886,6 +895,7 @@
   }
 
   window.bulkMergeCustomers = function (ids) {
+    if (!_isBoardMember()) { window.toast?.('🔒 Chỉ Ban giám đốc mới được gộp khách hàng', 'warn'); return; }
     ids = [...new Set((ids || []).filter(Boolean))];
     if (ids.length < 2) { window.toast?.('Chọn ít nhất 2 khách hàng để gộp', 'warn'); return; }
     const all = window.STORE.get('customers', []) || [];
