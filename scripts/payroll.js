@@ -934,6 +934,20 @@
     return null;
   }
 
+  /* Bỏ tiền tố xưng hô đầu tên máy (chị/anh/em/cô/chú/bác...) để khớp họ tên NV */
+  const _TS_TITLES = /^(chi|anh|em|co|chu|bac|ong|ba|cau|mo|di|thim|c|a)\s+/;
+  function _tsNameKey(k) { return String(k || '').replace(_TS_TITLES, '').trim(); }
+  /* Khớp TÊN máy ↔ họ tên NV theo TỪ: MỌI từ (≥2 ký tự) của tên máy đều là 1 từ trong họ tên NV.
+     VD: "the trung"↔"nguyen the trung" ✓ · "bich"↔"nguyen thi bich" ✓ · "tuoi"↔"vu thi hong tuoi" ✓ */
+  function _tsNameMatch(machineKey, fullName) {
+    const mw = String(machineKey || '').split(' ').filter(w => w.length > 1);
+    const fw = String(fullName || '').split(' ').filter(w => w.length > 1);
+    if (!mw.length || !fw.length) return false;
+    /* mọi từ tên máy ∈ họ tên NV, VÀ từ CUỐI (tên gọi) khớp từ cuối NV → né nhầm HỌ↔TÊN
+       (vd "đăng" KHÔNG khớp "Đặng Quang Vinh" vì tên gọi là "vinh" ≠ "dang"). */
+    return mw.every(w => fw.includes(w)) && mw[mw.length - 1] === fw[fw.length - 1];
+  }
+
   /* Upload → PARSE + phân loại → mở bảng ĐỐI SOÁT (chưa ghi gì). Giống up đơn có SP ngoài danh mục. */
   window.applyUploadedTimesheet = function () {
     const det = window._tsDet;
@@ -976,11 +990,18 @@
       if (cand.length === 1) { chosen = cand[0].id; status = 'ok'; }
       else if (cand.length > 1) { chosen = ''; status = 'amb'; }
       else {
-        let s = (code && staffs.find(x => x.code === code || x.id === code))
-          || staffs.find(x => _normAlias(x.name) === key)
-          || staffs.find(x => { const xn = _normAlias(x.name); return key.length > 2 && (xn.includes(key) || key.includes(xn)); });
-        if (s && wantZone && _deptZone(s.dept) !== wantZone) s = null;
-        if (s) { chosen = s.id; status = 'ok'; } else { chosen = ''; status = 'new'; }
+        const zoneOk = s => !wantZone || _deptZone(s.dept) === wantZone;
+        const byCode = code && staffs.find(x => (x.code === code || x.id === code) && zoneOk(x));
+        if (byCode) { chosen = byCode.id; status = 'ok'; }
+        else {
+          const kw = _tsNameKey(key);
+          /* khớp CHÍNH XÁC họ tên trước → rồi khớp theo TỪ (tên máy là tập con từ của họ tên NV) */
+          let ms = staffs.filter(s => zoneOk(s) && _normAlias(s.name) === kw);
+          if (!ms.length) ms = staffs.filter(s => zoneOk(s) && _tsNameMatch(kw, _normAlias(s.name)));
+          if (ms.length === 1) { chosen = ms[0].id; status = 'ok'; }        /* 1 người → tự khớp */
+          else if (ms.length > 1) { chosen = ''; status = 'amb'; }          /* nhiều người → HR chọn */
+          else { chosen = ''; status = 'new'; }                             /* không ai → NV mới / gán tay */
+        }
       }
       rows.push({ name: rawName || code, code, days, work, chosen, auto: chosen, status });
     }
