@@ -1141,6 +1141,51 @@
     render();
   };
 
+  /* ====== BẢNG XÁC THỰC CHẤM CÔNG — HR gửi NV qua Zalo (copy ảnh) để xác nhận cuối tháng ====== */
+  window.openAttendanceVerify = function () {
+    const [y, mm] = month.split('-').map(Number);
+    const last = new Date(y, mm, 0).getDate();
+    const esc = t => String(t == null ? '' : t).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/"/g, '&quot;');
+    const metaAll = window.STORE.get('timesheetMeta', {}) || {};
+    const staffs = (window.STORE.get('staff', window.STAFFS || []) || []).filter(s => s.status !== 'inactive' && s.status !== 'off' && s.status !== 'nghỉ');
+    const byDept = {};
+    staffs.forEach(s => { const d = s.dept || 'Khác'; (byDept[d] = byDept[d] || []).push(s); });
+    let stt = 0;
+    const sections = Object.keys(byDept).sort().map(dept => {
+      const rowsHtml = byDept[dept].map(s => {
+        const sh = sheetOf(s.id); const days = sh ? sh.days : [];
+        const meta = metaAll[s.id + '_' + month] || {};
+        const c = counts(days, meta);
+        const cong = c.X + c.L + c.H;
+        const nghi = [], muon = [], phep = [];
+        (days || []).forEach((d, i) => { if (d === 'V') nghi.push(i + 1); else if (d === 'L') muon.push(i + 1); else if (d === 'P') phep.push(i + 1); });
+        stt++;
+        const note = [];
+        if (nghi.length) note.push('nghỉ ' + nghi.join(','));
+        if (phep.length) note.push('phép ' + phep.join(','));
+        if (muon.length) note.push('muộn ' + muon.join(',') + (c.lateMin ? ' (' + c.lateMin + 'p)' : ''));
+        return `<tr><td class="c">${stt}</td><td class="nm">${esc(s.name)}</td><td>${esc(s.role || '')}</td><td class="c"><b>${cong}</b></td><td class="c">${last}</td><td class="note">${esc(note.join(' · '))}</td></tr>`;
+      }).join('');
+      return `<tr class="grp"><td colspan="6">${esc(dept)} (${byDept[dept].length})</td></tr>` + rowsHtml;
+    }).join('');
+    const css = `*{box-sizing:border-box;font-family:'Segoe UI',Arial,sans-serif}body{margin:0;padding:16px;background:#fff;color:#1a1a1a}
+      .rt-h{text-align:center;margin-bottom:12px}.rt-h .co{font-size:15px;font-weight:800;color:#1B5E20}.rt-h .ti{font-size:18px;font-weight:800;margin-top:3px;color:#111}.rt-h .mo{font-size:12px;color:#555;margin-top:3px}
+      table{width:100%;border-collapse:collapse;font-size:12.5px}th,td{border:1px solid #B6C9B0;padding:5px 8px}th{background:#1B5E20;color:#fff;font-weight:700;font-size:11px;text-transform:uppercase}td.c{text-align:center}td.nm{font-weight:700}td.note{font-style:italic;color:#B45309;font-size:11.5px}tr.grp td{background:#FEF3C7;font-weight:800;color:#1B5E20;text-transform:uppercase;font-size:12px}tbody tr:nth-child(even):not(.grp){background:#F7FBF5}`;
+    const body = `<div class="rt-h"><div class="co">NÔNG SẢN TUẤN TÚ HÀ NỘI</div><div class="ti">BẢNG CHẤM CÔNG THÁNG ${mm}/${y}</div><div class="mo">${last} ngày · Nhân viên vui lòng kiểm tra & xác nhận công / ngày nghỉ / đi muộn của mình</div></div>
+      <table><thead><tr><th style="width:34px">STT</th><th>Họ tên</th><th>Vị trí</th><th style="width:52px">Công</th><th style="width:52px">Chuẩn</th><th>Ghi chú (nghỉ / muộn / phép)</th></tr></thead><tbody>${sections}</tbody></table>`;
+    window._attReportHtml = `<!doctype html><html lang="vi"><head><meta charset="utf-8"><style>${css}</style></head><body>${body}</body></html>`;
+    window.openModal('📋 Bảng xác thực chấm công — Tháng ' + mm + '/' + y, `
+      <div style="font-size:12px;color:var(--muted);margin-bottom:8px">Gửi lên nhóm Zalo để NV tự kiểm tra. Bấm <b>"📋 Copy ảnh"</b> rồi dán (Ctrl/Cmd + V) vào Zalo.</div>
+      <iframe id="attPrev" style="width:100%;height:56vh;border:1px solid var(--line);border-radius:8px;background:#fff"></iframe>
+    `, { width: '860px', footer: `<button class="btn btn-ghost" onclick="window.closeModal()">Đóng</button><button class="btn btn-primary" onclick="window._copyAttendanceImg()">📋 Copy ảnh gửi Zalo</button>` });
+    setTimeout(() => { const f = document.getElementById('attPrev'); if (f) f.srcdoc = window._attReportHtml; }, 30);
+  };
+  window._copyAttendanceImg = function () {
+    if (!window.copyReceiptImageDirect) { window.toast?.('Chưa nạp trình copy ảnh — thử lại sau 1 giây', 'warn'); return; }
+    const r = window.copyReceiptImageDirect(window._attReportHtml, 'bang-cham-cong-' + month);
+    if (r && r.unsupported) window.toast?.('Trình duyệt không hỗ trợ copy ảnh — dùng máy tính/Chrome', 'warn');
+  };
+
   /* === Quản lý TÊN VIẾT TẮT máy chấm công (xem/sửa/gán cho NV mới) === */
   window.openAliasManager = function () {
     const staffs = window.STORE.get('staff', window.STAFFS || []).slice();
