@@ -864,9 +864,13 @@
   function _isBoardMember() {
     const u = window.CURRENT_USER || {};
     const perms = u.permissions || [];
-    if (perms.includes('all') || perms.includes('*')) return true;
-    const rd = ((u.role || '') + ' ' + (u.dept || '')).toLowerCase();
-    return /ban giám đốc|giám đốc|ceo|cfo|sếp|chủ doanh|tổng giám|admin/.test(rd);
+    if (perms.includes('all') || perms.includes('*') || perms.includes('Tất cả')) return true;
+    /* Dùng CHUẨN phân quyền CỦA APP (đã dùng cho login leader) */
+    try { if (window.AUTH && window.AUTH.isLeaderRole && window.AUTH.isLeaderRole(u.role, u.dept)) return true; } catch (e) {}
+    /* Accent-safe: cloud login perms RỖNG (staff không có cột permissions) + né bug NFC/NFD của regex có dấu */
+    const strip = s => String(s || '').toLowerCase().normalize('NFD').replace(/[̀-ͯ]/g, '').replace(/đ/g, 'd').replace(/\s+/g, ' ');
+    const rd = strip((u.role || '') + ' ' + (u.dept || ''));
+    return /ban giam doc|giam doc|dieu hanh|\bceo\b|\bcfo\b|\bsep\b|chu doanh|tong giam|admin|quan tri/.test(rd);
   }
   window._nsttCanMergeCust = _isBoardMember;
   const _mFmt = v => (+v || 0).toLocaleString('vi-VN');
