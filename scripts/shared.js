@@ -5,7 +5,7 @@
 
 /* Phiên bản app hiển thị (đối chiếu với CACHE_VERSION trong sw.js) — để user tự XÁC NHẬN
    đang chạy bản mới hay còn kẹt JS cũ (hiện ở góc sidebar + log console). */
-window.APP_VERSION = 'v377';
+window.APP_VERSION = 'v378';
 console.log('%c[NSTT] App ' + window.APP_VERSION, 'color:#339B21;font-weight:bold');
 
 /* Gom NGUỒN khách về 3 nhóm chuẩn: 'mkt' / 'sales' / 'sep-gioi-thieu'.
@@ -416,6 +416,27 @@ window.addDebtLedger = function (e) {
 /* Công nợ CHUẨN của 1 KH (nguồn DUY NHẤT) = tổng tiền đơn "Công nợ" (không draft/cancelled) −
    tổng phiếu thu (ledger payment). Dùng cho Báo cáo/Dashboard (không cần nạp customers.js).
    Khớp đúng rebuildCustStats trong customers.js. */
+
+/* ===== So khớp ĐỊA CHỈ gần giống — DÙNG CHUNG (cảnh báo trùng KH ở form thêm KH, NHẬP PHIẾU, CFO).
+   Trước đây logic này chỉ nằm trong customers.js (form tay) → nhập phiếu/CFO không cảnh báo trùng. ===== */
+window.normAddr = function (s) {
+  return String(s || '').normalize('NFD').replace(/[̀-ͯ]/g, '')
+    .toLowerCase().replace(/đ/g, 'd').replace(/[^a-z0-9]+/g, ' ')
+    .replace(/\b(so|nha|ngo|ngach|duong|pho|thon|xom|to|hn|ha noi)\b/g, ' ')
+    .replace(/\s+/g, ' ').trim();
+};
+window.addrLooksSame = function (a, b) {
+  a = window.normAddr(a); b = window.normAddr(b);
+  if (!a || !b || a.length < 6) return false;
+  if (a === b) return true;
+  const [sh, lo] = a.length <= b.length ? [a, b] : [b, a];
+  if (sh.length >= 8 && lo.indexOf(sh) >= 0) return true;
+  const ta = new Set(a.split(' ').filter(w => w.length > 1));
+  const common = b.split(' ').filter(w => w.length > 1 && ta.has(w)).length;
+  const nA = a.match(/\d+/g) || [], nB = b.match(/\d+/g) || [];
+  return common >= 3 && nA.some(n => nB.includes(n));
+};
+
 window.custDebt = function (custId) {
   if (!custId || !window.STORE) return 0;
   const orders = window.STORE.get('orders', []) || [];

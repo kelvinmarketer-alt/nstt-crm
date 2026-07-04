@@ -333,8 +333,16 @@
       else {
         const r = resolveCust(p, customers);
         const sel = p.forceCustId === undefined ? '__auto__' : (p.forceCustId === '' ? '__new__' : p.forceCustId);
-        const lbl = r ? `<span style="color:#15803D">→ ${esc(r.c.name)} <span style="color:var(--muted)">(${esc(r.c.code)} · ${_byLabel[r.by]})</span></span>`
-          : '<span style="color:#2563EB">🆕 Tạo khách mới</span>';
+        let lbl;
+        if (r) {
+          lbl = `<span style="color:#15803D">→ ${esc(r.c.name)} <span style="color:var(--muted)">(${esc(r.c.code)} · ${_byLabel[r.by]})</span></span>`;
+        } else {
+          /* CẢNH BÁO trùng địa chỉ: phiếu sắp tạo KHÁCH MỚI nhưng địa chỉ giống KH đã có →
+             có thể là cùng 1 điểm bán gõ lệch tên → nhắc NV GỘP, tránh tách công nợ 2 dòng. */
+          const sim = (window.addrLooksSame && p.addr) ? customers.filter(c => window.addrLooksSame(p.addr, c.address)).slice(0, 3) : [];
+          lbl = '<span style="color:#2563EB">🆕 Tạo khách mới</span>'
+            + (sim.length ? `<div style="font-size:10px;color:#B45309;margin-top:2px;line-height:1.3">⚠ Địa chỉ giống KH đã có: ${sim.map(c => esc(c.name) + ' (' + esc(c.code) + ')').join(', ')} — cùng khách? Chọn ở ô dưới để GỘP, tránh tách công nợ.</div>` : '');
+        }
         /* option khách dùng chung (custOptsBase) — chọn đúng dòng set sau render qua data-sel */
         const opts = `<option value="__auto__">↻ Tự động khớp</option><option value="__new__">🆕 Tạo khách mới</option>` + custOptsBase;
         custCell = `<div style="font-size:10.5px;margin-bottom:3px">${lbl}</div>`

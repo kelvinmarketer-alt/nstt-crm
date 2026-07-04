@@ -48,9 +48,12 @@
       });
       /* Xoá luôn drivers cũ sau khi migrate */
       localStorage.removeItem(PREFIX + 'drivers');
-      /* Xoá master data + chat history per user */
+      /* Xoá master data + chat history per user — NHƯNG GIỮ cache danh mục SP:
+         nếu xoá, khi reload app tạm dùng DANH SÁCH CỨNG (có 'rau-cu' cloud không có) → danh mục ĐÃ XOÁ
+         hiện lại (nháy, và HỒI SINH lâu dài nếu cloud chậm/lỗi/trống). Cloud là nguồn chuẩn nên giữ
+         cache chỉ giúp không nháy — không có mặt trái. (Bug SP029 ớt chuông cùng lớp.) */
       Object.keys(localStorage).filter(k =>
-        k.startsWith(PREFIX + 'md_') ||
+        (k.startsWith(PREFIX + 'md_') && k !== PREFIX + 'md_product_categories') ||
         k.startsWith(PREFIX + 'aic_') ||
         k.startsWith(PREFIX + 'hb_')
       ).forEach(k => localStorage.removeItem(k));
