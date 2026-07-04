@@ -49,6 +49,7 @@
       set('staffSubHead', `${staffs.length} nhân viên · ${depts.size} phòng ban · phân quyền truy cập module`);
     })();
     buildDeptChips(staffs);
+    const aliasMap = window.STORE.get('staffAliases', {}) || {};
     document.getElementById('stTbody').innerHTML = rows.map(s => {
       const col = window.avatarColor(s.id);
       const kpiNum = s.kpi ? parseInt(s.kpi) : null;
@@ -66,6 +67,9 @@
             </div>
           </div>
         </td>
+        <td class="hide-sm" data-field="alias" onclick="event.stopPropagation()">
+          <input value="${(aliasMap[s.id] || '').replace(/"/g, '&quot;')}" placeholder="(chưa gán)" onchange="window.stSaveAlias('${s.id}', this.value)" title="Tên NV hiển thị trong máy chấm công — sửa để khớp file chấm công · để trống = xoá" style="width:100%;max-width:130px;padding:4px 7px;border:1px solid var(--line);border-radius:6px;font-size:12px">
+        </td>
         <td class="hide-sm" data-field="dept"><span class="staff-pill">${s.dept}</span></td>
         <td class="hide-md" data-field="phone" style="font-size:12px">${s.phone || '—'}</td>
         <td class="hide-xs" style="font-size:11.5px">${perms}</td>
@@ -82,7 +86,7 @@
           </div>
         </td>
       </tr>`;
-    }).join('') || `<tr><td colspan="9" style="padding:40px;text-align:center;color:var(--muted)">Không có NV nào khớp.</td></tr>`;
+    }).join('') || `<tr><td colspan="10" style="padding:40px;text-align:center;color:var(--muted)">Không có NV nào khớp.</td></tr>`;
 
     document.querySelectorAll('#stTbody tr[data-id]').forEach(tr => {
       tr.onclick = () => openStaff(tr.dataset.id);
@@ -414,6 +418,14 @@
     render();
   };
 
+  /* Lưu / XOÁ tên viết tắt máy chấm công cho 1 NV (sửa inline ở bảng NV). Để trống = xoá. */
+  window.stSaveAlias = function (id, val) {
+    val = String(val || '').trim();
+    if (window.STORE.rmwKv) window.STORE.rmwKv('staffAliases', m => { m = (m && typeof m === 'object' && !Array.isArray(m)) ? m : {}; if (val) m[id] = val; else delete m[id]; return m; });
+    else { const m = window.STORE.get('staffAliases', {}) || {}; if (val) m[id] = val; else delete m[id]; window.STORE.set('staffAliases', m); }
+    window.toast?.(val ? '✓ Đã lưu tên viết tắt' : '✓ Đã xoá tên viết tắt', 'success');
+  };
+
   window.formNv = function() {
     const nextCode = window.STORE.nextId('staff', 'NV');
     /* Sinh password ngẫu nhiên 8 ký tự */
@@ -430,6 +442,10 @@
             <option>Kho &amp; Ship</option><option>Nhân sự</option><option>Sale</option><option>Thu Mua</option>
           </select></div>
         <div><label>Vị trí</label><input id="nRole" placeholder="VD: Nhân viên sales"></div>
+      </div>
+      <div class="form-row wide">
+        <label>Tên viết tắt (máy chấm công) <span style="color:var(--muted);font-weight:400;font-size:11px">— tên NV hiển thị trong máy vân tay, để khớp khi up file chấm công</span></label>
+        <input id="nAlias" placeholder="VD: quang kho, thế trung, chị bích...">
       </div>
       <div class="form-row">
         <div><label>SĐT *</label><input id="nPhone" placeholder="0912 xxx xxx"></div>
@@ -512,6 +528,9 @@
 
     /* Tạo staff record */
     window.STORE.add('staff', newNV);
+    /* Tên viết tắt máy chấm công (nếu nhập) → staffAliases để khớp file chấm công về sau */
+    const _alias = window.formVal('#nAlias');
+    if (_alias && _alias.trim() && window.STORE.rmwKv) window.STORE.rmwKv('staffAliases', m => { m = (m && typeof m === 'object' && !Array.isArray(m)) ? m : {}; m[code] = _alias.trim(); return m; });
 
     /* Đặt MẬT KHẨU đăng nhập = hash 'staffAuth' (cái mà staffLogin THỰC SỰ kiểm) →
        NV login được NGAY bằng SĐT/Email + mật khẩu này, không phụ thuộc Supabase Auth.
