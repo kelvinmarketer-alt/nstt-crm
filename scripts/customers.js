@@ -861,16 +861,26 @@
      xoá SAU (FK ON DELETE SET NULL). Công nợ là DERIVED → reload để rebuildCustStats tính lại. */
   let _mergeIds = [], _mergeKeeper = null, _mergeSel = [], _mergeStat = {};
   /* GỘP/xoá khách = thao tác nhạy cảm → CHỈ BAN GIÁM ĐỐC (quyền 'all' hoặc role/dept giám đốc) */
+  /* Quyền GỘP/xoá khách: theo chốt của chủ DN = CHỦ (Quang) + CEO + CFO + PHÒNG KẾ TOÁN.
+     ⚠️ LOẠI 2 bạn Tuyển dụng (NV012/NV013) dù phòng ghi 'Ban giám đốc' → phải nhận diện theo
+     ĐÚNG người/role, KHÔNG chỉ theo dept 'Ban giám đốc' (recruiter cũng ở dept đó). Accent-safe
+     (cloud login perms RỖNG vì staff không có cột permissions + né NFC/NFD). */
   function _isBoardMember() {
     const u = window.CURRENT_USER || {};
     const perms = u.permissions || [];
     if (perms.includes('all') || perms.includes('*') || perms.includes('Tất cả')) return true;
-    /* Dùng CHUẨN phân quyền CỦA APP (đã dùng cho login leader) */
-    try { if (window.AUTH && window.AUTH.isLeaderRole && window.AUTH.isLeaderRole(u.role, u.dept)) return true; } catch (e) {}
-    /* Accent-safe: cloud login perms RỖNG (staff không có cột permissions) + né bug NFC/NFD của regex có dấu */
-    const strip = s => String(s || '').toLowerCase().normalize('NFD').replace(/[̀-ͯ]/g, '').replace(/đ/g, 'd').replace(/\s+/g, ' ');
-    const rd = strip((u.role || '') + ' ' + (u.dept || ''));
-    return /ban giam doc|giam doc|dieu hanh|\bceo\b|\bcfo\b|\bsep\b|chu doanh|tong giam|admin|quan tri/.test(rd);
+    const strip = s => String(s || '').toLowerCase().normalize('NFD').replace(/[̀-ͯ]/g, '').replace(/đ/g, 'd').replace(/\s+/g, ' ').trim();
+    const role = strip(u.role), dept = strip(u.dept), name = strip(u.name);
+    const sid = String(u.staffId || u.id || ''), email = strip(u.email);
+    /* CHỦ DN (Quang) */
+    if (sid === 'NV001' || email === 'sep@nstt.vn' || name.includes('trinh xuan quang')) return true;
+    /* CEO / CFO (role hoặc tài khoản cứng) */
+    if (role === 'ceo' || role === 'cfo' || sid === 'CEO' || sid === 'CFO'
+      || email === 'ceo@nstt.vn' || email === 'cfo@nstt.vn'
+      || /\bceo\b|\bcfo\b|dieu hanh|tai chinh/.test(role)) return true;
+    /* PHÒNG KẾ TOÁN */
+    if (/ke toan/.test(dept)) return true;
+    return false;
   }
   window._nsttCanMergeCust = _isBoardMember;
   const _mFmt = v => (+v || 0).toLocaleString('vi-VN');
@@ -899,7 +909,7 @@
   }
 
   window.bulkMergeCustomers = function (ids) {
-    if (!_isBoardMember()) { window.toast?.('🔒 Chỉ Ban giám đốc mới được gộp khách hàng', 'warn'); return; }
+    if (!_isBoardMember()) { window.toast?.('🔒 Chỉ Ban giám đốc & Kế toán mới được gộp khách hàng', 'warn'); return; }
     ids = [...new Set((ids || []).filter(Boolean))];
     if (ids.length < 2) { window.toast?.('Chọn ít nhất 2 khách hàng để gộp', 'warn'); return; }
     const all = window.STORE.get('customers', []) || [];
