@@ -393,7 +393,10 @@
                 {id:'Mới', label:'🆕 Mới'},
                 {id:'Inactive', label:'⚫ Inactive'},
               ]
-            }
+            },
+            buttons: [
+              { label: '🔗 Gộp công nợ', handler: (ids) => window.bulkMergeCustomers(ids) },
+            ]
           }
         });
       }
@@ -823,7 +826,10 @@
           <div style="font-weight:700">${t.name} <span style="color:var(--muted);font-weight:400;font-size:11px">· ${t.code}</span></div>
           <div style="font-size:11.5px;color:var(--muted)">📍 ${t.address || '—'} · nợ ${window.fmt(t.debt || 0)} · NV: ${t.staffOwner || '—'}</div>
         </div>
-        <button class="btn btn-ghost btn-sm" style="flex:0 0 auto" onclick="window._ackDup('${custId}','${t.id}')">✓ Không trùng</button>
+        <div style="display:flex;gap:6px;flex:0 0 auto">
+          <button class="btn btn-primary btn-sm" onclick="window.bulkMergeCustomers(['${custId}','${t.id}'])" title="Gộp 2 khách này thành 1 (dồn đơn + công nợ)">🔗 Gộp</button>
+          <button class="btn btn-ghost btn-sm" onclick="window._ackDup('${custId}','${t.id}')">✓ Không trùng</button>
+        </div>
       </div>`).join('');
     window.openModal('⚠️ Trùng địa chỉ — ' + c.name + ' (' + c.code + ')', `
       <div style="font-size:12.5px;color:var(--muted);margin-bottom:10px">Địa chỉ: <b style="color:var(--text)">${c.address || '—'}</b><br>
@@ -847,6 +853,148 @@
     window.toast && window.toast('✓ Đã bỏ cảnh báo trùng cho khách này', 'success');
     render();
   };
+
+  /* ============ GỘP CÔNG NỢ KHÁCH TRÙNG (hard-merge: dời hết tham chiếu → xoá mã thừa) ============
+     Dời ĐƠN (o.cust→keeper, cột cloud customer_id) + SỔ NỢ (debtLedger.custId) + KV map
+     (custBrands/custPriceTiers/custCreditDays/cust_prefs) + quotes/recurring/invoices/web_orders
+     sang KH GIỮ, RỒI STORE.remove các KH thừa (tombstone chống hồi sinh). THỨ TỰ: dời hết TRƯỚC,
+     xoá SAU (FK ON DELETE SET NULL). Công nợ là DERIVED → reload để rebuildCustStats tính lại. */
+  let _mergeIds = [], _mergeKeeper = null, _mergeSel = [], _mergeStat = {};
+  const _mFmt = v => (+v || 0).toLocaleString('vi-VN');
+  const _mEsc = s => String(s == null ? '' : s).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/"/g, '&quot;');
+
+  function _renderMergeRows() {
+    return _mergeSel.map(c => {
+      const st = _mergeStat[c.id] || { n: 0, debt: 0 }; const keep = c.id === _mergeKeeper;
+      return `<label style="display:flex;gap:10px;align-items:flex-start;border:1px solid ${keep ? '#15803D' : 'var(--line)'};background:${keep ? '#F0FDF4' : '#fff'};border-radius:10px;padding:10px 12px;margin-bottom:8px;cursor:pointer">
+        <input type="radio" name="mkeep" value="${_mEsc(c.id)}" ${keep ? 'checked' : ''} onchange="window._pickMergeKeeper('${_mEsc(c.id)}')" style="margin-top:3px">
+        <div style="min-width:0;flex:1">
+          <div style="font-weight:700">${_mEsc(c.name)} <span style="color:var(--muted);font-weight:400;font-size:11px">· ${_mEsc(c.code)}</span> ${keep ? '<span style="font-size:10px;background:#15803D;color:#fff;padding:1px 6px;border-radius:6px">GIỮ LẠI</span>' : '<span style="font-size:10px;color:#B91C1C">sẽ xoá</span>'}</div>
+          <div style="font-size:11.5px;color:var(--muted)">📍 ${_mEsc(c.address || '—')} · ${st.n} đơn · nợ ${_mFmt(st.debt)}đ${c.phone ? ' · ☎ ' + _mEsc(c.phone) : ''}</div>
+        </div></label>`;
+    }).join('');
+  }
+  function _renderMergePreview() {
+    const el = document.getElementById('mergePreview'); if (!el) return;
+    const keeper = _mergeSel.find(c => c.id === _mergeKeeper);
+    const losers = _mergeIds.filter(x => x !== _mergeKeeper);
+    const lset = new Set(losers);
+    const orders = window.STORE.get('orders', []) || [];
+    let n = 0; orders.forEach(o => { if (lset.has(o.cust || o.custId)) n++; });
+    let debt = 0; losers.forEach(l => debt += (window.custDebt ? window.custDebt(l) : 0));
+    if (keeper) el.innerHTML = `→ Giữ <b style="color:#15803D">${_mEsc(keeper.name)}</b> (${_mEsc(keeper.code)}). Dời <b>${n} đơn</b> + <b>${_mFmt(debt)}đ</b> nợ từ <b>${losers.length}</b> khách sang, rồi xoá ${losers.length} khách.`;
+  }
+
+  window.bulkMergeCustomers = function (ids) {
+    ids = [...new Set((ids || []).filter(Boolean))];
+    if (ids.length < 2) { window.toast?.('Chọn ít nhất 2 khách hàng để gộp', 'warn'); return; }
+    const all = window.STORE.get('customers', []) || [];
+    const orders = window.STORE.get('orders', []) || [];
+    _mergeSel = ids.map(id => all.find(c => (c.id || c.code) === id)).filter(Boolean);
+    if (_mergeSel.length < 2) { window.toast?.('Không tìm thấy đủ khách đã chọn', 'warn'); return; }
+    _mergeIds = _mergeSel.map(c => c.id);
+    _mergeStat = {};
+    _mergeSel.forEach(c => { _mergeStat[c.id] = { n: 0, debt: (window.custDebt ? window.custDebt(c.id) : (+c.debt || 0)) }; });
+    orders.forEach(o => { const k = o.cust || o.custId; if (_mergeStat[k]) _mergeStat[k].n++; });
+    /* mặc định GIỮ khách nhiều đơn nhất (bản ghi vận hành chính) */
+    _mergeKeeper = _mergeSel.slice().sort((a, b) => (_mergeStat[b.id].n - _mergeStat[a.id].n) || (_mergeStat[b.id].debt - _mergeStat[a.id].debt))[0].id;
+    const totalN = _mergeSel.reduce((s, c) => s + _mergeStat[c.id].n, 0);
+    const totalDebt = _mergeSel.reduce((s, c) => s + _mergeStat[c.id].debt, 0);
+    window.openModal('🔗 Gộp công nợ khách hàng', `
+      <div style="font-size:12.5px;color:var(--muted);margin-bottom:10px">Chọn <b>1 khách GIỮ LẠI</b>. Toàn bộ đơn + công nợ + dữ liệu của các khách còn lại sẽ được <b>dồn về khách giữ</b>, rồi các khách kia bị <b>xoá</b>.</div>
+      <div id="mergeRows">${_renderMergeRows()}</div>
+      <div id="mergePreview" style="font-size:12.5px;background:#F7FBF5;border:1px solid #CBD9C4;border-radius:8px;padding:9px 12px;margin-top:6px"></div>
+      <div style="font-size:11px;color:#B45309;margin-top:8px">⚠ Chỉ gộp khi chắc chắn CÙNG 1 khách — thao tác không tự hoàn tác. Tổng: <b>${totalN} đơn · ${_mFmt(totalDebt)}đ</b>.</div>
+    `, {
+      footer: `<button class="btn btn-ghost" onclick="window.closeModal()">Hủy</button>
+               <button class="btn btn-primary" id="mergeGoBtn" onclick="window.confirmMergeCustomers()">🔗 Gộp & xoá khách thừa</button>`,
+      width: '560px',
+    });
+    _renderMergePreview();
+  };
+
+  window._pickMergeKeeper = function (id) {
+    _mergeKeeper = id;
+    const rows = document.getElementById('mergeRows');
+    if (rows) rows.innerHTML = _renderMergeRows();
+    _renderMergePreview();
+  };
+
+  window.confirmMergeCustomers = async function () {
+    const btn = document.getElementById('mergeGoBtn');
+    if (btn && btn.disabled) return;
+    if (btn) { btn.disabled = true; btn.textContent = '⏳ Đang gộp...'; }
+    const keeperId = _mergeKeeper, loserIds = _mergeIds.filter(x => x !== keeperId);
+    if (!keeperId || !loserIds.length) { window.toast?.('Chưa chọn khách giữ lại', 'warn'); if (btn) { btn.disabled = false; btn.textContent = '🔗 Gộp & xoá khách thừa'; } return; }
+    try { await _doMergeCustomers(keeperId, loserIds); }
+    catch (e) { console.error('[merge]', e); window.toast?.('Lỗi khi gộp: ' + (e.message || e), 'warn'); if (btn) { btn.disabled = false; btn.textContent = '🔗 Gộp & xoá khách thừa'; } }
+  };
+
+  async function _doMergeCustomers(keeperId, loserIds) {
+    const S = window.STORE;
+    const all = S.get('customers', []) || [];
+    const keeper = all.find(c => c.id === keeperId);
+    const keeperName = keeper ? keeper.name : '';
+    const lset = new Set(loserIds);
+    const orders = S.get('orders', []) || [];
+    const toMove = orders.filter(o => lset.has(o.cust || o.custId));
+
+    /* 1) DỜI ĐƠN → keeper (pending-tracked; rớt mạng thì self-heal đẩy lại) */
+    window.toast?.(`Đang dời ${toMove.length} đơn...`, 'info');
+    toMove.forEach(o => S.update('orders', o.code, { cust: keeperId, custId: keeperId, custName: keeperName }));
+
+    /* 2) SỔ NỢ: đổi custId loser→keeper + DEDUP (custId,ref,type) tránh nhân đôi */
+    if (S.rmwKv) S.rmwKv('debtLedger', arr => {
+      const seen = new Set(); const out = [];
+      (arr || []).forEach(e => {
+        const ne = lset.has(e.custId) ? { ...e, custId: keeperId } : e;
+        if (ne.ref) { const k = ne.custId + '|' + ne.ref + '|' + (ne.type || ''); if (seen.has(k)) return; seen.add(k); }
+        out.push(ne);
+      });
+      return out;
+    });
+
+    /* 3) KV map keyed-by-custId: GIỮ giá trị keeper nếu đã có, else kế thừa của loser */
+    ['custBrands', 'custPriceTiers', 'custCreditDays', 'cust_prefs'].forEach(kv => {
+      if (!S.rmwKv) return;
+      S.rmwKv(kv, m => {
+        if (!m || typeof m !== 'object' || Array.isArray(m)) return m;
+        loserIds.forEach(lid => { if (m[lid] != null) { if (m[keeperId] == null) m[keeperId] = m[lid]; delete m[lid]; } });
+        return m;
+      });
+    });
+
+    /* 4) quotes + recurring (nay rỗng, code cho tương lai) */
+    ['quotes', 'recurringOrders', 'recurring_orders'].forEach(k => {
+      try {
+        const list = S.get(k, []) || [];
+        if (Array.isArray(list) && list.length) list.filter(q => lset.has(q.custId)).forEach(q => S.update(k, q.id, { custId: keeperId, custName: keeperName }));
+      } catch (e) {}
+    });
+    /* 5) invoices — link theo TÊN → đổi cust của HĐ loser sang tên keeper */
+    try {
+      const inv = S.get('invoices', []) || [];
+      const loserNames = new Set(loserIds.map(l => (all.find(c => c.id === l) || {}).name).filter(Boolean));
+      if (inv.length) inv.filter(i => loserNames.has(i.cust)).forEach(i => S.update('invoices', i.no, { cust: keeperName }));
+    } catch (e) {}
+    /* 6) web_orders — bảng NGOÀI STORE → REST PATCH linked_cust */
+    try { if (window.SB && window.SB.from) for (const lid of loserIds) await window.SB.from('web_orders').update({ linked_cust: keeperId }).eq('linked_cust', lid); } catch (e) {}
+
+    /* 7) đợi PATCH đơn kịp lên cloud TRƯỚC khi xoá KH (giảm cửa sổ đua FK; self-heal lo phần còn lại) */
+    await new Promise(r => setTimeout(r, 1500));
+
+    /* 8) XOÁ khách thừa — STORE.remove (tombstone chống hồi sinh) */
+    loserIds.forEach(lid => S.remove('customers', lid));
+
+    /* 9) dọn addrDupOk chứa loser + flush KV lên cloud */
+    if (S.rmwKv) S.rmwKv('addrDupOk', arr => (Array.isArray(arr) ? arr.filter(k => !String(k).split('|').some(x => lset.has(x))) : arr));
+    try { window.STORE._flushAllRmw && window.STORE._flushAllRmw(); } catch (e) {}
+
+    window.closeModal && window.closeModal();
+    window.toast?.(`✓ Đã gộp ${loserIds.length} khách vào "${keeperName}". Đang tải lại...`, 'success');
+    /* reload để rebuildCustStats tính lại công nợ/đơn cho keeper (memo theo reference mảng) */
+    setTimeout(() => location.reload(), 1200);
+  }
 
   function _readAddForm() {
     return {
