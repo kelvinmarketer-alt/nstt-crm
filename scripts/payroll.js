@@ -864,8 +864,9 @@
       }
       try {
         const buf = await f.arrayBuffer();
-        const wb = window.XLSX.read(buf, { type: 'array', cellDates: false });
+        const wb = window.XLSX.read(buf, { type: 'array', cellDates: true });
         const det = _tsDetect(wb);
+        if (det) det.lateMap = _tsBuildLateMap(wb);   /* per-day đi muộn từ sheet "Bảng thống kê bất thường" */
         if (!det) {
           document.getElementById('tsPreview').innerHTML = '<span style="color:var(--danger)">❌ Không tìm thấy sheet chấm công có cột Họ tên/Mã NV. File có ' + wb.SheetNames.length + ' sheet: ' + wb.SheetNames.slice(0, 6).join(', ') + '…</span>';
           window._tsDet = null; document.getElementById('tsApply').disabled = true; return;
@@ -940,6 +941,36 @@
     return null;
   }
 
+  /* Đọc ĐI MUỘN per-day per-NV từ sheet "Bảng thống kê bất thường" (cột "Thời gian trễ giờ").
+     Trả { normName: { dayN: lateMin } }. CHÍNH XÁC hơn tổng "Số lần/Phút" (tổng chia TB sẽ phạt nhầm). */
+  function _tsBuildLateMap(wb) {
+    try {
+      const XU = window.XLSX.utils;
+      const sn = wb.SheetNames.find(n => /bat thuong/.test(_tsHnorm(n)));
+      if (!sn) return {};
+      const grid = XU.sheet_to_json(wb.Sheets[sn], { header: 1, defval: '' });
+      let hr = -1;
+      for (let r = 0; r < Math.min(8, grid.length); r++) { if ((grid[r] || []).map(_tsHnorm).some(c => /ho ten/.test(c))) { hr = r; break; } }
+      if (hr < 0) return {};
+      const H = (grid[hr] || []).map(_tsHnorm);
+      const nameCol = H.findIndex(h => /ho ten/.test(h));
+      const dateCol = H.findIndex(h => /ngay thang|^ngay/.test(h));
+      const lateCol = H.findIndex(h => /tre gio/.test(h));
+      if (nameCol < 0 || dateCol < 0 || lateCol < 0) return {};
+      const dayOf = v => { if (v instanceof Date) return v.getDate(); const m = String(v || '').match(/(\d{1,2})[-/.](\d{1,2})/); return m ? +m[1] : 0; };
+      const map = {};
+      for (let r = hr + 1; r < grid.length; r++) {
+        const row = grid[r]; if (!row) continue;
+        const nm = _normAlias(String(row[nameCol] || '')); if (!nm) continue;
+        const late = Math.round(parseFloat(String(row[lateCol]).replace(/[^0-9.]/g, '')) || 0);
+        if (late <= 0) continue;
+        const dayN = dayOf(row[dateCol]);
+        if (dayN >= 1 && dayN <= 31) { map[nm] = map[nm] || {}; map[nm][dayN] = Math.max(map[nm][dayN] || 0, late); }
+      }
+      return map;
+    } catch (e) { console.warn('[ts lateMap]', e); return {}; }
+  }
+
   /* Bỏ tiền tố xưng hô đầu tên máy (chị/anh/em/cô/chú/bác...) để khớp họ tên NV */
   const _TS_TITLES = /^(chi|anh|em|co|chu|bac|ong|ba|cau|mo|di|thim|c|a)\s+/;
   function _tsNameKey(k) { return String(k || '').replace(_TS_TITLES, '').trim(); }
@@ -974,7 +1005,7 @@
       const rawName = nameCol >= 0 ? String(row[nameCol] || '').trim() : '';
       const code = codeCol >= 0 ? String(row[codeCol] || '').trim() : '';
       if (!rawName) continue;   /* bỏ dòng tiêu đề phụ (Tiêu chuẩn/Thực tế) / dòng rỗng — không có tên */
-      let days = {}, work = 0;
+      let days = {}, work = 0, lateMeta = null;
       if (mode === 'summary') {
         /* Cột "Có mặt (Tiêu chuẩn/Thực tế)" = vd "30/28" → lấy THỰC TẾ (sau /). Dựng ngày để đếm đúng. */
         const pv = String(row[presentCol] || '').trim();
@@ -982,8 +1013,12 @@
         work = m ? parseFloat(m[2]) : _num(pv);
         const nP = phepCol >= 0 ? Math.round(_num(row[phepCol])) : 0;
         const nV = vangCol >= 0 ? Math.round(_num(row[vangCol])) : 0;
-        let di = 0; const put = (n, st) => { for (let k = 0; k < n && di < last; k++, di++) days[di] = st; };
-        put(Math.round(work), 'X'); put(nP, 'P'); put(nV, 'V');
+        /* ĐI MUỘN: đặt 'L' ĐÚNG NGÀY (từ lateMap chi tiết) + lưu số phút → hiện ở bảng + tính phạt đúng theo grace/tier */
+        const used = new Set(); let lateCnt = 0;
+        const lm = (det.lateMap && det.lateMap[_normAlias(rawName)]) || null;
+        if (lm) { lateMeta = {}; Object.keys(lm).forEach(dN => { const idx = +dN - 1; if (idx >= 0 && idx < last) { days[idx] = 'L'; lateMeta[+dN] = lm[dN]; used.add(idx); lateCnt++; } }); }
+        let di = 0; const put = (n, st) => { let c = 0; while (c < n && di < last) { if (!used.has(di)) { days[di] = st; used.add(di); c++; } di++; } };
+        put(Math.max(0, Math.round(work) - lateCnt), 'X'); put(nV, 'V'); put(nP, 'P');
       } else {
         Object.keys(dayCols).forEach(d => { const st = _cellStatus(row[dayCols[d]]); if (st) days[parseInt(d, 10) - 1] = st; });
         work = Object.values(days).reduce((a, st) => a + (st === 'X' ? 1 : st === 'H' ? 0.5 : 0), 0);
@@ -1009,7 +1044,7 @@
           else { chosen = ''; status = 'new'; }                             /* không ai → NV mới / gán tay */
         }
       }
-      rows.push({ name: rawName || code, code, days, work, chosen, auto: chosen, status });
+      rows.push({ name: rawName || code, code, days, work, lateMeta, chosen, auto: chosen, status });
     }
     if (!rows.length) { window.toast('Không đọc được dòng NV nào trong file', 'warn'); return; }
     window._tsParsed = { rows, last };
@@ -1081,20 +1116,28 @@
     const existing = window.STORE.get('staffAliases', {}) || {};
     const aliasMap = { ...existing };
     const sheets = window.STORE.get('timesheet', window.TIMESHEET || []).slice();
-    let applied = 0;
+    const metaMap = window.STORE.get('timesheetMeta', {}) || {};
+    let applied = 0, lateN = 0;
     P.rows.forEach(r => {
       if (!r.chosen) return;
       /* NHỚ tên viết tắt khi HR đổi khác gợi ý, hoặc NV chưa có alias (học tên mới) — KHÔNG đè alias đã đúng */
       if (r.name && (r.chosen !== r.auto || !existing[r.chosen])) aliasMap[r.chosen] = r.name.trim();
       _applyTsDays(sheets, r.chosen, r.days, P.last);
+      /* Số PHÚT MUỘN per-day → timesheetMeta (tính phạt đi muộn + hiện ⏰ ở bảng chấm công) */
+      if (r.lateMeta && Object.keys(r.lateMeta).length) {
+        const mk = r.chosen + '_' + month;
+        const mm = metaMap[mk] = metaMap[mk] || {};
+        Object.keys(r.lateMeta).forEach(dN => { mm[dN] = Object.assign({}, mm[dN], { lateMin: r.lateMeta[dN] }); lateN++; });
+      }
       applied++;
     });
     window.STORE.set('staffAliases', aliasMap);
     window.STORE.set('timesheet', sheets);
+    window.STORE.set('timesheetMeta', metaMap);
     const skipped = P.rows.length - applied;
     window._tsParsed = null;
     window.closeModal();
-    window.toast(`✓ Đã cập nhật chấm công ${applied} NV${skipped ? ' · bỏ qua ' + skipped + ' dòng chưa khớp' : ''}`, 'success');
+    window.toast(`✓ Đã cập nhật chấm công ${applied} NV${lateN ? ' · ' + lateN + ' lượt đi muộn' : ''}${skipped ? ' · bỏ ' + skipped + ' dòng chưa khớp' : ''}`, 'success');
     render();
   };
 
