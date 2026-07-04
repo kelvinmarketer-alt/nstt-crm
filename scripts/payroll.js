@@ -872,9 +872,10 @@
           window._tsDet = null; document.getElementById('tsApply').disabled = true; return;
         }
         window._tsDet = det;
-        const nData = Math.max(0, det.grid.length - det.headerRow - 1);
-        const modeLbl = det.mode === 'summary' ? 'Tổng hợp (Có mặt/Thực tế)' : 'Lưới ngày (X/P/V)';
-        document.getElementById('tsPreview').innerHTML = `✓ Đọc sheet <b>“${det.sheetName}”</b> · ~${nData} dòng NV · kiểu <b>${modeLbl}</b>.<br>Cột nhận diện: ${det.nameCol >= 0 ? 'Họ tên ✓' : '<span style="color:#B45309">thiếu Họ tên</span>'}${det.codeCol >= 0 ? ' · Mã/STT ✓' : ''}${det.deptCol >= 0 ? ' · Bộ phận ✓' : ''}${det.presentCol >= 0 ? ' · Công thực tế ✓' : ''}`;
+        const isOffice = det.mode === 'office';
+        const nData = isOffice ? (det.grid.filter(r => (r || []).some(c => /tên\s*:/i.test(String(c || '')) && !/phòng ban/i.test(String(c || '')))).length) : Math.max(0, det.grid.length - det.headerRow - 1);
+        const modeLbl = det.mode === 'summary' ? 'Tổng hợp (Có mặt/Thực tế)' : isOffice ? 'Văn phòng (khối theo NV, dấu * = muộn)' : 'Lưới ngày (X/P/V)';
+        document.getElementById('tsPreview').innerHTML = `✓ Đọc sheet <b>“${det.sheetName}”</b> · ~${nData} NV · kiểu <b>${modeLbl}</b>.<br>${isOffice ? 'Đọc: Họ tên ✓ · Ngày có mặt ✓ · Vắng ✓ · Đi muộn per-day (ca sáng 8:00 / chiều 13:30) ✓' : `Cột nhận diện: ${det.nameCol >= 0 ? 'Họ tên ✓' : '<span style="color:#B45309">thiếu Họ tên</span>'}${det.codeCol >= 0 ? ' · Mã/STT ✓' : ''}${det.deptCol >= 0 ? ' · Bộ phận ✓' : ''}${det.presentCol >= 0 ? ' · Công thực tế ✓' : ''}`}`;
         document.getElementById('tsApply').disabled = false;
       } catch (err) {
         document.getElementById('tsPreview').innerHTML = '<span style="color:var(--danger)">❌ Lỗi đọc file: ' + err.message + '</span>';
@@ -938,6 +939,14 @@
       if (!mode || (nameCol < 0 && codeCol < 0)) continue;
       return { grid, sheetName: sn, headerRow: hr, mode, nameCol, codeCol, deptCol, presentCol, vangCol, phepCol, dayCols };
     }
+    /* KHÔNG có bảng phẳng → thử format VĂN PHÒNG (khối "Báo cáo chấm công" + "Tên:" + "Ngày có mặt") */
+    for (const sn of names) {
+      const grid = XU.sheet_to_json(wb.Sheets[sn], { header: 1, defval: '' });
+      const flat = grid.slice(0, 60).map(r => (r || []).map(_tsHnorm).join(' ')).join(' | ');
+      if (/bao cao cham cong/.test(flat) && /ten\s*:/.test(flat) && /ngay co mat/.test(flat)) {
+        return { grid, sheetName: sn, headerRow: 0, mode: 'office', nameCol: -1, codeCol: -1, deptCol: -1, presentCol: -1, vangCol: -1, phepCol: -1, dayCols: {} };
+      }
+    }
     return null;
   }
 
@@ -985,6 +994,77 @@
     return mw.every(w => fw.includes(w)) && mw[mw.length - 1] === fw[fw.length - 1];
   }
 
+  /* Tên máy VP thường có ĐUÔI phòng ban ("van hr", "hieu sale", "quynhtrangsale") → tách tên + gợi ý phòng */
+  const _TS_DEPTMAP = { ktoan: 'ke toan', ketoan: 'ke toan', kt: 'ke toan', hr: 'nhan su', sale: 'sale', kinhdoanh: 'sale', mkt: 'marketing', marketing: 'marketing', cskh: 'cskh' };
+  const _TS_DEPTSUF = ['ktoan', 'ketoan', 'kinhdoanh', 'marketing', 'sale', 'mkt', 'kt', 'hr', 'cskh'];
+  function _tsStripDept(k) {
+    for (const suf of _TS_DEPTSUF) {
+      if (k === suf) continue;
+      if (k.endsWith(' ' + suf)) return { name: k.slice(0, -(suf.length + 1)).trim(), deptHint: _TS_DEPTMAP[suf] };
+      if (k.endsWith(suf) && k.length > suf.length + 1) return { name: k.slice(0, -suf.length).trim(), deptHint: _TS_DEPTMAP[suf] };
+    }
+    return { name: k, deptHint: '' };
+  }
+  /* Khớp 1 tên máy → NV app (alias → mã → tên chính xác → tên theo TỪ → đuôi phòng ban). Dùng chung MỌI format. */
+  function _tsMatchStaff(rawName, code, wantZone, staffs, aliasIdx) {
+    const key = _normAlias(rawName);
+    const zoneOk = s => !wantZone || _deptZone(s.dept) === wantZone;
+    let cand = (aliasIdx[key] || []).map(id => staffs.find(x => x.id === id)).filter(Boolean);
+    if (wantZone && cand.length > 1) cand = cand.filter(zoneOk);
+    if (cand.length === 1) return { chosen: cand[0].id, auto: cand[0].id, status: 'ok' };
+    if (cand.length > 1) return { chosen: '', auto: '', status: 'amb' };
+    const byCode = code && staffs.find(x => (x.code === code || x.id === code) && zoneOk(x));
+    if (byCode) return { chosen: byCode.id, auto: byCode.id, status: 'ok' };
+    const kw = _tsNameKey(key);
+    let ms = staffs.filter(s => zoneOk(s) && _normAlias(s.name) === kw);
+    if (!ms.length) ms = staffs.filter(s => zoneOk(s) && _tsNameMatch(kw, _normAlias(s.name)));
+    if (ms.length === 1) return { chosen: ms[0].id, auto: ms[0].id, status: 'ok' };
+    if (ms.length > 1) return { chosen: '', auto: '', status: 'amb' };
+    /* FALLBACK: tách đuôi phòng ban → lọc theo phòng → khớp tên (kể cả tên viết dính "quynhtrangsale") */
+    const off = _tsStripDept(key);
+    if (off.name && (off.name !== key || off.deptHint)) {
+      const pool = staffs.filter(s => zoneOk(s) && (!off.deptHint || _tsHnorm(s.dept).includes(off.deptHint) || (off.deptHint === 'sale' && /kinh doanh|cskh/.test(_tsHnorm(s.dept)))));
+      let m2 = pool.filter(s => _normAlias(s.name) === off.name || _tsNameMatch(off.name, _normAlias(s.name)));
+      if (!m2.length && off.name.replace(/\s/g, '').length >= 4) m2 = pool.filter(s => _normAlias(s.name).replace(/\s/g, '').includes(off.name.replace(/\s/g, '')));
+      if (m2.length === 1) return { chosen: m2[0].id, auto: m2[0].id, status: 'ok' };
+      if (m2.length > 1) return { chosen: '', auto: '', status: 'amb' };
+    }
+    return { chosen: '', auto: '', status: 'new' };
+  }
+
+  /* Parser format VĂN PHÒNG: mỗi NV 1 KHỐI (dòng "Tên:X" → dòng tổng hợp "Ngày có mặt/vắng" →
+     giờ vào-ra từng ngày, dấu '*' = muộn). Ca sáng 8:00 / chiều 13:30. Trả [{name, days, work, lateMeta}]. */
+  function _tsOfficeParse(grid, last) {
+    const cell = (r, c) => (grid[r] && grid[r][c] != null) ? String(grid[r][c]).trim() : '';
+    const statNum = (r, kn) => { for (const cv of (grid[r] || [])) { const m = _tsHnorm(cv).match(new RegExp(kn + '[^0-9]{0,4}(\\d+)')); if (m) return +m[1]; } return 0; };
+    const lateMinOf = (t, shMin) => { const m = String(t).match(/(\d{1,2}):(\d{2})/); if (!m) return 0; const v = (+m[1]) * 60 + (+m[2]) - shMin; return v > 0 ? v : 0; };
+    const recs = [];
+    for (let r = 0; r < grid.length; r++) {
+      let name = '';
+      for (let c = 0; c < 8; c++) { const v = cell(r, c); if (/tên\s*:/i.test(v) && !/phòng ban/i.test(v)) { name = v.replace(/[\s\S]*tên\s*:\s*/i, '').trim(); break; } }
+      if (!name) continue;
+      const sr = r + 1;
+      const present = statNum(sr, 'co mat'), absent = statNum(sr, 'vang mat'), phep = statNum(sr, 'nghi'), congtac = statNum(sr, 'cong tac');
+      const days = {}, lateMeta = {}; let lateCnt = 0;
+      for (let rr = r + 5; rr < r + 20 && rr < grid.length; rr++) {
+        [[0, 2, 4], [8, 10, 12]].forEach(g => {
+          const dv = cell(rr, g[0]); const dm = dv.match(/^(\d{1,2})/); if (!dm) return;
+          const day = +dm[1]; if (day < 1 || day > last) return;
+          let lm = 0;
+          if (cell(rr, g[1]).includes('*')) lm = Math.max(lm, lateMinOf(cell(rr, g[1]), 8 * 60));
+          if (cell(rr, g[2]).includes('*')) lm = Math.max(lm, lateMinOf(cell(rr, g[2]), 13 * 60 + 30));
+          if (lm > 0) { days[day - 1] = 'L'; lateMeta[day] = lm; lateCnt++; }
+        });
+      }
+      const used = new Set(Object.keys(days).map(Number));
+      let di = 0; const put = (n, st) => { let cc = 0; while (cc < n && di < last) { if (!used.has(di)) { days[di] = st; used.add(di); cc++; } di++; } };
+      put(Math.max(0, present - lateCnt), 'X'); put(absent, 'V'); put(phep + congtac, 'P');
+      recs.push({ name, work: present, days, lateMeta: Object.keys(lateMeta).length ? lateMeta : null });
+      r = sr;
+    }
+    return recs;
+  }
+
   /* Upload → PARSE + phân loại → mở bảng ĐỐI SOÁT (chưa ghi gì). Giống up đơn có SP ngoài danh mục. */
   window.applyUploadedTimesheet = function () {
     const det = window._tsDet;
@@ -1000,51 +1080,38 @@
     const _num = v => { const n = parseFloat(String(v == null ? '' : v).replace(/[^0-9.]/g, '')); return isNaN(n) ? 0 : n; };
 
     const rows = [];
-    for (let r = headerRow + 1; r < grid.length; r++) {
-      const row = grid[r]; if (!row || !row.length) continue;
-      const rawName = nameCol >= 0 ? String(row[nameCol] || '').trim() : '';
-      const code = codeCol >= 0 ? String(row[codeCol] || '').trim() : '';
-      if (!rawName) continue;   /* bỏ dòng tiêu đề phụ (Tiêu chuẩn/Thực tế) / dòng rỗng — không có tên */
-      let days = {}, work = 0, lateMeta = null;
-      if (mode === 'summary') {
-        /* Cột "Có mặt (Tiêu chuẩn/Thực tế)" = vd "30/28" → lấy THỰC TẾ (sau /). Dựng ngày để đếm đúng. */
-        const pv = String(row[presentCol] || '').trim();
-        const m = pv.match(/(\d+(?:\.\d+)?)\s*\/\s*(\d+(?:\.\d+)?)/);
-        work = m ? parseFloat(m[2]) : _num(pv);
-        const nP = phepCol >= 0 ? Math.round(_num(row[phepCol])) : 0;
-        const nV = vangCol >= 0 ? Math.round(_num(row[vangCol])) : 0;
-        /* ĐI MUỘN: đặt 'L' ĐÚNG NGÀY (từ lateMap chi tiết) + lưu số phút → hiện ở bảng + tính phạt đúng theo grace/tier */
-        const used = new Set(); let lateCnt = 0;
-        const lm = (det.lateMap && det.lateMap[_normAlias(rawName)]) || null;
-        if (lm) { lateMeta = {}; Object.keys(lm).forEach(dN => { const idx = +dN - 1; if (idx >= 0 && idx < last) { days[idx] = 'L'; lateMeta[+dN] = lm[dN]; used.add(idx); lateCnt++; } }); }
-        let di = 0; const put = (n, st) => { let c = 0; while (c < n && di < last) { if (!used.has(di)) { days[di] = st; used.add(di); c++; } di++; } };
-        put(Math.max(0, Math.round(work) - lateCnt), 'X'); put(nV, 'V'); put(nP, 'P');
-      } else {
-        Object.keys(dayCols).forEach(d => { const st = _cellStatus(row[dayCols[d]]); if (st) days[parseInt(d, 10) - 1] = st; });
-        work = Object.values(days).reduce((a, st) => a + (st === 'X' ? 1 : st === 'H' ? 0.5 : 0), 0);
-      }
-      const key = _normAlias(rawName);
-      const wantZone = zone || (deptCol >= 0 ? _deptZone(row[deptCol]) : '');
-      let cand = (aliasIdx[key] || []).map(id => staffs.find(x => x.id === id)).filter(Boolean);
-      if (wantZone && cand.length > 1) cand = cand.filter(s => _deptZone(s.dept) === wantZone);
-      let chosen = '', status = '';
-      if (cand.length === 1) { chosen = cand[0].id; status = 'ok'; }
-      else if (cand.length > 1) { chosen = ''; status = 'amb'; }
-      else {
-        const zoneOk = s => !wantZone || _deptZone(s.dept) === wantZone;
-        const byCode = code && staffs.find(x => (x.code === code || x.id === code) && zoneOk(x));
-        if (byCode) { chosen = byCode.id; status = 'ok'; }
-        else {
-          const kw = _tsNameKey(key);
-          /* khớp CHÍNH XÁC họ tên trước → rồi khớp theo TỪ (tên máy là tập con từ của họ tên NV) */
-          let ms = staffs.filter(s => zoneOk(s) && _normAlias(s.name) === kw);
-          if (!ms.length) ms = staffs.filter(s => zoneOk(s) && _tsNameMatch(kw, _normAlias(s.name)));
-          if (ms.length === 1) { chosen = ms[0].id; status = 'ok'; }        /* 1 người → tự khớp */
-          else if (ms.length > 1) { chosen = ''; status = 'amb'; }          /* nhiều người → HR chọn */
-          else { chosen = ''; status = 'new'; }                             /* không ai → NV mới / gán tay */
+    if (mode === 'office') {
+      /* VĂN PHÒNG (format khối). zone lấy theo dropdown (mặc định 'vp'). */
+      _tsOfficeParse(grid, last).forEach(rec => {
+        const mr = _tsMatchStaff(rec.name, '', zone || 'vp', staffs, aliasIdx);
+        rows.push({ name: rec.name, code: '', days: rec.days, work: rec.work, lateMeta: rec.lateMeta, chosen: mr.chosen, auto: mr.auto, status: mr.status });
+      });
+    } else {
+      for (let r = headerRow + 1; r < grid.length; r++) {
+        const row = grid[r]; if (!row || !row.length) continue;
+        const rawName = nameCol >= 0 ? String(row[nameCol] || '').trim() : '';
+        const code = codeCol >= 0 ? String(row[codeCol] || '').trim() : '';
+        if (!rawName) continue;   /* bỏ dòng tiêu đề phụ / rỗng — không có tên */
+        let days = {}, work = 0, lateMeta = null;
+        if (mode === 'summary') {
+          const pv = String(row[presentCol] || '').trim();
+          const m = pv.match(/(\d+(?:\.\d+)?)\s*\/\s*(\d+(?:\.\d+)?)/);
+          work = m ? parseFloat(m[2]) : _num(pv);
+          const nP = phepCol >= 0 ? Math.round(_num(row[phepCol])) : 0;
+          const nV = vangCol >= 0 ? Math.round(_num(row[vangCol])) : 0;
+          const used = new Set(); let lateCnt = 0;
+          const lm = (det.lateMap && det.lateMap[_normAlias(rawName)]) || null;
+          if (lm) { lateMeta = {}; Object.keys(lm).forEach(dN => { const idx = +dN - 1; if (idx >= 0 && idx < last) { days[idx] = 'L'; lateMeta[+dN] = lm[dN]; used.add(idx); lateCnt++; } }); }
+          let di = 0; const put = (n, st) => { let c = 0; while (c < n && di < last) { if (!used.has(di)) { days[di] = st; used.add(di); c++; } di++; } };
+          put(Math.max(0, Math.round(work) - lateCnt), 'X'); put(nV, 'V'); put(nP, 'P');
+        } else {
+          Object.keys(dayCols).forEach(d => { const st = _cellStatus(row[dayCols[d]]); if (st) days[parseInt(d, 10) - 1] = st; });
+          work = Object.values(days).reduce((a, st) => a + (st === 'X' ? 1 : st === 'H' ? 0.5 : 0), 0);
         }
+        const wantZone = zone || (deptCol >= 0 ? _deptZone(row[deptCol]) : '');
+        const mr = _tsMatchStaff(rawName, code, wantZone, staffs, aliasIdx);
+        rows.push({ name: rawName || code, code, days, work, lateMeta, chosen: mr.chosen, auto: mr.auto, status: mr.status });
       }
-      rows.push({ name: rawName || code, code, days, work, lateMeta, chosen, auto: chosen, status });
     }
     if (!rows.length) { window.toast('Không đọc được dòng NV nào trong file', 'warn'); return; }
     window._tsParsed = { rows, last };
