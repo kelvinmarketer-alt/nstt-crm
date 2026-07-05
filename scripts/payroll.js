@@ -21,32 +21,48 @@
   function meStaffId()  { const u = window.AUTH && window.AUTH.currentUser(); return u ? u.staffId : null; }
 
   /* =========================================================
-     LỊCH LÀM VIỆC theo PHÒNG BAN:
+     LỊCH LÀM VIỆC theo VỊ TRÍ (giờ VÀO ca = mốc tính đi muộn):
 
-     [Ban GĐ / Sales / CSKH / Kế toán]
-     - T2-T6 full · Sáng 08:00-12:00 · Chiều 13:30-17:30 = 8h
-     - T7 sáng    · 08:00-12:00 = 4h (0.5 công)
+     [Văn phòng — Ban GĐ / Sales / CSKH / Kế toán / Marketing / Nhân sự]
+     - Sáng 08:00-12:00 · Chiều 13:30-17:30
+     - T7 chỉ ca sáng (0.5 công)
 
-     [Vận hành — Shipper]
-     - T2-T6 full · Sáng 05:00-11:00 · Chiều 13:00-18:00 = 11h
-     - T7 sáng    · 05:00-11:00 = 6h (0.5 công)
-     CN: cả hai dept đều nghỉ.
+     [Kho — Nhân viên Kho / Quản lý kho]  (dept "Kho & Ship", role ~ "Kho")
+     - Sáng 01:00-09:00 · Chiều 13:00-18:00
+
+     [Ship — Giao hàng / Shipper / Tài xế]  (dept "Kho & Ship", role ~ "Giao hàng")
+     - Sáng 05:00-11:00 · Chiều 13:00-18:00
+
+     CN: tất cả nghỉ. Lưu ý: dept "Kho & Ship" DÙNG CHUNG cho cả kho lẫn ship →
+     PHẢI phân theo ROLE (kho ≠ giao hàng), không phân theo dept.
      ========================================================= */
   const SHIFT_DEFAULT = {
     morn: ['08:00','12:00'],
     aft:  ['13:30','17:30'],
     label: 'Văn phòng',
   };
+  const SHIFT_WAREHOUSE = {
+    morn: ['01:00','09:00'],
+    aft:  ['13:00','18:00'],
+    label: 'Kho',
+  };
   const SHIFT_SHIPPER = {
     morn: ['05:00','11:00'],
     aft:  ['13:00','18:00'],
-    label: 'Shipper / Vận hành',
+    label: 'Shipper / Giao hàng',
   };
   function shiftHoursFor(staff) {
-    if (staff && (staff.dept === 'Vận hành' || /shipper|tài xế|tai xe/i.test(staff.role || ''))) {
-      return SHIFT_SHIPPER;
-    }
-    return SHIFT_DEFAULT;
+    if (!staff) return SHIFT_DEFAULT;
+    const dept = String(staff.dept || '');
+    const role = String(staff.role || '').toLowerCase();
+    /* Khối Kho/Vận hành mới dùng ca kho/ship; văn phòng giữ mặc định. */
+    const isOps = /kho|ship|giao|vận hành|van hanh/i.test(dept) || /shipper|tài xế|tai xe/.test(role);
+    if (!isOps) return SHIFT_DEFAULT;
+    /* Trong khối Kho/Vận hành: phân theo VAI TRÒ — giao hàng/shipper/tài xế = ca ship,
+       còn lại (kho) = ca kho. (dept "Kho & Ship" chứa cả "kho" lẫn "ship" nên KHÔNG
+       xét dept để tách — chỉ xét role.) */
+    if (/giao hàng|giao hang|giao|shipper|tài xế|tai xe/.test(role)) return SHIFT_SHIPPER;
+    return SHIFT_WAREHOUSE;
   }
   /* Để legacy code tham chiếu — dùng mặc định */
   const SHIFT_MORN_START = SHIFT_DEFAULT.morn[0];
@@ -442,8 +458,9 @@
 
       <div class="att-legend" style="flex-direction:column;align-items:stretch;gap:6px">
         <div style="display:flex;align-items:center;gap:14px;flex-wrap:wrap;font-size:11.5px">
-          <span>🏢 <b>Văn phòng (GĐ/Sales/CSKH/Kế toán):</b> T2-T6 <b>${SHIFT_DEFAULT.morn[0]}-${SHIFT_DEFAULT.morn[1]}</b> + <b>${SHIFT_DEFAULT.aft[0]}-${SHIFT_DEFAULT.aft[1]}</b></span>
-          <span>🛵 <b>Shipper (Vận hành):</b> T2-T6 <b>${SHIFT_SHIPPER.morn[0]}-${SHIFT_SHIPPER.morn[1]}</b> + <b>${SHIFT_SHIPPER.aft[0]}-${SHIFT_SHIPPER.aft[1]}</b></span>
+          <span>🏢 <b>Văn phòng (GĐ/Sales/CSKH/Kế toán):</b> <b>${SHIFT_DEFAULT.morn[0]}-${SHIFT_DEFAULT.morn[1]}</b> + <b>${SHIFT_DEFAULT.aft[0]}-${SHIFT_DEFAULT.aft[1]}</b></span>
+          <span>📦 <b>Kho:</b> <b>${SHIFT_WAREHOUSE.morn[0]}-${SHIFT_WAREHOUSE.morn[1]}</b> + <b>${SHIFT_WAREHOUSE.aft[0]}-${SHIFT_WAREHOUSE.aft[1]}</b></span>
+          <span>🛵 <b>Ship (Giao hàng):</b> <b>${SHIFT_SHIPPER.morn[0]}-${SHIFT_SHIPPER.morn[1]}</b> + <b>${SHIFT_SHIPPER.aft[0]}-${SHIFT_SHIPPER.aft[1]}</b></span>
           <span>T7 chỉ ca sáng = 0.5 công · CN nghỉ</span>
         </div>
         <div style="display:flex;align-items:center;gap:14px;flex-wrap:wrap">
@@ -493,10 +510,10 @@
     /* Get staff to use correct shift hours */
     const staff = STAFF().find(s => s.id === sid);
     const SH = shiftHoursFor(staff);
-    const isShipper = SH === SHIFT_SHIPPER;
+    const shTag = SH === SHIFT_SHIPPER ? '🛵 Ship' : SH === SHIFT_WAREHOUSE ? '📦 Kho' : '🏢 Văn phòng';
     const shiftInfo = isSat
-      ? `${isShipper ? '🛵 Shipper' : '🏢 Văn phòng'} · T7 — chỉ ca sáng <b>${SH.morn[0]}-${SH.morn[1]}</b> · 1 công = <b>0.5</b>`
-      : `${isShipper ? '🛵 Shipper' : '🏢 Văn phòng'} · T${new Date(+month.slice(0,4), +month.slice(5,7)-1, day).getDay()+1} — sáng <b>${SH.morn[0]}-${SH.morn[1]}</b>, chiều <b>${SH.aft[0]}-${SH.aft[1]}</b> · 1 công = 1.0`;
+      ? `${shTag} · T7 — chỉ ca sáng <b>${SH.morn[0]}-${SH.morn[1]}</b> · 1 công = <b>0.5</b>`
+      : `${shTag} · T${new Date(+month.slice(0,4), +month.slice(5,7)-1, day).getDay()+1} — sáng <b>${SH.morn[0]}-${SH.morn[1]}</b>, chiều <b>${SH.aft[0]}-${SH.aft[1]}</b> · 1 công = 1.0`;
 
     /* Remove existing popover */
     document.querySelectorAll('.att-pop').forEach(p => p.remove());
