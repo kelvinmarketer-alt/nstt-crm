@@ -423,10 +423,20 @@
     return res;
   }
 
+  /* Tab trong màn phiên gom: 'assign' = gán NCC theo mã · 'order' = đặt hàng theo NCC.
+     Giữ qua các lần re-render (bấm chip → render lại vẫn ở tab đang xem). */
+  let _pcDetailTab = 'assign';
+  window.pcDetailTab = function (tab) {
+    _pcDetailTab = (tab === 'order') ? 'order' : 'assign';
+    document.querySelectorAll('.pc-dpane').forEach(p => { p.style.display = (p.dataset.dpane === _pcDetailTab) ? 'block' : 'none'; });
+    document.querySelectorAll('.pc-dtab').forEach(b => b.classList.toggle('on', b.dataset.dtab === _pcDetailTab));
+    const dc = document.getElementById('pcRunDetail'); if (dc) dc.scrollTop = 0;
+  };
   window.pcOpenRun = function (runId) {
     const runs = getRuns();
     const run = normalizeRun(runs.find(r => r.id === runId));
     if (!run) return;
+    if (window._pcActiveRun !== runId) _pcDetailTab = 'assign';   /* mở phiên KHÁC → về tab Gán NCC (giữ tab khi re-render cùng phiên) */
     saveRuns(runs);  /* lưu migration allocations nếu có */
     const sups = getSuppliers().filter(s => s.active !== false);
     const supDL = `<datalist id="pcSupDL">${sups.map(s => `<option value="${esc(s.name)}">`).join('')}</datalist>`;
@@ -438,12 +448,22 @@
     const nExt = run.lines.filter(l => suppliersForProduct(l.productId, l.name).length === 0).length;
 
     let body = supDL + `
+      <style>
+        .pc-dtab{flex:1;padding:11px 8px;font-size:12.5px;font-weight:700;cursor:pointer;border:none;background:#F1F5F9;color:#64748B;border-bottom:3px solid transparent;white-space:nowrap}
+        .pc-dtab.on{background:#fff;color:#15803D;border-bottom-color:#15803D}
+        .pc-dtab .b{display:inline-block;margin-left:5px;font-size:10px;font-weight:700;border-radius:8px;padding:0 6px;vertical-align:middle}
+      </style>
       <div style="background:linear-gradient(135deg,#1B5E20,#2E7D32);color:#fff;padding:14px 18px;position:relative">
         <button onclick="window.pcCloseDetail()" title="Đóng" style="position:absolute;top:11px;right:13px;background:rgba(255,255,255,.18);border:none;color:#fff;width:28px;height:28px;border-radius:6px;cursor:pointer">✕</button>
         <h2 style="margin:0;font-size:16px">${run.id} — Phiên gom hàng</h2>
         <div style="opacity:.9;font-size:12px;margin-top:3px">${run.orderCodes.length} đơn · ${run.lines.length} mã hàng · ${fmtQty(totalKg)} kg · ${nSup} NCC</div>
       </div>
-      <div style="padding:14px 18px">`;
+      <div class="pc-dtabs" style="display:flex;gap:0;background:#F1F5F9;position:sticky;top:0;z-index:8">
+        <button class="pc-dtab${_pcDetailTab === 'assign' ? ' on' : ''}" data-dtab="assign" onclick="window.pcDetailTab('assign')">🧮 Gán NCC theo mã${nIncomplete ? `<span class="b" style="background:#FEF3C7;color:#B45309">${nIncomplete} thiếu</span>` : ''}</button>
+        <button class="pc-dtab${_pcDetailTab === 'order' ? ' on' : ''}" data-dtab="order" onclick="window.pcDetailTab('order')">🏭 Đặt hàng NCC<span class="b" style="background:#DCFCE7;color:#15803D">${nSup}</span>${nExt ? `<span class="b" style="background:#FEF3C7;color:#B45309">🛒${nExt}</span>` : ''}</button>
+      </div>
+      <div style="padding:14px 18px">
+      <div class="pc-dpane" data-dpane="assign" style="display:${_pcDetailTab === 'order' ? 'none' : 'block'}">`;
 
     /* ===== TỔNG QUAN SAU GOM ===== */
     body += `<div style="background:#F0FDF4;border:1px solid #BBF7D0;border-radius:10px;padding:12px 14px;margin-bottom:14px">
@@ -467,7 +487,7 @@
     body += `<div style="font-weight:800;color:var(--navy);font-size:12.5px;margin:4px 0 8px">🧮 PHÂN BỔ NCC THEO TỪNG MÃ <span style="font-weight:400;color:var(--muted)">(1 mã có thể chia nhiều NCC · tự gán NCC theo ⭐ sao)</span></div>`;
     /* ===== THANH CHỌN NHIỀU + GÁN HÀNG LOẠT ===== */
     if (!_isDoneRun(run)) {
-      body += `<div class="pc-bulkbar" style="display:flex;align-items:center;gap:8px;flex-wrap:wrap;background:#EFF6FF;border:1px solid #BFDBFE;border-radius:8px;padding:8px 10px;margin-bottom:10px;font-size:12px;position:sticky;top:0;z-index:5">
+      body += `<div class="pc-bulkbar" style="display:flex;align-items:center;gap:8px;flex-wrap:wrap;background:#EFF6FF;border:1px solid #BFDBFE;border-radius:8px;padding:8px 10px;margin-bottom:10px;font-size:12px">
         <label style="display:flex;align-items:center;gap:5px;cursor:pointer;font-weight:700;color:#1D4ED8"><input type="checkbox" id="pcChkAll" onclick="window.pcToggleAllLines(this.checked)" style="width:15px;height:15px;cursor:pointer"> Chọn tất cả</label>
         <span id="pcSelCount" style="color:var(--muted)">0 mã chọn</span>
         <div style="flex:1;min-width:8px"></div>
@@ -539,9 +559,11 @@
       </div>`;
     });
 
+    /* ===== Đóng pane "Gán NCC" → mở pane "Đặt hàng NCC" (tab riêng, khỏi lướt dài) ===== */
+    body += `</div><div class="pc-dpane" data-dpane="order" style="display:${_pcDetailTab === 'order' ? 'block' : 'none'}">`;
     /* ===== TỔNG HỢP ĐẶT HÀNG THEO NCC ===== */
     if (nSup > 0) {
-      body += `<div style="font-weight:800;color:var(--navy);font-size:12.5px;margin:14px 0 8px">🏭 ĐẶT HÀNG THEO NHÀ CUNG CẤP</div>`;
+      body += `<div style="font-weight:800;color:var(--navy);font-size:12.5px;margin:0 0 8px">🏭 ĐẶT HÀNG THEO NHÀ CUNG CẤP <span style="font-weight:400;color:var(--muted);font-size:11px">— bấm 📋 Copy Zalo gửi từng NCC</span></div>`;
       Object.values(bySup).forEach(b => {
         const sObj = getSuppliers().find(s => s.id === b.id) || {};
         const typ = supplyTypeOf(b.id);
@@ -585,6 +607,10 @@
           <div style="padding:0 12px 10px;font-size:11px;color:#92400E">💡 Cuối ngày: thu mua nhập phiếu kèm <b>giá thật</b> ở <b>Phiếu nhập → 🛒 Thu mua ngoài</b> (đọc ảnh AI được) → tự vào sổ quỹ kế toán + cập nhật giá vốn.</div>
         </div>`;
     }
+
+    /* Pane Đặt hàng rỗng (chưa gán NCC + không có mã mua ngoài) → nhắc sang tab Gán NCC */
+    if (!nSup && !extData.lines.length) body += `<div style="padding:24px;text-align:center;color:var(--muted);font-size:12.5px">Chưa gán NCC cho mã nào.<br>Sang tab <b>🧮 Gán NCC theo mã</b> để chọn NCC → phần đặt hàng sẽ hiện ở đây.</div>`;
+    body += `</div>`;   /* đóng pane "Đặt hàng NCC" */
 
     if (_isDoneRun(run)) {
       /* Phiên đã chốt (xem lại từ Lịch sử) — không cho chốt lại, chỉ xem + in phiếu NCC */
