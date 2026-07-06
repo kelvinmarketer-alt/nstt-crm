@@ -29,12 +29,28 @@
   const money = n => (window.fmt ? window.fmt(n) : (+n || 0).toLocaleString('vi-VN'));
   const esc = v => String(v == null ? '' : v).replace(/[&<>"]/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]));
 
-  /* Đơn đủ điều kiện gom: chưa giao/hủy, chưa xuất kho */
-  function eligibleOrders() {
+  /* Ngày giao → khoá so sánh 'YYYYMMDD' (nhận cả ISO 2026-07-06 lẫn dd/mm/yyyy). Rỗng → '' */
+  function _dateKey(v) {
+    if (!v) return '';
+    const s = String(v).trim();
+    let m = s.match(/^(\d{4})-(\d{2})-(\d{2})/);              /* ISO YYYY-MM-DD */
+    if (m) return m[1] + m[2] + m[3];
+    m = s.match(/^(\d{1,2})[/-](\d{1,2})[/-](\d{4})/);        /* dd/mm/yyyy */
+    if (m) return m[3] + String(m[2]).padStart(2, '0') + String(m[1]).padStart(2, '0');
+    return '';
+  }
+  const _todayKey = () => { const d = new Date(); return `${d.getFullYear()}${String(d.getMonth() + 1).padStart(2, '0')}${String(d.getDate()).padStart(2, '0')}`; };
+
+  /* Đơn đủ điều kiện gom: chưa giao/hủy, chưa xuất kho, VÀ ngày giao CHƯA QUA (>= hôm nay).
+     Đơn quá ngày giao thì không cần gom/ship nữa → ẩn. includePast=true để đếm số đã ẩn. */
+  function eligibleOrders(includePast) {
+    const today = _todayKey();
     return getOrders().filter(o => {
       const st = o.status;
       if (st === 'cancelled' || st === 'returned' || st === 'delivered' || st === 'reconciled') return false;
       if (o.whStatus === 'released' || o.whStatus === 'confirmed') return false;
+      /* Quá NGÀY GIAO → ẩn (giữ đơn hôm nay + tương lai + đơn chưa đặt ngày giao). */
+      if (!includePast) { const dk = _dateKey(o.deliverDate); if (dk && dk < today) return false; }
       /* Danh sách đơn KHÔNG kéo cột `items` (tối ưu tải ~21×) → KHÔNG đòi o.items ở đây,
          nếu không MỌI đơn bị lọc sạch → "không có đơn nào cần gom". Chỉ cần đơn CÓ hàng:
          items (đơn vừa tạo còn trong RAM) HOẶC goods/qty/weight (đơn tải nhẹ từ cloud).
@@ -154,18 +170,20 @@
   let picked = new Set();
   function renderGather() {
     const host = document.getElementById('pcGather');
-    const orders = eligibleOrders();
+    const orders = eligibleOrders();                         /* hôm nay + tương lai + chưa đặt ngày */
+    const nPast = eligibleOrders(true).length - orders.length; /* số đơn đã QUÁ ngày giao (ẩn) */
     /* nhóm theo ngày giao */
     const byDate = {};
     orders.forEach(o => { const d = o.deliverDate || '(chưa đặt ngày giao)'; (byDate[d] = byDate[d] || []).push(o); });
     const dates = Object.keys(byDate).sort();
     let html = `<div style="display:flex;align-items:center;gap:10px;margin-bottom:10px;flex-wrap:wrap">
         <span style="font-size:12.5px;color:var(--muted)">Tick các đơn cùng đợt giao → bấm <b>Tạo phiên gom</b>. Phiên gom mở ra → <b>gán NCC cho từng mặt hàng</b> + xác nhận đủ/thiếu.</span>
+        ${nPast ? `<span title="Đơn có ngày giao trước hôm nay — đã qua nên không gom/ship nữa" style="font-size:11.5px;color:#B45309;background:#FEF3C7;padding:3px 9px;border-radius:6px;font-weight:600">🕐 Ẩn ${nPast} đơn quá ngày giao</span>` : ''}
         <div style="flex:1"></div>
         <button class="btn btn-primary btn-sm" id="pcMakeRun" onclick="window.pcMakeRun()" disabled>🧺 Tạo phiên gom (<span id="pcSelN">0</span>)</button>
       </div>`;
     if (!orders.length) {
-      html += `<div style="background:#fff;border:1px solid var(--line);border-radius:10px;padding:40px;text-align:center;color:var(--muted)">Không có đơn nào cần gom. Đơn mới do Sale tạo sẽ hiện ở đây.</div>`;
+      html += `<div style="background:#fff;border:1px solid var(--line);border-radius:10px;padding:40px;text-align:center;color:var(--muted)">Không có đơn nào cần gom cho hôm nay trở đi.${nPast ? ` (${nPast} đơn quá ngày giao đã ẩn.)` : ' Đơn mới do Sale tạo sẽ hiện ở đây.'}</div>`;
     } else {
       dates.forEach(d => {
         html += `<div style="margin:14px 0 6px;font-weight:700;color:var(--navy);font-size:13px;display:flex;align-items:center;gap:8px">
