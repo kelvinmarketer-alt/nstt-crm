@@ -542,10 +542,13 @@
             <button class="btn btn-ghost btn-sm" style="background:rgba(255,255,255,.2);color:#fff;border:none" onclick="window.pcCopySupReq('${run.id}','${b.id}')">📋 Copy Zalo</button>
           </div>
           <div style="padding:8px 12px">
-          ${b.items.map(it => `<div style="font-size:12px;padding:3px 0;border-bottom:1px dashed #EEF2F0">
-            <b>${esc(it.name)}</b>: ${fmtQty(it.qty)} ${it.unit}${it.unitCost ? ` <span style="color:var(--muted)">× ${money(it.unitCost)}₫</span>` : ''}
-            ${typ === 'le' || typ === 'both' ? `<div style="font-size:10.5px;color:var(--muted);margin-top:1px">Chia khách: ${it.breakdown.map(bd => esc(bd.custName || bd.code) + ' ' + fmtQty(bd.qty) + it.unit).join(' · ')}</div>` : ''}
-          </div>`).join('')}
+          ${supReqData(run, b.id).lines.map(it => {
+            const isLeSup = typ === 'le' || typ === 'both';
+            const bags = isLeSup ? _mergeCusts(it.custs) : [];
+            return `<div style="font-size:12px;padding:3px 0;border-bottom:1px dashed #EEF2F0">
+            <b>${esc(it.name)}</b>: ${isLeSup ? 'tổng ' : ''}${fmtQty(it.qty)} ${it.unit}${it.unitCost ? ` <span style="color:var(--muted)">× ${money(it.unitCost)}₫</span>` : ''}
+            ${bags.length ? `<div style="font-size:10.5px;color:var(--muted);margin-top:1px">📦 Túi: ${bags.map(bd => esc(bd.name) + ' - ' + fmtQty(bd.qty) + it.unit).join(' · ')}</div>` : ''}
+          </div>`; }).join('')}
           </div>
         </div>`;
       });
@@ -891,6 +894,12 @@
     });
     return slots.map(s => s.items);
   }
+  /* Gộp phần chia theo TÊN khách (1 khách có thể nằm ở >1 slot NCC) → 1 dòng túi/khách */
+  function _mergeCusts(custs) {
+    const m = new Map();
+    (custs || []).forEach(x => { const k = x.custName || x.code || '?'; m.set(k, (m.get(k) || 0) + (+x.qty || 0)); });
+    return [...m.entries()].map(([name, qty]) => ({ name, qty: +qty.toFixed(2) }));
+  }
   /* Dữ liệu đặt hàng cho 1 NCC: gộp các mã NCC đó cung cấp + chia khách (cho NCC lẻ) */
   function supReqData(run, supId) {
     const sObj = getSuppliers().find(s => s.id === supId) || {};
@@ -978,12 +987,14 @@ tbody tr:nth-child(even){background:#FFFBEB}tfoot td{background:#FEF3C7;font-wei
     const c = company();
     const today = new Date().toLocaleDateString('vi-VN');
     const isLe = type === 'le' || type === 'both';
-    const colHd = isLe ? 'Chia theo khách (NCC đóng sẵn)' : 'Chi tiết theo đơn';
+    const colHd = isLe ? 'Túi theo khách (NCC đóng sẵn)' : 'Chi tiết theo đơn';
     const rows = lines.map((l, i) => `<tr>
         <td class="stt">${i + 1}</td>
         <td><b>${esc(l.name)}</b></td>
         <td class="num"><b>${fmtQty(l.qty)}</b> ${l.unit}</td>
-        <td style="font-size:11px;color:#555">${(l.custs || []).map(b => esc(isLe ? (b.custName || b.code) : b.code) + ': ' + fmtQty(b.qty)).join(' · ')}</td>
+        <td style="font-size:11px;color:#555">${isLe
+          ? _mergeCusts(l.custs).map(b => esc(b.name) + ' - ' + fmtQty(b.qty) + l.unit).join(' · ')
+          : (l.custs || []).map(b => esc(b.code) + ': ' + fmtQty(b.qty)).join(' · ')}</td>
       </tr>`).join('');
     const totalKg = lines.reduce((s, l) => s + l.qty, 0);
     const html = `<!doctype html><html lang="vi"><head><meta charset="utf-8"><title>PHIẾU YÊU CẦU HÀNG</title>
@@ -1014,10 +1025,20 @@ tbody tr:nth-child(even){background:#F4FAF2}tfoot td{background:#E8F5E9;font-wei
     const { lines, supName, type } = supReqData(run, supKey);
     const isLe = type === 'le' || type === 'both';
     const totalKg = lines.reduce((s, l) => s + l.qty, 0);
-    const txt = `📋 PHIẾU YÊU CẦU HÀNG — ${run.id}\n🏭 NCC: ${supName} (${TYPE_LABEL[type]})\n📅 ${new Date().toLocaleDateString('vi-VN')}\n────────────\n`
-      + lines.map((l, i) => `${i + 1}. ${l.name}: ${fmtQty(l.qty)} ${l.unit}` + (isLe && l.custs.length ? `\n   Chia khách: ${l.custs.map(b => (b.custName || b.code) + ' ' + fmtQty(b.qty) + l.unit).join(' · ')}` : '')).join('\n')
-      + `\n────────────\n📦 Tổng: ${fmtQty(totalKg)} kg · đơn vị KG\n${isLe ? 'NCC LẺ: đóng gói sẵn theo từng khách như trên.' : 'NCC SỈ: đóng 1 lô theo tổng.'}\nĐề nghị NCC xác nhận + báo sớm hàng thiếu. Cảm ơn!\n— Nông Sản Tuấn Tú`;
-    copyText(txt, 'phiếu yêu cầu NCC');
+    /* CÚ PHÁP "cả hai": mỗi SP ghi TỔNG (để NCC cân) + danh sách TÚI theo khách bên dưới
+       (NCC lẻ đóng sẵn mỗi túi 1 khách). NCC sỉ: chỉ tổng (đóng 1 lô). */
+    const body = lines.map(l => {
+      const head = `🔸 ${l.name}: ${isLe ? 'TỔNG ' : ''}${fmtQty(l.qty)}${l.unit}`;
+      if (!isLe) return head;
+      const bags = _mergeCusts(l.custs).map(b => `   • ${b.name} - ${fmtQty(b.qty)}${l.unit}`).join('\n');
+      return bags ? head + '\n' + bags : head;
+    }).join('\n');
+    const txt = `📋 ĐẶT HÀNG — ${run.id}\n🏭 NCC: ${supName} (${isLe ? 'Lẻ — đóng túi theo khách' : 'Sỉ — gộp tổng'})\n📅 ${new Date().toLocaleDateString('vi-VN')}\n────────────\n`
+      + body
+      + `\n────────────\n📦 Tổng đơn: ${fmtQty(totalKg)} kg`
+      + (isLe ? `\n👉 NCC LẺ đóng gói SẴN theo từng khách (mỗi • = 1 túi).` : `\n👉 NCC SỈ đóng 1 lô theo tổng.`)
+      + ` Báo sớm mã thiếu giúp mình. Cảm ơn!\n— Nông Sản Tuấn Tú`;
+    copyText(txt, 'tin đặt NCC (Zalo)');
   };
 
   /* ============ ③ XUẤT KHO → SHIP ============ */
