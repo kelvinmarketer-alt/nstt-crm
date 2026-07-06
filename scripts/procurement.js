@@ -35,7 +35,12 @@
       const st = o.status;
       if (st === 'cancelled' || st === 'returned' || st === 'delivered' || st === 'reconciled') return false;
       if (o.whStatus === 'released' || o.whStatus === 'confirmed') return false;
-      return Array.isArray(o.items) && o.items.length;
+      /* Danh sách đơn KHÔNG kéo cột `items` (tối ưu tải ~21×) → KHÔNG đòi o.items ở đây,
+         nếu không MỌI đơn bị lọc sạch → "không có đơn nào cần gom". Chỉ cần đơn CÓ hàng:
+         items (đơn vừa tạo còn trong RAM) HOẶC goods/qty/weight (đơn tải nhẹ từ cloud).
+         Items thật sẽ nạp lazy trong buildLines khi bấm Tạo phiên gom. */
+      return (Array.isArray(o.items) && o.items.length) ||
+        (o.goods && String(o.goods).trim()) || (+o.qty > 0) || (+o.weight > 0);
     });
   }
 
@@ -79,10 +84,25 @@
   const remainOf = (l) => +((l.totalQty || 0) - allocOf(l)).toFixed(2);                            /* còn chưa phân bổ */
   const confirmedOf = (l) => (l.allocations || []).reduce((s, a) => s + (a.confirmedQty != null && a.confirmedQty !== '' ? +a.confirmedQty : (+a.qty || 0)), 0); /* tổng NCC giao thực */
 
-  /* ===== Gom SL nhiều đơn → lines (gom theo MÃ HÀNG) ===== */
-  function buildLines(orderCodes) {
-    const orders = getOrders().filter(o => orderCodes.includes(o.code))
+  /* ===== Gom SL nhiều đơn → lines (gom theo MÃ HÀNG) =====
+     ASYNC: danh sách đơn không kéo `items` (tối ưu tải) → nạp lazy items cho CÁC ĐƠN ĐƯỢC GOM
+     qua getOrderItems (song song). Nếu không có items thì mọi line totalQty = 0 → gom rỗng. */
+  async function buildLines(orderCodes) {
+    const base = getOrders().filter(o => orderCodes.includes(o.code))
       .sort((a, b) => (a.createdAt || a.date || '') < (b.createdAt || b.date || '') ? -1 : 1);
+    const _fail = [];
+    const orders = await Promise.all(base.map(async o => {
+      let items = (Array.isArray(o.items) && o.items.length) ? o.items : null;
+      if (!items && window.SB_DATA && window.SB_DATA.getOrderItems) {
+        const its = await window.SB_DATA.getOrderItems(o.code);
+        if (Array.isArray(its)) items = its;   /* [] = đơn rỗng thật (hợp lệ) */
+        else _fail.push(o.code);               /* null = TẢI LỖI (timeout/mạng) */
+      }
+      return Object.assign({}, o, { items: items || [] });   /* copy — không đụng STORE */
+    }));
+    /* Tải lỗi 1 đơn → NÉM để pcMakeRun bắt & báo; KHÔNG âm thầm bỏ SL đơn đó →
+       tránh tạo phiên gom THIẾU sản lượng (đặt NCC hụt hàng mà tưởng đã đủ). */
+    if (_fail.length) throw new Error('Chưa tải được mặt hàng của đơn: ' + _fail.join(', ') + ' — thử lại (tránh gom thiếu sản lượng).');
     const products = getProducts();
     const prodByName = {};
     products.forEach(p => { prodByName[norm(p.name)] = p; });
@@ -152,8 +172,11 @@
           📅 Giao: ${esc(d)} <span style="font-weight:400;color:var(--muted);font-size:12px">(${byDate[d].length} đơn)</span>
           <button class="btn btn-ghost btn-sm" onclick="window.pcPickDate('${esc(d)}')">Chọn cả ngày</button></div>`;
         byDate[d].forEach(o => {
-          const nItems = (o.items || []).length;
-          const kg = (o.items || []).reduce((s, it) => s + (+it.qty || 0), 0);
+          /* Danh sách đơn không kéo items → đếm mã từ `goods` (phẩy) + kg từ `weight`,
+             giống trang Đơn hàng. Đơn vừa tạo (còn items trong RAM) thì dùng items. */
+          const hasItems = Array.isArray(o.items) && o.items.length;
+          const nItems = hasItems ? o.items.length : (o.goods || '').split(',').filter(s => s.trim()).length;
+          const kg = hasItems ? o.items.reduce((s, it) => s + (+it.qty || 0), 0) : (+o.weight || 0);
           html += `<div class="ord-pick ${picked.has(o.code) ? 'sel' : ''}" data-code="${o.code}" onclick="window.pcTogglePick('${o.code}')">
             <input type="checkbox" ${picked.has(o.code) ? 'checked' : ''} style="width:16px;height:16px;pointer-events:none">
             <div style="flex:1;min-width:0">
@@ -183,10 +206,20 @@
     eligibleOrders().filter(o => (o.deliverDate || '(chưa đặt ngày giao)') === d).forEach(o => picked.add(o.code));
     renderGather();
   };
-  window.pcMakeRun = function () {
+  window.pcMakeRun = async function () {
     if (!picked.size) return;
     const codes = [...picked];
-    const lines = buildLines(codes);
+    const btn = document.getElementById('pcMakeRun');
+    if (btn) { btn.disabled = true; btn.dataset._t = btn.textContent; btn.textContent = '⏳ Đang nạp hàng…'; }
+    let lines;
+    try {
+      lines = await buildLines(codes);   /* nạp lazy items cho các đơn được gom */
+    } catch (e) {
+      console.error('[pcMakeRun buildLines]', e);
+      window.toast?.('⚠ Lỗi nạp mặt hàng của đơn: ' + (e.message || 'unknown'), 'warn');
+      if (btn) { btn.disabled = false; btn.textContent = btn.dataset._t || '🧺 Tạo phiên gom'; }
+      return;
+    }
     const noSup = lines.filter(l => remainOf(l) > 0.001);  /* chưa phân bổ đủ NCC */
     const runs = getRuns();
     const seq = String(runs.length + 1).padStart(3, '0');
@@ -735,15 +768,37 @@
   };
 
   /* Chốt: ghi SL phân bổ về từng đơn + note thiếu + báo Sale */
-  window.pcApplyAlloc = function (runId) {
+  const _applyBusy = new Set();   /* chống double-click chốt: pcApplyAlloc async (có await getOrderItems) */
+  window.pcApplyAlloc = async function (runId) {
     const runs = getRuns(); const run = runs.find(r => r.id === runId); if (!run) return;
     /* GATE: đơn chưa tải xong từ cloud → KHÔNG ghi (tránh áp phân bổ lên cache rỗng rồi đè cloud). */
     if (!window.STORE.isPreloaded('orders')) {
       window.toast && window.toast('Đang tải dữ liệu đơn, thử lại sau vài giây', 'warn');
       return;
     }
+    /* Chống double-click: phiên đang chốt → bỏ lần bấm thứ 2 (nếu không: ghi note thiếu 2 lần
+       + gửi Telegram báo thiếu 2 lần, do status chỉ đổi 'applied' SAU await). */
+    if (_applyBusy.has(runId)) return;
+    _applyBusy.add(runId);
+    try {
     readConfirmInputs(run);
     const orders = getOrders();
+    /* Danh sách đơn KHÔNG kéo cột `items` (tối ưu tải) → PHẢI nạp items thật cho các đơn của
+       phiên TRƯỚC khi ghi. Nếu không: it (line dưới) undefined → không ghi SL phân bổ, và
+       freight = Σ items = 0 → XOÁ TIỀN đơn. Nạp lỗi 1 đơn nào đó → HỦY (không ghi sai). */
+    const _fail = [];
+    await Promise.all((run.orderCodes || []).map(async code => {
+      const o = orders.find(x => x.code === code);
+      if (!o) return;
+      if (Array.isArray(o.items) && o.items.length) return;            /* đã có items (đơn vừa tạo) */
+      const its = window.SB_DATA && window.SB_DATA.getOrderItems ? await window.SB_DATA.getOrderItems(code) : null;
+      if (Array.isArray(its) && its.length) o.items = its;
+      else _fail.push(code);
+    }));
+    if (_fail.length) {
+      window.toast?.('⚠ Chưa tải được mặt hàng của đơn: ' + _fail.join(', ') + ' — thử lại (tránh ghi sai tiền/hàng).', 'warn');
+      return;
+    }
     const shortByOrder = {};   /* code → [ {name, short, reason} ] */
     run.lines.forEach(l => {
       const alloc = allocateLine(l);
@@ -794,6 +849,7 @@
     window._pcActiveRun = null;
     renderRuns(); renderRunHistory(); renderRelease();
     window.pcCloseDetail && window.pcCloseDetail();
+    } finally { _applyBusy.delete(runId); }
   };
   function closeDrawerSoft() { /* giữ drawer mở để xem; no-op */ }
 
@@ -954,7 +1010,10 @@ tbody tr:nth-child(even){background:#F4FAF2}tfoot td{background:#E8F5E9;font-wei
     if (!orders.length) { host.innerHTML = `<div style="background:#fff;border:1px solid var(--line);border-radius:10px;padding:40px;text-align:center;color:var(--muted)">Chưa có đơn nào đã chốt hàng. Hoàn tất xác nhận NCC ở tab ② trước.</div>`; return; }
     host.innerHTML = `<div style="font-size:12.5px;color:var(--muted);margin-bottom:10px">Đơn đã chốt sản lượng — tạo phiếu xuất kho (có ca/giờ giao) rồi giao shipper.</div>` +
       orders.map(o => {
-        const kg = (o.items || []).reduce((s, it) => s + (+it.qty || 0), 0);
+        /* Danh sách đơn không kéo items → kg từ `weight`, mã từ `goods` (đơn đã chốt) */
+        const hasItems = Array.isArray(o.items) && o.items.length;
+        const kg = hasItems ? o.items.reduce((s, it) => s + (+it.qty || 0), 0) : (+o.weight || 0);
+        const nMa = hasItems ? o.items.length : (o.goods || '').split(',').filter(s => s.trim()).length;
         const hasShort = o.shortages && o.shortages.length;
         return `<div class="run-card" style="cursor:default">
           <div style="display:flex;align-items:center;gap:10px;flex-wrap:wrap">
@@ -963,7 +1022,7 @@ tbody tr:nth-child(even){background:#F4FAF2}tfoot td{background:#E8F5E9;font-wei
             ${o.shipShift ? `<span class="tag" style="background:#FEF3C7;color:#92400E">Ca ${esc(o.shipShift)}${o.shipTime ? ' · ' + esc(o.shipTime) : ''}</span>` : ''}
             ${hasShort ? `<span class="tag" style="background:#FEE2E2;color:#B91C1C">⚠ thiếu ${o.shortages.length} mã</span>` : ''}
             <div style="flex:1"></div>
-            <span style="font-size:12px;color:var(--muted)">${(o.items || []).length} mã · ${fmtQty(kg)} kg</span>
+            <span style="font-size:12px;color:var(--muted)">${nMa} mã · ${fmtQty(kg)} kg</span>
             <button class="btn btn-ghost btn-sm" onclick="window.pcReturnToGom('${o.code}')" title="Trả đơn về giai đoạn ② (gán lại NCC)">↩ Trả về gom</button>
             <button class="btn btn-ghost btn-sm" onclick="window.pcEditOrder('${o.code}')" title="Sửa đơn (nhập sai)">✏️ Sửa</button>
             <button class="btn btn-ghost btn-sm" style="color:var(--danger)" onclick="window.pcDeleteOrder('${o.code}')" title="Xoá hẳn đơn này">🗑 Xoá</button>
@@ -1003,10 +1062,20 @@ tbody tr:nth-child(even){background:#F4FAF2}tfoot td{background:#E8F5E9;font-wei
     renderAll();
   };
 
-  window.pcPrintRelease = function (code) {
+  let _printBusy = false;
+  window.pcPrintRelease = async function (code) {
+    if (_printBusy) return;   /* chống double-click: async (await getOrderItems) → tránh mở 2 cửa in */
+    _printBusy = true;
+    try {
     const o = getOrders().find(x => x.code === code); if (!o) return;
     const c = company();
-    const items = o.items || [];
+    /* Danh sách đơn không kéo items → nạp lazy để phiếu xuất kho không in rỗng */
+    let items = (Array.isArray(o.items) && o.items.length) ? o.items : null;
+    if (!items && window.SB_DATA && window.SB_DATA.getOrderItems) {
+      const its = await window.SB_DATA.getOrderItems(code);
+      items = Array.isArray(its) ? its : [];
+    }
+    items = items || [];
     const totalKg = items.reduce((s, it) => s + (+it.qty || 0), 0);
     const rows = items.map((it, i) => `<tr><td class="stt">${i + 1}</td><td><b>${esc(it.name)}</b></td><td class="num">${fmtQty(it.qty)} ${it.unit || 'kg'}</td></tr>`).join('');
     const html = `<!doctype html><html lang="vi"><head><meta charset="utf-8"><title>PHIẾU XUẤT KHO</title>
@@ -1033,6 +1102,7 @@ ${o.shortages && o.shortages.length ? `<div style="margin-top:10px;font-size:11.
 <div class="sig"><div><div class="role">Thủ kho xuất</div><div class="l"></div></div><div><div class="role">Shipper nhận</div><div class="l"></div></div><div><div class="role">Khách nhận</div><div class="l"></div></div></div>
 </div></body></html>`;
     printViaIframe(html);
+    } finally { _printBusy = false; }
   };
 
   window.pcDispatch = function (code) {
