@@ -38,6 +38,34 @@
   function custBrandMap() { return S().get('custBrands', {}) || {}; }
   function brandOf(custId, name) { const m = custBrandMap(); return (m[custId] && String(m[custId]).trim()) || name || custId; }
 
+  /* ===== Cache items để tính GIÁ VỐN (danh sách đơn không kéo items) ===== */
+  let _costItems = {};          /* code → items[] (nạp bulk khi xem view Giá vốn) */
+  let _costItemsKey = '';       /* '[from]|[to]' của khoảng đã nạp xong → khỏi nạp lại */
+  let _costItemsLoading = false;
+  /* Mã đơn trong khoảng (cùng bộ lọc build) mà CHƯA có items → cần nạp bulk */
+  function _codesNeedingCost(fromISO, toISO) {
+    const orders = S().get('orders', window.ORDERS || []) || [];
+    const days = new Set(dayList(fromISO, toISO));
+    return orders.filter(o => o.status !== 'draft' && o.status !== 'cancelled'
+      && (+o.freight || 0) && days.has(orderISO(o))
+      && !((Array.isArray(o.items) && o.items.length) || _costItems[o.code]))
+      .map(o => o.code);
+  }
+  async function _loadCostItems(fromISO, toISO) {
+    const key = fromISO + '|' + toISO;
+    if (_costItemsLoading || _costItemsKey === key) return;
+    _costItemsLoading = true;
+    try {
+      const codes = _codesNeedingCost(fromISO, toISO);
+      if (codes.length && window.SB_DATA && window.SB_DATA.getOrderItemsBulk) {
+        const map = await window.SB_DATA.getOrderItemsBulk(codes);
+        if (map) Object.assign(_costItems, map);
+      }
+      _costItemsKey = key;
+    } catch (e) { console.warn('[cn cost items]', e); }
+    finally { _costItemsLoading = false; window.cnRender && window.cnRender(); }
+  }
+
   /* ===== Build dữ liệu báo cáo ===== */
   function build(fromISO, toISO) {
     const orders = S().get('orders', window.ORDERS || []) || [];
@@ -54,7 +82,9 @@
        số THẬT tại thời điểm). Nếu không có → quy về giá nhập của SP trong danh mục theo ngày.
        SP ngoài DM & không có snapshot → 0 (không tính được vốn → LN ước tính). */
     function orderCost(o, iso) {
-      const items = Array.isArray(o.items) ? o.items : [];
+      /* Danh sách đơn KHÔNG kéo cột `items` (tối ưu tải) → dùng items thật đã nạp lazy vào
+         _costItems (bulk) cho view Giá vốn. Nếu chưa nạp → [] (giá vốn 0 tạm, sẽ re-render sau). */
+      const items = (Array.isArray(o.items) && o.items.length) ? o.items : (_costItems[o.code] || []);
       let c = 0, known = false;
       items.forEach(it => {
         if (+it.buyTotal > 0) { c += +it.buyTotal; known = true; return; }   /* số thật từ phiếu */
@@ -163,6 +193,8 @@
       return;
     }
     const isCost = cnView === 'cost';
+    /* View Giá vốn cần items thật → nạp bulk 1 lần cho khoảng này (async → tự re-render). */
+    if (isCost && _costItemsKey !== (fromISO + '|' + toISO)) _loadCostItems(fromISO, toISO);
     const dailyOf = r => isCost ? r.dailyCost : r.daily;
 
     /* Tổng cột theo ngày + tổng chung */
@@ -251,7 +283,8 @@
     document.getElementById('cnSummary').innerHTML =
       `📅 <b>${ddmm(fromISO)} → ${ddmm(toISO)}</b> · ${data.days.length} ngày · ${data.list.length} đối tác · đơn vị: <b>${dvi}</b> · đang xem: <b>${isCost ? 'Giá vốn & Lợi nhuận' : 'Doanh thu & Công nợ'}</b><br>` +
       `💰 Doanh thu <b>${gT.toLocaleString('vi-VN')}đ</b> · giá vốn <b>${gCost.toLocaleString('vi-VN')}đ</b> · lợi nhuận <b style="color:#15803D">${gProfit.toLocaleString('vi-VN')}đ</b> (biên ${gT ? pct(gProfit / gT) : '0%'}) · đã thu <b style="color:#16A34A">${gPaid.toLocaleString('vi-VN')}đ</b>` +
-      (anyEst ? `<br><span class="cn-est-note" style="color:#B45309;font-size:11.5px">* Có đơn thiếu giá vốn (SP ngoài DM / SP chưa có giá nhập) → lợi nhuận là ƯỚC TÍNH (chỉ trừ phần có giá nhập).</span>` : '');
+      (isCost && _costItemsLoading ? `<br><span style="color:#1D4ED8;font-size:11.5px">⏳ Đang tải giá vốn từng đơn… (bảng sẽ tự cập nhật)</span>` : '') +
+      (anyEst && !(isCost && _costItemsLoading) ? `<br><span class="cn-est-note" style="color:#B45309;font-size:11.5px">* Có đơn thiếu giá vốn (SP ngoài DM / SP chưa có giá nhập) → lợi nhuận là ƯỚC TÍNH (chỉ trừ phần có giá nhập).</span>` : '');
   };
 
   /* ===== Preset khoảng ngày ===== */

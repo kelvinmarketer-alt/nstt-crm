@@ -387,6 +387,21 @@
       } catch (e) { return null; }
     },
 
+    /* Lấy `items` của NHIỀU đơn (bulk) — cho báo cáo GIÁ VỐN của CFO (danh sách không kéo items).
+       Chia lô 100 mã/câu để né URL quá dài. Trả map { code: items[] }. Lô lỗi → bỏ qua lô đó. */
+    async getOrderItemsBulk(codes) {
+      const out = {};
+      const list = Array.from(new Set((codes || []).filter(Boolean)));
+      for (let i = 0; i < list.length; i += 100) {
+        const chunk = list.slice(i, i + 100);
+        try {
+          const { data, error } = await client.from('orders').select('code,items').in('code', chunk);
+          if (!error && Array.isArray(data)) data.forEach(r => { out[r.code] = Array.isArray(r.items) ? r.items : []; });
+        } catch (e) { /* lô lỗi → bỏ qua, các lô khác vẫn có dữ liệu */ }
+      }
+      return out;
+    },
+
     /* Lấy mã đơn kế tiếp THEO CLOUD (chống trùng khi nhiều máy tạo đơn cùng lúc) */
     async nextCloudOrderCode() {
       try {
