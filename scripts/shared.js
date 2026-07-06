@@ -5,7 +5,7 @@
 
 /* Phiên bản app hiển thị (đối chiếu với CACHE_VERSION trong sw.js) — để user tự XÁC NHẬN
    đang chạy bản mới hay còn kẹt JS cũ (hiện ở góc sidebar + log console). */
-window.APP_VERSION = 'v393';
+window.APP_VERSION = 'v394';
 console.log('%c[NSTT] App ' + window.APP_VERSION, 'color:#339B21;font-weight:bold');
 
 /* Gom NGUỒN khách về 3 nhóm chuẩn: 'mkt' / 'sales' / 'sep-gioi-thieu'.
@@ -428,13 +428,16 @@ window.normAddr = function (s) {
 window.addrLooksSame = function (a, b) {
   a = window.normAddr(a); b = window.normAddr(b);
   if (!a || !b || a.length < 6) return false;
+  /* BẮT BUỘC chung SỐ NHÀ: địa chỉ chỉ có tên khu (vd "OCP Gia Lâm", "Vinhomes",
+     "Gia Lâm") KHÔNG có số nhà → quá chung chung, KHÔNG coi là trùng dù chứa nhau. */
+  const nA = a.match(/\d+/g) || [], nB = b.match(/\d+/g) || [];
+  if (!nA.some(n => nB.includes(n))) return false;
   if (a === b) return true;
   const [sh, lo] = a.length <= b.length ? [a, b] : [b, a];
   if (sh.length >= 8 && lo.indexOf(sh) >= 0) return true;
   const ta = new Set(a.split(' ').filter(w => w.length > 1));
   const common = b.split(' ').filter(w => w.length > 1 && ta.has(w)).length;
-  const nA = a.match(/\d+/g) || [], nB = b.match(/\d+/g) || [];
-  return common >= 3 && nA.some(n => nB.includes(n));
+  return common >= 3;
 };
 
 window.custDebt = function (custId) {

@@ -775,13 +775,16 @@
   function _addrLooksSame(a, b) {
     a = _normAddr(a); b = _normAddr(b);
     if (!a || !b || a.length < 6) return false;
+    /* BẮT BUỘC chung SỐ NHÀ: địa chỉ chỉ có tên khu (vd "OCP Gia Lâm", "Vinhomes",
+       "Gia Lâm") KHÔNG có số nhà → quá chung chung, KHÔNG coi là trùng dù chứa nhau. */
+    const nA = a.match(/\d+/g) || [], nB = b.match(/\d+/g) || [];
+    if (!nA.some(n => nB.includes(n))) return false;
     if (a === b) return true;
     const [sh, lo] = a.length <= b.length ? [a, b] : [b, a];
-    if (sh.length >= 8 && lo.indexOf(sh) >= 0) return true;    /* 1 địa chỉ chứa trọn cái kia */
+    if (sh.length >= 8 && lo.indexOf(sh) >= 0) return true;    /* 1 địa chỉ chứa trọn cái kia (đã chung số nhà) */
     const ta = new Set(a.split(' ').filter(w => w.length > 1));
     const common = b.split(' ').filter(w => w.length > 1 && ta.has(w)).length;
-    const nA = a.match(/\d+/g) || [], nB = b.match(/\d+/g) || [];
-    return common >= 3 && nA.some(n => nB.includes(n));        /* ≥3 từ chung + trùng SỐ nhà */
+    return common >= 3;                                        /* ≥3 từ chung (đã bảo đảm chung số nhà) */
   }
   function _custsSameAddr(addr, excludeId) {
     if (!_normAddr(addr)) return [];
