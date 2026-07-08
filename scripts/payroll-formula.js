@@ -203,8 +203,9 @@
     /* Phụ cấp theo TỔNG công (cả mixed lẫn single) */
     const allowance = roundK(allowanceMonthly / workStandard * workActual);
 
-    /* Tổng thưởng */
-    const totalBonus = (input.bonuses || []).reduce((s, b) => s + (+b.amount || 0), 0);
+    /* Tổng thưởng = thưởng thủ công + thưởng hỗ trợ Kho/Ship (sổ ghi, tự tính) */
+    const helperBonus = +input.helperBonus || 0;
+    const totalBonus = (input.bonuses || []).reduce((s, b) => s + (+b.amount || 0), 0) + helperBonus;
     /* Tổng phạt */
     const totalPenalty = (input.penalties || []).reduce((s, p) => s + (+p.amount || 0), 0);
 
@@ -237,6 +238,7 @@
       baseSalary,
       allowance,
       totalBonus,
+      helperBonus,
       totalPenalty,
       bhxh,
       advance,

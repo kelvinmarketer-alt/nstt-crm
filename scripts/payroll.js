@@ -142,6 +142,7 @@
     document.getElementById('payTabs').innerHTML =
       `<div class="rpt-tab ${tab === 'attend' ? 'active' : ''}" onclick="window.setPayTab('attend')">📅 Chấm công</div>` +
       `<div class="rpt-tab ${tab === 'calendar' ? 'active' : ''}" onclick="window.setPayTab('calendar')">🗓️ Lịch công</div>` +
+      `<div class="rpt-tab ${tab === 'bonus' ? 'active' : ''}" onclick="window.setPayTab('bonus')">🎁 Thưởng hỗ trợ</div>` +
       `<div class="rpt-tab ${tab === 'payroll' ? 'active' : ''}" onclick="window.setPayTab('payroll')">💰 Bảng lương</div>`;
     document.getElementById('payMonth').value = month;
     /* Hide upload button if user lacks perm */
@@ -153,10 +154,13 @@
       head.innerHTML = '🔒 Bạn chỉ được xem chấm công + lương <b>của chính mình</b>. ' +
                        'Cần perm <code>payroll.viewAll</code> để xem toàn bộ NV.';
     }
-    if (tab === 'attend') renderAttend(); else if (tab === 'calendar') renderCalendar(); else renderPayroll();
+    if (tab === 'attend') renderAttend();
+    else if (tab === 'calendar') renderCalendar();
+    else if (tab === 'bonus') { if (window.BONUS) window.BONUS.setBonusMonth(month); }
+    else renderPayroll();
   }
   window.setPayTab = t => { tab = t; render(); };
-  window.setPayMonth = m => { month = m; render(); };
+  window.setPayMonth = m => { month = m; if (window.BONUS) window.BONUS.setBonusMonth(m); render(); };
   /* Expose để batch submit gọi refresh không cần reload */
   window.renderPayrollPublic = () => { if (tab === 'payroll') renderPayroll(); else render(); };
 
@@ -792,11 +796,13 @@
         ? PF.computeLateAutoForMonth(s.id, month)
         : { count: 0, total: 0, detail: [] };
 
+      /* Thưởng hỗ trợ Kho/Ship — TỰ tính từ sổ ghi (bonusLog), cộng thẳng vào cột Thưởng */
+      const helperBonus = window.BONUS ? (window.BONUS.helperFor(s.id, month).total || 0) : 0;
       if (ps && typeof ps.total === 'number') {
         hasPhieu = true;
         countByStatus[ps.status] = (countByStatus[ps.status] || 0) + 1;
         workActual = ps.workActual || 0;
-        bonusSum = (ps.bonuses || []).reduce((sum, b) => sum + (+b.amount || 0), 0);
+        bonusSum = (ps.bonuses || []).reduce((sum, b) => sum + (+b.amount || 0), 0) + helperBonus;
         const manualPen = (ps.penalties || []).reduce((sum, p) => sum + (+p.amount || 0), 0);
         penSum = manualPen + lateAuto.total;
         bhxh = +ps.bhxh || 0;
@@ -809,9 +815,9 @@
         hasPhieu = false;
         countByStatus.none++;
         workActual = paid;
-        bonusSum = 0; penSum = lateAuto.total; bhxh = 0; advance = 0;
+        bonusSum = helperBonus; penSum = lateAuto.total; bhxh = 0; advance = 0;
         baseSalary = luongCo;
-        total = Math.max(0, luongCo - lateAuto.total);
+        total = Math.max(0, luongCo + helperBonus - lateAuto.total);
         statusBadge = '<span style="color:var(--muted);font-size:10.5px">— chưa lập</span>';
       }
 
@@ -831,7 +837,7 @@
         <td class="num"><b>${window.fmt(s.salary || 0)}</b></td>
         <td class="num"><b style="color:#0369A1">${workActual % 1 === 0 ? workActual : workActual.toFixed(2)}</b><div style="font-size:10px;color:var(--muted)">/${wd % 1 === 0 ? wd : wd.toFixed(1)}</div></td>
         <td class="num"><b>${window.fmt(baseSalary)}</b></td>
-        <td class="num" style="color:#15803D">${bonusSum ? '<b>+' + window.fmt(bonusSum) + '</b>' : '<span style="color:var(--muted)">—</span>'}</td>
+        <td class="num" style="color:#15803D" title="${helperBonus ? 'Gồm thưởng hỗ trợ (sổ ghi): ' + window.fmt(helperBonus) + 'đ' : ''}">${bonusSum ? '<b>+' + window.fmt(bonusSum) + '</b>' + (helperBonus ? '<div style="font-size:10px;color:#0369A1;font-weight:400">🎁 ' + window.fmt(helperBonus) + '</div>' : '') : '<span style="color:var(--muted)">—</span>'}</td>
         <td class="num" style="color:#DC2626" title="${lateAuto.count ? lateAuto.count + ' lần muộn = ' + window.fmt(lateAuto.total) + 'đ (auto từ chấm công) + phạt khác' : 'Phạt thủ công'}">${penSum ? '<b>−' + window.fmt(penSum) + '</b>' + (lateAuto.count ? '<div style="font-size:10px;color:#A16207;font-weight:400">⏰ ' + lateAuto.count + ' lần muộn</div>' : '') : '<span style="color:var(--muted)">—</span>'}</td>
         <td class="num" style="color:#7C3AED">${bhxh ? '<b>−' + window.fmt(bhxh) + '</b>' : '<span style="color:var(--muted)">—</span>'}</td>
         <td class="num" style="color:#A16207">${advance ? '<b>−' + window.fmt(advance) + '</b>' : '<span style="color:var(--muted)">—</span>'}</td>
@@ -1455,6 +1461,8 @@
   if (document.getElementById('payView')) {
     window.STORE.subscribe('timesheet', render);
     window.STORE.subscribe('payrollExtra', () => { if (tab === 'payroll') renderPayroll(); });
+    window.STORE.subscribe('bonusLog', () => { if (tab === 'bonus' || tab === 'payroll') render(); });
+    window.STORE.subscribe('bonusRules', () => { if (tab === 'bonus' || tab === 'payroll') render(); });
     /* Trang Nhân sự gộp (HR_MERGED) → staff.js đã dựng shell, KHÔNG gọi lại renderAppShell */
     if (!window.HR_MERGED) window.renderAppShell('payroll', 'Chấm công & Lương');
     render();
