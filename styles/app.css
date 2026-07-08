@@ -772,7 +772,9 @@ td.num, td.hide-md {
   .oi-table tbody td:nth-child(1){display:none}                                   /* STT ẩn */
   .oi-table tbody td:nth-child(2){font-weight:600;padding-right:96px!important}    /* tên SP, chừa chỗ tiền */
   .oi-table tbody td:nth-child(6){position:absolute!important;top:9px;right:11px;font-weight:800;color:var(--red)}  /* thành tiền ghim phải */
-  .oi-table tbody td:nth-child(3),.oi-table tbody td:nth-child(4),.oi-table tbody td:nth-child(5),.oi-table tbody td:nth-child(7){display:inline-block!important;margin:6px 12px 0 0;vertical-align:middle}
+  .oi-table tbody td:nth-child(3),.oi-table tbody td:nth-child(4),.oi-table tbody td:nth-child(5),.oi-table tbody td:nth-child(8){display:inline-block!important;margin:6px 12px 0 0;vertical-align:middle}
+  .oi-table tbody td:nth-child(7){display:block!important;margin:8px 0 0}          /* ghi chú xuống dòng riêng, rộng hết thẻ */
+  .oi-table tbody td:nth-child(7) input{width:100%!important;box-sizing:border-box}
   .oi-table tbody td:nth-child(3)::before{content:"SL ";color:var(--muted);font-size:11px}
   .oi-table tbody td:nth-child(4)::before{content:"Giá ";color:var(--muted);font-size:11px}
   .oi-table tfoot,.oi-table tfoot tr,.oi-table tfoot td{display:block;text-align:left!important;padding:3px 0!important}

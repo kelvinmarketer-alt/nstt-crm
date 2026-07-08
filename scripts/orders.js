@@ -1217,17 +1217,18 @@
           <div style="flex:1"></div>
           ${nUnconf?`<button type="button" class="btn btn-primary btn-sm" onclick="window.confirmAllPrices()">✓ Xác nhận tất cả giá (${nUnconf})</button>`:''}
         </div>`;
-      box.innerHTML = bulkBar + `<table class="mini-table oi-table" style="margin:0">
+      box.innerHTML = bulkBar + `<div class="oi-scroll" style="overflow-x:auto;-webkit-overflow-scrolling:touch;max-width:100%">
+      <table class="mini-table oi-table" style="margin:0;min-width:860px">
         <thead><tr>
           <th style="width:40px" class="num">STT</th>
           <th>Sản phẩm</th>
           <th class="num">SL</th>
           <th class="num">Đơn giá</th>
-          <th>Ghi chú</th>
           <th class="num">
             <span title="Sale có quyền sửa giá theo đối tác — bấm vào ô đơn giá để gõ">✏</span>
           </th>
           <th class="num">Thành tiền</th>
+          <th>Ghi chú</th>
           <th></th>
         </tr></thead>
         <tbody>${orderItems.map((it, i) => `<tr>
@@ -1240,12 +1241,12 @@
             <input type="number" min="0" step="100" value="${it.price||0}" data-idx="${i}" class="oi-price" style="width:100px;padding:4px 6px;text-align:right;border:1px solid ${it.priceConfirmed===false?'#FCD34D':'var(--line)'};border-radius:5px;font-size:12.5px;font-weight:600;background:${it.priceConfirmed===false?'#FEF9C3':'#fff'}" title="Sale có quyền sửa giá theo đối tác">
             ${it.basePrice && it.price !== it.basePrice ? `<div style="font-size:10px;color:var(--muted);margin-top:2px">Gốc: ${window.fmt(it.basePrice)}</div>` : ''}
           </td>
-          <td><input type="text" value="${(it.note || '').replace(/"/g, '&quot;')}" data-idx="${i}" class="oi-note" placeholder="ghi chú…" style="width:130px;padding:4px 7px;border:1px solid var(--line);border-radius:5px;font-size:12px" title="Ghi chú riêng cho mặt hàng này (vd: cắt nhỏ, loại 1, giao sớm...)"></td>
           <td class="num"><label style="display:flex;align-items:center;gap:4px;cursor:pointer;font-size:11px">
             <input type="checkbox" data-idx="${i}" class="oi-confirm" ${it.priceConfirmed!==false?'checked':''} title="Đã xác nhận giá thủ công">
             ${it.priceConfirmed!==false?'<span style="color:#15803D">✓</span>':'<span style="color:#A16207">!</span>'}
           </label></td>
           <td class="num"><b>${window.fmt(it.total)}</b></td>
+          <td><input type="text" value="${(it.note || '').replace(/"/g, '&quot;')}" data-idx="${i}" class="oi-note" placeholder="ghi chú…" style="width:130px;padding:4px 7px;border:1px solid var(--line);border-radius:5px;font-size:12px" title="Ghi chú riêng cho mặt hàng này (vd: cắt nhỏ, loại 1, giao sớm...)"></td>
           <td class="num"><button type="button" class="icon-btn" style="color:var(--danger)" onclick="window.removeOrderItem(${i})" title="Xóa dòng sản phẩm này khỏi đơn">✕</button></td>
         </tr>`).join('')}</tbody>
         <tfoot>
@@ -1253,13 +1254,13 @@
             <td colspan="2" style="padding:8px"><b style="color:#15803D">📊 Tổng:</b> <span style="color:var(--muted);font-size:12px">${totalSKU} mã · </span><b style="color:#15803D;font-size:12.5px" title="Tách rõ theo từng đơn vị">${_unitBreakdown()}</b></td>
             <td class="num"></td>
             <td class="num">—</td>
-            <td></td>
             <td class="num">${orderItems.filter(x => x.priceConfirmed === false).length ? '<span style="color:#A16207;font-size:11px">⚠ '+orderItems.filter(x => x.priceConfirmed === false).length+' chưa xác nhận</span>' : '<span style="color:#15803D;font-size:11px">✓ đã xác nhận hết</span>'}</td>
             <td class="num"><b style="color:var(--red);font-size:14px">${window.fmt(total)} ₫</b></td>
             <td></td>
+            <td></td>
           </tr>
         </tfoot>
-      </table>`;
+      </table></div>`;
       /* Wire input tên SP thủ công (cập nhật live, không re-render để giữ focus) */
       box.querySelectorAll('.oi-name').forEach(inp => {
         inp.addEventListener('input', (e) => {
