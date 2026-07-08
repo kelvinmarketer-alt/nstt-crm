@@ -383,8 +383,8 @@
       </th>`;
     }).join('');
 
-    /* === ROWS === */
-    const rows = staffs.map((s) => {
+    /* === ROWS (gom theo phòng ban, accordion — dùng chung _payDeptOpen với bảng lương) === */
+    const empRows = staffs.map((s) => {
       const sh = sheetOf(s.id); const days = sh ? sh.days : defaultDays();
       const meta = metaOf(s.id);
       const c = counts(days, meta);
@@ -411,7 +411,8 @@
         const satMark = isSat && !isOff ? '<span class="sat-mark" title="½ công">½</span>' : '';
         return `<td class="${cellClass}${isSat?' is-sat':''} hide-xs" data-sid="${s.id}" data-day="${dayN}" title="${tip}">${chip}${satMark}</td>`;
       }).join('');
-      return `<tr class="att-row">
+      const deptKey = _payDeptKey(s.dept);
+      const rowHtml = `<tr class="att-row pay-emp" data-dept="${deptKey}" style="${_payDeptOpen.has(deptKey) ? '' : 'display:none'}">
         <td class="att-staff">
           <div class="staff-cell">
             <div class="av" style="background:${window.avatarColor(s.name)}">${window.initials(s.name)}</div>
@@ -429,6 +430,24 @@
         <td class="att-stat s-v hide-xs" title="Vắng"><b>${c.V}</b></td>
         <td class="att-stat sum" title="Công tính lương (H=0.5)"><b>${paid % 1 === 0 ? paid : paid.toFixed(1)}</b></td>
       </tr>`;
+      return { deptKey, dept: s.dept || 'Khác', paid, rowHtml };
+    });
+    /* Gom theo PHÒNG BAN → header (bấm xổ) + NV bên dưới (ẩn khi gập). Tổng công mỗi phòng. */
+    const _attColspan = last + 7;
+    const _adg = {};
+    empRows.forEach(e => { const g = _adg[e.deptKey] || (_adg[e.deptKey] = { name: e.dept, key: e.deptKey, emps: [], cong: 0 }); g.emps.push(e); g.cong += e.paid; });
+    const rows = Object.values(_adg).sort((a, b) => b.emps.length - a.emps.length).map(g => {
+      const open = _payDeptOpen.has(g.key);
+      const hdr = `<tr class="pay-dept-hdr att-dept-hdr${open ? ' open' : ''}" data-deptkey="${g.key}" onclick="window.togglePayDept('${g.key}')">
+        <td colspan="${_attColspan}" style="padding:0!important">
+          <div style="position:sticky;left:0;display:inline-flex;align-items:center;gap:8px;padding:9px 12px;white-space:nowrap">
+            <span class="dept-chev" style="color:#15803D;font-size:12px;width:12px">${open ? '▾' : '▸'}</span>
+            <b style="font-size:13px">${g.name}</b>
+            <span style="color:var(--muted);font-size:11.5px">${g.emps.length} NV</span>
+            <span style="color:#15803D;font-weight:700;margin-left:10px">· Tổng công: ${g.cong % 1 === 0 ? g.cong : g.cong.toFixed(1)}</span>
+          </div>
+        </td></tr>`;
+      return hdr + g.emps.map(e => e.rowHtml).join('');
     }).join('');
 
     /* === Tổng kết toàn công ty === */
@@ -483,6 +502,11 @@
 
         .att-row:hover .att-staff{background:#F0FDF4}
         .att-row:hover td:not(.att-staff){background:#FAFAFB}
+        /* Header PHÒNG BAN trong bảng chấm công (accordion) — 1 ô colspan, nội dung ghim trái */
+        .att-table tr.att-dept-hdr td{position:static!important;background:#F0FDF4!important;cursor:pointer;border-top:2px solid #BBF7D0!important;text-align:left!important}
+        .att-table tr.att-dept-hdr td > div{background:#F0FDF4}
+        .att-table tr.att-dept-hdr:hover td, .att-table tr.att-dept-hdr:hover td > div{background:#E4F7E8!important}
+        .att-table tr.att-dept-hdr.open td, .att-table tr.att-dept-hdr.open td > div{background:#DCFCE7!important}
 
         .att-cell{width:34px;height:42px;text-align:center;vertical-align:middle;cursor:pointer;transition:transform 0.08s;background:#fff;position:relative;line-height:1;font-size:0;padding:0}
         .att-cell > *{font-size:12.5px;line-height:1}
@@ -830,10 +854,13 @@
       const open = _payDeptOpen.has(g.key);
       const hdr = `<tr class="pay-dept-hdr${open ? ' open' : ''}" data-deptkey="${g.key}" onclick="window.togglePayDept('${g.key}')">
         <td colspan="11">
-          <span class="dept-chev" style="display:inline-block;width:14px;color:#15803D">${open ? '▾' : '▸'}</span>
-          <b style="font-size:13px">${g.name}</b>
-          <span style="color:var(--muted);font-size:11.5px;margin-left:6px">${g.emps.length} NV</span>
-          <span style="float:right;font-weight:800;color:var(--red)">Quỹ: ${window.fmt(g.total)}đ</span>
+          <div style="display:flex;align-items:center;gap:8px">
+            <span class="dept-chev" style="color:#15803D;font-size:12px;width:12px">${open ? '▾' : '▸'}</span>
+            <b style="font-size:13px">${g.name}</b>
+            <span style="color:var(--muted);font-size:11.5px">${g.emps.length} NV</span>
+            <div style="flex:1"></div>
+            <span style="font-weight:800;color:var(--red)">Quỹ: ${window.fmt(g.total)}đ</span>
+          </div>
         </td></tr>`;
       return hdr + g.emps.map(e => e.rowHtml).join('');
     }).join('');
@@ -886,7 +913,7 @@
         .pay-table tbody tr:hover td{background:#F8FAF8}
         .pay-table tbody tr:hover td:first-child,.pay-table tbody tr:hover td:last-child{background:#F3FAF3}
         /* Dòng header PHÒNG BAN (accordion) — 1 ô colspan, KHÔNG sticky, bấm để xổ/gập NV */
-        .pay-table tr.pay-dept-hdr td{position:static!important;left:auto!important;right:auto!important;box-shadow:none!important;background:#F0FDF4!important;cursor:pointer;padding:10px 14px!important;border-top:2px solid #BBF7D0;white-space:normal!important}
+        .pay-table tr.pay-dept-hdr td{position:static!important;left:auto!important;right:auto!important;box-shadow:none!important;background:#F0FDF4!important;cursor:pointer;padding:10px 14px!important;border-top:2px solid #BBF7D0;white-space:normal!important;text-align:left!important}
         .pay-table tr.pay-dept-hdr:hover td{background:#E4F7E8!important}
         .pay-table tr.pay-dept-hdr.open td{background:#DCFCE7!important}
         /* ===== ĐIỆN THOẠI: bảng lương → mỗi NV 1 THẺ (hết kéo ngang) ===== */
