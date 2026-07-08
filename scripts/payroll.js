@@ -138,6 +138,12 @@
     const [y, m] = month.split('-').map(Number); const last = new Date(y, m, 0).getDate();
     return Array.from({ length: last }, () => 'X');   /* Kho/Ship mặc định làm cả tháng (kể cả T7/CN) */
   }
+  /* Ngày để HIỂN THỊ + TÍNH cho 1 NV. Kho/Ship làm CẢ TUẦN → ô '_' (kiểu "CN nghỉ" của VP)
+     coi là CÓ MẶT (X). Vắng thật vẫn là V. → thứ 7 + chủ nhật đều tính công. */
+  function daysForStaff(s, rawDays) {
+    const arr = rawDays || defaultDaysFor(s);
+    return _fullWeekStaff(s) ? arr.map(v => (v === '_' ? 'X' : v)) : arr;
+  }
   /* Công tính lương THEO NV: Kho/Ship mọi ngày = 1 công; VP T7 = 0.5, CN = 0 */
   function paidDaysFor(s, days) {
     const full = _fullWeekStaff(s);
@@ -413,7 +419,7 @@
 
     /* === ROWS (gom theo phòng ban, accordion — dùng chung _payDeptOpen với bảng lương) === */
     const empRows = staffs.map((s) => {
-      const sh = sheetOf(s.id); const days = sh ? sh.days : defaultDaysFor(s);
+      const sh = sheetOf(s.id); const days = daysForStaff(s, sh ? sh.days : null);
       const meta = metaOf(s.id);
       const c = counts(days, meta);
       const paid = paidDaysFor(s, days);
@@ -481,7 +487,7 @@
     /* === Tổng kết toàn công ty === */
     const totals = staffs.reduce((acc, s) => {
       const sh = sheetOf(s.id); const md = metaOf(s.id);
-      const c = counts(sh ? sh.days : defaultDaysFor(s), md);
+      const c = counts(daysForStaff(s, sh ? sh.days : null), md);
       acc.X += c.X; acc.L += c.L; acc.H += c.H; acc.P += c.P; acc.V += c.V; acc.lateMin += c.lateMin;
       return acc;
     }, { X: 0, L: 0, H: 0, P: 0, V: 0, lateMin: 0 });
@@ -804,7 +810,7 @@
 
     const empData = staffs.map(s => {
       const sh = sheetOf(s.id);
-      const days = sh ? sh.days : defaultDaysFor(s);
+      const days = daysForStaff(s, sh ? sh.days : null);
       const paid = paidDaysFor(s, days);
       /* NC chuẩn theo PHÒNG: Ship 30 · Kho 29/30(TV) · Văn phòng theo lịch tháng */
       const wd = window.workStandardFor ? window.workStandardFor(s.dept, s.contractType, month, s.role) : wdOffice;
