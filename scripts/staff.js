@@ -9,13 +9,15 @@
   function _normDept(d) {
     const x = (d || '').toString().trim().toLowerCase().replace(/[-_]+/g, ' ').replace(/\s+/g, ' ');
     if (!x) return 'Khác';
+    /* 7 phòng ban chuẩn: Sale · Kế Toán · Ban Giám Đốc · Nhân Sự · Marketing · Kho · Ship.
+       Kho ≠ Ship (KHÔNG gộp) — dept đã tách theo vai trò khi chuẩn hoá. */
     const M = {
-      'ban gd': 'Ban giám đốc', 'ban giam doc': 'Ban giám đốc', 'ban giám đốc': 'Ban giám đốc', 'bgd': 'Ban giám đốc', 'giam doc': 'Ban giám đốc', 'giám đốc': 'Ban giám đốc', 'ceo': 'Ban giám đốc',
+      'ban gd': 'Ban Giám Đốc', 'ban giam doc': 'Ban Giám Đốc', 'ban giám đốc': 'Ban Giám Đốc', 'bgd': 'Ban Giám Đốc', 'giam doc': 'Ban Giám Đốc', 'giám đốc': 'Ban Giám Đốc', 'ceo': 'Ban Giám Đốc',
       'sale': 'Sale', 'sales': 'Sale', 'kinh doanh': 'Sale', 'cskh': 'Sale', 'cham soc khach hang': 'Sale', 'chăm sóc khách hàng': 'Sale',
-      'ke toan': 'Kế toán', 'kế toán': 'Kế toán', 'ketoan': 'Kế toán',
-      'kho': 'Kho & Ship', 'kho van': 'Kho & Ship', 'kho ship': 'Kho & Ship', 'kho & ship': 'Kho & Ship', 'van hanh': 'Kho & Ship', 'vận hành': 'Kho & Ship', 'giao hang': 'Kho & Ship', 'giao hàng': 'Kho & Ship', 'shipper': 'Kho & Ship', 'ship': 'Kho & Ship',
-      'thu mua': 'Thu Mua', 'mua hang': 'Thu Mua', 'mua hàng': 'Thu Mua', 'procurement': 'Thu Mua',
-      'hcns': 'Nhân sự', 'nhan su': 'Nhân sự', 'nhân sự': 'Nhân sự', 'tuyen dung': 'Nhân sự', 'tuyển dụng': 'Nhân sự', 'hanh chinh': 'Nhân sự', 'hr': 'Nhân sự',
+      'ke toan': 'Kế Toán', 'kế toán': 'Kế Toán', 'ketoan': 'Kế Toán',
+      'kho': 'Kho', 'kho van': 'Kho', 'kho vận': 'Kho', 'kho & ship': 'Kho', 'kho ship': 'Kho',
+      'ship': 'Ship', 'shipper': 'Ship', 'giao hang': 'Ship', 'giao hàng': 'Ship', 'van hanh': 'Ship', 'vận hành': 'Ship',
+      'hcns': 'Nhân Sự', 'nhan su': 'Nhân Sự', 'nhân sự': 'Nhân Sự', 'tuyen dung': 'Nhân Sự', 'tuyển dụng': 'Nhân Sự', 'hanh chinh': 'Nhân Sự', 'hr': 'Nhân Sự',
       'mkt': 'Marketing', 'marketing': 'Marketing', 'digital marketing': 'Marketing', 'truyen thong': 'Marketing',
     };
     return M[x] || ((d || '').toString().trim());
@@ -274,7 +276,7 @@
         <div><label>Họ tên *</label><input id="sName" value="${s.name}"></div>
         <div><label>Phòng ban</label>
           <select id="sDept">
-            ${['Ban giám đốc','Kế toán','Marketing','Kho & Ship','Nhân sự','Sale','Thu Mua'].map(d=>`<option ${s.dept===d?'selected':''}>${d}</option>`).join('')}
+            ${['Sale','Kế Toán','Ban Giám Đốc','Nhân Sự','Marketing','Kho','Ship'].map(d=>`<option ${s.dept===d?'selected':''}>${d}</option>`).join('')}
           </select></div>
       </div>
       <div class="form-row">
@@ -627,7 +629,7 @@
       [''],
       ['1. Cột "Mã NV": Để trống → app tự sinh (NV001, NV002...). Nếu nhập, phải duy nhất.'],
       ['2. Cột "Họ tên *" và "SĐT *": BẮT BUỘC. Thiếu sẽ bị bỏ qua.'],
-      ['3. Cột "Phòng ban": Ban giám đốc / Kế toán / Marketing / Kho & Ship / Nhân sự / Sale / Thu Mua.'],
+      ['3. Cột "Phòng ban": Sale / Kế Toán / Ban Giám Đốc / Nhân Sự / Marketing / Kho / Ship.'],
       ['4. Cột "Lương cơ bản": Số nguyên VNĐ (vd: 10000000 = 10 triệu).'],
       ['5. Cột "Vào làm": Định dạng dd/mm/yyyy (vd: 01/06/2026).'],
       ['6. Cột "Quyền": Danh sách quyền cách nhau dấu chấm phẩy ;'],

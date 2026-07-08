@@ -5,7 +5,7 @@
 
 /* Phiên bản app hiển thị (đối chiếu với CACHE_VERSION trong sw.js) — để user tự XÁC NHẬN
    đang chạy bản mới hay còn kẹt JS cũ (hiện ở góc sidebar + log console). */
-window.APP_VERSION = 'v402';
+window.APP_VERSION = 'v403';
 console.log('%c[NSTT] App ' + window.APP_VERSION, 'color:#339B21;font-weight:bold');
 
 /* Gom NGUỒN khách về 3 nhóm chuẩn: 'mkt' / 'sales' / 'sep-gioi-thieu'.
@@ -1279,11 +1279,13 @@ window.MD_DEFAULTS = {
     'Vĩnh Long','An Giang','Cần Thơ','Cà Mau',
   ],
   departments: [
-    { id:'gd',    label:'Ban giám đốc' },
-    { id:'sales', label:'Sales' },
-    { id:'cskh',  label:'CSKH' },
-    { id:'ketoan',label:'Kế toán' },
-    { id:'vanhanh',label:'Vận hành' },
+    { id:'sale',      label:'Sale' },
+    { id:'ke-toan',   label:'Kế Toán' },
+    { id:'ban-gd',    label:'Ban Giám Đốc' },
+    { id:'nhan-su',   label:'Nhân Sự' },
+    { id:'marketing', label:'Marketing' },
+    { id:'kho',       label:'Kho' },
+    { id:'ship',      label:'Ship' },
   ],
   vehicleTypes: [
     { id:'xetai-1.5t',  label:'Xe tải 1.5T' },

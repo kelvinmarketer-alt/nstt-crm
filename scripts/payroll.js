@@ -33,8 +33,8 @@
      [Ship — Giao hàng / Shipper / Tài xế]  (dept "Kho & Ship", role ~ "Giao hàng")
      - Sáng 05:00-11:00 · Chiều 13:00-18:00
 
-     CN: tất cả nghỉ. Lưu ý: dept "Kho & Ship" DÙNG CHUNG cho cả kho lẫn ship →
-     PHẢI phân theo ROLE (kho ≠ giao hàng), không phân theo dept.
+     CN: tất cả nghỉ. Dept nay đã tách "Kho" ≠ "Ship" (v403), nhưng vẫn phân theo
+     ROLE cho chắc (data cũ có thể còn "Kho & Ship" gộp; role luôn đúng).
      ========================================================= */
   const SHIFT_DEFAULT = {
     morn: ['08:00','12:00'],
