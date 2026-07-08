@@ -1223,6 +1223,7 @@
           <th>Sản phẩm</th>
           <th class="num">SL</th>
           <th class="num">Đơn giá</th>
+          <th>Ghi chú</th>
           <th class="num">
             <span title="Sale có quyền sửa giá theo đối tác — bấm vào ô đơn giá để gõ">✏</span>
           </th>
@@ -1239,6 +1240,7 @@
             <input type="number" min="0" step="100" value="${it.price||0}" data-idx="${i}" class="oi-price" style="width:100px;padding:4px 6px;text-align:right;border:1px solid ${it.priceConfirmed===false?'#FCD34D':'var(--line)'};border-radius:5px;font-size:12.5px;font-weight:600;background:${it.priceConfirmed===false?'#FEF9C3':'#fff'}" title="Sale có quyền sửa giá theo đối tác">
             ${it.basePrice && it.price !== it.basePrice ? `<div style="font-size:10px;color:var(--muted);margin-top:2px">Gốc: ${window.fmt(it.basePrice)}</div>` : ''}
           </td>
+          <td><input type="text" value="${(it.note || '').replace(/"/g, '&quot;')}" data-idx="${i}" class="oi-note" placeholder="ghi chú…" style="width:130px;padding:4px 7px;border:1px solid var(--line);border-radius:5px;font-size:12px" title="Ghi chú riêng cho mặt hàng này (vd: cắt nhỏ, loại 1, giao sớm...)"></td>
           <td class="num"><label style="display:flex;align-items:center;gap:4px;cursor:pointer;font-size:11px">
             <input type="checkbox" data-idx="${i}" class="oi-confirm" ${it.priceConfirmed!==false?'checked':''} title="Đã xác nhận giá thủ công">
             ${it.priceConfirmed!==false?'<span style="color:#15803D">✓</span>':'<span style="color:#A16207">!</span>'}
@@ -1251,6 +1253,7 @@
             <td colspan="2" style="padding:8px"><b style="color:#15803D">📊 Tổng:</b> <span style="color:var(--muted);font-size:12px">${totalSKU} mã · </span><b style="color:#15803D;font-size:12.5px" title="Tách rõ theo từng đơn vị">${_unitBreakdown()}</b></td>
             <td class="num"></td>
             <td class="num">—</td>
+            <td></td>
             <td class="num">${orderItems.filter(x => x.priceConfirmed === false).length ? '<span style="color:#A16207;font-size:11px">⚠ '+orderItems.filter(x => x.priceConfirmed === false).length+' chưa xác nhận</span>' : '<span style="color:#15803D;font-size:11px">✓ đã xác nhận hết</span>'}</td>
             <td class="num"><b style="color:var(--red);font-size:14px">${window.fmt(total)} ₫</b></td>
             <td></td>
@@ -1297,6 +1300,10 @@
             renderOrderItems();
           }
         });
+      });
+      /* Ghi chú từng mặt hàng — lưu trực tiếp vào item, KHÔNG re-render (giữ con trỏ đang gõ) */
+      box.querySelectorAll('.oi-note').forEach(inp => {
+        inp.addEventListener('input', (e) => { const it = orderItems[+e.target.dataset.idx]; if (it) it.note = e.target.value; });
       });
       /* Wire đổi đơn vị — cho MỌI sản phẩm. Đổi đơn vị → TỰ ĐIỀN GIÁ CỦA ĐỐI TÁC cho đơn vị đó
          (lấy từ lịch sử đơn của KH). KHÔNG đụng bảng giá danh mục. */
