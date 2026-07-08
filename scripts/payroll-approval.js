@@ -295,7 +295,7 @@
         <div id="psBonusList" style="background:#FAFBFC;border:1px solid var(--line);border-radius:8px;padding:8px 12px;margin-bottom:${_helper.total ? '8px' : '14px'}">
           ${bonusRows(p.bonuses)}
         </div>
-        ${_helper.total ? `<details open style="border:1px solid #BAE6FD;border-radius:8px;background:#F0F9FF;padding:8px 12px;margin-bottom:14px">
+        ${_helper.total ? `<details style="border:1px solid #BAE6FD;border-radius:8px;background:#F0F9FF;padding:8px 12px;margin-bottom:14px">
           <summary style="cursor:pointer;font-weight:700;color:#0369A1;font-size:12.5px">🎁 Thưởng hỗ trợ Kho/Ship (tự tính từ sổ ghi): + ${PF.formatVND(_helper.total)} ₫ · ${_helper.entries.length} khoản <span style="font-weight:400;color:var(--muted)">— bấm xem từng ngày</span></summary>
           <div style="margin-top:8px;display:grid;gap:3px">
             ${_helper.entries.map(e => `<div style="display:flex;justify-content:space-between;gap:10px;font-size:12px;border-bottom:1px dashed #E0F2FE;padding:3px 0">
