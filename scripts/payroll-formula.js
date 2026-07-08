@@ -153,7 +153,12 @@
          segments (optional): [{name, basicSalary, contractType, workActual, workStandardOverride?}]
        } */
     const cfg = getDeptConfig(input.dept, input.contractType);
-    const workStandardDefault = input.workStandardOverride || cfg.workStandard;
+    /* NC chuẩn: Ship 30 · Kho 29/30(TV) · Văn phòng theo LỊCH tháng (workStandardFor).
+       Fallback cfg.workStandard nếu helper chưa nạp. */
+    const _autoWS = (typeof window !== 'undefined' && window.workStandardFor)
+      ? window.workStandardFor(input.dept, input.contractType, input.month, input.role)
+      : cfg.workStandard;
+    const workStandardDefault = input.workStandardOverride || _autoWS;
     const allowanceMonthly = (input.allowanceOverride != null)
       ? input.allowanceOverride : cfg.allowanceMonthly;
 
@@ -164,7 +169,9 @@
       /* === MIXED MODE === thử việc + chính thức trong cùng tháng */
       input.segments.forEach(seg => {
         const segRatio = CONTRACT_RATIO[seg.contractType] || 1.00;
-        const segWS = seg.workStandardOverride || getDeptConfig(input.dept, seg.contractType).workStandard;
+        const segWS = seg.workStandardOverride || ((typeof window !== 'undefined' && window.workStandardFor)
+          ? window.workStandardFor(input.dept, seg.contractType, input.month, input.role)
+          : getDeptConfig(input.dept, seg.contractType).workStandard);
         const segBasic = +seg.basicSalary || 0;
         const segWork = +seg.workActual || 0;
         const segBase = roundK(segBasic * segRatio / segWS * segWork);

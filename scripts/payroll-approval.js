@@ -855,7 +855,7 @@
       const sheet = sheets.find(t => t.staffId === s.id && t.month === month);
       const workActual = sheet
         ? sheet.days.filter(d => d === 'X' || d === 'P').length
-        : (PF.getDeptConfig(s.dept, s.contractType).workStandard);
+        : (window.workStandardFor ? window.workStandardFor(s.dept, s.contractType, month, s.role) : PF.getDeptConfig(s.dept, s.contractType).workStandard);
       const draft = {
         id: 'PR-' + month + '-' + s.id,
         month,

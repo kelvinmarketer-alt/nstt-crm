@@ -730,7 +730,8 @@
   };
 
   function renderPayroll() {
-    const staffs = STAFF(); const wd = workdaysInMonth();
+    const staffs = STAFF();
+    const wdOffice = window.officeWorkStandard ? window.officeWorkStandard(month) : workdaysInMonth();   /* NC chuẩn khối VP theo lịch tháng */
     /* === Đọc payslips đã lập (array) cho tháng đang chọn === */
     const allPayslips = window.STORE.get('payrollExtra', []) || [];
     const monthPayslips = Array.isArray(allPayslips)
@@ -754,6 +755,8 @@
       const sh = sheetOf(s.id);
       const days = sh ? sh.days : defaultDays();
       const paid = paidDays(days);
+      /* NC chuẩn theo PHÒNG: Ship 30 · Kho 29/30(TV) · Văn phòng theo lịch tháng */
+      const wd = window.workStandardFor ? window.workStandardFor(s.dept, s.contractType, month, s.role) : wdOffice;
       const luongNgay = wd ? Math.round((s.salary || 0) / wd) : 0;
       const luongCo = Math.round(luongNgay * paid);
 
@@ -835,7 +838,7 @@
       return hdr + g.emps.map(e => e.rowHtml).join('');
     }).join('');
 
-    const wdFmt = wd % 1 === 0 ? wd : wd.toFixed(1);
+    const wdFmt = wdOffice % 1 === 0 ? wdOffice : wdOffice.toFixed(1);
     const draftCount = countByStatus.draft || 0;
     const submittedCount = countByStatus.submitted || 0;
     const approvedCount = countByStatus.approved || 0;
@@ -847,7 +850,7 @@
 
     document.getElementById('payView').innerHTML = `
       <section class="kpis" style="margin-bottom:14px">
-        <div class="kpi k-1"><div class="kpi-label">Tổng quỹ lương T${month.slice(5)}/${month.slice(0, 4)}</div><div class="kpi-value">${window.fmtShort(totalAll)}</div><div class="kpi-trend">${staffs.length} NV · NC chuẩn ${wdFmt}</div><div class="kpi-icon">💰</div></div>
+        <div class="kpi k-1"><div class="kpi-label">Tổng quỹ lương T${month.slice(5)}/${month.slice(0, 4)}</div><div class="kpi-value">${window.fmtShort(totalAll)}</div><div class="kpi-trend">${staffs.length} NV · VP ${wdFmt} · Kho 29/30 · Ship 30</div><div class="kpi-icon">💰</div></div>
         <div class="kpi k-2"><div class="kpi-label">Tổng thưởng tháng</div><div class="kpi-value" style="color:var(--ok)">${window.fmtShort(totalBonusAll)}</div><div class="kpi-trend">lễ + chuyên cần + hoa hồng + ship</div><div class="kpi-icon">🎁</div></div>
         <div class="kpi k-3"><div class="kpi-label">Tổng phạt + BHXH</div><div class="kpi-value" style="color:var(--danger)">${window.fmtShort(totalPenAll + totalBhxhAll)}</div><div class="kpi-trend">Phạt ${window.fmtShort(totalPenAll)} + BHXH ${window.fmtShort(totalBhxhAll)}</div><div class="kpi-icon">⚠️</div></div>
         <div class="kpi k-4"><div class="kpi-label">Tạm ứng đã ứng</div><div class="kpi-value" style="color:#A16207">${window.fmtShort(totalAdvAll)}</div><div class="kpi-trend">trừ vào lương cuối tháng</div><div class="kpi-icon">💵</div></div>

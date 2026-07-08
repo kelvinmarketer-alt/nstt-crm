@@ -5,7 +5,7 @@
 
 /* Phiên bản app hiển thị (đối chiếu với CACHE_VERSION trong sw.js) — để user tự XÁC NHẬN
    đang chạy bản mới hay còn kẹt JS cũ (hiện ở góc sidebar + log console). */
-window.APP_VERSION = 'v403';
+window.APP_VERSION = 'v404';
 console.log('%c[NSTT] App ' + window.APP_VERSION, 'color:#339B21;font-weight:bold');
 
 /* Gom NGUỒN khách về 3 nhóm chuẩn: 'mkt' / 'sales' / 'sep-gioi-thieu'.
@@ -355,6 +355,29 @@ window.priceEntryOn = function(product, dateISO) {
 window.priceOn = function(productId, dateISO) {
   const e = window.priceEntryOn(window.productById(productId), dateISO || window.todayISO());
   return e ? e.sell : 0;
+};
+
+/* ===== CÔNG CHUẨN (NC chuẩn) theo phòng ban =====
+   - Khối VĂN PHÒNG: theo LỊCH tháng — T2-T6 = 1 công · T7 = 0.5 (nghỉ chiều) · CN = 0 (nghỉ).
+   - Kho: chính thức 29 · thử việc / part-time 30 (cố định).
+   - Ship (giao hàng): 30 cố định. */
+window.officeWorkStandard = function (monthStr) {
+  const mm = String(monthStr || '').match(/^(\d{4})-(\d{1,2})/);
+  let y, mo;
+  if (mm) { y = +mm[1]; mo = +mm[2]; }
+  else { const t = window.todayISO ? window.todayISO() : ''; const m2 = t.match(/^(\d{4})-(\d{2})/); y = m2 ? +m2[1] : 2026; mo = m2 ? +m2[2] : 1; }
+  const last = new Date(y, mo, 0).getDate();
+  let n = 0;
+  for (let d = 1; d <= last; d++) { const dow = new Date(y, mo - 1, d).getDay(); if (dow === 0) continue; n += dow === 6 ? 0.5 : 1; }
+  return n;
+};
+window.workStandardFor = function (dept, contractType, monthStr, role) {
+  const d = String(dept || ''); const r = String(role || '').toLowerCase();
+  if (d === 'Ship' || /giao hàng|giao hang|shipper|tài xế|tai xe/.test(r)) return 30;
+  if (d === 'Kho' || /(^|\s)kho(\s|$)/.test(d.toLowerCase()) || /kho/.test(r)) {
+    return (contractType === 'probation' || contractType === 'parttime') ? 30 : 29;
+  }
+  return window.officeWorkStandard(monthStr);   /* khối văn phòng → theo lịch tháng */
 };
 
 /* ============ NHÓM GIÁ (price tiers) — helper TOÀN CỤC ============
