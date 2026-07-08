@@ -23,6 +23,17 @@
     return M[x] || ((d || '').toString().trim());
   }
 
+  /* ===== Nhóm bảng NV theo PHÒNG BAN (accordion — mặc định MỞ, bấm header để gập) ===== */
+  const _sDeptKey = d => String(d || 'Khác').normalize('NFD').replace(/[̀-ͯ]/g, '').replace(/đ/gi, 'd').replace(/[^a-zA-Z0-9]+/g, '_').toLowerCase() || 'khac';
+  let _staffDeptCollapsed = new Set();
+  window.toggleStaffDept = function (key) {
+    if (_staffDeptCollapsed.has(key)) _staffDeptCollapsed.delete(key); else _staffDeptCollapsed.add(key);
+    const collapsed = _staffDeptCollapsed.has(key);
+    document.querySelectorAll(`#stTbody tr.st-emp[data-dept="${key}"]`).forEach(tr => { tr.style.display = collapsed ? 'none' : ''; });
+    const chev = document.querySelector(`#stTbody tr.st-dept-hdr[data-deptkey="${key}"] .st-chev`);
+    if (chev) chev.textContent = collapsed ? '▸' : '▾';
+  };
+
   function render() {
     staffs = window.STORE.get('staff', window.STAFFS || []);
     const q = document.getElementById('qSearch').value.trim().toLowerCase();
@@ -52,13 +63,15 @@
     })();
     buildDeptChips(staffs);
     const aliasMap = window.STORE.get('staffAliases', {}) || {};
-    document.getElementById('stTbody').innerHTML = rows.map(s => {
+    const _empRows = rows.map(s => {
       const col = window.avatarColor(s.id);
       const kpiNum = s.kpi ? parseInt(s.kpi) : null;
       const kpiCls = kpiNum && kpiNum < 85 ? 'warn' : '';
       const perms = (s.permissions||[]).slice(0,2).map(p => `<span class="perm-pill">${p}</span>`).join('')
                   + ((s.permissions||[]).length > 2 ? `<span class="perm-pill">+${s.permissions.length-2}</span>` : '');
-      return `<tr data-id="${s.id}">
+      const _dName = _normDept(s.dept);
+      const _dKey = _sDeptKey(_dName);
+      const _html = `<tr class="st-emp" data-id="${s.id}" data-dept="${_dKey}" style="${_staffDeptCollapsed.has(_dKey) ? 'display:none' : ''}">
         <td class="hide-xs"><b>${s.code || s.id || '—'}</b></td>
         <td data-field="name">
           <div class="cust-cell">
@@ -88,7 +101,23 @@
           </div>
         </td>
       </tr>`;
-    }).join('') || `<tr><td colspan="10" style="padding:40px;text-align:center;color:var(--muted)">Không có NV nào khớp.</td></tr>`;
+      return { dName: _dName, dKey: _dKey, salary: +s.salary || 0, html: _html };
+    });
+    /* Gom theo PHÒNG BAN → dòng header (bấm gập/mở) + các NV bên dưới */
+    const _sg = {};
+    _empRows.forEach(e => { const g = _sg[e.dKey] || (_sg[e.dKey] = { name: e.dName, key: e.dKey, emps: [], salary: 0 }); g.emps.push(e); g.salary += e.salary; });
+    const _fmtS = window.fmtShort || (n => (n || 0).toLocaleString('vi-VN'));
+    const _tbody = Object.values(_sg).sort((a, b) => b.emps.length - a.emps.length).map(g => {
+      const collapsed = _staffDeptCollapsed.has(g.key);
+      const hdr = `<tr class="st-dept-hdr" data-deptkey="${g.key}" onclick="window.toggleStaffDept('${g.key}')" style="cursor:pointer">
+        <td colspan="10" style="padding:9px 14px;background:#F0FDF4;border-top:2px solid #BBF7D0;text-align:left">
+          <span class="st-chev" style="color:#15803D;width:12px;display:inline-block">${collapsed ? '▸' : '▾'}</span>
+          <b style="font-size:13px">${g.name}</b>
+          <span style="color:var(--muted);font-size:11.5px;margin-left:6px">${g.emps.length} NV · Quỹ LCB ${_fmtS(g.salary)}đ</span>
+        </td></tr>`;
+      return hdr + g.emps.map(e => e.html).join('');
+    }).join('');
+    document.getElementById('stTbody').innerHTML = _tbody || `<tr><td colspan="10" style="padding:40px;text-align:center;color:var(--muted)">Không có NV nào khớp.</td></tr>`;
 
     document.querySelectorAll('#stTbody tr[data-id]').forEach(tr => {
       tr.onclick = () => openStaff(tr.dataset.id);
@@ -440,8 +469,7 @@
       <div class="form-row">
         <div><label>Phòng ban</label>
           <select id="nDept">
-            <option>Ban giám đốc</option><option>Kế toán</option><option>Marketing</option>
-            <option>Kho &amp; Ship</option><option>Nhân sự</option><option>Sale</option><option>Thu Mua</option>
+            ${['Sale','Kế Toán','Ban Giám Đốc','Nhân Sự','Marketing','Kho','Ship'].map(d=>`<option>${d}</option>`).join('')}
           </select></div>
         <div><label>Vị trí</label><input id="nRole" placeholder="VD: Nhân viên sales"></div>
       </div>
