@@ -126,6 +126,30 @@
     });
     return n;
   }
+  /* ===== KHO & SHIP làm CẢ TUẦN (T7 full 1 công, CN vẫn làm) — KHÔNG giảm cuối tuần như VP.
+     Đó là lý do công chuẩn Kho 29 / Ship 30 (cao hơn VP ~24). VP: T7 = 0.5, CN = nghỉ. ===== */
+  function _fullWeekStaff(s) {
+    const d = String(s && s.dept || ''); const r = String(s && s.role || '').toLowerCase();
+    return d === 'Kho' || d === 'Ship' || /kho|ship|giao|vận hành|van hanh/i.test(d) || /giao hàng|giao hang|shipper|tài xế|tai xe/.test(r);
+  }
+  function shiftFactorForStaff(s, dayN) { return _fullWeekStaff(s) ? 1.0 : shiftFactorOfDay(dayN); }
+  function defaultDaysFor(s) {
+    if (!_fullWeekStaff(s)) return defaultDays();
+    const [y, m] = month.split('-').map(Number); const last = new Date(y, m, 0).getDate();
+    return Array.from({ length: last }, () => 'X');   /* Kho/Ship mặc định làm cả tháng (kể cả T7/CN) */
+  }
+  /* Công tính lương THEO NV: Kho/Ship mọi ngày = 1 công; VP T7 = 0.5, CN = 0 */
+  function paidDaysFor(s, days) {
+    const full = _fullWeekStaff(s);
+    let n = 0;
+    (days || []).forEach((d, i) => {
+      const sf = full ? 1.0 : shiftFactorOfDay(i + 1);
+      if (sf === 0) return;
+      if (d === 'X' || d === 'L' || d === 'P') n += sf;
+      else if (d === 'H') n += sf * 0.5;
+    });
+    return n;
+  }
   /* NC chuẩn = Σ shiftFactor của các ngày trong tháng (T7 = 0.5, CN = 0)
      → ví dụ tháng 31 ngày: 22 ngày T2-T6 × 1 + 4 ngày T7 × 0.5 + 4 CN × 0 = 24 NC */
   function workdaysInMonth() {
@@ -389,13 +413,13 @@
 
     /* === ROWS (gom theo phòng ban, accordion — dùng chung _payDeptOpen với bảng lương) === */
     const empRows = staffs.map((s) => {
-      const sh = sheetOf(s.id); const days = sh ? sh.days : defaultDays();
+      const sh = sheetOf(s.id); const days = sh ? sh.days : defaultDaysFor(s);
       const meta = metaOf(s.id);
       const c = counts(days, meta);
-      const paid = paidDays(days);
+      const paid = paidDaysFor(s, days);
       const cells = days.map((v, i) => {
         const dayN = i + 1;
-        const sf = shiftFactorOfDay(dayN);
+        const sf = shiftFactorForStaff(s, dayN);   /* Kho/Ship: mọi ngày = 1 (không ½ T7/nghỉ CN) */
         const isOff = v === '_';
         const isSat = sf === 0.5;
         const cellClass = isOff ? 'att-cell off' :
@@ -457,7 +481,7 @@
     /* === Tổng kết toàn công ty === */
     const totals = staffs.reduce((acc, s) => {
       const sh = sheetOf(s.id); const md = metaOf(s.id);
-      const c = counts(sh ? sh.days : defaultDays(), md);
+      const c = counts(sh ? sh.days : defaultDaysFor(s), md);
       acc.X += c.X; acc.L += c.L; acc.H += c.H; acc.P += c.P; acc.V += c.V; acc.lateMin += c.lateMin;
       return acc;
     }, { X: 0, L: 0, H: 0, P: 0, V: 0, lateMin: 0 });
@@ -604,13 +628,12 @@
   function openCellPopover(td, evt) {
     if (!canEdit()) { window.toast('🔒 Bạn không có quyền chấm công (cần payroll.edit)', 'warn'); return; }
     const sid = td.dataset.sid; const day = parseInt(td.dataset.day, 10);
-    const sh = sheetOf(sid); const days = sh ? sh.days.slice() : defaultDays();
-    const cur = days[day - 1]; if (cur === '_') return;
-    const md = metaOf(sid); const curLate = (md[day] && md[day].lateMin) || 0;
-    const sf = shiftFactorOfDay(day);
-    const isSat = sf === 0.5;
-    /* Get staff to use correct shift hours */
     const staff = STAFF().find(s => s.id === sid);
+    const sh = sheetOf(sid); const days = sh ? sh.days.slice() : defaultDaysFor(staff);
+    const cur = days[day - 1]; if (cur === '_' && !_fullWeekStaff(staff)) return;   /* Kho/Ship: cho sửa cả ngày CN (làm cả tuần) */
+    const md = metaOf(sid); const curLate = (md[day] && md[day].lateMin) || 0;
+    const sf = shiftFactorForStaff(staff, day);   /* Kho/Ship: T7/CN vẫn full */
+    const isSat = sf === 0.5;
     const SH = shiftHoursFor(staff);
     const shTag = SH === SHIFT_SHIPPER ? '🛵 Ship' : SH === SHIFT_WAREHOUSE ? '📦 Kho' : '🏢 Văn phòng';
     const shiftInfo = isSat
@@ -781,8 +804,8 @@
 
     const empData = staffs.map(s => {
       const sh = sheetOf(s.id);
-      const days = sh ? sh.days : defaultDays();
-      const paid = paidDays(days);
+      const days = sh ? sh.days : defaultDaysFor(s);
+      const paid = paidDaysFor(s, days);
       /* NC chuẩn theo PHÒNG: Ship 30 · Kho 29/30(TV) · Văn phòng theo lịch tháng */
       const wd = window.workStandardFor ? window.workStandardFor(s.dept, s.contractType, month, s.role) : wdOffice;
       const luongNgay = wd ? Math.round((s.salary || 0) / wd) : 0;
