@@ -90,6 +90,19 @@
     const A = window.AUTH; const u = A && A.currentUser && A.currentUser();
     return (u && u.name) || (window.CURRENT_USER && window.CURRENT_USER.name) || '';
   }
+  /* NV phụ trách KH = CHỈ phòng Sale (khách do sale quản lý). Trả TÊN NV. */
+  function _saleStaffNames() {
+    const all = (window.STORE.get('staff', []) || []).filter(s => s.status === 'active');
+    let sale = all.filter(s => String(s.dept || '') === 'Sale').map(s => s.name);
+    if (!sale.length) sale = all.map(s => s.name);   /* fallback: chưa gán ai vào Sale */
+    return sale;
+  }
+  /* <option> cho select — Sale + GIỮ giá trị hiện tại nếu là người ngoài Sale (khỏi mất chủ cũ) */
+  function _saleStaffOpts(selected) {
+    let list = _saleStaffNames();
+    if (selected && !list.includes(selected)) list = [selected, ...list];
+    return list.map(s => `<option ${selected === s ? 'selected' : ''}>${s}</option>`).join('');
+  }
 
   /* ====== SỔ CÔNG NỢ THẬT theo ngày (thay bảng giả) ======
      Lấy từ debtLedger (phát sinh từ đơn giao + phiếu thu). Số dư đầu kỳ tự khớp về c.debt
@@ -418,7 +431,9 @@
                           options: () => window.MD.get('custGroups').map(g => ({ value: g.id, label: g.label || g.id })),
                           format: v => { const cls = v==='VIP'?'tag-vip':v==='Mới'?'tag-moi':v==='Inactive'?'tag-inact':'tag-thuong'; return `<span class="tag ${cls}">${v}</span>`; } },
             address:    { type: 'text', format: v => v || '—' },
-            staffOwner: { type: 'text', format: v => `<span class="staff-pill">${v||'—'}</span>` },
+            staffOwner: { type: 'select',
+                          options: () => _saleStaffNames().map(n => ({ value: n, label: n })),
+                          format: v => `<span class="staff-pill">${v||'—'}</span>` },
           }
         });
       }
@@ -737,12 +752,7 @@
       <div class="form-row">
         <div><label>NV phụ trách${isScoped() ? ' <span style="color:var(--muted);font-weight:400">(chính bạn)</span>' : ''}</label>
           <select id="addStaff" ${isScoped() ? 'disabled' : ''}>${
-            (isScoped()
-              ? [`<option selected>${myName()}</option>`]
-              : (window.STORE.get('staff', []) || [])
-                  .filter(s => s.status !== 'inactive')
-                  .map(s => `<option ${s.name === myName() ? 'selected' : ''}>${s.name}</option>`)
-            ).join('') || '<option>Tuấn Tú</option>'
+            isScoped() ? `<option selected>${myName()}</option>` : (_saleStaffOpts(myName()) || '<option>Tuấn Tú</option>')
           }</select></div>
         <div><label>Nguồn</label>
           <select id="addSource">${window.MD.options('sources')}</select></div>
@@ -1134,13 +1144,8 @@
       </div>
       <div class="form-row">
         <div><label>Email</label><input id="eEmail" value="${c.email||''}"></div>
-        <div><label>NV phụ trách</label>
-          <select id="eStaff">${
-            ((window.STORE.get('staff', []) || []).filter(s => s.status !== 'inactive').map(s => s.name).length
-              ? (window.STORE.get('staff', []) || []).filter(s => s.status !== 'inactive').map(s => s.name)
-              : ['Trần Lan','Phạm Hùng','Hoàng Mai','Tuấn Tú']
-            ).map(s=>`<option ${c.staffOwner===s?'selected':''}>${s}</option>`).join('')
-          }</select></div>
+        <div><label>NV phụ trách <span style="color:var(--muted);font-weight:400;font-size:11px">(phòng Sale)</span></label>
+          <select id="eStaff">${_saleStaffOpts(c.staffOwner)}</select></div>
       </div>
       <div class="form-row">
         <div><label>Nhóm giá (bảng giá KH nhận)</label>
