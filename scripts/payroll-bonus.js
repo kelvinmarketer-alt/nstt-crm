@@ -126,7 +126,7 @@
         <div style="font-size:12.5px;color:var(--muted)">Sổ thưởng hỗ trợ tháng <b style="color:var(--navy)">${_bMonth.slice(5)}/${_bMonth.slice(0, 4)}</b> · ${monthLog.length} khoản · Σ <b style="color:#15803D">${fmt(grandTotal)}đ</b> → tự cộng vào phiếu lương.</div>
         <div style="flex:1"></div>
         <button class="btn btn-ghost" onclick="window.BONUS.openRules()" title="Sửa mức thưởng">⚙ Cấu hình mức thưởng</button>
-        <button class="btn btn-primary" onclick="window.BONUS.openEntry()">➕ Ghi khoản thưởng</button>
+        <button class="btn btn-primary" onclick="window.BONUS.openBatch()">➕ Ghi phiếu thưởng</button>
       </div>
       <div style="overflow:auto;border:1px solid var(--line);border-radius:10px;background:#fff">
         <table class="mini-table" style="width:100%;border-collapse:separate;border-spacing:0">
@@ -296,6 +296,146 @@
     renderBonusTab();
   }
 
+  /* ===== MODAL: GHI PHIẾU (nhiều khoản 1 lần cho 1 NV) =====
+     Chọn NV 1 lần → thêm nhiều DÒNG (mỗi dòng: ngày · nhiệm vụ · đơn/kg/đơn xa) → lưu tất cả. */
+  let _rowSeq = 0;
+  function openBatch() {
+    _rowSeq = 0;
+    const html = `
+      <style>
+        .be-ac{position:absolute;left:0;right:0;top:100%;z-index:60;background:#fff;border:1px solid var(--line);border-radius:8px;box-shadow:0 8px 24px rgba(0,0,0,.14);max-height:220px;overflow:auto;display:none;margin-top:2px}
+        .be-ac-grp{padding:5px 10px;font-size:10px;font-weight:700;color:#15803D;background:#F0FDF4;text-transform:uppercase;position:sticky;top:0}
+        .be-ac-item{padding:7px 11px;font-size:13px;cursor:pointer}.be-ac-item:hover{background:#EFF9F0}
+      </style>
+      <div style="display:grid;gap:11px">
+        <div style="position:relative"><label style="font-size:11.5px;font-weight:600;color:var(--muted)">Nhân sự (Kho / Ship) — gõ tên</label>
+          <input id="beStaff" autocomplete="off" placeholder="Gõ tên NV… (bỏ trống = xem theo phòng)"
+            oninput="window.BONUS._acStaff(this.value)" onfocus="window.BONUS._acStaff(this.value)" onblur="window.BONUS._hideAc('beStaffSug')"
+            style="width:100%;padding:8px;border:1px solid var(--line);border-radius:7px">
+          <input type="hidden" id="beStaffId" value="">
+          <div id="beStaffSug" class="be-ac"></div></div>
+        <div style="display:flex;justify-content:space-between;align-items:center;margin-top:2px">
+          <b style="font-size:12.5px;color:var(--navy)">Các khoản hỗ trợ</b>
+          <button class="btn btn-ghost btn-sm" style="font-size:12px" onclick="window.BONUS._addRow()">➕ Thêm dòng</button>
+        </div>
+        <div id="beRows"></div>
+        <div id="beBatchTotal" style="background:#F0FDF4;border:1px solid #BBF7D0;border-radius:8px;padding:9px 12px;font-size:13px;color:#15803D">Tổng phiếu: <b>+0đ</b> · <b>0</b> khoản</div>
+      </div>`;
+    window.openModal('➕ Ghi phiếu thưởng hỗ trợ (nhiều khoản)', html, {
+      width: '660px',
+      footer: `<button class="btn btn-ghost" onclick="window.closeModal()">Huỷ</button>
+               <button class="btn btn-primary" onclick="window.BONUS._saveBatch()">💾 Lưu tất cả</button>`,
+    });
+    setTimeout(() => { _addRow(); _addRow(); }, 30);   /* mở sẵn 2 dòng */
+  }
+  function _rowHtml(idx, date) {
+    const far = (getRules().shipFar || []).map(f => `<option value="${f.id}">${esc(f.name)} (+${fmt(f.amount)})</option>`).join('');
+    const inp = 'padding:6px;border:1px solid var(--line);border-radius:6px;font-size:12px';
+    return `<div class="be-row" data-idx="${idx}" style="border:1px solid #E6ECE4;border-radius:8px;padding:8px 10px;margin-bottom:8px;background:#fff">
+      <div style="display:flex;gap:6px;align-items:center;flex-wrap:wrap">
+        <input type="date" class="be-r-date" value="${esc(date)}" style="${inp}">
+        <select class="be-r-task" onchange="window.BONUS._rowTask(${idx})" style="${inp}">
+          <option value="">— nhiệm vụ —</option>
+          ${Object.keys(TASKS).map(k => `<option value="${k}">${TASKS[k].icon} ${TASKS[k].dept}·${TASKS[k].label}</option>`).join('')}
+        </select>
+        <div class="be-r-order" style="display:none;position:relative;flex:1;min-width:150px">
+          <input class="be-r-ord" autocomplete="off" placeholder="Gõ mã/tên đơn…" oninput="window.BONUS._acOrderRow(${idx})" onfocus="window.BONUS._acOrderRow(${idx})" onblur="window.BONUS._hideAcEl(this.nextElementSibling)" style="width:100%;${inp}">
+          <div class="be-r-ordsug be-ac"></div>
+        </div>
+        <input type="number" class="be-r-wt" min="0" step="0.1" placeholder="kg" oninput="window.BONUS._rowCalc(${idx})" style="display:none;width:62px;text-align:right;${inp}">
+        <select class="be-r-far" onchange="window.BONUS._rowCalc(${idx})" style="display:none;${inp}"><option value="">— đơn xa —</option>${far}</select>
+        <span class="be-r-amt" style="font-weight:700;color:#15803D;min-width:62px;text-align:right;font-size:12.5px">+0đ</span>
+        <button onclick="window.BONUS._removeRow(${idx})" title="Xoá dòng" style="border:none;background:none;color:#B91C1C;cursor:pointer;font-size:14px">✕</button>
+      </div>
+      <input class="be-r-note" placeholder="ghi chú (tuỳ chọn)" style="width:100%;margin-top:5px;${inp}">
+    </div>`;
+  }
+  function _addRow() {
+    const box = document.getElementById('beRows'); if (!box) return;
+    const idx = _rowSeq++;
+    const date = window.todayISO ? window.todayISO().slice(0, 10) : '';
+    const d = document.createElement('div'); d.innerHTML = _rowHtml(idx, date);
+    box.appendChild(d.firstElementChild);
+  }
+  function _rowOf(idx) { return document.querySelector('.be-row[data-idx="' + idx + '"]'); }
+  function _rowTask(idx) {
+    const row = _rowOf(idx); if (!row) return;
+    const t = TASKS[row.querySelector('.be-r-task').value] || {};
+    row.querySelector('.be-r-order').style.display = t.needsOrder ? 'block' : 'none';
+    row.querySelector('.be-r-wt').style.display = t.needsOrder ? 'block' : 'none';
+    row.querySelector('.be-r-far').style.display = t.needsFar ? 'block' : 'none';
+    _rowCalc(idx);
+  }
+  function _rowEntry(row) {
+    return { task: row.querySelector('.be-r-task').value, weight: row.querySelector('.be-r-wt').value, farId: row.querySelector('.be-r-far').value };
+  }
+  function _rowCalc(idx) {
+    const row = _rowOf(idx); if (!row) return;
+    const e = _rowEntry(row); const amt = computeAmount(e, getRules());
+    const el = row.querySelector('.be-r-amt');
+    el.textContent = amt ? '+' + fmt(amt) : (e.task === 'kho-ship' ? '0 (ngoài 31-99kg)' : '0');
+    el.style.color = amt ? '#15803D' : '#B45309';
+    _batchTotal();
+  }
+  function _batchTotal() {
+    let total = 0, n = 0; const rules = getRules();
+    document.querySelectorAll('.be-row').forEach(row => { const e = _rowEntry(row); if (!e.task) return; total += computeAmount(e, rules); n++; });
+    const el = document.getElementById('beBatchTotal');
+    if (el) el.innerHTML = `Tổng phiếu: <b style="color:#15803D">+${fmt(total)}đ</b> · <b>${n}</b> khoản`;
+  }
+  function _removeRow(idx) { const row = _rowOf(idx); if (row) row.remove(); _batchTotal(); }
+  function _hideAcEl(el) { setTimeout(() => { if (el) el.style.display = 'none'; }, 160); }
+  function _acOrderRow(idx) {
+    const row = _rowOf(idx); if (!row) return;
+    const inp = row.querySelector('.be-r-ord'); const box = row.querySelector('.be-r-ordsug');
+    const nq = _norm(inp.value);
+    let list = (S().get('orders', []) || []).filter(o => o.status !== 'draft' && o.status !== 'cancelled');
+    list.sort((a, b) => String(b.code).localeCompare(String(a.code)));
+    list = (nq ? list.filter(o => _norm(String(o.code) + ' ' + (o.custName || '')).includes(nq)) : list).slice(0, nq ? 30 : 12);
+    if (!list.length) { box.style.display = 'none'; return; }
+    box.innerHTML = list.map(o => `<div class="be-ac-item" onmousedown="window.BONUS._pickOrderRow(${idx},'${esc(String(o.code))}')"><b>${esc(o.code)}</b> <span style="color:var(--muted);font-size:11px">· ${esc(o.custName || '')}${o.weight ? ' · ' + o.weight + 'kg' : ''}</span></div>`).join('');
+    box.style.display = 'block';
+  }
+  function _pickOrderRow(idx, code) {
+    const row = _rowOf(idx); if (!row) return;
+    const o = (S().get('orders', []) || []).find(x => String(x.code) === code);
+    row.querySelector('.be-r-ord').value = code;
+    if (o && o.weight) row.querySelector('.be-r-wt').value = o.weight;
+    row.querySelector('.be-r-ordsug').style.display = 'none';
+    _rowCalc(idx);
+  }
+  function _saveBatch() {
+    const staffId = (document.getElementById('beStaffId') || {}).value;
+    if (!staffId) { window.toast?.('Chọn nhân sự trước (gõ tên)', 'warn'); return; }
+    const st = staffById(staffId);
+    const rules = getRules();
+    const toAdd = []; let skip = 0;
+    document.querySelectorAll('.be-row').forEach(row => {
+      const date = row.querySelector('.be-r-date').value;
+      const task = row.querySelector('.be-r-task').value;
+      if (!date || !task) { skip++; return; }
+      const t = TASKS[task];
+      if (st.dept && t.dept && st.dept !== t.dept) { skip++; return; }
+      const weight = t.needsOrder ? (+row.querySelector('.be-r-wt').value || 0) : null;
+      const farId = t.needsFar ? (row.querySelector('.be-r-far').value || '') : null;
+      if (t.needsFar && !farId) { skip++; return; }
+      const orderCode = t.needsOrder ? (row.querySelector('.be-r-ord').value || '') : '';
+      toAdd.push({
+        id: uid(), date, staffId, staffName: st.name || '', dept: st.dept || t.dept,
+        task, orderCode, orderName: orderCode, weight, farId,
+        amount: computeAmount({ task, weight, farId }, rules),
+        note: row.querySelector('.be-r-note').value || '', updatedAt: new Date().toISOString(),
+      });
+    });
+    if (!toAdd.length) { window.toast?.('Chưa có dòng hợp lệ — điền Ngày + Nhiệm vụ (khớp phòng NV)', 'warn'); return; }
+    const log = getLog(); toAdd.forEach(r => log.unshift(r)); saveLog(log);
+    window.closeModal?.();
+    const total = toAdd.reduce((s, r) => s + r.amount, 0);
+    window.toast?.(`✓ Lưu ${toAdd.length} khoản cho ${st.name} (+${fmt(total)}đ)${skip ? ` · bỏ ${skip} dòng thiếu/lệch phòng` : ''}`, 'success');
+    renderBonusTab();
+    window.renderPayrollPublic && window.renderPayrollPublic();
+  }
+
   /* ===== MODAL: cấu hình mức thưởng ===== */
   function openRules() {
     const r = getRules();
@@ -379,6 +519,7 @@
     renderBonusTab, openEntry, delEntry, openRules, setBonusMonth,
     _onStaffTask, _calc, _save, _addTier, _addFar, _saveRules,
     _acStaff, _pickStaff, _acOrder, _pickOrder, _hideAc,
+    openBatch, _addRow, _rowTask, _rowCalc, _removeRow, _acOrderRow, _pickOrderRow, _hideAcEl, _saveBatch,
     labelOf: _labelOf,
   };
 })();
