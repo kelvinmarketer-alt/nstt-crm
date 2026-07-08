@@ -141,6 +141,7 @@
   function render() {
     document.getElementById('payTabs').innerHTML =
       `<div class="rpt-tab ${tab === 'attend' ? 'active' : ''}" onclick="window.setPayTab('attend')">📅 Chấm công</div>` +
+      `<div class="rpt-tab ${tab === 'calendar' ? 'active' : ''}" onclick="window.setPayTab('calendar')">🗓️ Lịch công</div>` +
       `<div class="rpt-tab ${tab === 'payroll' ? 'active' : ''}" onclick="window.setPayTab('payroll')">💰 Bảng lương</div>`;
     document.getElementById('payMonth').value = month;
     /* Hide upload button if user lacks perm */
@@ -152,12 +153,85 @@
       head.innerHTML = '🔒 Bạn chỉ được xem chấm công + lương <b>của chính mình</b>. ' +
                        'Cần perm <code>payroll.viewAll</code> để xem toàn bộ NV.';
     }
-    if (tab === 'attend') renderAttend(); else renderPayroll();
+    if (tab === 'attend') renderAttend(); else if (tab === 'calendar') renderCalendar(); else renderPayroll();
   }
   window.setPayTab = t => { tab = t; render(); };
   window.setPayMonth = m => { month = m; render(); };
   /* Expose để batch submit gọi refresh không cần reload */
   window.renderPayrollPublic = () => { if (tab === 'payroll') renderPayroll(); else render(); };
+
+  /* ===== 🗓️ LỊCH CÔNG: xem tháng nào có 5 T7 + 5 CN → NC chuẩn (công mặc định) GIẢM ===== */
+  function _monthStats(y, m) {
+    const last = new Date(y, m, 0).getDate();
+    let sat = 0, sun = 0, nc = 0;
+    for (let d = 1; d <= last; d++) {
+      const dow = new Date(y, m - 1, d).getDay();
+      if (dow === 6) sat++; else if (dow === 0) sun++;
+      nc += shiftFactor(y, m - 1, d);   /* T2-T6=1 · T7=0.5 · CN=0 */
+    }
+    return { last, sat, sun, nc, reduced: sat >= 5 && sun >= 5 };
+  }
+  const _ncFmt = n => (n % 1 === 0 ? String(n) : n.toFixed(1));
+  function renderCalendar() {
+    const [y, m] = month.split('-').map(Number);
+    const st = _monthStats(y, m);
+    /* NC chuẩn "đầy đủ" tham chiếu = tháng 4 T7 + 4 CN cùng số ngày (để so lệch) */
+    const refNc = st.last - 4 * 0.5 - 4;   /* (last - 8 ngày cuối tuần) + 4×0.5 = last - 4 - 4 = last-8+2... */
+    /* Lưới ngày, tuần bắt đầu THỨ 2 */
+    const first = new Date(y, m - 1, 1).getDay();       /* 0=CN..6=T7 */
+    const startCol = (first + 6) % 7;                    /* Mon=0 */
+    const cells = [];
+    for (let i = 0; i < startCol; i++) cells.push(0);
+    for (let d = 1; d <= st.last; d++) cells.push(d);
+    while (cells.length % 7) cells.push(0);
+    const dow = ['T2', 'T3', 'T4', 'T5', 'T6', 'T7', 'CN'];
+    let grid = `<div style="display:grid;grid-template-columns:repeat(7,1fr);gap:5px;max-width:520px">`;
+    grid += dow.map((n, i) => `<div style="text-align:center;font-weight:700;font-size:11.5px;color:${i === 5 ? '#B45309' : i === 6 ? '#DC2626' : 'var(--muted)'};padding:3px 0">${n}</div>`).join('');
+    cells.forEach(d => {
+      if (!d) { grid += `<div></div>`; return; }
+      const wd = new Date(y, m - 1, d).getDay();
+      const isSat = wd === 6, isSun = wd === 0;
+      const bg = isSun ? '#FEE2E2' : isSat ? '#FEF3C7' : '#fff';
+      const bd = isSun ? '#FCA5A5' : isSat ? '#FDE68A' : '#E6ECE4';
+      const col = isSun ? '#DC2626' : isSat ? '#B45309' : 'var(--navy)';
+      const fac = isSun ? '0' : isSat ? '½' : '1';
+      grid += `<div style="background:${bg};border:1px solid ${bd};border-radius:8px;padding:6px 3px;text-align:center;min-height:44px">
+        <div style="font-weight:700;font-size:14px;color:${col}">${d}</div>
+        <div style="font-size:9px;color:${col};opacity:.75">${fac} công</div>
+      </div>`;
+    });
+    grid += `</div>`;
+    /* Dải 12 tháng của năm — cờ tháng 5+5 */
+    const yr = Array.from({ length: 12 }, (_, i) => {
+      const ms = _monthStats(y, i + 1); const cur = (i + 1) === m;
+      return `<button onclick="window.setPayMonth('${y}-${String(i + 1).padStart(2, '0')}')" title="${ms.reduced ? '⚠ 5 T7 + 5 CN → công giảm' : ''} NC chuẩn ${_ncFmt(ms.nc)}"
+        style="border:1.5px solid ${cur ? '#15803D' : ms.reduced ? '#F59E0B' : '#E6ECE4'};background:${cur ? '#DCFCE7' : ms.reduced ? '#FFFBEB' : '#fff'};border-radius:8px;padding:6px 4px;cursor:pointer;text-align:center">
+        <div style="font-weight:700;font-size:12px;color:${cur ? '#15803D' : 'var(--navy)'}">Th${i + 1}</div>
+        <div style="font-size:10px;color:var(--muted)">${_ncFmt(ms.nc)} công</div>
+        ${ms.reduced ? '<div style="font-size:9px;color:#B45309;font-weight:700">⚠ 5+5</div>' : ''}
+      </button>`;
+    }).join('');
+
+    document.getElementById('payView').innerHTML = `
+      <div style="display:flex;gap:14px;flex-wrap:wrap;align-items:flex-start">
+        <div style="flex:1;min-width:300px">
+          <div style="display:flex;gap:10px;flex-wrap:wrap;margin-bottom:12px">
+            <div class="kpi" style="flex:1;min-width:120px"><div class="kpi-label">NC chuẩn tháng ${m}/${y}</div><div class="kpi-value">${_ncFmt(st.nc)}</div><div class="kpi-trend">công mặc định 1 NV làm đủ</div><div class="kpi-icon">🗓️</div></div>
+            <div class="kpi" style="flex:1;min-width:90px"><div class="kpi-label" style="color:#B45309">Thứ 7</div><div class="kpi-value" style="color:#B45309">${st.sat}</div><div class="kpi-trend">½ công/ngày</div></div>
+            <div class="kpi" style="flex:1;min-width:90px"><div class="kpi-label" style="color:#DC2626">Chủ nhật</div><div class="kpi-value" style="color:#DC2626">${st.sun}</div><div class="kpi-trend">nghỉ · 0 công</div></div>
+          </div>
+          ${st.reduced
+            ? `<div style="background:#FFFBEB;border:1px solid #FDE68A;border-radius:9px;padding:11px 14px;margin-bottom:12px;font-size:12.5px;color:#92400E"><b>⚠ Tháng ${m}/${y} có 5 Thứ 7 + 5 Chủ nhật</b> → NC chuẩn chỉ còn <b>${_ncFmt(st.nc)} công</b> (thường ~${_ncFmt(refNc)}). Công mặc định của NV tháng này bị GIẢM — app đã tự tính đúng khi ra lương.</div>`
+            : `<div style="background:#F0FDF4;border:1px solid #BBF7D0;border-radius:9px;padding:11px 14px;margin-bottom:12px;font-size:12.5px;color:#15803D">✓ Tháng ${m}/${y} bình thường (${st.sat} T7 + ${st.sun} CN) → NC chuẩn <b>${_ncFmt(st.nc)} công</b>.</div>`}
+          ${grid}
+          <div style="font-size:11px;color:var(--muted);margin-top:10px">Quy ước công: <b>T2–T6</b> = 1 công · <b style="color:#B45309">T7</b> = ½ công · <b style="color:#DC2626">CN</b> = nghỉ (0). Tháng nào rơi <b>5 T7 + 5 CN</b> thì tổng công mặc định thấp hơn.</div>
+        </div>
+        <div style="flex:1;min-width:280px">
+          <div style="font-weight:700;color:var(--navy);font-size:13px;margin-bottom:8px">📆 Cả năm ${y} <span style="font-weight:400;color:var(--muted);font-size:11.5px">— tháng viền cam ⚠ = 5+5, công giảm</span></div>
+          <div style="display:grid;grid-template-columns:repeat(4,1fr);gap:6px">${yr}</div>
+        </div>
+      </div>`;
+  }
   /* Hide nút header theo perm — call sau init render */
   window.applyPayrollHeaderPerms = function () {
     const subBtn = document.querySelector('[onclick*="submitAllDrafts"]');
@@ -642,6 +716,19 @@
     return { amount: 0, label: '—' };
   }
 
+  /* ===== Nhóm bảng lương theo PHÒNG BAN (accordion: header = quỹ lương phòng, bấm xổ NV) ===== */
+  const _payDeptKey = d => String(d || 'Khác').normalize('NFD').replace(/[̀-ͯ]/g, '').replace(/đ/gi, 'd').replace(/[^a-zA-Z0-9]+/g, '_').toLowerCase() || 'khac';
+  let _payDeptOpen = new Set();   /* phòng đang xổ (mặc định GẬP hết → chỉ hiện tổng quỹ mỗi phòng) */
+  window.togglePayDept = function (key) {
+    const open = !_payDeptOpen.has(key);
+    if (open) _payDeptOpen.add(key); else _payDeptOpen.delete(key);
+    document.querySelectorAll(`tr.pay-emp[data-dept="${key}"]`).forEach(tr => { tr.style.display = open ? '' : 'none'; });
+    const chev = document.querySelector(`tr.pay-dept-hdr[data-deptkey="${key}"] .dept-chev`);
+    if (chev) chev.textContent = open ? '▾' : '▸';
+    const hdr = document.querySelector(`tr.pay-dept-hdr[data-deptkey="${key}"]`);
+    if (hdr) hdr.classList.toggle('open', open);
+  };
+
   function renderPayroll() {
     const staffs = STAFF(); const wd = workdaysInMonth();
     /* === Đọc payslips đã lập (array) cho tháng đang chọn === */
@@ -663,7 +750,7 @@
     let totalBhxhAll = 0; let totalAdvAll = 0; let totalCongAll = 0;
     let countByStatus = { draft: 0, submitted: 0, approved: 0, paid: 0, none: 0 };
 
-    const rows = staffs.map(s => {
+    const empData = staffs.map(s => {
       const sh = sheetOf(s.id);
       const days = sh ? sh.days : defaultDays();
       const paid = paidDays(days);
@@ -708,7 +795,8 @@
       totalAdvAll += advance;
       totalCongAll += workActual;
 
-      return `<tr>
+      const deptKey = _payDeptKey(s.dept);
+      const rowHtml = `<tr class="pay-emp" data-dept="${deptKey}" style="${_payDeptOpen.has(deptKey) ? '' : 'display:none'}">
         <td><div style="display:flex;align-items:center;gap:8px">
           <div style="width:28px;height:28px;border-radius:50%;background:${window.avatarColor(s.name)};color:#fff;display:grid;place-items:center;font-size:11px;font-weight:700">${window.initials(s.name)}</div>
           <div><b>${s.name}</b><div style="color:var(--muted);font-size:11px">${s.role} · ${s.dept || ''}</div></div>
@@ -728,6 +816,23 @@
             : `<span style="color:var(--muted);font-size:11px;opacity:0.6" title="Bạn không có quyền duyệt lương">🔒</span>`}
         </td>
       </tr>`;
+      return { deptKey, dept: s.dept || 'Khác', total, rowHtml };
+    });
+
+    /* Gom theo PHÒNG BAN → mỗi phòng 1 dòng header (bấm xổ) + các NV bên dưới (ẩn khi gập) */
+    const _dg = {};
+    empData.forEach(e => { const g = _dg[e.deptKey] || (_dg[e.deptKey] = { name: e.dept, key: e.deptKey, emps: [], total: 0 }); g.emps.push(e); g.total += e.total; });
+    const _dgList = Object.values(_dg).sort((a, b) => b.total - a.total);   /* phòng quỹ lớn lên trước */
+    const rows = _dgList.map(g => {
+      const open = _payDeptOpen.has(g.key);
+      const hdr = `<tr class="pay-dept-hdr${open ? ' open' : ''}" data-deptkey="${g.key}" onclick="window.togglePayDept('${g.key}')">
+        <td colspan="11">
+          <span class="dept-chev" style="display:inline-block;width:14px;color:#15803D">${open ? '▾' : '▸'}</span>
+          <b style="font-size:13px">${g.name}</b>
+          <span style="color:var(--muted);font-size:11.5px;margin-left:6px">${g.emps.length} NV</span>
+          <span style="float:right;font-weight:800;color:var(--red)">Quỹ: ${window.fmt(g.total)}đ</span>
+        </td></tr>`;
+      return hdr + g.emps.map(e => e.rowHtml).join('');
     }).join('');
 
     const wdFmt = wd % 1 === 0 ? wd : wd.toFixed(1);
@@ -777,6 +882,10 @@
         .pay-table tfoot td:first-child,.pay-table tfoot td:last-child{background:#F9FAFB}
         .pay-table tbody tr:hover td{background:#F8FAF8}
         .pay-table tbody tr:hover td:first-child,.pay-table tbody tr:hover td:last-child{background:#F3FAF3}
+        /* Dòng header PHÒNG BAN (accordion) — 1 ô colspan, KHÔNG sticky, bấm để xổ/gập NV */
+        .pay-table tr.pay-dept-hdr td{position:static!important;left:auto!important;right:auto!important;box-shadow:none!important;background:#F0FDF4!important;cursor:pointer;padding:10px 14px!important;border-top:2px solid #BBF7D0;white-space:normal!important}
+        .pay-table tr.pay-dept-hdr:hover td{background:#E4F7E8!important}
+        .pay-table tr.pay-dept-hdr.open td{background:#DCFCE7!important}
         /* ===== ĐIỆN THOẠI: bảng lương → mỗi NV 1 THẺ (hết kéo ngang) ===== */
         @media (max-width:560px){
           .pay-wrap{overflow:visible!important;border:none;background:transparent}
@@ -804,6 +913,9 @@
           /* nút Phiếu (cột 11) = hàng đáy full-width */
           .pay-table tbody td:nth-child(11){margin-top:8px;text-align:center!important}
           .pay-table tbody td:nth-child(11) .btn{width:100%}
+          /* Header phòng ban trên ĐT: 1 dòng gọn, bỏ style card của cột 1 */
+          .pay-table tr.pay-dept-hdr td{padding:10px 12px!important;padding-right:12px!important;font-size:13px;border-bottom:none!important;margin-bottom:0!important}
+          .pay-table tr.pay-dept-hdr td::before{content:""!important}
         }
       </style>
       <div class="pay-wrap">
