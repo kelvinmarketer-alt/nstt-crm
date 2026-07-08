@@ -23,15 +23,15 @@
     return M[x] || ((d || '').toString().trim());
   }
 
-  /* ===== Nhóm bảng NV theo PHÒNG BAN (accordion — mặc định MỞ, bấm header để gập) ===== */
+  /* ===== Nhóm bảng NV theo PHÒNG BAN (accordion — mặc định GẬP, bấm header để xổ) ===== */
   const _sDeptKey = d => String(d || 'Khác').normalize('NFD').replace(/[̀-ͯ]/g, '').replace(/đ/gi, 'd').replace(/[^a-zA-Z0-9]+/g, '_').toLowerCase() || 'khac';
-  let _staffDeptCollapsed = new Set();
+  let _staffDeptOpen = new Set();   /* phòng đang XỔ (mặc định rỗng = gập hết, chỉ hiện header) */
   window.toggleStaffDept = function (key) {
-    if (_staffDeptCollapsed.has(key)) _staffDeptCollapsed.delete(key); else _staffDeptCollapsed.add(key);
-    const collapsed = _staffDeptCollapsed.has(key);
-    document.querySelectorAll(`#stTbody tr.st-emp[data-dept="${key}"]`).forEach(tr => { tr.style.display = collapsed ? 'none' : ''; });
+    if (_staffDeptOpen.has(key)) _staffDeptOpen.delete(key); else _staffDeptOpen.add(key);
+    const open = _staffDeptOpen.has(key);
+    document.querySelectorAll(`#stTbody tr.st-emp[data-dept="${key}"]`).forEach(tr => { tr.style.display = open ? '' : 'none'; });
     const chev = document.querySelector(`#stTbody tr.st-dept-hdr[data-deptkey="${key}"] .st-chev`);
-    if (chev) chev.textContent = collapsed ? '▸' : '▾';
+    if (chev) chev.textContent = open ? '▾' : '▸';
   };
 
   function render() {
@@ -71,7 +71,7 @@
                   + ((s.permissions||[]).length > 2 ? `<span class="perm-pill">+${s.permissions.length-2}</span>` : '');
       const _dName = _normDept(s.dept);
       const _dKey = _sDeptKey(_dName);
-      const _html = `<tr class="st-emp" data-id="${s.id}" data-dept="${_dKey}" style="${_staffDeptCollapsed.has(_dKey) ? 'display:none' : ''}">
+      const _html = `<tr class="st-emp" data-id="${s.id}" data-dept="${_dKey}" style="${_staffDeptOpen.has(_dKey) ? '' : 'display:none'}">
         <td class="hide-xs"><b>${s.code || s.id || '—'}</b></td>
         <td data-field="name">
           <div class="cust-cell">
@@ -103,15 +103,17 @@
       </tr>`;
       return { dName: _dName, dKey: _dKey, salary: +s.salary || 0, html: _html };
     });
+    /* Lọc theo 1 phòng cụ thể (chip) → tự XỔ phòng đó để thấy NV luôn */
+    if (curDept !== 'all') _staffDeptOpen.add(_sDeptKey(_normDept(curDept)));
     /* Gom theo PHÒNG BAN → dòng header (bấm gập/mở) + các NV bên dưới */
     const _sg = {};
     _empRows.forEach(e => { const g = _sg[e.dKey] || (_sg[e.dKey] = { name: e.dName, key: e.dKey, emps: [], salary: 0 }); g.emps.push(e); g.salary += e.salary; });
     const _fmtS = window.fmtShort || (n => (n || 0).toLocaleString('vi-VN'));
     const _tbody = Object.values(_sg).sort((a, b) => b.emps.length - a.emps.length).map(g => {
-      const collapsed = _staffDeptCollapsed.has(g.key);
+      const open = _staffDeptOpen.has(g.key);
       const hdr = `<tr class="st-dept-hdr" data-deptkey="${g.key}" onclick="window.toggleStaffDept('${g.key}')" style="cursor:pointer">
         <td colspan="10" style="padding:9px 14px;background:#F0FDF4;border-top:2px solid #BBF7D0;text-align:left">
-          <span class="st-chev" style="color:#15803D;width:12px;display:inline-block">${collapsed ? '▸' : '▾'}</span>
+          <span class="st-chev" style="color:#15803D;width:12px;display:inline-block">${open ? '▾' : '▸'}</span>
           <b style="font-size:13px">${g.name}</b>
           <span style="color:var(--muted);font-size:11.5px;margin-left:6px">${g.emps.length} NV · Quỹ LCB ${_fmtS(g.salary)}đ</span>
         </td></tr>`;

@@ -148,23 +148,28 @@
   function openEntry(id) {
     const rules = getRules();
     const ent = id ? getLog().find(e => e.id === id) : null;
-    const staff = KHO_SHIP().sort((a, b) => String(a.dept).localeCompare(b.dept) || String(a.name).localeCompare(b.name));
-    const orders = (S().get('orders', []) || []).filter(o => o.status !== 'draft' && o.status !== 'cancelled').slice(0, 400);
-    const orderDL = orders.map(o => `<option value="${esc(o.code)}">${esc(o.code)} — ${esc(o.custName || '')}${o.weight ? ' · ' + o.weight + 'kg' : ''}</option>`).join('');
     const cur = ent || { date: (document.getElementById('payMonth') || {}).value ? _bMonth + '-' + String(new Date().getDate()).padStart(2, '0') : '', staffId: '', task: '', note: '' };
     if (!cur.date && window.todayISO) cur.date = window.todayISO().slice(0, 10);
+    const curStaffName = cur.staffId ? (staffById(cur.staffId).name || '') : '';
 
     const farOpts = (rules.shipFar || []).map(f => `<option value="${f.id}" ${cur.farId === f.id ? 'selected' : ''}>${esc(f.name)} (+${fmt(f.amount)})</option>`).join('');
     const html = `
+      <style>
+        .be-ac{position:absolute;left:0;right:0;top:100%;z-index:60;background:#fff;border:1px solid var(--line);border-radius:8px;box-shadow:0 8px 24px rgba(0,0,0,.14);max-height:250px;overflow:auto;display:none;margin-top:2px}
+        .be-ac-grp{padding:5px 10px;font-size:10px;font-weight:700;color:#15803D;background:#F0FDF4;text-transform:uppercase;letter-spacing:.3px;position:sticky;top:0}
+        .be-ac-item{padding:7px 11px;font-size:13px;cursor:pointer}
+        .be-ac-item:hover{background:#EFF9F0}
+      </style>
       <div style="display:grid;gap:11px">
         <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px">
           <div><label style="font-size:11.5px;font-weight:600;color:var(--muted)">Ngày</label>
             <input type="date" id="beDate" value="${esc(cur.date || '')}" style="width:100%;padding:8px;border:1px solid var(--line);border-radius:7px"></div>
-          <div><label style="font-size:11.5px;font-weight:600;color:var(--muted)">Nhân sự (Kho / Ship)</label>
-            <select id="beStaff" onchange="window.BONUS._onStaffTask()" style="width:100%;padding:8px;border:1px solid var(--line);border-radius:7px">
-              <option value="">— chọn NV —</option>
-              ${staff.map(s => `<option value="${s.id}" data-dept="${esc(s.dept)}" ${cur.staffId === s.id ? 'selected' : ''}>${esc(s.name)} · ${esc(s.dept)}</option>`).join('')}
-            </select></div>
+          <div style="position:relative"><label style="font-size:11.5px;font-weight:600;color:var(--muted)">Nhân sự (Kho / Ship) — gõ tên để tìm</label>
+            <input id="beStaff" autocomplete="off" value="${esc(curStaffName)}" placeholder="Gõ tên NV… (bỏ trống = xem theo phòng)"
+              oninput="window.BONUS._acStaff(this.value)" onfocus="window.BONUS._acStaff(this.value)" onblur="window.BONUS._hideAc('beStaffSug')"
+              style="width:100%;padding:8px;border:1px solid var(--line);border-radius:7px">
+            <input type="hidden" id="beStaffId" value="${esc(cur.staffId || '')}">
+            <div id="beStaffSug" class="be-ac"></div></div>
         </div>
         <div><label style="font-size:11.5px;font-weight:600;color:var(--muted)">Nhiệm vụ</label>
           <select id="beTask" onchange="window.BONUS._onStaffTask()" style="width:100%;padding:8px;border:1px solid var(--line);border-radius:7px">
@@ -172,9 +177,11 @@
             ${Object.keys(TASKS).map(k => `<option value="${k}" data-dept="${TASKS[k].dept}" ${cur.task === k ? 'selected' : ''}>${TASKS[k].icon} ${TASKS[k].dept} · ${TASKS[k].label}</option>`).join('')}
           </select></div>
         <div id="beOrderWrap" style="display:none;grid-template-columns:2fr 1fr;gap:10px">
-          <div><label style="font-size:11.5px;font-weight:600;color:var(--muted)">Tên/mã đơn (chọn đơn thật → tự lấy kg, hoặc gõ tay)</label>
-            <input id="beOrder" list="beOrderDL" value="${esc(cur.orderCode || cur.orderName || '')}" placeholder="NSTT-… hoặc tên đơn" onchange="window.BONUS._onOrder()" style="width:100%;padding:8px;border:1px solid var(--line);border-radius:7px">
-            <datalist id="beOrderDL">${orderDL}</datalist></div>
+          <div style="position:relative"><label style="font-size:11.5px;font-weight:600;color:var(--muted)">Tên/mã đơn — gõ để tìm (tự lấy kg), hoặc gõ tay</label>
+            <input id="beOrder" autocomplete="off" value="${esc(cur.orderCode || cur.orderName || '')}" placeholder="Gõ mã/tên đơn…"
+              oninput="window.BONUS._acOrder(this.value)" onfocus="window.BONUS._acOrder(this.value)" onblur="window.BONUS._hideAc('beOrderSug')"
+              style="width:100%;padding:8px;border:1px solid var(--line);border-radius:7px">
+            <div id="beOrderSug" class="be-ac"></div></div>
           <div><label style="font-size:11.5px;font-weight:600;color:var(--muted)">Trọng lượng (kg)</label>
             <input id="beWeight" type="number" min="0" step="0.1" value="${cur.weight != null ? cur.weight : ''}" placeholder="kg" oninput="window.BONUS._calc()" style="width:100%;padding:8px;border:1px solid var(--line);border-radius:7px;text-align:right;font-weight:700"></div>
         </div>
@@ -202,10 +209,42 @@
     _calc();
   }
   /* Chọn đơn thật → tự lấy kg */
-  function _onOrder() {
-    const v = (document.getElementById('beOrder') || {}).value || '';
-    const o = (S().get('orders', []) || []).find(x => String(x.code) === v.trim());
+  const _norm = s => String(s || '').normalize('NFD').replace(/[̀-ͯ]/g, '').toLowerCase().replace(/đ/g, 'd');
+  function _hideAc(id) { setTimeout(() => { const b = document.getElementById(id); if (b) b.style.display = 'none'; }, 160); }
+  /* Autocomplete NHÂN SỰ: gõ tên → gợi ý; bỏ trống → nhóm theo phòng ban */
+  function _acStaff(q) {
+    const box = document.getElementById('beStaffSug'); if (!box) return;
+    const nq = _norm(q);
+    const list = KHO_SHIP().sort((a, b) => String(a.dept).localeCompare(String(b.dept)) || String(a.name).localeCompare(String(b.name)));
+    const fil = nq ? list.filter(s => _norm(s.name).includes(nq) || _norm(s.role).includes(nq)) : list;
+    if (!fil.length) { box.innerHTML = '<div class="be-ac-item" style="color:var(--muted)">Không thấy NV khớp</div>'; box.style.display = 'block'; return; }
+    const g = {}; fil.forEach(s => { (g[s.dept] = g[s.dept] || []).push(s); });
+    box.innerHTML = Object.keys(g).map(d => `<div class="be-ac-grp">${esc(d)}</div>` + g[d].map(s => `<div class="be-ac-item" onmousedown="window.BONUS._pickStaff('${s.id}')">${esc(s.name)} <span style="color:var(--muted);font-size:11px">· ${esc(s.role || '')}</span></div>`).join('')).join('');
+    box.style.display = 'block';
+  }
+  function _pickStaff(id) {
+    const s = staffById(id);
+    const inp = document.getElementById('beStaff'); if (inp) inp.value = s.name || '';
+    const hid = document.getElementById('beStaffId'); if (hid) hid.value = id;
+    const box = document.getElementById('beStaffSug'); if (box) box.style.display = 'none';
+    _onStaffTask();
+  }
+  /* Autocomplete ĐƠN HÀNG: gõ mã/tên → gợi ý; bỏ trống → 12 đơn mới nhất. Chọn → tự lấy kg */
+  function _acOrder(q) {
+    const box = document.getElementById('beOrderSug'); if (!box) return;
+    const nq = _norm(q);
+    let list = (S().get('orders', []) || []).filter(o => o.status !== 'draft' && o.status !== 'cancelled');
+    list.sort((a, b) => String(b.code).localeCompare(String(a.code)));
+    list = (nq ? list.filter(o => _norm(String(o.code) + ' ' + (o.custName || '')).includes(nq)) : list).slice(0, nq ? 30 : 12);
+    if (!list.length) { box.style.display = 'none'; return; }
+    box.innerHTML = list.map(o => `<div class="be-ac-item" onmousedown="window.BONUS._pickOrder('${esc(String(o.code))}')"><b>${esc(o.code)}</b> <span style="color:var(--muted);font-size:11px">· ${esc(o.custName || '')}${o.weight ? ' · ' + o.weight + 'kg' : ''}</span></div>`).join('');
+    box.style.display = 'block';
+  }
+  function _pickOrder(code) {
+    const o = (S().get('orders', []) || []).find(x => String(x.code) === code);
+    const inp = document.getElementById('beOrder'); if (inp) inp.value = code;
     if (o && o.weight && document.getElementById('beWeight')) document.getElementById('beWeight').value = o.weight;
+    const box = document.getElementById('beOrderSug'); if (box) box.style.display = 'none';
     _calc();
   }
   /* Tính lại số tiền hiển thị */
@@ -222,7 +261,7 @@
     }
   }
   function _save(id) {
-    const staffId = (document.getElementById('beStaff') || {}).value;
+    const staffId = (document.getElementById('beStaffId') || {}).value;
     const task = (document.getElementById('beTask') || {}).value;
     const date = (document.getElementById('beDate') || {}).value;
     if (!date || !staffId || !task) { window.toast?.('Điền đủ Ngày · Nhân sự · Nhiệm vụ', 'warn'); return; }
@@ -338,7 +377,8 @@
   window.BONUS = {
     getRules, saveRules, getLog, saveLog, computeAmount, helperFor, TASKS,
     renderBonusTab, openEntry, delEntry, openRules, setBonusMonth,
-    _onStaffTask, _onOrder, _calc, _save, _addTier, _addFar, _saveRules,
+    _onStaffTask, _calc, _save, _addTier, _addFar, _saveRules,
+    _acStaff, _pickStaff, _acOrder, _pickOrder, _hideAc,
     labelOf: _labelOf,
   };
 })();
