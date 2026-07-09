@@ -53,7 +53,7 @@
     p.aliases = p.aliases || {}; p.defaultQty = p.defaultQty || {}; p.favorites = p.favorites || []; p.history = p.history || [];
     p.lastOrderItems = items.map(it => ({ id: it.id, name: it.name, qty: it.qty, price: it.price, unit: it.unit }));
     p.history.unshift({ date: new Date().toISOString().slice(0, 10), items: items.map(it => ({ id: it.id, qty: it.qty })) });
-    if (p.history.length > 20) p.history.length = 20;
+    if (p.history.length > 6) p.history.length = 6;   /* v417: 20→6. history CHỈ để tính favorites + defaultQty, 6 đơn gần nhất là đủ. Giảm blob cust_prefs (781KB→~450KB) → đỡ timeout setKv trên 4G/5G. */
     const count = {};
     p.history.forEach(h => h.items.forEach(it => { count[it.id] = (count[it.id] || 0) + 1; }));
     p.favorites = Object.entries(count).sort((a, b) => b[1] - a[1]).slice(0, 8).map(x => x[0]);

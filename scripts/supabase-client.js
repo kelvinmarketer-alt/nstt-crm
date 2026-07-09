@@ -644,7 +644,12 @@
         const now = Date.now();
         const why = /permission|rls|policy|42501/i.test(error.message + error.code) ? ' (quyền ghi bị chặn)'
           : /JWT|token|expired|401/i.test(error.message + error.code) ? ' (phiên hết hạn — đăng nhập lại)' : '';
-        if (!W[key] || now - W[key] > 30000) { W[key] = now; window.toast?.('⚠ Chưa lưu được "' + key + '" lên cloud' + why + ' — sẽ tự thử lại', 'warn'); }
+        /* cust_prefs = bộ nhớ HỌC thói quen mua (không phải tiền/đơn) — blob to (~450KB) nên trên
+           4G/5G hay timeout; bản local KHÔNG mất, đơn kế tiếp tự ghi lại → ĐỪNG dọa user bằng toast,
+           chỉ log console. Các key quan trọng (công nợ, chấm công, sổ kho…) vẫn cảnh báo bình thường.
+           Ngoại lệ: nếu lỗi do QUYỀN/PHIÊN (cần user xử lý) thì vẫn báo. */
+        const quiet = key === 'cust_prefs' && !why;
+        if (!quiet && (!W[key] || now - W[key] > 30000)) { W[key] = now; window.toast?.('⚠ Chưa lưu được "' + key + '" lên cloud' + why + ' — sẽ tự thử lại', 'warn'); }
       }
       return !error;
     },
