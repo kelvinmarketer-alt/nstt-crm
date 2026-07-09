@@ -426,6 +426,32 @@
     /* Insert 1 record — auto-strip cột lạ + retry (chống schema mismatch mọi bảng) */
     async insert(table, record) {
       const mapped = mapTo(table, record);
+      /* === CHỐNG "ĐƠN ẢO" (phantom) — idempotency theo NỘI DUNG ===
+         Khi mạng chờn, cơ chế tự-cứu-dữ-liệu (store.js self-heal) có thể ĐẨY LẠI đơn dưới dạng
+         "nhẹ" — KHÔNG kèm mặt hàng (items rỗng). Vì mỗi lần đẩy lại được cấp MÃ MỚI nên chốt
+         chặn trùng-mã (23505) bên dưới KHÔNG bắt được → sinh ra đơn rỗng 0 mặt hàng (vụ
+         527096–099). Chặn tại đây: nếu order sắp chèn KHÔNG có mặt hàng mà ĐÃ có 1 đơn CÙNG
+         khách + CÙNG tiền hàng (khác mã) CÓ mặt hàng trên cloud → đây là bản đẩy-lại trùng,
+         BỎ QUA, trả về đơn thật. (Chỉ chạy khi items rỗng → không thêm tải cho đơn bình thường.) */
+      if (table === 'orders') {
+        const itemsArr = mapped.items;
+        const itemsEmpty = !Array.isArray(itemsArr) || itemsArr.length === 0;
+        if (itemsEmpty && mapped.customer_id && (+mapped.freight > 0)) {
+          try {
+            const { data: twins } = await client.from('orders')
+              .select('code,items,freight,customer_id')
+              .eq('customer_id', mapped.customer_id)
+              .eq('freight', mapped.freight)
+              .limit(20);
+            const twin = (twins || []).find(t =>
+              t.code !== mapped.code && Array.isArray(t.items) && t.items.length > 0);
+            if (twin) {
+              console.warn(`[SB insert] orders: BỎ QUA đơn RỖNG (items=0) '${mapped.code}' — đã có đơn thật '${twin.code}' cùng KH+tiền (chống đơn ảo do đẩy-lại).`);
+              return mapFrom(table, twin);
+            }
+          } catch (e) { /* đọc lỗi → cứ chèn bình thường, KHÔNG chặn nhầm */ }
+        }
+      }
       for (let attempt = 0; attempt < 30; attempt++) {   /* đủ lượt strip mọi cột lạ (trước đây 6 → thiếu) */
         const { data, error } = await client.from(table).insert(mapped).select().single();
         if (!error) return mapFrom(table, data);

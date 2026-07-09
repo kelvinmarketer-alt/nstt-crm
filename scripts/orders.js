@@ -2293,7 +2293,17 @@ CHỈ TRẢ JSON, không giải thích gì thêm.`;
   };
 
   window.submitCreateOrder = async function(initStatus) {
-    if (window.__busyCreateOrder) return; window.__busyCreateOrder = true; setTimeout(() => { window.__busyCreateOrder = false; }, 2500);   /* chống double-click lúc mạng chậm → tạo 2 đơn */
+    /* CHỐNG BẤM 2 LẦN / ĐẺ ĐƠN TRÙNG lúc mạng chậm: GIỮ khoá tới khi tạo XONG (không dùng hẹn
+       giờ 2,5s "mù" như trước — mạng chậm quá 2,5s là guard tự mở cho bấm/đẩy lại → sinh đơn
+       trùng). Đồng thời KHOÁ luôn nút Lưu để không bấm lại được; failsafe 20s phòng treo. */
+    if (window.__busyCreateOrder) return;
+    window.__busyCreateOrder = true;
+    const _subBtns = Array.from(document.querySelectorAll('.modal-foot .btn'))
+      .filter(b => /submitCreateOrder/.test(b.getAttribute('onclick') || ''));
+    _subBtns.forEach(b => { b.disabled = true; b.style.opacity = '0.6'; });
+    const _endBusy = () => { window.__busyCreateOrder = false; _subBtns.forEach(b => { b.disabled = false; b.style.opacity = ''; }); };
+    const _failsafe = setTimeout(_endBusy, 20000);
+    try {
     const custId = window.formVal('#oCust');
     const goods = window.formVal('#oGoods');
     const freight = _moneyVal('#oFreight');
@@ -2399,6 +2409,7 @@ CHỈ TRẢ JSON, không giải thích gì thêm.`;
         if (r && r.ok) window.toast?.('📋 Đã gửi phiếu báo hàng vào "' + r.channel + '"', 'success');
       }).catch(() => {});
     }
+    } finally { clearTimeout(_failsafe); _endBusy(); }   /* mở khoá nút Lưu (thành công hoặc lỗi/validate) */
   };
 
   /* === Auto-open create modal if ?createFor=KH00X === */
