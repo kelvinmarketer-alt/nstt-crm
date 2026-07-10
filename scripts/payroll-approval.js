@@ -159,9 +159,11 @@
     /* Đảm bảo computePayslip có staffId + month để tính lateAuto */
     p.staffId = p.staffId || staffId;
     p.month = p.month || month;
-    /* Thưởng hỗ trợ Kho/Ship (sổ ghi hàng ngày) — tự tính, cộng vào tổng thưởng */
-    const _helper = window.BONUS ? window.BONUS.helperFor(staffId, month) : { total: 0, entries: [] };
-    p.helperBonus = _helper.total;
+    /* Thưởng hỗ trợ Kho/Ship (sổ ghi hàng ngày) — tính theo QUY CHẾ phủ ngày của từng khoản.
+       KHOÁ phiếu đã nộp/duyệt/trả: giữ đúng tổng thưởng đã chốt, dù sau này sửa quy chế. */
+    const _helper = window.BONUS ? window.BONUS.helperFor(staffId, month) : { total: 0, entries: [], noPolicy: 0 };
+    const _psLocked = p.status && p.status !== 'draft' && typeof p.helperBonus === 'number';
+    if (!_psLocked) p.helperBonus = _helper.total;
     const computed = PF.computePayslip(p);
     const lateAuto = computed.lateAuto || { count: 0, total: 0, detail: [] };
     /* Phiếu lập TRƯỚC v418 chưa khai bhxhOn/commMode → giữ nguyên UI + số cũ, KHÔNG tự tính lại */
@@ -359,12 +361,20 @@
         <div id="psBonusList" style="background:#FAFBFC;border:1px solid var(--line);border-radius:8px;padding:8px 12px;margin-bottom:${_helper.total ? '8px' : '14px'}">
           ${bonusRows(p.bonuses)}
         </div>
-        ${_helper.total ? `<details style="border:1px solid #BAE6FD;border-radius:8px;background:#F0F9FF;padding:8px 12px;margin-bottom:14px">
-          <summary style="cursor:pointer;font-weight:700;color:#0369A1;font-size:12.5px">🎁 Thưởng hỗ trợ Kho/Ship (tự tính từ sổ ghi): + ${PF.formatVND(_helper.total)} ₫ · ${_helper.entries.length} khoản <span style="font-weight:400;color:var(--muted)">— bấm xem từng ngày</span></summary>
+        ${(_helper.total || _helper.entries.length || _psLocked) ? `<details style="border:1px solid #BAE6FD;border-radius:8px;background:#F0F9FF;padding:8px 12px;margin-bottom:14px">
+          <summary style="cursor:pointer;font-weight:700;color:#0369A1;font-size:12.5px">🎁 Thưởng hỗ trợ Kho/Ship (theo quy chế): + ${PF.formatVND(_psLocked ? p.helperBonus : _helper.total)} ₫ · ${_helper.entries.length} khoản <span style="font-weight:400;color:var(--muted)">— bấm xem từng ngày</span></summary>
+          ${_psLocked ? `<div style="margin-top:8px;background:#F3F4F6;border:1px solid var(--line);border-radius:7px;padding:7px 10px;font-size:11.5px;color:#374151">
+            🔒 Phiếu đã chốt — giữ nguyên tổng <b>${PF.formatVND(p.helperBonus)} ₫</b> tại thời điểm duyệt.
+            ${_helper.total !== p.helperBonus ? `Quy chế hiện tại tính ra ${PF.formatVND(_helper.total)} ₫ (chỉ tham khảo).` : ''}
+          </div>` : ''}
+          ${_helper.noPolicy ? `<div style="margin-top:8px;background:#FEF2F2;border:1px solid #FECACA;border-radius:7px;padding:7px 10px;font-size:11.5px;color:#B91C1C">
+            ⚠ <b>${_helper.noPolicy} khoản</b> rơi vào ngày không thuộc quy chế nào → tính 0đ. Khai bổ sung ở tab <b>🎁 Thưởng hỗ trợ → ⚙ Quy chế thưởng</b>.
+          </div>` : ''}
           <div style="margin-top:8px;display:grid;gap:3px">
             ${_helper.entries.map(e => `<div style="display:flex;justify-content:space-between;gap:10px;font-size:12px;border-bottom:1px dashed #E0F2FE;padding:3px 0">
-              <span>${(e.date || '').split('-').reverse().join('/')} · ${window.BONUS ? window.BONUS.labelOf(e) : e.task}${e.note ? ' <span style="color:var(--muted)">(' + (e.note || '').replace(/</g, '&lt;') + ')</span>' : ''}</span>
-              <b style="color:#0369A1;white-space:nowrap">+${PF.formatVND(e.amount)}</b>
+              <span>${(e.date || '').split('-').reverse().join('/')} · ${window.BONUS ? window.BONUS.labelOf(e) : e.task}${e.note ? ' <span style="color:var(--muted)">(' + (e.note || '').replace(/</g, '&lt;') + ')</span>' : ''}
+                ${e.noPolicy ? '<span style="color:#B91C1C">· ⚠ chưa có quy chế</span>' : `<span style="color:var(--muted)">· ${(e.policyName || '').replace(/</g, '&lt;')}</span>`}</span>
+              <b style="color:${e.amount ? '#0369A1' : '#B91C1C'};white-space:nowrap">+${PF.formatVND(e.amount)}</b>
             </div>`).join('')}
           </div>
           <div style="font-size:11px;color:var(--muted);margin-top:6px">Đã gộp vào tổng ③ Thưởng ở trên. Sửa ở tab <b>🎁 Thưởng hỗ trợ</b>.</div>
@@ -574,7 +584,9 @@
         if (el.dataset.unit === 'cong') { row.unit = 'cong'; row.days = +el.dataset.days || 0; }
         return row;
       }).filter(x => x.amount > 0 || x.name || x.unit === 'cong');
-      d.helperBonus = window.BONUS ? window.BONUS.helperFor(d.staffId || staffId, d.month || month).total : 0;
+      /* Phiếu ĐÃ nộp/duyệt/trả → giữ nguyên tổng thưởng hỗ trợ đã chốt (không tính lại theo quy chế mới) */
+      if (d.status && d.status !== 'draft' && typeof d.helperBonus === 'number') { /* giữ nguyên */ }
+      else d.helperBonus = window.BONUS ? window.BONUS.helperFor(d.staffId || staffId, d.month || month).total : 0;
       return d;
     }
     function refreshComputed() {

@@ -900,7 +900,11 @@
         : { count: 0, total: 0, detail: [] };
 
       /* Thưởng hỗ trợ Kho/Ship — TỰ tính từ sổ ghi (bonusLog), cộng thẳng vào cột Thưởng */
-      const helperBonus = window.BONUS ? (window.BONUS.helperFor(s.id, month).total || 0) : 0;
+      /* Thưởng hỗ trợ = tính theo QUY CHẾ phủ ngày từng khoản. Nhưng phiếu ĐÃ nộp/duyệt/trả
+         thì GIỮ số đã chốt trên phiếu (sửa quy chế sau này không làm đổi lương đã duyệt). */
+      const _liveHelper = window.BONUS ? (window.BONUS.helperFor(s.id, month).total || 0) : 0;
+      const helperBonus = (ps && ps.status && ps.status !== 'draft' && typeof ps.helperBonus === 'number')
+        ? ps.helperBonus : _liveHelper;
 
       /* Dùng CHUNG engine với phiếu lương → bảng & phiếu KHÔNG BAO GIỜ lệch số.
          Chưa lập phiếu → dựng input tạm từ hồ sơ NV + chấm công để XEM TRƯỚC

@@ -26,12 +26,50 @@
     ],
   };
   const clone = o => JSON.parse(JSON.stringify(o));
-  function getRules() {
-    const r = S().get('bonusRules', null);
-    if (!r || typeof r !== 'object') return clone(DEFAULT_RULES);
-    return Object.assign(clone(DEFAULT_RULES), r);
+  const _pid = () => 'qc' + (_uidN++) + Math.random().toString(36).slice(2, 6);
+  const _today = () => (window.todayISO ? window.todayISO() : new Date().toISOString()).slice(0, 10);
+
+  /* ===== QUY CHẾ THƯỞNG — mỗi quy chế có KHOẢNG NGÀY hiệu lực =====
+     Lưu KV bonusRules = { schema:2, policies:[{id,name,from,to,rules}] }
+     · from/to rỗng = mở vô hạn phía đó · bao gồm cả 2 đầu (inclusive)
+     · Tiền của 1 dòng sổ ghi LUÔN tra theo quy chế phủ NGÀY của dòng đó
+       → sửa mức hôm nay KHÔNG làm đổi tiền của các ngày thuộc quy chế cũ. */
+  function getPolicies() {
+    const raw = S().get('bonusRules', null);
+    if (raw && Array.isArray(raw.policies) && raw.policies.length) {
+      return raw.policies.map(p => ({
+        id: p.id || _pid(),
+        name: p.name || 'Quy chế',
+        from: p.from || '',
+        to: p.to || '',
+        rules: Object.assign(clone(DEFAULT_RULES), p.rules || {}),
+      }));
+    }
+    /* MIGRATE schema cũ (1 bộ mức phẳng, không có ngày) → 1 quy chế mở vô hạn 2 đầu.
+       Nhờ vậy mọi dòng sổ ghi cũ vẫn tính đúng như trước khi nâng cấp. */
+    const flat = (raw && typeof raw === 'object') ? raw : {};
+    return [{ id: 'qc_base', name: 'Quy chế gốc', from: '', to: '', rules: Object.assign(clone(DEFAULT_RULES), flat) }];
   }
-  function saveRules(r) { S().set('bonusRules', r); }
+  function savePolicies(arr) { S().set('bonusRules', { schema: 2, policies: arr }); }
+
+  /* Quy chế áp dụng cho MỘT NGÀY. Nếu nhiều quy chế cùng phủ → lấy cái BẮT ĐẦU MUỘN NHẤT. */
+  function policyForDate(date) {
+    const d = String(date || '').slice(0, 10);
+    if (!d) return null;
+    const hits = getPolicies().filter(p => (!p.from || d >= p.from) && (!p.to || d <= p.to));
+    if (!hits.length) return null;                       /* ngày trống → 0đ + cảnh báo (không tự đoán) */
+    return hits.sort((a, b) => ((a.from || '') < (b.from || '') ? -1 : 1)).pop();
+  }
+  function rulesForDate(date) { const p = policyForDate(date); return p ? p.rules : null; }
+  /* Mức ĐANG hiệu lực hôm nay — chỉ dùng làm gợi ý mặc định trên UI */
+  function getRules() { return rulesForDate(_today()) || clone(DEFAULT_RULES); }
+  /* Gộp danh mục "đơn xa" của MỌI quy chế → dropdown luôn chọn được;
+     số tiền vẫn tính theo quy chế của NGÀY (id không có trong quy chế đó → 0đ). */
+  function allFarList() {
+    const seen = new Map();
+    getPolicies().forEach(p => (p.rules.shipFar || []).forEach(f => { if (f && f.id) seen.set(f.id, f); }));
+    return Array.from(seen.values());
+  }
 
   /* ===== SỔ GHI ===== */
   function getLog() { const a = S().get('bonusLog', []); return Array.isArray(a) ? a : []; }
@@ -46,9 +84,11 @@
   };
   const tasksForDept = dept => Object.keys(TASKS).filter(k => TASKS[k].dept === dept);
 
-  /* ===== TÍNH TIỀN 1 dòng theo quy tắc ===== */
+  /* ===== TÍNH TIỀN 1 dòng — theo QUY CHẾ phủ NGÀY của dòng đó =====
+     Bỏ trống `rules` → tự tra theo entry.date. Không quy chế nào phủ → 0đ. */
   function computeAmount(entry, rules) {
-    rules = rules || getRules();
+    if (rules === undefined) rules = rulesForDate(entry && entry.date);
+    if (!rules) return 0;
     switch (entry.task) {
       case 'kho-ship': {
         const w = +entry.weight || 0;
@@ -65,15 +105,20 @@
     }
   }
 
-  /* ===== Tổng thưởng hỗ trợ 1 NV trong 1 tháng (dùng cho phiếu lương) ===== */
+  /* ===== Tổng thưởng hỗ trợ 1 NV trong 1 tháng (dùng cho phiếu lương) =====
+     LUÔN tính lại theo quy chế phủ NGÀY của từng dòng (quy chế = nguồn sự thật duy nhất).
+     Số `amount` lưu trong sổ chỉ là bản cache để hiển thị nhanh/offline. */
   function helperFor(staffId, month) {
-    const rules = getRules();
     const entries = getLog()
       .filter(e => e.staffId === staffId && String(e.date || '').slice(0, 7) === month)
-      .map(e => ({ ...e, amount: (e.amount != null ? +e.amount : computeAmount(e, rules)) }))
+      .map(e => {
+        const pol = policyForDate(e.date);
+        return { ...e, amount: pol ? computeAmount(e, pol.rules) : 0, policyName: pol ? pol.name : null, noPolicy: !pol };
+      })
       .sort((a, b) => (a.date < b.date ? -1 : 1));
     const total = entries.reduce((s, e) => s + (+e.amount || 0), 0);
-    return { total, entries };
+    const noPolicy = entries.filter(e => e.noPolicy).length;
+    return { total, entries, noPolicy };
   }
 
   /* ===== Helpers dữ liệu ===== */
@@ -83,7 +128,7 @@
   const _labelOf = e => {
     const t = TASKS[e.task] || {};
     if (e.task === 'kho-ship') return `${t.label} · ${esc(e.orderName || e.orderCode || '?')}${e.weight ? ' (' + e.weight + 'kg)' : ''}`;
-    if (e.task === 'ship-far') { const f = (getRules().shipFar || []).find(x => x.id === e.farId); return `${t.label} · ${esc(f ? f.name : '?')}`; }
+    if (e.task === 'ship-far') { const f = allFarList().find(x => x.id === e.farId); return `${t.label} · ${esc(f ? f.name : '?')}`; }
     return t.label || e.task;
   };
 
@@ -95,24 +140,27 @@
     if (!_bMonth) _bMonth = (document.getElementById('payMonth') || {}).value || (window.todayISO ? window.todayISO().slice(0, 7) : '2026-07');
     const host = document.getElementById('payView');
     if (!host) return;
-    const rules = getRules();
     const monthLog = getLog().filter(e => String(e.date || '').slice(0, 7) === _bMonth);
-    /* gom theo NV để tổng nhanh */
-    const byStaff = {};
-    monthLog.forEach(e => { const a = (e.amount != null ? +e.amount : computeAmount(e, rules)); (byStaff[e.staffId] = byStaff[e.staffId] || { total: 0, n: 0 }); byStaff[e.staffId].total += a; byStaff[e.staffId].n++; });
-    const grandTotal = Object.values(byStaff).reduce((s, x) => s + x.total, 0);
+    /* Tiền LUÔN tính lại theo quy chế phủ NGÀY của từng dòng */
+    const calc = e => { const pol = policyForDate(e.date); return { pol, amt: pol ? computeAmount(e, pol.rules) : 0 }; };
+    const grandTotal = monthLog.reduce((s, e) => s + calc(e).amt, 0);
+    const nNoPolicy = monthLog.filter(e => !policyForDate(e.date)).length;
 
     const rowsHtml = monthLog
       .sort((a, b) => (a.date < b.date ? 1 : a.date > b.date ? -1 : 0))
       .map(e => {
         const st = staffById(e.staffId);
-        const amt = (e.amount != null ? +e.amount : computeAmount(e, rules));
+        const { pol, amt } = calc(e);
         const t = TASKS[e.task] || {};
+        const amtCell = !pol
+          ? '<span style="color:#B91C1C" title="Ngày này không nằm trong quy chế nào — khai bổ sung ở ⚙ Quy chế thưởng">⚠ 0 · chưa có quy chế</span>'
+          : amt ? '+' + fmt(amt) : '<span style="color:#B45309">0 · chưa đủ ĐK</span>';
         return `<tr>
           <td style="white-space:nowrap">${esc((e.date || '').split('-').reverse().join('/'))}</td>
           <td><b>${esc(st.name || e.staffName || '?')}</b><div style="font-size:11px;color:var(--muted)">${esc(st.dept || t.dept || '')}</div></td>
           <td>${t.icon || ''} ${_labelOf(e)}</td>
-          <td class="num" style="font-weight:700;color:#15803D;white-space:nowrap">${amt ? '+' + fmt(amt) : '<span style="color:#B45309">0 · chưa đủ ĐK</span>'}</td>
+          <td style="font-size:11px;color:var(--muted);white-space:nowrap">${pol ? esc(pol.name) : '<span style="color:#B91C1C">—</span>'}</td>
+          <td class="num" style="font-weight:700;color:#15803D;white-space:nowrap">${amtCell}</td>
           <td style="font-size:12px;color:var(--muted)">${esc(e.note || '')}</td>
           <td class="num" style="white-space:nowrap">
             <button class="btn btn-ghost btn-sm" style="padding:2px 7px" onclick="window.BONUS.openEntry('${e.id}')" title="Sửa">✏️</button>
@@ -125,34 +173,39 @@
       <div style="display:flex;align-items:center;gap:10px;flex-wrap:wrap;margin-bottom:12px">
         <div style="font-size:12.5px;color:var(--muted)">Sổ thưởng hỗ trợ tháng <b style="color:var(--navy)">${_bMonth.slice(5)}/${_bMonth.slice(0, 4)}</b> · ${monthLog.length} khoản · Σ <b style="color:#15803D">${fmt(grandTotal)}đ</b> → tự cộng vào phiếu lương.</div>
         <div style="flex:1"></div>
-        <button class="btn btn-ghost" onclick="window.BONUS.openRules()" title="Sửa mức thưởng">⚙ Cấu hình mức thưởng</button>
+        <button class="btn btn-ghost" onclick="window.BONUS.openPolicies()" title="Quy chế thưởng theo giai đoạn">⚙ Quy chế thưởng</button>
         <button class="btn btn-primary" onclick="window.BONUS.openBatch()">➕ Ghi phiếu thưởng</button>
       </div>
+      ${nNoPolicy ? `<div style="background:#FEF2F2;border:1px solid #FECACA;border-radius:9px;padding:10px 13px;margin-bottom:10px;font-size:12.5px;color:#B91C1C">
+        ⚠ <b>${nNoPolicy} khoản</b> rơi vào ngày <b>không thuộc quy chế nào</b> → đang tính <b>0đ</b>.
+        Bấm <b>⚙ Quy chế thưởng</b> để khai giai đoạn còn thiếu.
+      </div>` : ''}
       <div style="overflow:auto;border:1px solid var(--line);border-radius:10px;background:#fff">
         <table class="mini-table" style="width:100%;border-collapse:separate;border-spacing:0">
           <thead><tr style="background:#F9FAFB">
             <th style="text-align:left;padding:10px 12px">Ngày</th>
             <th style="text-align:left;padding:10px 12px">Nhân sự</th>
             <th style="text-align:left;padding:10px 12px">Nhiệm vụ</th>
+            <th style="text-align:left;padding:10px 12px">Quy chế áp dụng</th>
             <th class="num" style="padding:10px 12px">Số tiền</th>
             <th style="text-align:left;padding:10px 12px">Ghi chú</th>
             <th class="num" style="padding:10px 12px">Sửa</th>
           </tr></thead>
-          <tbody>${rowsHtml || `<tr><td colspan="6" style="padding:34px;text-align:center;color:var(--muted)">Chưa có khoản thưởng nào tháng này. Bấm <b>➕ Ghi khoản thưởng</b> để thêm.</td></tr>`}</tbody>
+          <tbody>${rowsHtml || `<tr><td colspan="7" style="padding:34px;text-align:center;color:var(--muted)">Chưa có khoản thưởng nào tháng này. Bấm <b>➕ Ghi phiếu thưởng</b> để thêm.</td></tr>`}</tbody>
         </table>
       </div>
-      <div style="font-size:11.5px;color:var(--muted);margin-top:10px">💡 Ghi hằng ngày ai hỗ trợ việc gì — hệ thống tự tính tiền theo mức đã cấu hình. Cuối tháng tổng của mỗi NV tự vào cột <b>Thưởng</b> ở bảng lương (mở phiếu lương xem chi tiết từng ngày).</div>`;
+      <div style="font-size:11.5px;color:var(--muted);margin-top:10px">💡 Tiền thưởng của mỗi dòng tra theo <b>quy chế đang hiệu lực NGÀY đó</b> — sửa mức hôm nay không làm đổi tiền của giai đoạn trước. Cuối tháng tổng của mỗi NV tự vào cột <b>Thưởng</b> ở bảng lương.</div>`;
   }
 
   /* ===== MODAL: Ghi / sửa khoản thưởng ===== */
   function openEntry(id) {
-    const rules = getRules();
     const ent = id ? getLog().find(e => e.id === id) : null;
     const cur = ent || { date: (document.getElementById('payMonth') || {}).value ? _bMonth + '-' + String(new Date().getDate()).padStart(2, '0') : '', staffId: '', task: '', note: '' };
     if (!cur.date && window.todayISO) cur.date = window.todayISO().slice(0, 10);
     const curStaffName = cur.staffId ? (staffById(cur.staffId).name || '') : '';
 
-    const farOpts = (rules.shipFar || []).map(f => `<option value="${f.id}" ${cur.farId === f.id ? 'selected' : ''}>${esc(f.name)} (+${fmt(f.amount)})</option>`).join('');
+    /* Danh mục đơn xa gộp từ MỌI quy chế → chọn được; tiền vẫn tính theo quy chế của NGÀY */
+    const farOpts = allFarList().map(f => `<option value="${f.id}" ${cur.farId === f.id ? 'selected' : ''}>${esc(f.name)}</option>`).join('');
     const html = `
       <style>
         .be-ac{position:absolute;left:0;right:0;top:100%;z-index:60;background:#fff;border:1px solid var(--line);border-radius:8px;box-shadow:0 8px 24px rgba(0,0,0,.14);max-height:250px;overflow:auto;display:none;margin-top:2px}
@@ -163,7 +216,7 @@
       <div style="display:grid;gap:11px">
         <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px">
           <div><label style="font-size:11.5px;font-weight:600;color:var(--muted)">Ngày</label>
-            <input type="date" id="beDate" value="${esc(cur.date || '')}" style="width:100%;padding:8px;border:1px solid var(--line);border-radius:7px"></div>
+            <input type="date" id="beDate" value="${esc(cur.date || '')}" onchange="window.BONUS._calc()" style="width:100%;padding:8px;border:1px solid var(--line);border-radius:7px"></div>
           <div style="position:relative"><label style="font-size:11.5px;font-weight:600;color:var(--muted)">Nhân sự (Kho / Ship) — gõ tên để tìm</label>
             <input id="beStaff" autocomplete="off" value="${esc(curStaffName)}" placeholder="Gõ tên NV… (bỏ trống = xem theo phòng)"
               oninput="window.BONUS._acStaff(this.value)" onfocus="window.BONUS._acStaff(this.value)" onblur="window.BONUS._hideAc('beStaffSug')"
@@ -250,15 +303,23 @@
   /* Tính lại số tiền hiển thị */
   function _calc() {
     const task = (document.getElementById('beTask') || {}).value || '';
-    const entry = { task, weight: (document.getElementById('beWeight') || {}).value, farId: (document.getElementById('beFar') || {}).value };
-    const amt = computeAmount(entry, getRules());
+    const date = (document.getElementById('beDate') || {}).value || '';
+    const entry = { task, date, weight: (document.getElementById('beWeight') || {}).value, farId: (document.getElementById('beFar') || {}).value };
+    const pol = policyForDate(date);
+    const amt = pol ? computeAmount(entry, pol.rules) : 0;
     const el = document.getElementById('beAmtVal');
-    if (el) {
-      el.textContent = amt ? '+' + fmt(amt) + 'đ' : (task === 'kho-ship' ? '0đ — đơn không nằm trong 31–99kg (chưa đủ điều kiện)' : '0đ');
-      el.parentElement.style.background = amt ? '#F0FDF4' : '#FEF3C7';
-      el.parentElement.style.borderColor = amt ? '#BBF7D0' : '#FDE68A';
-      el.style.color = amt ? '#15803D' : '#B45309';
+    if (!el) return;
+    if (date && !pol) {
+      el.textContent = '0đ — ⚠ ngày này chưa có quy chế nào áp dụng';
+    } else if (amt) {
+      el.textContent = '+' + fmt(amt) + 'đ' + (pol ? ` · theo “${pol.name}”` : '');
+    } else {
+      el.textContent = '0đ — chưa đủ điều kiện của quy chế' + (pol ? ` “${pol.name}”` : '');
     }
+    const bad = !amt;
+    el.parentElement.style.background = bad ? '#FEF3C7' : '#F0FDF4';
+    el.parentElement.style.borderColor = bad ? '#FDE68A' : '#BBF7D0';
+    el.style.color = bad ? '#B45309' : '#15803D';
   }
   function _save(id) {
     const staffId = (document.getElementById('beStaffId') || {}).value;
@@ -272,8 +333,8 @@
     const weight = t.needsOrder ? (+((document.getElementById('beWeight') || {}).value) || 0) : null;
     const farId = t.needsFar ? ((document.getElementById('beFar') || {}).value || '') : null;
     if (t.needsFar && !farId) { window.toast?.('Chọn loại đơn xa', 'warn'); return; }
-    const entry = { task, weight, farId, orderCode };
-    const amount = computeAmount(entry, getRules());
+    const entry = { task, weight, farId, orderCode, date };
+    const amount = computeAmount(entry);   /* theo quy chế phủ NGÀY của dòng */
     const rec = {
       id: id || uid(), date, staffId, staffName: st.name || '', dept: st.dept || t.dept,
       task, orderCode: t.needsOrder ? orderCode : '', orderName: t.needsOrder ? orderCode : '',
@@ -329,7 +390,7 @@
     setTimeout(() => { _addRow(); _addRow(); }, 30);   /* mở sẵn 2 dòng */
   }
   function _rowHtml(idx, date) {
-    const far = (getRules().shipFar || []).map(f => `<option value="${f.id}">${esc(f.name)} (+${fmt(f.amount)})</option>`).join('');
+    const far = allFarList().map(f => `<option value="${f.id}">${esc(f.name)}</option>`).join('');
     const inp = 'padding:6px;border:1px solid var(--line);border-radius:6px;font-size:12px';
     return `<div class="be-row" data-idx="${idx}" style="border:1px solid #E6ECE4;border-radius:8px;padding:8px 10px;margin-bottom:8px;background:#fff">
       <div style="display:flex;gap:6px;align-items:center;flex-wrap:wrap">
@@ -367,19 +428,22 @@
     _rowCalc(idx);
   }
   function _rowEntry(row) {
-    return { task: row.querySelector('.be-r-task').value, weight: row.querySelector('.be-r-wt').value, farId: row.querySelector('.be-r-far').value };
+    return { date: row.querySelector('.be-r-date').value, task: row.querySelector('.be-r-task').value, weight: row.querySelector('.be-r-wt').value, farId: row.querySelector('.be-r-far').value };
   }
   function _rowCalc(idx) {
     const row = _rowOf(idx); if (!row) return;
-    const e = _rowEntry(row); const amt = computeAmount(e, getRules());
+    const e = _rowEntry(row);
+    const pol = policyForDate(e.date);
+    const amt = pol ? computeAmount(e, pol.rules) : 0;
     const el = row.querySelector('.be-r-amt');
-    el.textContent = amt ? '+' + fmt(amt) : (e.task === 'kho-ship' ? '0 (ngoài 31-99kg)' : '0');
-    el.style.color = amt ? '#15803D' : '#B45309';
+    el.textContent = (e.date && !pol) ? '⚠ chưa có quy chế' : (amt ? '+' + fmt(amt) : '0 (chưa đủ ĐK)');
+    el.title = pol ? 'Quy chế: ' + pol.name : (e.date ? 'Ngày này không thuộc quy chế nào' : '');
+    el.style.color = amt ? '#15803D' : (e.date && !pol ? '#B91C1C' : '#B45309');
     _batchTotal();
   }
   function _batchTotal() {
-    let total = 0, n = 0; const rules = getRules();
-    document.querySelectorAll('.be-row').forEach(row => { const e = _rowEntry(row); if (!e.task) return; total += computeAmount(e, rules); n++; });
+    let total = 0, n = 0;
+    document.querySelectorAll('.be-row').forEach(row => { const e = _rowEntry(row); if (!e.task) return; total += computeAmount(e); n++; });
     const el = document.getElementById('beBatchTotal');
     if (el) el.innerHTML = `Tổng phiếu: <b style="color:#15803D">+${fmt(total)}đ</b> · <b>${n}</b> khoản`;
   }
@@ -408,7 +472,6 @@
     const staffId = (document.getElementById('beStaffId') || {}).value;
     if (!staffId) { window.toast?.('Chọn nhân sự trước (gõ tên)', 'warn'); return; }
     const st = staffById(staffId);
-    const rules = getRules();
     const toAdd = []; let skip = 0;
     document.querySelectorAll('.be-row').forEach(row => {
       const date = row.querySelector('.be-r-date').value;
@@ -423,7 +486,7 @@
       toAdd.push({
         id: uid(), date, staffId, staffName: st.name || '', dept: st.dept || t.dept,
         task, orderCode, orderName: orderCode, weight, farId,
-        amount: computeAmount({ task, weight, farId }, rules),
+        amount: computeAmount({ task, weight, farId, date }),   /* cache; helperFor vẫn tính lại theo quy chế */
         note: row.querySelector('.be-r-note').value || '', updatedAt: new Date().toISOString(),
       });
     });
@@ -437,77 +500,171 @@
   }
 
   /* ===== MODAL: cấu hình mức thưởng ===== */
-  function openRules() {
-    const r = getRules();
-    const tierRows = (r.khoShipTiers || []).map((t, i) => `<div class="br-tier" style="display:grid;grid-template-columns:1fr 1fr 1.2fr 30px;gap:6px;align-items:center;margin-bottom:5px">
-        <input type="number" class="br-min" value="${t.min}" placeholder="từ kg" style="padding:6px;border:1px solid var(--line);border-radius:6px;text-align:right">
-        <input type="number" class="br-max" value="${t.max}" placeholder="đến kg" style="padding:6px;border:1px solid var(--line);border-radius:6px;text-align:right">
-        <input type="number" class="br-amt" value="${t.amount}" placeholder="thưởng" style="padding:6px;border:1px solid var(--line);border-radius:6px;text-align:right;font-weight:700">
-        <button onclick="this.closest('.br-tier').remove()" style="border:none;background:none;color:#B91C1C;cursor:pointer">✕</button>
-      </div>`).join('');
-    const farRows = (r.shipFar || []).map(f => `<div class="br-far" data-id="${f.id}" style="display:grid;grid-template-columns:2fr 1.2fr 30px;gap:6px;align-items:center;margin-bottom:5px">
-        <input type="text" class="br-far-name" value="${esc(f.name)}" placeholder="Tên tuyến/điểm" style="padding:6px;border:1px solid var(--line);border-radius:6px">
-        <input type="number" class="br-far-amt" value="${f.amount}" placeholder="thưởng" style="padding:6px;border:1px solid var(--line);border-radius:6px;text-align:right;font-weight:700">
-        <button onclick="this.closest('.br-far').remove()" style="border:none;background:none;color:#B91C1C;cursor:pointer">✕</button>
-      </div>`).join('');
-    const html = `
-      <div style="display:grid;gap:14px;font-size:13px">
-        <div style="background:#F0FDF4;border:1px solid #BBF7D0;border-radius:9px;padding:11px 13px">
-          <div style="font-weight:800;color:#15803D;margin-bottom:8px">📦 KHO</div>
+  /* ===== QUY CHẾ THƯỞNG — quản lý nhiều giai đoạn ===== */
+  function _nextDay(iso) {
+    if (!iso) return '';
+    const d = new Date(iso + 'T00:00:00');
+    d.setDate(d.getDate() + 1);
+    return d.toISOString().slice(0, 10);
+  }
+  const _tierRow = t => `<div class="br-tier" style="display:grid;grid-template-columns:1fr 1fr 1.2fr 30px;gap:6px;align-items:center;margin-bottom:5px">
+      <input type="number" class="br-min" value="${t ? t.min : ''}" placeholder="từ kg" style="padding:6px;border:1px solid var(--line);border-radius:6px;text-align:right">
+      <input type="number" class="br-max" value="${t ? t.max : ''}" placeholder="đến kg" style="padding:6px;border:1px solid var(--line);border-radius:6px;text-align:right">
+      <input type="number" class="br-amt" value="${t ? t.amount : ''}" placeholder="thưởng" style="padding:6px;border:1px solid var(--line);border-radius:6px;text-align:right;font-weight:700">
+      <button onclick="this.closest('.br-tier').remove()" style="border:none;background:none;color:#B91C1C;cursor:pointer">✕</button>
+    </div>`;
+  const _farRow = f => `<div class="br-far" data-id="${f ? f.id : 'f_' + uid()}" style="display:grid;grid-template-columns:2fr 1.2fr 30px;gap:6px;align-items:center;margin-bottom:5px">
+      <input type="text" class="br-far-name" value="${f ? esc(f.name) : ''}" placeholder="Tên tuyến/điểm" style="padding:6px;border:1px solid var(--line);border-radius:6px">
+      <input type="number" class="br-far-amt" value="${f ? f.amount : ''}" placeholder="thưởng" style="padding:6px;border:1px solid var(--line);border-radius:6px;text-align:right;font-weight:700">
+      <button onclick="this.closest('.br-far').remove()" style="border:none;background:none;color:#B91C1C;cursor:pointer">✕</button>
+    </div>`;
+
+  function _polCard(p, i, open) {
+    const r = p.rules;
+    return `<div class="qc-card" data-id="${p.id}" style="border:1px solid var(--line);border-radius:10px;margin-bottom:10px;background:#fff;overflow:hidden">
+      <div style="display:flex;align-items:center;gap:8px;padding:9px 11px;background:#F9FAFB;border-bottom:1px solid var(--line);cursor:pointer" onclick="window.BONUS._polToggle(${i})">
+        <span class="qc-chev" style="color:#15803D;width:12px">${open ? '▾' : '▸'}</span>
+        <b style="flex:1;font-size:13px" class="qc-title">${esc(p.name)}</b>
+        <span class="qc-range" style="font-size:11.5px;color:var(--muted)">${p.from ? p.from.split('-').reverse().join('/') : '−∞'} → ${p.to ? p.to.split('-').reverse().join('/') : 'nay'}</span>
+        <button onclick="event.stopPropagation();window.BONUS._polRemove(${i})" style="border:none;background:none;color:#B91C1C;cursor:pointer;font-size:15px" title="Xoá quy chế">🗑</button>
+      </div>
+      <div class="qc-body" style="padding:11px 13px;display:${open ? 'block' : 'none'}">
+        <div style="display:grid;grid-template-columns:1.6fr 1fr 1fr;gap:8px;margin-bottom:11px">
+          <div><label style="font-size:11px;color:var(--muted);font-weight:600">Tên quy chế</label>
+            <input type="text" class="qc-name" value="${esc(p.name)}" style="width:100%;padding:6px;border:1px solid var(--line);border-radius:6px;box-sizing:border-box"></div>
+          <div><label style="font-size:11px;color:var(--muted);font-weight:600">Áp dụng từ</label>
+            <input type="date" class="qc-from" value="${p.from}" style="width:100%;padding:6px;border:1px solid var(--line);border-radius:6px;box-sizing:border-box"></div>
+          <div><label style="font-size:11px;color:var(--muted);font-weight:600">Đến hết (trống = nay)</label>
+            <input type="date" class="qc-to" value="${p.to}" style="width:100%;padding:6px;border:1px solid var(--line);border-radius:6px;box-sizing:border-box"></div>
+        </div>
+        <div style="background:#F0FDF4;border:1px solid #BBF7D0;border-radius:9px;padding:10px 12px;margin-bottom:9px">
+          <div style="font-weight:800;color:#15803D;margin-bottom:7px">📦 KHO</div>
           <div style="font-size:12px;color:var(--muted);margin-bottom:5px">Hỗ trợ ship — theo trọng lượng đơn (từ–đến kg → thưởng/đơn):</div>
-          <div id="brTiers">${tierRows}</div>
-          <button class="btn btn-ghost btn-sm" onclick="window.BONUS._addTier()" style="font-size:11.5px;margin-bottom:8px">➕ Thêm mốc kg</button>
+          <div class="qc-tiers">${(r.khoShipTiers || []).map(_tierRow).join('')}</div>
+          <button class="btn btn-ghost btn-sm" onclick="window.BONUS._polAddTier(${i})" style="font-size:11.5px;margin-bottom:8px">➕ Thêm mốc kg</button>
           <div style="display:flex;align-items:center;gap:8px"><label style="flex:1">Trực kho (/buổi)</label>
-            <input type="number" id="brTruc" value="${r.khoTruc}" style="width:130px;padding:6px;border:1px solid var(--line);border-radius:6px;text-align:right;font-weight:700"></div>
+            <input type="number" class="qc-truc" value="${r.khoTruc}" style="width:130px;padding:6px;border:1px solid var(--line);border-radius:6px;text-align:right;font-weight:700"></div>
         </div>
-        <div style="background:#EFF6FF;border:1px solid #BFDBFE;border-radius:9px;padding:11px 13px">
-          <div style="font-weight:800;color:#1E40AF;margin-bottom:8px">🛵 SHIP</div>
-          <div style="display:flex;align-items:center;gap:8px;margin-bottom:10px"><label style="flex:1">Ship sáng hỗ trợ ship chiều (/lần)</label>
-            <input type="number" id="brChieu" value="${r.shipChieu}" style="width:130px;padding:6px;border:1px solid var(--line);border-radius:6px;text-align:right;font-weight:700"></div>
-          <div style="font-size:12px;color:var(--muted);margin-bottom:5px">Đơn xa — danh mục (thêm/sửa/xoá):</div>
-          <div id="brFar">${farRows}</div>
-          <button class="btn btn-ghost btn-sm" onclick="window.BONUS._addFar()" style="font-size:11.5px">➕ Thêm tuyến đơn xa</button>
+        <div style="background:#EFF6FF;border:1px solid #BFDBFE;border-radius:9px;padding:10px 12px">
+          <div style="font-weight:800;color:#1E40AF;margin-bottom:7px">🛵 SHIP</div>
+          <div style="display:flex;align-items:center;gap:8px;margin-bottom:9px"><label style="flex:1">Ship sáng hỗ trợ ship chiều (/lần)</label>
+            <input type="number" class="qc-chieu" value="${r.shipChieu}" style="width:130px;padding:6px;border:1px solid var(--line);border-radius:6px;text-align:right;font-weight:700"></div>
+          <div style="font-size:12px;color:var(--muted);margin-bottom:5px">Đơn xa — danh mục:</div>
+          <div class="qc-far">${(r.shipFar || []).map(_farRow).join('')}</div>
+          <button class="btn btn-ghost btn-sm" onclick="window.BONUS._polAddFar(${i})" style="font-size:11.5px">➕ Thêm tuyến đơn xa</button>
         </div>
-      </div>`;
-    window.openModal('⚙ Cấu hình mức thưởng hỗ trợ', html, {
-      width: '600px',
+      </div>
+    </div>`;
+  }
+
+  function openPolicies() {
+    const pols = getPolicies().sort((a, b) => ((a.from || '') < (b.from || '') ? -1 : 1));
+    const last = pols.length - 1;
+    window.openModal('⚙ Quy chế thưởng hỗ trợ', `
+      <div style="background:#EFF6FF;border:1px solid #BFDBFE;border-radius:9px;padding:10px 12px;font-size:12.5px;color:#1E40AF;line-height:1.65;margin-bottom:12px">
+        💡 Mỗi <b>quy chế</b> có khoảng ngày hiệu lực riêng. Tiền thưởng của một khoản ghi được tra theo
+        <b>quy chế phủ NGÀY của khoản đó</b> — nên sửa mức hôm nay <b>không</b> làm đổi tiền của giai đoạn trước.<br>
+        Để trống <b>“Đến hết”</b> = quy chế đang áp dụng tới hiện tại. Ngày không thuộc quy chế nào → khoản đó tính <b>0đ</b>.
+      </div>
+      <div id="qcList">${pols.map((p, i) => _polCard(p, i, i === last)).join('')}</div>
+      <button class="btn btn-ghost" onclick="window.BONUS._polAdd()" style="width:100%;margin-top:4px">➕ Thêm quy chế mới (chép mức từ quy chế cuối)</button>
+      <div id="qcWarn" style="margin-top:10px"></div>
+    `, {
+      width: '660px',
       footer: `<button class="btn btn-ghost" onclick="window.closeModal()">Huỷ</button>
-               <button class="btn btn-primary" onclick="window.BONUS._saveRules()">💾 Lưu mức thưởng</button>`,
+               <button class="btn btn-primary" onclick="window.BONUS._savePolicies()">💾 Lưu quy chế</button>`,
     });
   }
-  function _addTier() {
-    const w = document.getElementById('brTiers'); if (!w) return;
-    const d = document.createElement('div'); d.innerHTML = `<div class="br-tier" style="display:grid;grid-template-columns:1fr 1fr 1.2fr 30px;gap:6px;align-items:center;margin-bottom:5px">
-      <input type="number" class="br-min" placeholder="từ kg" style="padding:6px;border:1px solid var(--line);border-radius:6px;text-align:right">
-      <input type="number" class="br-max" placeholder="đến kg" style="padding:6px;border:1px solid var(--line);border-radius:6px;text-align:right">
-      <input type="number" class="br-amt" placeholder="thưởng" style="padding:6px;border:1px solid var(--line);border-radius:6px;text-align:right;font-weight:700">
-      <button onclick="this.closest('.br-tier').remove()" style="border:none;background:none;color:#B91C1C;cursor:pointer">✕</button></div>`;
-    w.appendChild(d.firstElementChild);
+  function _polToggle(i) {
+    const card = document.querySelectorAll('#qcList .qc-card')[i]; if (!card) return;
+    const body = card.querySelector('.qc-body');
+    const open = body.style.display === 'none';
+    body.style.display = open ? 'block' : 'none';
+    card.querySelector('.qc-chev').textContent = open ? '▾' : '▸';
   }
-  function _addFar() {
-    const w = document.getElementById('brFar'); if (!w) return;
-    const d = document.createElement('div'); d.innerHTML = `<div class="br-far" data-id="f_${uid()}" style="display:grid;grid-template-columns:2fr 1.2fr 30px;gap:6px;align-items:center;margin-bottom:5px">
-      <input type="text" class="br-far-name" placeholder="Tên tuyến/điểm" style="padding:6px;border:1px solid var(--line);border-radius:6px">
-      <input type="number" class="br-far-amt" placeholder="thưởng" style="padding:6px;border:1px solid var(--line);border-radius:6px;text-align:right;font-weight:700">
-      <button onclick="this.closest('.br-far').remove()" style="border:none;background:none;color:#B91C1C;cursor:pointer">✕</button></div>`;
-    w.appendChild(d.firstElementChild);
+  function _polAddTier(i) {
+    const box = document.querySelectorAll('#qcList .qc-card')[i]?.querySelector('.qc-tiers'); if (!box) return;
+    const d = document.createElement('div'); d.innerHTML = _tierRow(null); box.appendChild(d.firstElementChild);
   }
-  function _saveRules() {
-    const tiers = Array.from(document.querySelectorAll('#brTiers .br-tier')).map(el => ({
-      min: +el.querySelector('.br-min').value || 0, max: +el.querySelector('.br-max').value || 0, amount: +el.querySelector('.br-amt').value || 0,
-    })).filter(t => t.max > 0 && t.amount > 0);
-    const shipFar = Array.from(document.querySelectorAll('#brFar .br-far')).map(el => ({
-      id: el.dataset.id, name: el.querySelector('.br-far-name').value.trim(), amount: +el.querySelector('.br-far-amt').value || 0,
-    })).filter(f => f.name);
-    const r = {
-      khoShipTiers: tiers.length ? tiers : DEFAULT_RULES.khoShipTiers,
-      khoTruc: +document.getElementById('brTruc').value || 0,
-      shipChieu: +document.getElementById('brChieu').value || 0,
-      shipFar,
-    };
-    saveRules(r);
+  function _polAddFar(i) {
+    const box = document.querySelectorAll('#qcList .qc-card')[i]?.querySelector('.qc-far'); if (!box) return;
+    const d = document.createElement('div'); d.innerHTML = _farRow(null); box.appendChild(d.firstElementChild);
+  }
+  function _polRemove(i) {
+    const cards = document.querySelectorAll('#qcList .qc-card');
+    if (cards.length <= 1) { window.toast?.('Phải còn ít nhất 1 quy chế', 'warn'); return; }
+    if (!confirm('Xoá quy chế này? Các khoản thưởng rơi vào giai đoạn đó sẽ thành 0đ nếu không quy chế nào phủ.')) return;
+    cards[i].remove();
+    _reindexPolicies();
+  }
+  /* Vẽ lại chỉ số handler sau khi xoá (onclick nhúng index) */
+  function _reindexPolicies() {
+    const arr = _readPolicies();
+    const list = document.getElementById('qcList'); if (!list) return;
+    list.innerHTML = arr.map((p, i) => _polCard(p, i, i === arr.length - 1)).join('');
+  }
+  function _polAdd() {
+    const arr = _readPolicies();
+    const lastP = arr[arr.length - 1];
+    const from = lastP && lastP.to ? _nextDay(lastP.to) : _today();
+    arr.push({
+      id: _pid(),
+      name: 'Quy chế ' + (arr.length + 1),
+      from, to: '',
+      rules: lastP ? clone(lastP.rules) : clone(DEFAULT_RULES),
+    });
+    const list = document.getElementById('qcList');
+    list.innerHTML = arr.map((p, i) => _polCard(p, i, i === arr.length - 1)).join('');
+  }
+  /* Đọc toàn bộ quy chế đang hiển thị trong modal */
+  function _readPolicies() {
+    return Array.from(document.querySelectorAll('#qcList .qc-card')).map(card => {
+      const tiers = Array.from(card.querySelectorAll('.qc-tiers .br-tier')).map(el => ({
+        min: +el.querySelector('.br-min').value || 0,
+        max: +el.querySelector('.br-max').value || 0,
+        amount: +el.querySelector('.br-amt').value || 0,
+      })).filter(t => t.max > 0 && t.amount > 0);
+      const shipFar = Array.from(card.querySelectorAll('.qc-far .br-far')).map(el => ({
+        id: el.dataset.id,
+        name: el.querySelector('.br-far-name').value.trim(),
+        amount: +el.querySelector('.br-far-amt').value || 0,
+      })).filter(f => f.name);
+      return {
+        id: card.dataset.id,
+        name: card.querySelector('.qc-name').value.trim() || 'Quy chế',
+        from: card.querySelector('.qc-from').value || '',
+        to: card.querySelector('.qc-to').value || '',
+        rules: {
+          khoShipTiers: tiers,           /* rỗng = KHÔNG thưởng mốc kg nào (hợp lệ, vd "dưới 20kg không thưởng") */
+          khoTruc: +card.querySelector('.qc-truc').value || 0,
+          shipChieu: +card.querySelector('.qc-chieu').value || 0,
+          shipFar,
+        },
+      };
+    });
+  }
+  function _savePolicies() {
+    const arr = _readPolicies();
+    if (!arr.length) { window.toast?.('Phải có ít nhất 1 quy chế', 'warn'); return; }
+    /* Ngày bắt đầu > ngày kết thúc → chặn */
+    for (const p of arr) {
+      if (p.from && p.to && p.from > p.to) {
+        window.toast?.(`"${p.name}": ngày bắt đầu sau ngày kết thúc`, 'warn'); return;
+      }
+    }
+    /* Cảnh báo chồng lấn / khoảng trống (vẫn cho lưu — chồng lấn thì lấy quy chế bắt đầu muộn hơn) */
+    const sorted = arr.slice().sort((a, b) => ((a.from || '') < (b.from || '') ? -1 : 1));
+    const warns = [];
+    for (let i = 1; i < sorted.length; i++) {
+      const prev = sorted[i - 1], cur = sorted[i];
+      if (!prev.to) { warns.push(`“${prev.name}” để trống ngày kết thúc nên chồng lấn “${cur.name}” — ngày trùng sẽ tính theo “${cur.name}”.`); continue; }
+      if (cur.from && prev.to >= cur.from) warns.push(`“${prev.name}” và “${cur.name}” chồng ngày — ngày trùng tính theo “${cur.name}”.`);
+      else if (cur.from && _nextDay(prev.to) < cur.from) warns.push(`Trống từ ${_nextDay(prev.to).split('-').reverse().join('/')} đến ${_nextDay(cur.from).split('-').reverse().join('/')} — khoản ghi trong khoảng này sẽ là 0đ.`);
+    }
+    savePolicies(arr);
     window.closeModal?.();
-    window.toast?.('✓ Đã lưu mức thưởng', 'success');
+    window.toast?.(`✓ Đã lưu ${arr.length} quy chế` + (warns.length ? ` · ${warns.length} cảnh báo` : ''), warns.length ? 'warn' : 'success');
+    if (warns.length) setTimeout(() => window.toast?.('⚠ ' + warns[0], 'warn'), 900);
     renderBonusTab();
     window.renderPayrollPublic && window.renderPayrollPublic();
   }
@@ -515,9 +672,13 @@
   function setBonusMonth(m) { _bMonth = m; renderBonusTab(); }
 
   window.BONUS = {
-    getRules, saveRules, getLog, saveLog, computeAmount, helperFor, TASKS,
-    renderBonusTab, openEntry, delEntry, openRules, setBonusMonth,
-    _onStaffTask, _calc, _save, _addTier, _addFar, _saveRules,
+    getRules, getLog, saveLog, computeAmount, helperFor, TASKS,
+    /* Quy chế theo giai đoạn (v419) */
+    getPolicies, savePolicies, policyForDate, rulesForDate, allFarList,
+    renderBonusTab, openEntry, delEntry, setBonusMonth,
+    openPolicies, openRules: openPolicies,   /* alias tương thích */
+    _polToggle, _polAdd, _polRemove, _polAddTier, _polAddFar, _savePolicies,
+    _onStaffTask, _calc, _save,
     _acStaff, _pickStaff, _acOrder, _pickOrder, _hideAc,
     openBatch, _addRow, _rowTask, _rowCalc, _removeRow, _acOrderRow, _pickOrderRow, _hideAcEl, _saveBatch,
     labelOf: _labelOf,
