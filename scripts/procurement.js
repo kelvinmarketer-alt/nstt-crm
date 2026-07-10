@@ -290,7 +290,141 @@
     if (navigator.clipboard?.writeText) navigator.clipboard.writeText(txt).then(done).catch(() => window.toast?.('Không chép được — bôi đen rồi Ctrl+C', 'warn'));
     else window.toast?.('Trình duyệt không hỗ trợ chép tự động', 'warn');
   };
-  window.pcCallRun = function (rid) { _callRunId = rid; renderCall(); };
+  /* ===================================================================
+     ① TỔNG HỢP — bản sao sheet "Tổng hợp" + 2 lệnh gọi hàng, trên MỘT màn hình.
+
+     Luồng cũ bắt kho làm 4 bước mới thấy được lệnh gọi hàng:
+       tick đơn → tạo phiên gom → mở phiên → gán NCC từng mã.
+     Nhưng lệnh gọi hàng KHÔNG cần phiên gom: NCC đã có mặc định theo sản phẩm.
+     Nay: chọn NGÀY GIAO → tự gom mọi đơn của ngày đó → tự gán NCC → hiện luôn.
+     Phiên gom chỉ dùng về sau, khi cân hàng thực nhận rồi xuất kho.
+     =================================================================== */
+  let _sumDate = '';                 /* 'YYYY-MM-DD' */
+  let _sumCache = null;              /* { dk, codes, lines } */
+  let _sumBusy = false;
+
+  const _dkToISO = dk => `${dk.slice(0, 4)}-${dk.slice(4, 6)}-${dk.slice(6, 8)}`;
+  const _isoToDk = iso => String(iso || '').replace(/-/g, '');
+  const ordersForDate = dk => eligibleOrders().filter(o => _dateKey(o.deliverDate) === dk);
+
+  window.pcSumDate = function (iso) { _sumDate = iso; _sumCache = null; renderSummary(); };
+  window.pcSumReload = function () { _sumCache = null; renderSummary(); };
+
+  /* Đổi NCC của 1 mã hàng ngay trên bảng — ghi vào whProcure, dùng lại cho MỌI ngày sau.
+     Đây là cột F của sheet, nhưng sửa được và nhớ luôn. */
+  window.pcSumSetSup = function (pid, supId) {
+    if (!pid) { window.toast?.('Mặt hàng này chưa khớp mã sản phẩm trong app', 'warn'); return; }
+    window.whSetDefaultSupplier(pid, supId);
+    const s = getSuppliers().find(x => x.id === supId);
+    window.toast?.(supId ? `✓ ${s ? s.name : supId} là NCC mặc định của mã này` : '✓ Đã bỏ NCC mặc định', 'success');
+    _sumCache = null; renderSummary();
+  };
+
+  window.pcSumMakeRun = async function () {
+    if (!_sumCache || !_sumCache.codes.length) { window.toast?.('Chưa có đơn nào', 'warn'); return; }
+    picked = new Set(_sumCache.codes);
+    await window.pcMakeRun();
+  };
+
+  async function renderSummary() {
+    const host = document.getElementById('pcSum');
+    if (!host) return;
+    if (!_sumDate) _sumDate = _dkToISO(targetDeliverKey());
+    const dk = _isoToDk(_sumDate);
+    const cutH = +whCfg().cutoffHour || 10;
+    const orders = ordersForDate(dk);
+
+    const head = `
+      <div style="display:flex;align-items:center;gap:10px;flex-wrap:wrap;margin-bottom:12px">
+        <label style="font-size:12.5px;color:var(--muted);font-weight:600">Ngày giao</label>
+        <input type="date" value="${_sumDate}" onchange="window.pcSumDate(this.value)"
+               style="padding:7px 10px;border:1px solid var(--line);border-radius:7px;font-size:13px;font-weight:700;color:var(--navy)">
+        <span class="tag" style="background:#F1F5F9;color:#475569;font-weight:700">${orders.length} đơn</span>
+        <span style="font-size:11.5px;color:var(--muted)">🕙 chốt ${cutH}h</span>
+        <button class="btn btn-ghost btn-sm" style="font-size:11.5px;padding:2px 7px" onclick="window.pcEditCutoff()">⚙</button>
+        <div style="flex:1"></div>
+        <button class="btn btn-ghost btn-sm" onclick="window.pcSumReload()">↻ Tải lại</button>
+        <button class="btn btn-primary btn-sm" onclick="window.pcSumMakeRun()" ${orders.length ? '' : 'disabled'}>🧺 Chốt &amp; nhận hàng</button>
+      </div>`;
+
+    if (!orders.length) { host.innerHTML = head + _emptyBox(`Không có đơn nào giao ngày <b>${_sumDate.split('-').reverse().join('/')}</b>.`); return; }
+
+    if (!_sumCache || _sumCache.dk !== dk) {
+      if (_sumBusy) return;
+      _sumBusy = true;
+      host.innerHTML = head + _emptyBox('⏳ Đang gom ' + orders.length + ' đơn…');
+      try {
+        const codes = orders.map(o => o.code);
+        _sumCache = { dk, codes, lines: await buildLines(codes) };
+      } catch (e) {
+        _sumBusy = false;
+        host.innerHTML = head + _emptyBox('⚠ ' + esc(e.message || 'Không tải được mặt hàng của đơn'));
+        return;
+      }
+      _sumBusy = false;
+    }
+
+    const lines = _sumCache.lines;
+    const sups = getSuppliers().filter(s => s.active !== false && !isPaused(s.id))
+      .sort((a, b) => String(a.name).localeCompare(String(b.name), 'vi'));
+
+    /* Bảng TỔNG HỢP — 1 dòng cho mỗi (mã hàng × khách), đúng như sheet */
+    const rows = lines.map(l => {
+      const sup = (l.allocations[0] || {}).supplierId || '';
+      const out = isBuyOutside(l.productId);
+      const bd = l.breakdown || [];
+      const supCell = out
+        ? `<span class="tag" style="background:#FEF3C7;color:#92400E;font-weight:700">Mua ngoài</span>`
+        : `<select onchange="window.pcSumSetSup('${esc(l.productId)}',this.value)"
+             style="width:100%;max-width:200px;padding:4px 6px;border:1px solid ${sup ? 'var(--line)' : '#FCA5A5'};border-radius:6px;font-size:12px;background:${sup ? '#fff' : '#FEF2F2'}">
+             <option value="">— chưa gán NCC —</option>
+             ${sups.map(x => `<option value="${x.id}" ${x.id === sup ? 'selected' : ''}>${esc(x.name)} · ${TYPE_LABEL[supplyTypeOf(x.id)]}</option>`).join('')}
+           </select>`;
+      return bd.map((b, i) => `<tr style="${i ? 'background:#FCFDFC' : ''}">
+        <td style="padding:6px 9px;${i ? 'color:var(--muted)' : 'font-weight:700'}">${i ? '↳' : esc(l.name)}</td>
+        <td style="padding:6px 9px;color:var(--muted)">${esc(l.unit)}</td>
+        <td class="num" style="padding:6px 9px;font-weight:700">${fmtQty(b.qty)}</td>
+        <td style="padding:6px 9px">${esc(b.custName || b.code)}</td>
+        ${i === 0 ? `<td style="padding:5px 9px;vertical-align:middle" rowspan="${bd.length || 1}">${supCell}</td>` : ''}
+      </tr>`).join('');
+    }).join('');
+
+    const noSup = lines.filter(l => !isBuyOutside(l.productId) && !(l.allocations[0] || {}).supplierId).length;
+    const pair = kgPair(lines.map(l => ({ productId: l.productId, unit: l.unit, qty: l.totalQty })));
+
+    host.innerHTML = head + `
+      <div style="display:flex;gap:8px;flex-wrap:wrap;margin-bottom:10px">
+        <span class="tag" style="background:#F0FDF4;color:#15803D;font-weight:700">${lines.length} mã hàng</span>
+        <span class="tag" style="background:#EFF6FF;color:#1E40AF;font-weight:700">${pairLabel(pair)}</span>
+        ${noSup ? `<span class="tag" style="background:#FEE2E2;color:#B91C1C;font-weight:700">⚠ ${noSup} mã chưa gán NCC</span>` : ''}
+      </div>
+
+      <div class="section-h" style="margin:0 0 8px">📞 Gọi hàng</div>
+      ${callPanesHTML({ id: 'SUM-' + dk, lines })}
+
+      <details style="margin-top:18px">
+        <summary style="cursor:pointer;font-weight:700;color:var(--navy);font-size:13px">📋 Bảng tổng hợp — ${lines.length} mã hàng · bấm để xem &amp; đổi NCC</summary>
+        <div style="overflow-x:auto;border:1px solid var(--line);border-radius:10px;background:#fff;margin-top:8px">
+          <table class="mini-table" style="width:100%;border-collapse:collapse;font-size:13px">
+            <thead><tr style="background:#F9FAFB">
+              <th style="text-align:left;padding:8px 9px">Mã hàng</th>
+              <th style="text-align:left;padding:8px 9px">ĐVT</th>
+              <th class="num" style="padding:8px 9px">Số lượng</th>
+              <th style="text-align:left;padding:8px 9px">Khách</th>
+              <th style="text-align:left;padding:8px 9px;min-width:180px">Nhà cung cấp</th>
+            </tr></thead>
+            <tbody>${rows}</tbody>
+          </table>
+        </div>
+      </details>
+
+      <details style="margin-top:12px">
+        <summary style="cursor:pointer;font-weight:600;color:var(--muted);font-size:12.5px">⚙ Chọn đơn thủ công (khi chỉ muốn gom một phần)</summary>
+        <div id="pcGather" style="margin-top:10px"></div>
+      </details>`;
+    renderGather();
+  }
+
   /* Khai hệ số quy đổi kg cho 1 SP ngay tại màn hình Kho (không phải vào trang Sản phẩm) */
   window.pcAskKg = function (pid, name, unit) {
     if (!pid) { window.toast?.('Mặt hàng này chưa khớp mã sản phẩm trong app', 'warn'); return; }
@@ -299,24 +433,12 @@
     if (v == null) return;
     window.whSetKgFactor(pid, v);
     window.toast?.(+v > 0 ? `✓ 1 ${unit} = ${v} kg` : '✓ Đã bỏ hệ số quy đổi', 'success');
-    renderCall();
+    renderSummary();
   };
-  let _callRunId = null;
 
-  function renderCall() {
-    const host = document.getElementById('pcCall');
-    if (!host) return;
-    const runs = getRuns().filter(r => !_isDoneRun(r));
-    if (!runs.length) { host.innerHTML = _emptyBox('Chưa có phiên gom nào đang mở. Tạo phiên gom ở tab ① rồi quay lại đây.'); return; }
-    if (!_callRunId || !runs.some(r => r.id === _callRunId)) _callRunId = runs[0].id;
-    const run = normalizeRun(runs.find(r => r.id === _callRunId));
+  /* Vẽ 2 pane gọi hàng cho MỘT tập dòng hàng — dùng chung cho màn Tổng hợp và phiên gom */
+  function callPanesHTML(run) {
     const d = callDataForRun(run);
-
-    const picker = runs.length > 1
-      ? `<select onchange="window.pcCallRun(this.value)" style="padding:7px 10px;border:1px solid var(--line);border-radius:7px;font-size:13px;font-weight:600">
-           ${runs.map(r => `<option value="${r.id}" ${r.id === _callRunId ? 'selected' : ''}>${r.id} · ${r.orderCodes.length} đơn</option>`).join('')}
-         </select>`
-      : `<b style="color:var(--navy)">${run.id}</b>`;
 
     const warn = [];
     if (d.unassigned.length) warn.push(`<span class="tag" style="background:#FEE2E2;color:#B91C1C;font-weight:700">⚠ ${d.unassigned.length} mặt hàng chưa gán NCC</span>`);
@@ -384,11 +506,7 @@
         ${d.outside.length ? `<div style="font-size:12.5px;color:#92400E;margin-top:6px">🛒 <b>Mua ngoài:</b> ${d.outside.map(l => `${esc(l.name)} ${fmtQty(l.totalQty)} ${esc(l.unit)}`).join(' · ')}</div>` : ''}
       </div>` : '';
 
-    host.innerHTML = `
-      <div style="display:flex;align-items:center;gap:10px;flex-wrap:wrap;margin-bottom:12px">
-        <span style="font-size:12.5px;color:var(--muted)">Phiên gom:</span> ${picker}
-        ${warn.join(' ')}
-      </div>
+    return `${warn.length ? `<div style="display:flex;gap:8px;flex-wrap:wrap;margin-bottom:10px">${warn.join(' ')}</div>` : ''}
       ${problem}
       <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(340px,1fr));gap:16px;align-items:start">
         <div><div class="section-h" style="margin-bottom:8px">🛵 NCC lẻ — chia mô sẵn theo khách</div>${lePane}</div>
@@ -399,32 +517,16 @@
 
   /* ============ SUB-TAB (tab-trong-tab): chỉ hiện 1 pane ============ */
   window.pcSwitch = function (tab) {
-    const valid = ['gather', 'runs', 'call', 'release', 'history'];
-    if (valid.indexOf(tab) < 0) tab = 'gather';
+    const valid = ['sum', 'runs', 'release', 'history'];
+    if (valid.indexOf(tab) < 0) tab = 'sum';
     document.querySelectorAll('.pc-subtab').forEach(b => b.classList.toggle('active', b.dataset.pst === tab));
     document.querySelectorAll('.pc-pane').forEach(p => p.classList.toggle('active', p.dataset.pane === tab));
     try { window.scrollTo({ top: 0, behavior: 'smooth' }); } catch (e) {}
   };
-  function renderAll() { renderGather(); renderRuns(); renderCall(); renderRunHistory(); renderRelease(); }
+  function renderAll() { renderSummary(); renderRuns(); renderRunHistory(); renderRelease(); }
 
   /* ============ ① CHỌN ĐƠN → GOM ============ */
   let picked = new Set();
-  /* R1 — GIỜ CHỐT: quá giờ này thì hàng báo hôm nay là hàng của NGÀY MAI.
-     Chỉ là chỉ dẫn cho kho biết đang gom cho ngày nào — KHÔNG tự sửa ngày giao của đơn. */
-  function _cutoffBanner() {
-    const cutH = +whCfg().cutoffHour || 10;
-    const tgt = targetDeliverKey();
-    const past = new Date().getHours() >= cutH;
-    const lbl = `${tgt.slice(6, 8)}/${tgt.slice(4, 6)}`;
-    return `<div style="display:flex;align-items:center;gap:10px;flex-wrap:wrap;background:${past ? '#EFF6FF' : '#F0FDF4'};border:1px solid ${past ? '#BFDBFE' : '#BBF7D0'};border-radius:9px;padding:9px 12px;margin-bottom:12px">
-      <b style="font-size:12.5px;color:${past ? '#1E40AF' : '#15803D'}">🕙 Giờ chốt ${cutH}h</b>
-      <span style="font-size:12.5px;color:var(--muted)">${past
-        ? `Đã quá giờ chốt — hàng báo bây giờ giao <b>ngày mai ${lbl}</b>.`
-        : `Chưa tới giờ chốt — hàng báo bây giờ giao <b>hôm nay ${lbl}</b>.`}</span>
-      <div style="flex:1"></div>
-      <button class="btn btn-ghost btn-sm" style="font-size:11.5px" onclick="window.pcEditCutoff()">⚙ Đổi giờ chốt</button>
-    </div>`;
-  }
   window.pcEditCutoff = function () {
     const cur = +whCfg().cutoffHour || 10;
     const v = prompt('Giờ chốt đơn của công ty (0–23).\nSau giờ này, hàng khách báo sẽ giao vào NGÀY MAI.', cur);
@@ -449,7 +551,7 @@
         ${nPast ? `<span title="Đơn có ngày giao trước hôm nay — đã qua nên không gom/ship nữa" style="font-size:11.5px;color:#B45309;background:#FEF3C7;padding:3px 9px;border-radius:6px;font-weight:600">🕐 Ẩn ${nPast} đơn quá ngày giao</span>` : ''}
         <div style="flex:1"></div>
         <button class="btn btn-primary btn-sm" id="pcMakeRun" onclick="window.pcMakeRun()" disabled>🧺 Tạo phiên gom (<span id="pcSelN">0</span>)</button>
-      </div>` + _cutoffBanner();
+      </div>`;
     if (!orders.length) {
       html += `<div style="background:#fff;border:1px solid var(--line);border-radius:10px;padding:40px;text-align:center;color:var(--muted)">Không có đơn nào cần gom cho hôm nay trở đi.${nPast ? ` (${nPast} đơn quá ngày giao đã ẩn.)` : ' Đơn mới do Sale tạo sẽ hiện ở đây.'}</div>`;
     } else {
@@ -1217,7 +1319,7 @@
     window.toast?.(`✅ Đã chốt ${run.id}: ghi SL về ${run.orderCodes.length} đơn` + (shortCodes.length ? ` · ${shortCodes.length} đơn thiếu` : ' · đủ hàng') + ' · đã chuyển sang Lịch sử đã gom', 'success');
     /* Phiên rời danh sách đang gom → vào Lịch sử; mở bước ③ để xuất kho */
     window._pcActiveRun = null;
-    renderRuns(); renderCall(); renderRunHistory(); renderRelease();
+    renderRuns(); renderRunHistory(); renderRelease(); _sumCache = null; renderSummary();
     window.pcCloseDetail && window.pcCloseDetail();
     } finally { _applyBusy.delete(runId); }
   };
@@ -1543,17 +1645,18 @@ ${o.shortages && o.shortages.length ? `<div style="margin-top:10px;font-size:11.
 
   /* Hook cho bộ test node (scratchpad/test_wh_procure.js). Không dùng lúc chạy thật. */
   window.__whTest = { kgPair, pairLabel, kgFactorOf, whCfg, targetDeliverKey, cutoffHourFor,
-    suppliersForProduct, autoAllocate, callDataForRun, leAllText, siText, isBuyOutside, supplyTypeOf, isPaused };
+    suppliersForProduct, autoAllocate, callDataForRun, leAllText, siText, isBuyOutside, supplyTypeOf, isPaused,
+    callPanesHTML, ordersForDate };
 
   /* ===== Init ===== */
   function init() {
     if (window.renderAppShell) window.renderAppShell('procurement', 'Gom hàng → NCC');
     renderAll();
     /* refresh khi STORE đổi (realtime) */
-    S().subscribe?.('orders', () => { renderGather(); renderRelease(); });
-    S().subscribe?.('procurementRuns', () => { renderRuns(); renderCall(); renderRelease(); });
-    S().subscribe?.('whProcure', () => renderAll());
-    S().subscribe?.('supplierMeta', () => { renderRuns(); renderCall(); });
+    S().subscribe?.('orders', () => { _sumCache = null; renderSummary(); renderRelease(); });
+    S().subscribe?.('procurementRuns', () => { renderRuns(); renderRelease(); });
+    S().subscribe?.('whProcure', () => { _sumCache = null; renderSummary(); renderRuns(); });
+    S().subscribe?.('supplierMeta', () => { _sumCache = null; renderSummary(); renderRuns(); });
   }
   if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', init);
   else init();

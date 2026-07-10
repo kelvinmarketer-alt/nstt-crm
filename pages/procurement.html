@@ -93,25 +93,24 @@
 
     <!-- Sub-tabs (tab-trong-tab) cho Gom hàng -->
     <div class="pc-subtabs" id="pcSubtabs">
-      <div class="pc-subtab active" data-pst="gather" onclick="window.pcSwitch('gather')"><span class="pst-ic">📋</span>Chọn đơn để gom</div>
-      <div class="pc-subtab" data-pst="runs" onclick="window.pcSwitch('runs')"><span class="pst-ic">🧺</span>Phiên gom</div>
-      <div class="pc-subtab" data-pst="call" onclick="window.pcSwitch('call')"><span class="pst-ic">📞</span>Gọi hàng NCC</div>
+      <div class="pc-subtab active" data-pst="sum" onclick="window.pcSwitch('sum')"><span class="pst-ic">📞</span>Tổng hợp &amp; Gọi hàng</div>
+      <div class="pc-subtab" data-pst="runs" onclick="window.pcSwitch('runs')"><span class="pst-ic">⚖️</span>Nhận hàng</div>
       <div class="pc-subtab" data-pst="release" onclick="window.pcSwitch('release')"><span class="pst-ic">🚚</span>Xuất kho</div>
-      <div class="pc-subtab" data-pst="history" onclick="window.pcSwitch('history')"><span class="pst-ic">✓</span>Lịch sử đã gom</div>
+      <div class="pc-subtab" data-pst="history" onclick="window.pcSwitch('history')"><span class="pst-ic">✓</span>Lịch sử</div>
     </div>
 
-    <div class="pc-pane active" data-pane="gather">
-      <section class="pc-step" id="stepGather">
-        <div class="pc-step-hd"><span class="pc-step-n">1</span> Chọn đơn → Gom
-          <span class="pc-step-sub">Tick các đơn cùng đợt giao rồi bấm <b>Tạo phiên gom</b></span></div>
-        <div id="pcGather"></div>
+    <div class="pc-pane active" data-pane="sum">
+      <section class="pc-step" id="stepSum">
+        <div class="pc-step-hd"><span class="pc-step-n">1</span> Tổng hợp &amp; Gọi hàng
+          <span class="pc-step-sub">Chọn <b>ngày giao</b> → app tự gom mọi đơn của ngày đó → chép tin nhắn gửi NCC. Không cần tạo phiên gom.</span></div>
+        <div id="pcSum"></div>
       </section>
     </div>
 
     <div class="pc-pane" data-pane="runs">
       <section class="pc-step" id="stepRuns">
-        <div class="pc-step-hd"><span class="pc-step-n">2</span> Phiên gom &amp; Đặt NCC
-          <span class="pc-step-sub">Chọn phiên bên trái → <b>gán NCC cho từng mặt hàng</b> → xác nhận đủ/thiếu</span></div>
+        <div class="pc-step-hd"><span class="pc-step-n">2</span> Nhận hàng &amp; chốt sản lượng
+          <span class="pc-step-sub">Sau khi NCC giao — nhập <b>số thực nhận</b>, thiếu thì app tự cắt theo đơn đặt trước</span></div>
         <div class="pc-runs-wrap">
           <div id="pcRunList" class="pc-run-list"></div>
           <div id="pcRunDetail" class="pc-run-detail"><div class="pc-detail-empty">← Chọn một phiên gom bên trái để gán NCC &amp; xác nhận hàng.</div></div>
@@ -119,17 +118,9 @@
       </section>
     </div>
 
-    <div class="pc-pane" data-pane="call">
-      <section class="pc-step" id="stepCall">
-        <div class="pc-step-hd"><span class="pc-step-n">3</span> Gọi hàng nhà cung cấp
-          <span class="pc-step-sub"><b>Lẻ</b> = họ chia mô sẵn theo khách → chép tin nhắn gửi luôn. <b>Sỉ</b> = họ giao cả lô → gọi theo tổng, kho tự chia</span></div>
-        <div id="pcCall"></div>
-      </section>
-    </div>
-
     <div class="pc-pane" data-pane="release">
       <section class="pc-step" id="stepRelease">
-        <div class="pc-step-hd"><span class="pc-step-n">4</span> Xuất kho → Ship
+        <div class="pc-step-hd"><span class="pc-step-n">3</span> Xuất kho → Ship
           <span class="pc-step-sub">Phiên đã xác nhận → xuất kho, bàn giao cho shipper</span></div>
         <div id="pcRelease"></div>
       </section>
