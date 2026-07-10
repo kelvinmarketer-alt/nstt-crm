@@ -7,7 +7,7 @@
 <link rel="stylesheet" href="../styles/tokens.css">
 <link rel="stylesheet" href="../styles/app.css">
 <style>
-  #supList{display:grid;grid-template-columns:repeat(auto-fill,minmax(340px,1fr));gap:12px}
+  #supList{display:block}   /* layout mới: các nhóm Sỉ/Lẻ xếp DỌC full-width (accordion) */
   .sup-card{background:#fff;border:1px solid var(--line);border-radius:12px;padding:14px 16px 12px 40px;position:relative;display:flex;flex-direction:column;gap:9px;transition:border-color .15s,box-shadow .15s}
   .sup-card:hover{border-color:var(--navy);box-shadow:0 2px 12px rgba(0,0,0,0.06)}
   .sup-head{display:flex;align-items:flex-start;gap:12px}
@@ -46,7 +46,7 @@
   .pur-btn-create-m{display:none}   /* nút Tạo phiếu bản mobile — chỉ hiện ≤560 */
   /* MOBILE ≤560: danh bạ NCC = thẻ 1 cột vừa khít (đã là grid card sẵn) */
   @media (max-width:560px){
-    #supList{grid-template-columns:1fr;gap:10px}
+    #supList{display:block}
     .sup-card{padding:12px 14px 11px 38px}
     .sup-card .sup-meta span[title="Địa chỉ"]{white-space:normal}
   }
