@@ -644,7 +644,8 @@
         <div class="sup-block" style="margin-bottom:12px;border:1px solid #FDE68A">
           <div class="hd" style="background:linear-gradient(135deg,#B45309,#D97706)">🛒 Danh sách thu mua ngoài <span style="opacity:.85;font-weight:400;font-size:11px">${extData.lines.length} mã · ${fmtQty(extKg)}kg</span>
             <div style="flex:1"></div>
-            <button class="btn btn-ghost btn-sm" style="background:rgba(255,255,255,.2);color:#fff;border:none" onclick="window.pcCopyExtReq('${run.id}')">📋 Copy danh sách</button>
+            <button class="btn btn-ghost btn-sm" style="background:rgba(255,255,255,.2);color:#fff;border:none" onclick="window.pcCopyExtImage('${run.id}')">📸 Copy ảnh phiếu</button>
+            <button class="btn btn-ghost btn-sm" style="background:rgba(255,255,255,.2);color:#fff;border:none" onclick="window.pcExtToPurchase('${run.id}')">📥 Phiếu về</button>
           </div>
           <div style="padding:8px 12px">
           ${extData.lines.map(it => `<div style="font-size:12px;padding:3px 0;border-bottom:1px dashed #EEF2F0">
@@ -1085,6 +1086,48 @@
       + lines.map((l, i) => `${i + 1}. ${l.name}: ${fmtQty(l.qty)} ${l.unit}` + (l.custs.length ? `\n   Cho: ${l.custs.map(b => (b.custName || b.code) + ' ' + fmtQty(b.qty) + l.unit).join(' · ')}` : '')).join('\n')
       + `\n────────────\n📦 Tổng: ${fmtQty(totalKg)} kg\n⚠ Mua xong GHI RÕ GIÁ từng mã để cuối ngày nhập sổ (Phiếu nhập → Thu mua ngoài). Cảm ơn!\n— Nông Sản Tuấn Tú`;
     copyText(txt, 'danh sách thu mua ngoài');
+  };
+  /* 📸 Chụp danh sách thu mua ngoài thành ẢNH → copy clipboard (dán thẳng Zalo). Lỗi → fallback copy chữ. */
+  window.pcCopyExtImage = async function (runId) {
+    const run = getRuns().find(r => r.id === runId); if (!run) return;
+    const { lines } = extReqData(run);
+    if (!lines.length) { window.toast && window.toast('Không có mã thu mua ngoài', 'info'); return; }
+    const totalKg = lines.reduce((s, l) => s + l.qty, 0);
+    const _x = s => String(s == null ? '' : s).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+    const W = 560, rowH = 30, H = 132 + lines.length * rowH + 70;
+    const today = new Date().toLocaleDateString('vi-VN');
+    const rowsHtml = lines.map((it, i) => `<div style="display:flex;justify-content:space-between;align-items:baseline;padding:6px 0;border-bottom:1px solid #EFE9DC;font-size:16px"><span style="color:#1B5E20"><b>${i + 1}.</b> ${_x(it.name)}</span><span style="font-weight:700;color:#B45309;white-space:nowrap;padding-left:12px">${_x(fmtQty(it.qty))} ${_x(it.unit || 'kg')}</span></div>`).join('');
+    const html = `<div xmlns="http://www.w3.org/1999/xhtml" style="width:${W}px;box-sizing:border-box;padding:20px 24px;font-family:-apple-system,BlinkMacSystemFont,Segoe UI,Roboto,Arial,sans-serif;background:#ffffff;color:#1f2937">`
+      + `<div style="display:flex;align-items:center;gap:10px;border-bottom:2px solid #1B5E20;padding-bottom:10px;margin-bottom:12px"><div style="font-size:24px">🛒</div><div><div style="font-size:18px;font-weight:800;color:#1B5E20">NÔNG SẢN TUẤN TÚ</div><div style="font-size:13px;color:#6b7280">PHIẾU THU MUA NGOÀI · ${today}</div></div></div>`
+      + rowsHtml
+      + `<div style="display:flex;justify-content:space-between;margin-top:12px;padding-top:10px;border-top:2px solid #1B5E20;font-size:16px;font-weight:800;color:#1B5E20"><span>TỔNG</span><span>${lines.length} mã · ${_x(fmtQty(totalKg))} kg</span></div>`
+      + `<div style="font-size:12px;color:#92400E;margin-top:8px">⚠ Mua xong ghi rõ GIÁ từng mã để nhập sổ.</div></div>`;
+    const svg = `<svg xmlns="http://www.w3.org/2000/svg" width="${W}" height="${H}"><foreignObject width="100%" height="100%">${html}</foreignObject></svg>`;
+    const renderBlob = async () => {
+      const img = new Image();
+      await new Promise((res, rej) => { img.onload = res; img.onerror = () => rej(new Error('svg load')); img.src = 'data:image/svg+xml;charset=utf-8,' + encodeURIComponent(svg); });
+      const scale = 2, cv = document.createElement('canvas'); cv.width = W * scale; cv.height = H * scale;
+      const ctx = cv.getContext('2d'); ctx.scale(scale, scale); ctx.fillStyle = '#ffffff'; ctx.fillRect(0, 0, W, H); ctx.drawImage(img, 0, 0);
+      const blob = await new Promise(r => cv.toBlob(r, 'image/png')); if (!blob) throw new Error('no blob'); return blob;
+    };
+    try {
+      if (!(navigator.clipboard && window.ClipboardItem)) throw new Error('no clipboard-image support');
+      await navigator.clipboard.write([new ClipboardItem({ 'image/png': renderBlob() })]);
+      window.toast && window.toast('📸 Đã copy ảnh phiếu — dán vào Zalo (Ctrl/⌘+V)', 'success');
+    } catch (e) {
+      console.warn('[pcCopyExtImage] lỗi copy ảnh → fallback chữ:', e);
+      window.pcCopyExtReq(runId);
+      window.toast && window.toast('Máy không copy được ảnh → đã copy CHỮ thay thế', 'warn');
+    }
+  };
+  /* 📥 "Phiếu về": mở Phiếu nhập → 🛒 Thu mua ngoài, điền sẵn các mã (kho nhập GIÁ THẬT → vào sổ + giá vốn) */
+  window.pcExtToPurchase = function (runId) {
+    const run = getRuns().find(r => r.id === runId); if (!run) return;
+    const { lines } = extReqData(run);
+    if (!lines.length) { window.toast && window.toast('Không có mã thu mua ngoài', 'info'); return; }
+    const items = lines.map(l => ({ name: l.name, qty: l.qty, price: '' }));
+    try { sessionStorage.setItem('pn_prefill_items', JSON.stringify(items)); } catch (e) {}
+    location.href = 'purchases.html?createForSup=EXT-MARKET';
   };
   window.pcPrintExtReq = function (runId) {
     const run = getRuns().find(r => r.id === runId); if (!run) return;

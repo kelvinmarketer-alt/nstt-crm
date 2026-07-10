@@ -570,6 +570,13 @@ CHỈ TRẢ JSON.`,
 
   /* Handle URL param: createForSup, createFor (productId) */
   const params = new URLSearchParams(location.search);
-  if (params.get('createForSup')) setTimeout(() => window.openPurModal(params.get('createForSup')), 300);
+  if (params.get('createForSup')) setTimeout(() => {
+    const forSup = params.get('createForSup');
+    let preset = null;
+    if (forSup === EXT_SUP_ID) {   /* chỉ Thu mua ngoài mới nhận prefill từ gom đơn */
+      try { const raw = sessionStorage.getItem('pn_prefill_items'); if (raw) { preset = JSON.parse(raw); sessionStorage.removeItem('pn_prefill_items'); } } catch (e) {}
+    }
+    window.openPurModal(forSup, (Array.isArray(preset) && preset.length) ? preset : undefined);
+  }, 300);
   if (params.get('focus')) setTimeout(() => window.openPurDrawer(params.get('focus')), 300);
 })();
