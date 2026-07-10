@@ -95,6 +95,7 @@
     <div class="pc-subtabs" id="pcSubtabs">
       <div class="pc-subtab active" data-pst="gather" onclick="window.pcSwitch('gather')"><span class="pst-ic">📋</span>Chọn đơn để gom</div>
       <div class="pc-subtab" data-pst="runs" onclick="window.pcSwitch('runs')"><span class="pst-ic">🧺</span>Phiên gom</div>
+      <div class="pc-subtab" data-pst="call" onclick="window.pcSwitch('call')"><span class="pst-ic">📞</span>Gọi hàng NCC</div>
       <div class="pc-subtab" data-pst="release" onclick="window.pcSwitch('release')"><span class="pst-ic">🚚</span>Xuất kho</div>
       <div class="pc-subtab" data-pst="history" onclick="window.pcSwitch('history')"><span class="pst-ic">✓</span>Lịch sử đã gom</div>
     </div>
@@ -118,9 +119,17 @@
       </section>
     </div>
 
+    <div class="pc-pane" data-pane="call">
+      <section class="pc-step" id="stepCall">
+        <div class="pc-step-hd"><span class="pc-step-n">3</span> Gọi hàng nhà cung cấp
+          <span class="pc-step-sub"><b>Lẻ</b> = họ chia mô sẵn theo khách → chép tin nhắn gửi luôn. <b>Sỉ</b> = họ giao cả lô → gọi theo tổng, kho tự chia</span></div>
+        <div id="pcCall"></div>
+      </section>
+    </div>
+
     <div class="pc-pane" data-pane="release">
       <section class="pc-step" id="stepRelease">
-        <div class="pc-step-hd"><span class="pc-step-n">3</span> Xuất kho → Ship
+        <div class="pc-step-hd"><span class="pc-step-n">4</span> Xuất kho → Ship
           <span class="pc-step-sub">Phiên đã xác nhận → xuất kho, bàn giao cho shipper</span></div>
         <div id="pcRelease"></div>
       </section>

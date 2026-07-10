@@ -9,25 +9,20 @@
   const supplyTypeOf = id => { const m = getSupMeta()[id]; return (m && m.type) || 'both'; };
   const TYPE_LABEL = { si: 'Sỉ', le: 'Lẻ', both: 'Sỉ + Lẻ' };
   const TYPE_DESC = { si: 'Bán sỉ — đóng 1 lô lớn theo tổng', le: 'Bán lẻ — chia sẵn theo từng khách', both: 'Cả sỉ và lẻ' };
-  function saveSupplyType(id, type) {
-    window.STORE.rmwKv('supplierMeta', m => {   /* chống đè: set loại NCC theo id lên bản cloud mới nhất */
+  /* Trạng thái NHẬP HÀNG (khác cột `active` = còn dùng NCC hay không).
+     'paused' = ngừng nhập → không hiện ở lệnh gọi hàng của Kho, nhưng giữ nguyên lịch sử & công nợ. */
+  const supplyStatusOf = id => { const m = getSupMeta()[id]; return (m && m.status) || 'active'; };
+  const ST_LABEL = { active: 'Đang nhập', paused: 'Ngừng nhập' };
+  function saveSupplyMeta(id, patch) {
+    window.STORE.rmwKv('supplierMeta', m => {   /* chống đè: set theo id lên bản cloud mới nhất */
       m = (m && typeof m === 'object' && !Array.isArray(m)) ? m : {};
-      m[id] = Object.assign({}, m[id] || {}, { type });
+      m[id] = Object.assign({}, m[id] || {}, patch);
       return m;
-    });
+    }, {});
   }
   const CATS = { 'rau-ta':'Rau ta', 'rau-dalat':'Rau Đà Lạt', 'nam':'Nấm',
                  'rau-vung-mien':'Rau vùng miền', 'rau-gia-vi':'Rau gia vị', 'hai-san':'Hải sản' };
 
-  function stars(r) {
-    const full = Math.floor(r);
-    const half = (r - full) >= 0.5;
-    let s = '';
-    for (let i = 0; i < full; i++) s += '★';
-    if (half) s += '✬';
-    while (s.length < 5) s += '☆';
-    return s.slice(0, 5);
-  }
 
   function renderKpis() {
     const list = getSup();
@@ -87,7 +82,10 @@
               <span title="Địa chỉ">📍 <span data-field="address" title="Click để sửa địa chỉ">${has(s.address)?s.address:empty}</span></span>
             </div>
           </div>
-          <div class="rating-stars" title="Đánh giá">${stars(s.rating)}</div>
+          <div title="${supplyStatusOf(s.id)==='paused' ? 'Ngừng nhập hàng — không hiện ở lệnh gọi hàng của Kho' : 'Đang nhập hàng bình thường'}"
+               style="font-size:11px;font-weight:700;white-space:nowrap;padding:3px 9px;border-radius:20px;border:1px solid ${supplyStatusOf(s.id)==='paused'?'#FCA5A5':'#BBF7D0'};background:${supplyStatusOf(s.id)==='paused'?'#FEF2F2':'#F0FDF4'};color:${supplyStatusOf(s.id)==='paused'?'#B91C1C':'#15803D'}">
+            ${ST_LABEL[supplyStatusOf(s.id)]}
+          </div>
         </div>
         <div class="sup-foot">
           <div class="sup-tags">${cats}
@@ -164,7 +162,7 @@
         <div style="background:#FAFBFC;padding:12px;border-radius:8px;font-size:13px;line-height:1.7">
           <div><b>Địa chỉ:</b> ${s.address}</div>
           <div><b>Điều khoản TT:</b> <span class="tag" style="background:#DBEAFE;color:#1E40AF">${s.paymentTerm}</span> ${window.helpTip('COD = trả ngay khi nhận hàng. NET X = thanh toán trong X ngày.')}</div>
-          <div><b>Đánh giá:</b> <span class="rating-stars">${stars(s.rating)}</span> ${s.rating}/5</div>
+          <div><b>Trạng thái nhập:</b> <span class="tag" style="background:${supplyStatusOf(s.id)==='paused'?'#FEE2E2':'#DCFCE7'};color:${supplyStatusOf(s.id)==='paused'?'#B91C1C':'#15803D'};font-weight:700">${ST_LABEL[supplyStatusOf(s.id)]}</span> ${window.helpTip('Ngừng nhập = ẩn khỏi lệnh gọi hàng của Kho, vẫn giữ lịch sử và công nợ.')}</div>
           <div><b>Loại cung cấp:</b> <span class="tag" style="background:#FEF3C7;color:#92400E;font-weight:700">${TYPE_LABEL[supplyTypeOf(s.id)]}</span> <span style="color:var(--muted);font-size:12px">${TYPE_DESC[supplyTypeOf(s.id)]}</span></div>
           <div><b>Ghi chú:</b> ${s.note || '—'}</div>
         </div>
@@ -219,7 +217,10 @@
         <div><label style="font-size:12px;color:var(--muted)">SĐT</label><input id="sf_phone" value="${s.phone}" style="width:100%;border:1px solid var(--line);border-radius:6px;padding:7px;font-size:13px"></div>
         <div style="grid-column:span 2"><label style="font-size:12px;color:var(--muted)">Địa chỉ</label><input id="sf_addr" value="${s.address}" style="width:100%;border:1px solid var(--line);border-radius:6px;padding:7px;font-size:13px"></div>
         <div><label style="font-size:12px;color:var(--muted)">Điều khoản TT ${window.helpTip('COD=trả ngay · NET 7/14/30 = trả trong 7/14/30 ngày sau nhận hàng.')}</label><select id="sf_term" style="width:100%;border:1px solid var(--line);border-radius:6px;padding:7px;font-size:13px"><option ${s.paymentTerm==='COD'?'selected':''}>COD</option><option ${s.paymentTerm==='NET 7'?'selected':''}>NET 7</option><option ${s.paymentTerm==='NET 14'?'selected':''}>NET 14</option><option ${s.paymentTerm==='NET 30'?'selected':''}>NET 30</option></select></div>
-        <div><label style="font-size:12px;color:var(--muted)">Đánh giá ⭐ (1-5) ${window.helpTip('Số sao = mức ưu tiên khi GOM ĐƠN tự chọn NCC. Sao cao nhất được chọn trước. Đánh giá theo giá tốt / nhà hay nhập / độ tin cậy.')}</label><input id="sf_rating" type="number" step="0.1" min="1" max="5" value="${s.rating}" style="width:100%;border:1px solid var(--line);border-radius:6px;padding:7px;font-size:13px"></div>
+        <div><label style="font-size:12px;color:var(--muted)">Trạng thái nhập hàng ${window.helpTip('Ngừng nhập = KHÔNG hiện ở lệnh gọi hàng của Kho. Lịch sử và công nợ giữ nguyên.')}</label>
+          <select id="sf_supplyStatus" style="width:100%;border:1px solid var(--line);border-radius:6px;padding:7px;font-size:13px">
+            ${[['active','Đang nhập hàng'],['paused','Ngừng nhập hàng']].map(([v,lb])=>`<option value="${v}" ${supplyStatusOf(s.id)===v?'selected':''}>${lb}</option>`).join('')}
+          </select></div>
         <div style="grid-column:span 2"><label style="font-size:12px;color:var(--muted)">Loại cung cấp ${window.helpTip('Sỉ = đóng 1 lô lớn theo tổng (vd gom 100kg → đóng 100kg). Lẻ = chia sẵn theo từng khách (vd khách A 20kg, B 30kg...). Cả hai = linh hoạt.')}</label>
           <select id="sf_supplyType" style="width:100%;border:1px solid var(--line);border-radius:6px;padding:7px;font-size:13px">
             ${[['both', 'Cả sỉ và lẻ'], ['si', 'Chỉ Sỉ (đóng 1 lô theo tổng)'], ['le', 'Chỉ Lẻ (chia sẵn theo từng khách)']].map(([v, lb]) => `<option value="${v}" ${supplyTypeOf(s.id) === v ? 'selected' : ''}>${lb}</option>`).join('')}
@@ -317,14 +318,18 @@
       address: document.getElementById('sf_addr').value.trim(),
       products: products,
       paymentTerm: document.getElementById('sf_term').value,
-      rating: parseFloat(document.getElementById('sf_rating').value) || 5,
+      /* `rating` không còn hiện trên giao diện — giữ nguyên giá trị cũ trong DB, không xoá cột */
       note: document.getElementById('sf_note').value,
       active: document.getElementById('sf_active').checked,
     };
     if (!obj.name) { window.toast('Nhập tên NCC','warn'); return; }
-    /* Loại sỉ/lẻ → kv supplierMeta (không phải cột suppliers) */
+    /* Loại sỉ/lẻ + trạng thái nhập → kv supplierMeta (bảng suppliers không có 2 cột này) */
     const _stEl = document.getElementById('sf_supplyType');
-    if (_stEl) saveSupplyType(obj.id, _stEl.value);
+    const _ssEl = document.getElementById('sf_supplyStatus');
+    const _patch = {};
+    if (_stEl) _patch.type = _stEl.value;
+    if (_ssEl) _patch.status = _ssEl.value;
+    if (Object.keys(_patch).length) saveSupplyMeta(obj.id, _patch);
     const list = getSup();
     if (isEdit) {
       const idx = list.findIndex(x => x.id === obj.id);
@@ -337,6 +342,7 @@
       }
     } else {
       obj.debt = 0; obj.totalSpend = 0;
+      obj.rating = 5;   /* cột `rating` vẫn còn trong DB (đã ẩn khỏi giao diện) — đừng ghi null */
       list.push(obj);
     }
     window.STORE.set('suppliers', list);

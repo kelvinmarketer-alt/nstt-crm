@@ -228,6 +228,7 @@
     'accountOpenings', /* Số dư GỐC từng TK quỹ {accId:number} — số dư = opening + (thu−chi từ cashEntries) */
     'recurringDrivers',/* Shipper mặc định mẫu đơn định kỳ {roId:{id,name}} — bảng recurring_orders không có cột driver */
     'procurementRuns', /* Phiên gom hàng → đặt NCC (Kho) — CRITICAL */
+    'whProcure',       /* Module KHO: NCC mặc định/SP · hệ số quy đổi kg · giờ chốt đơn · SP mua ngoài */
     'supplierClaims',  /* Khoản đòi lại NCC khi hàng NCC giao hỏng (Trả hàng) */
     'supplierMeta',    /* Loại NCC (sỉ/lẻ/cả hai) — cloud suppliers không có cột này */
     'custPriceTiers',  /* Nhóm giá gán cho từng KH {custId:tierId} — cloud customers không có cột price_tier */
@@ -277,7 +278,7 @@
     'timesheet', 'timesheetMeta', 'payrollExtra', 'payrollConfig', 'payrollStaffCfg',
     'latePolicy', 'bonusRules', 'bonusLog', 'khoDuty',
     'procurementRuns', 'debtLedger', 'accountOpenings', 'staffAuth', 'staffAliases',
-    'inv_movements', 'custBrands', 'mktPrices', 'autoRecurring',
+    'inv_movements', 'custBrands', 'mktPrices', 'autoRecurring', 'whProcure',
     'custPriceTiers', 'custCreditDays', 'priceTiers', 'orderQtyLocks', 'orderQuoteLocks',
   ]);
   /* Cloud đã TRẢ LỜI cho key KV này chưa (khác _preloadDone: done kể cả khi getKv ném lỗi) */
