@@ -311,6 +311,33 @@
   let _sumDate = '';                 /* 'YYYY-MM-DD' */
   let _sumCache = null;              /* { dk, codes, lines } */
   let _sumBusy = false;
+  let _sumView = 'prod';             /* 'prod' = theo mã hàng (gọi NCC) · 'order' = theo đơn (hoá đơn gốc) */
+  window.pcSumView = function (v) { _sumView = v; renderSummary(); };
+
+  /* Đảo chiều: từ các dòng đã GỘP theo mã hàng → về lại TỪNG ĐƠN.
+     Đây là "hoá đơn gốc" của sheet: đơn nào có mặt hàng gì, bao nhiêu, ai giao.
+     Gộp mà không đảo lại được thì kho không biết sản lượng nào của đơn nào. */
+  function linesToOrders(lines) {
+    const orders = getOrders();
+    const byCode = new Map();
+    (lines || []).forEach(l => {
+      const sup = (l.allocations || [])[0] || {};
+      (l.breakdown || []).forEach(b => {
+        const g = byCode.get(b.code) || { code: b.code, items: [] };
+        g.items.push({ name: l.name, unit: l.unit, productId: l.productId, qty: b.qty,
+          supName: sup.supplierName || '', supId: sup.supplierId || '', out: isBuyOutside(l.productId) });
+        byCode.set(b.code, g);
+      });
+    });
+    return [...byCode.values()].map(g => {
+      const o = orders.find(x => x.code === g.code) || {};
+      return Object.assign(g, {
+        custName: o.custName || g.code,
+        addr: o.drop || '', shift: o.shipShift || '', time: o.shipTime || '',
+        items: g.items.sort((a, b) => String(a.name).localeCompare(String(b.name), 'vi')),
+      });
+    }).sort((a, b) => String(a.custName).localeCompare(String(b.custName), 'vi'));
+  }
 
   const _dkToISO = dk => `${dk.slice(0, 4)}-${dk.slice(4, 6)}-${dk.slice(6, 8)}`;
   const _isoToDk = iso => String(iso || '').replace(/-/g, '');
@@ -377,29 +404,96 @@
     const sups = getSuppliers().filter(s => s.active !== false && !isPaused(s.id))
       .sort((a, b) => String(a.name).localeCompare(String(b.name), 'vi'));
 
-    /* Bảng TỔNG HỢP — 1 dòng cho mỗi (mã hàng × khách), đúng như sheet */
+    /* ── Góc nhìn A: THEO MÃ HÀNG (để gọi NCC) ──
+       Mỗi mã 1 dòng, nhưng cột "Chia cho đơn" nói rõ sản lượng nào của khách nào.
+       Gộp mà mất dấu đơn thì kho không chia hàng được. */
     const rows = lines.map(l => {
       const sup = (l.allocations[0] || {}).supplierId || '';
       const out = isBuyOutside(l.productId);
-      const bd = l.breakdown || [];
+      const bd = [...(l.breakdown || [])].sort((a, b) => b.qty - a.qty);
       const supCell = out
         ? `<span class="tag" style="background:#FEF3C7;color:#92400E;font-weight:700">Mua ngoài</span>`
         : `<select onchange="window.pcSumSetSup(${jsq(l.productId)},this.value)"
-             style="width:100%;max-width:200px;padding:4px 6px;border:1px solid ${sup ? 'var(--line)' : '#FCA5A5'};border-radius:6px;font-size:12px;background:${sup ? '#fff' : '#FEF2F2'}">
+             style="width:100%;max-width:190px;padding:4px 6px;border:1px solid ${sup ? 'var(--line)' : '#FCA5A5'};border-radius:6px;font-size:12px;background:${sup ? '#fff' : '#FEF2F2'}">
              <option value="">— chưa gán NCC —</option>
              ${sups.map(x => `<option value="${x.id}" ${x.id === sup ? 'selected' : ''}>${esc(x.name)} · ${TYPE_LABEL[supplyTypeOf(x.id)]}</option>`).join('')}
            </select>`;
-      return bd.map((b, i) => `<tr style="${i ? 'background:#FCFDFC' : ''}">
-        <td style="padding:6px 9px;${i ? 'color:var(--muted)' : 'font-weight:700'}">${i ? '↳' : esc(l.name)}</td>
-        <td style="padding:6px 9px;color:var(--muted)">${esc(l.unit)}</td>
-        <td class="num" style="padding:6px 9px;font-weight:700">${fmtQty(b.qty)}</td>
-        <td style="padding:6px 9px">${esc(b.custName || b.code)}</td>
-        ${i === 0 ? `<td style="padding:5px 9px;vertical-align:middle" rowspan="${bd.length || 1}">${supCell}</td>` : ''}
+      const split = bd.map(b => `<span title="${esc(b.code)}" style="display:inline-flex;align-items:center;gap:5px;background:#F1F5F9;border:1px solid #E2E8F0;border-radius:6px;padding:2px 7px;font-size:11.5px;white-space:nowrap">
+          <span style="color:#475569">${esc(b.custName || b.code)}</span><b style="color:var(--navy)">${fmtQty(b.qty)}</b></span>`).join(' ');
+      return `<tr>
+        <td style="padding:8px 9px;font-weight:700;color:var(--navy)">${esc(l.name)}</td>
+        <td style="padding:8px 9px;color:var(--muted)">${esc(l.unit)}</td>
+        <td class="num" style="padding:8px 9px;font-weight:800;font-size:14px">${fmtQty(l.totalQty)}</td>
+        <td style="padding:6px 9px"><div style="display:flex;flex-wrap:wrap;gap:4px">${split}</div>
+          <div style="font-size:10.5px;color:var(--muted);margin-top:3px">${bd.length} đơn</div></td>
+        <td style="padding:5px 9px;vertical-align:middle">${supCell}</td>
+      </tr>`;
+    }).join('');
+
+    /* ── Góc nhìn B: THEO ĐƠN (bản sao "HÓA ĐƠN GỐC") ── */
+    const orderCards = linesToOrders(lines).map(o => {
+      const p = kgPair(o.items);
+      const its = o.items.map(it => `<tr>
+        <td style="padding:5px 8px">${esc(it.name)}</td>
+        <td class="num" style="padding:5px 8px;font-weight:700">${fmtQty(it.qty)}</td>
+        <td style="padding:5px 8px;color:var(--muted)">${esc(it.unit)}</td>
+        <td style="padding:5px 8px;font-size:11.5px">${it.out
+            ? '<span style="color:#92400E">🛒 mua ngoài</span>'
+            : it.supName ? `${esc(it.supName)} <span style="color:var(--muted)">· ${TYPE_LABEL[supplyTypeOf(it.supId)]}</span>` : '<span style="color:#B91C1C">chưa gán NCC</span>'}</td>
       </tr>`).join('');
+      return `<div style="background:#fff;border:1px solid var(--line);border-radius:10px;padding:12px 14px">
+        <div style="display:flex;align-items:baseline;gap:8px;flex-wrap:wrap;margin-bottom:6px">
+          <b style="font-size:14.5px;color:var(--navy)">${esc(o.custName)}</b>
+          <span style="font-family:ui-monospace,Menlo,monospace;font-size:11px;color:var(--muted)">${esc(o.code)}</span>
+          <div style="flex:1"></div>
+          <span class="tag" style="background:#EFF6FF;color:#1E40AF;font-weight:700">${o.items.length} mã · ${pairLabel(p)}</span>
+        </div>
+        <div style="font-size:11.5px;color:var(--muted);margin-bottom:8px">
+          ${o.shift ? `Ca ${esc(o.shift)}` : ''}${o.time ? ` · ${esc(o.time)}` : ''}${o.addr ? ` · ${esc(o.addr)}` : ''}
+        </div>
+        <div style="overflow-x:auto;border:1px solid var(--line-soft,#EEF2EE);border-radius:8px">
+          <table class="mini-table" style="width:100%;border-collapse:collapse;font-size:12.5px">
+            <thead><tr style="background:#FAFBFA">
+              <th style="text-align:left;padding:6px 8px">Mặt hàng</th>
+              <th class="num" style="padding:6px 8px">SL</th>
+              <th style="text-align:left;padding:6px 8px">ĐVT</th>
+              <th style="text-align:left;padding:6px 8px">Lấy từ</th>
+            </tr></thead><tbody>${its}</tbody>
+          </table>
+        </div>
+      </div>`;
     }).join('');
 
     const noSup = lines.filter(l => !isBuyOutside(l.productId) && !(l.allocations[0] || {}).supplierId).length;
     const pair = kgPair(lines.map(l => ({ productId: l.productId, unit: l.unit, qty: l.totalQty })));
+
+    const tabBtn = (v, ic, lb, sub) => `<button onclick="window.pcSumView('${v}')"
+      style="flex:1;min-width:150px;display:flex;align-items:center;gap:9px;text-align:left;cursor:pointer;
+             border:1.5px solid ${_sumView === v ? '#15803D' : 'var(--line)'};background:${_sumView === v ? '#F0FDF4' : '#fff'};
+             border-radius:9px;padding:9px 12px">
+      <span style="font-size:17px">${ic}</span>
+      <span><b style="font-size:13px;color:${_sumView === v ? '#15803D' : 'var(--navy)'};display:block">${lb}</b>
+      <span style="font-size:10.5px;color:var(--muted)">${sub}</span></span></button>`;
+
+    const viewProd = `
+      <div style="overflow-x:auto;border:1px solid var(--line);border-radius:10px;background:#fff">
+        <table class="mini-table" style="width:100%;border-collapse:collapse;font-size:13px">
+          <thead><tr style="background:#F9FAFB">
+            <th style="text-align:left;padding:8px 9px">Mã hàng</th>
+            <th style="text-align:left;padding:8px 9px">ĐVT</th>
+            <th class="num" style="padding:8px 9px">Tổng</th>
+            <th style="text-align:left;padding:8px 9px;min-width:220px">Chia cho đơn nào</th>
+            <th style="text-align:left;padding:8px 9px;min-width:180px">Nhà cung cấp</th>
+          </tr></thead>
+          <tbody>${rows}</tbody>
+        </table>
+      </div>
+      <div class="section-h" style="margin:18px 0 8px">📞 Gọi hàng</div>
+      ${callPanesHTML({ id: 'SUM-' + dk, lines })}`;
+
+    const viewOrder = `
+      <div style="font-size:12px;color:var(--muted);margin-bottom:10px">Đúng như <b>Hoá đơn gốc</b> của sheet — đơn nào có mặt hàng gì, lấy từ nhà nào.</div>
+      <div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(330px,1fr));gap:12px">${orderCards}</div>`;
 
     host.innerHTML = head + `
       <div style="display:flex;gap:8px;flex-wrap:wrap;margin-bottom:10px">
@@ -408,26 +502,14 @@
         ${noSup ? `<span class="tag" style="background:#FEE2E2;color:#B91C1C;font-weight:700">⚠ ${noSup} mã chưa gán NCC</span>` : ''}
       </div>
 
-      <div class="section-h" style="margin:0 0 8px">📞 Gọi hàng</div>
-      ${callPanesHTML({ id: 'SUM-' + dk, lines })}
+      <div style="display:flex;gap:8px;flex-wrap:wrap;margin-bottom:14px">
+        ${tabBtn('prod', '📦', 'Theo mã hàng', 'gom lại để gọi nhà cung cấp')}
+        ${tabBtn('order', '🧾', 'Theo đơn khách', 'xem đơn nào có gì — như hoá đơn gốc')}
+      </div>
 
-      <details style="margin-top:18px">
-        <summary style="cursor:pointer;font-weight:700;color:var(--navy);font-size:13px">📋 Bảng tổng hợp — ${lines.length} mã hàng · bấm để xem &amp; đổi NCC</summary>
-        <div style="overflow-x:auto;border:1px solid var(--line);border-radius:10px;background:#fff;margin-top:8px">
-          <table class="mini-table" style="width:100%;border-collapse:collapse;font-size:13px">
-            <thead><tr style="background:#F9FAFB">
-              <th style="text-align:left;padding:8px 9px">Mã hàng</th>
-              <th style="text-align:left;padding:8px 9px">ĐVT</th>
-              <th class="num" style="padding:8px 9px">Số lượng</th>
-              <th style="text-align:left;padding:8px 9px">Khách</th>
-              <th style="text-align:left;padding:8px 9px;min-width:180px">Nhà cung cấp</th>
-            </tr></thead>
-            <tbody>${rows}</tbody>
-          </table>
-        </div>
-      </details>
+      ${_sumView === 'order' ? viewOrder : viewProd}
 
-      <details style="margin-top:12px">
+      <details style="margin-top:16px">
         <summary style="cursor:pointer;font-weight:600;color:var(--muted);font-size:12.5px">⚙ Chọn đơn thủ công (khi chỉ muốn gom một phần)</summary>
         <div id="pcGather" style="margin-top:10px"></div>
       </details>`;
@@ -842,6 +924,8 @@
           <div style="flex:1;min-width:160px">
             <div style="font-weight:800;font-size:15px;color:var(--navy)">${esc(l.name)}</div>
             <div style="font-size:11.5px;color:var(--muted);margin-top:3px">Đặt <b>${fmtQty(l.totalQty)} ${esc(l.unit)}</b> · ${supChips}</div>
+            <div style="display:flex;flex-wrap:wrap;gap:4px;margin-top:6px">${(l.breakdown || []).map(b =>
+              `<span title="${esc(b.code)}" style="background:#F1F5F9;border:1px solid #E2E8F0;border-radius:6px;padding:1px 6px;font-size:11px;white-space:nowrap"><span style="color:#475569">${esc(b.custName || b.code)}</span> <b style="color:var(--navy)">${fmtQty(b.qty)}</b></span>`).join('')}</div>
           </div>
           <div style="text-align:right">
             <div style="font-size:10.5px;color:var(--muted);text-transform:uppercase;font-weight:700;letter-spacing:.3px;margin-bottom:4px">Thực nhận</div>
@@ -1764,7 +1848,7 @@ ${o.shortages && o.shortages.length ? `<div style="margin-top:10px;font-size:11.
   /* Hook cho bộ test node (scratchpad/test_wh_procure.js). Không dùng lúc chạy thật. */
   window.__whTest = { kgPair, pairLabel, kgFactorOf, whCfg, targetDeliverKey, cutoffHourFor,
     suppliersForProduct, autoAllocate, callDataForRun, leAllText, siText, isBuyOutside, supplyTypeOf, isPaused,
-    callPanesHTML, ordersForDate, confirmedOf, allocateLine };
+    callPanesHTML, ordersForDate, confirmedOf, allocateLine, linesToOrders };
 
   /* ===== Init ===== */
   function init() {
