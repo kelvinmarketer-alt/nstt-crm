@@ -56,71 +56,97 @@
   function supOrder(s) { const m = String(s && s.id || '').match(/(\d+)/); return m ? +m[1] : 1e9; }
   function render() {
     renderKpis();
-    const q = (document.getElementById('supQ').value || '').trim().toLowerCase();
     const pur = getPur();
-
     const all = getSup().slice().sort((a, b) => supOrder(a) - supOrder(b));
-    const match = s => !q || (s.name + ' ' + (s.phone || '') + ' ' + s.id).toLowerCase().includes(q);
-    const si = all.filter(s => groupOf(s) === 'si' && match(s));
-    const le = all.filter(s => groupOf(s) === 'le' && match(s));
-    const other = all.filter(s => groupOf(s) === 'other');   /* chưa xếp nhóm — KHÔNG lọc theo q */
+    const si = all.filter(s => groupOf(s) === 'si');
+    const le = all.filter(s => groupOf(s) === 'le');
+    const other = all.filter(s => groupOf(s) === 'other');
 
     const has = v => v && String(v).trim() && String(v).trim().toLowerCase() !== 'null';
     const dash = '<span style="color:var(--muted);opacity:.5">—</span>';
+    const money = n => (+n > 0) ? window.fmt(n) + ' ₫' : '<span style="color:var(--muted)">—</span>';
 
-    /* 1 nhà = 1 accordion. Bấm dòng → xổ ra sản phẩm cung cấp (chỉ thông tin).
-       Bấm "Chi tiết & Sửa" trong đó → mới mở popup. */
+    /* 1 nhà = 1 accordion full-width. Bấm dòng → xổ sản phẩm cung cấp. */
     const accRow = s => {
       const prods = s.products || [];
       const paused = supplyStatusOf(s.id) === 'paused';
+      const search = (s.name + ' ' + (s.phone || '')).toLowerCase().replace(/"/g, '');
       const prodLine = prods.length
-        ? prods.map(p => `<span style="display:inline-block;background:#fff;border:1px solid var(--line);border-radius:6px;padding:1px 8px;margin:2px 3px 0 0;font-size:12px">${escH(p.name)}${p.price ? `<span style="color:var(--muted)"> · ${window.fmtShort(p.price)}</span>` : ''}</span>`).join('')
+        ? prods.map(p => `<span style="display:inline-block;background:#fff;border:1px solid var(--line);border-radius:6px;padding:1px 8px;margin:2px 4px 0 0;font-size:12px">${escH(p.name)}${p.price ? `<span style="color:var(--muted)"> · ${window.fmtShort(p.price)}</span>` : ''}</span>`).join('')
         : '<span style="color:var(--muted);font-size:12px;font-style:italic">Chưa gán sản phẩm — bấm “Chi tiết & Sửa” để chọn</span>';
-      return `<details class="sup-acc" style="border-bottom:1px solid #EFF2EE">
-        <summary style="display:flex;align-items:center;gap:9px;padding:9px 11px;cursor:pointer;list-style:none">
-          <span class="sup-caret" style="color:#94A3B8;font-size:11px;flex:0 0 auto">▸</span>
+      return `<details class="sup-acc" data-search="${escH(search)}" style="border-bottom:1px solid #EFF2EE">
+        <summary style="display:flex;align-items:center;gap:12px;padding:10px 14px;cursor:pointer;list-style:none">
+          <span class="sup-caret" style="color:#94A3B8;font-size:11px;flex:0 0 12px">▸</span>
           <span style="flex:1;min-width:0;font-weight:700;color:var(--navy);white-space:nowrap;overflow:hidden;text-overflow:ellipsis">
             ${has(s.name) ? escH(s.name) : '(chưa đặt tên)'}
-            ${paused ? '<span class="tag" style="background:#FEE2E2;color:#B91C1C;font-weight:700;margin-left:5px">Ngừng nhập</span>' : ''}
+            ${paused ? '<span class="tag" style="background:#FEE2E2;color:#B91C1C;font-weight:700;margin-left:6px">Ngừng nhập</span>' : ''}
           </span>
-          <span style="font-variant-numeric:tabular-nums;color:var(--muted);white-space:nowrap;font-size:12px">${has(s.phone) ? escH(s.phone) : dash}</span>
-          <span style="width:66px;text-align:right;font-variant-numeric:tabular-nums;white-space:nowrap;font-weight:${s.debt > 0 ? '700' : '400'};color:${s.debt > 0 ? '#DC2626' : 'var(--muted)'}">${s.debt > 0 ? window.fmtShort(s.debt) : '—'}</span>
+          <span style="flex:0 0 140px;font-variant-numeric:tabular-nums;color:var(--muted);font-size:12.5px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${has(s.phone) ? escH(s.phone) : dash}</span>
+          <span style="flex:0 0 160px;text-align:right;font-variant-numeric:tabular-nums;white-space:nowrap;font-weight:${s.debt > 0 ? '700' : '400'};color:${s.debt > 0 ? '#DC2626' : 'var(--muted)'}">${money(s.debt)}</span>
         </summary>
-        <div style="padding:2px 12px 12px 31px;background:#FAFBFA">
+        <div style="padding:2px 14px 13px 38px;background:#FAFBFA">
           <div style="font-size:10.5px;color:var(--muted);text-transform:uppercase;font-weight:700;letter-spacing:.3px;margin-bottom:4px">Sản phẩm cung cấp (${prods.length})</div>
-          <div style="line-height:1.9">${prodLine}</div>
-          <button class="btn btn-ghost btn-sm" style="margin-top:9px" onclick="window.openSupDrawer('${s.id}')">Chi tiết &amp; Sửa →</button>
+          <div style="line-height:1.95">${prodLine}</div>
+          <button class="btn btn-ghost btn-sm" style="margin-top:10px" onclick="window.openSupDrawer('${s.id}')">Chi tiết &amp; Sửa →</button>
         </div>
       </details>`;
     };
 
-    const panel = (title, sub, color, bg, arr) => `
-      <div style="border:1px solid var(--line);border-radius:11px;overflow:hidden;background:#fff;min-width:0">
-        <div style="background:${bg};padding:10px 13px;border-bottom:1px solid var(--line);position:sticky;top:0;z-index:1">
-          <div style="display:flex;align-items:baseline;gap:8px;flex-wrap:wrap">
-            <b style="color:${color};font-size:13.5px">${title}</b>
-            <span style="background:#fff;border:1px solid ${color}33;color:${color};font-weight:800;font-size:11.5px;border-radius:20px;padding:1px 9px">${arr.length}</span>
+    /* Panel full-width: header (tiêu đề + ô tìm riêng) · hàng cột · danh sách accordion */
+    const panel = (group, title, sub, color, bg, arr) => `
+      <div style="border:1px solid var(--line);border-radius:12px;overflow:hidden;background:#fff;margin-bottom:16px">
+        <div style="background:${bg};padding:11px 14px;border-bottom:1px solid var(--line);display:flex;align-items:center;gap:12px;flex-wrap:wrap">
+          <div style="min-width:0">
+            <div style="display:flex;align-items:baseline;gap:8px">
+              <b style="color:${color};font-size:14px">${title}</b>
+              <span style="background:#fff;border:1px solid ${color}33;color:${color};font-weight:800;font-size:12px;border-radius:20px;padding:1px 10px">${arr.length}</span>
+            </div>
+            <div style="font-size:11px;color:var(--muted);margin-top:2px">${sub}</div>
           </div>
-          <div style="font-size:11px;color:var(--muted);margin-top:2px">${sub}</div>
+          <div style="flex:1"></div>
+          <div style="position:relative;min-width:220px;flex:0 1 300px">
+            <span style="position:absolute;left:11px;top:50%;transform:translateY(-50%);color:#94A3B8;font-size:13px;pointer-events:none">🔍</span>
+            <input type="text" oninput="window.supFilterPanel('${group}',this.value)" placeholder="Tìm nhà cung cấp trong nhóm này…"
+              style="width:100%;box-sizing:border-box;padding:8px 11px 8px 32px;border:1px solid var(--line);border-radius:8px;font-size:12.5px;background:#fff">
+          </div>
         </div>
-        <div style="max-height:66vh;overflow:auto">
-          ${arr.length ? arr.map(accRow).join('') : '<div style="padding:26px;text-align:center;color:var(--muted);font-size:12px">Chưa có nhà cung cấp nào</div>'}
+        <div style="display:flex;align-items:center;gap:12px;padding:7px 14px;background:#FAFBFA;border-bottom:1px solid var(--line);font-size:10.5px;color:var(--muted);text-transform:uppercase;font-weight:700;letter-spacing:.3px">
+          <span style="flex:0 0 12px"></span>
+          <span style="flex:1;min-width:0">Tên nhà cung cấp</span>
+          <span style="flex:0 0 140px">SĐT liên hệ</span>
+          <span style="flex:0 0 160px;text-align:right">Công nợ phải trả</span>
+        </div>
+        <div id="supBody-${group}" style="max-height:none">
+          ${arr.length ? arr.map(accRow).join('') : ''}
+          <div id="supEmpty-${group}" style="display:${arr.length ? 'none' : 'block'};padding:26px;text-align:center;color:var(--muted);font-size:12px">Không có nhà cung cấp nào</div>
         </div>
       </div>`;
 
     document.getElementById('supList').innerHTML = `
       ${other.length
-        ? `<button onclick="window.supOpenUnassigned()" style="display:flex;align-items:center;gap:9px;width:100%;text-align:left;cursor:pointer;background:#FFFBEB;border:1px solid #FDE68A;border-radius:10px;padding:10px 14px;margin-bottom:14px">
-             <span style="font-size:18px">🔔</span>
-             <span style="flex:1;font-size:13px;color:#92400E"><b>${other.length} nhà cung cấp chưa xếp nhóm</b> — bấm để xếp vào Sỉ / Lẻ</span>
-             <span style="background:#DC2626;color:#fff;font-weight:800;font-size:12px;border-radius:20px;padding:2px 10px">${other.length}</span>
-           </button>`
-        : `<div style="background:#F0FDF4;border:1px solid #BBF7D0;border-radius:10px;padding:9px 14px;margin-bottom:14px;font-size:12.5px;color:#15803D">✓ Tất cả nhà cung cấp đã được xếp nhóm</div>`}
-      <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(340px,1fr));gap:14px;align-items:start">
-        ${panel('📦 NHÀ CUNG CẤP SỈ', 'Giao cả lô theo tổng — kho tự chia', '#1E40AF', '#EFF6FF', si)}
-        ${panel('🛵 NHÀ CUNG CẤP LẺ', 'Chia mô sẵn theo từng khách', '#15803D', '#F0FDF4', le)}
-      </div>`;
+        ? `<div style="display:flex;align-items:center;gap:8px;background:#FFFBEB;border:1px solid #FDE68A;border-radius:8px;padding:7px 12px;margin-bottom:13px;font-size:12.5px;color:#92400E">
+             <span>🔔</span><span style="flex:1"><b>${other.length}</b> nhà cung cấp chưa được xếp vào nhóm Sỉ / Lẻ.</span>
+             <a href="javascript:void 0" onclick="window.supOpenUnassigned()" style="color:#B45309;font-weight:700;white-space:nowrap">Xếp ngay →</a>
+           </div>`
+        : `<div style="background:#F0FDF4;border:1px solid #BBF7D0;border-radius:8px;padding:6px 12px;margin-bottom:13px;font-size:12px;color:#15803D">✓ Tất cả nhà cung cấp đã được xếp nhóm.</div>`}
+      ${panel('si', '📦 NHÀ CUNG CẤP SỈ', 'Giao cả lô theo tổng — kho tự chia cho từng khách', '#1E40AF', '#EFF6FF', si)}
+      ${panel('le', '🛵 NHÀ CUNG CẤP LẺ', 'Chia mô sẵn theo từng khách — nhận về là túi có tên', '#15803D', '#F0FDF4', le)}`;
   }
+
+  /* Tìm trong 1 nhóm — lọc tại chỗ (không dựng lại cả trang, giữ ô đang gõ + accordion đang mở) */
+  window.supFilterPanel = function (group, q) {
+    q = String(q || '').trim().toLowerCase();
+    const body = document.getElementById('supBody-' + group);
+    if (!body) return;
+    let shown = 0;
+    body.querySelectorAll('details.sup-acc').forEach(d => {
+      const hit = !q || (d.getAttribute('data-search') || '').includes(q);
+      d.style.display = hit ? '' : 'none';
+      if (hit) shown++;
+    });
+    const empty = document.getElementById('supEmpty-' + group);
+    if (empty) { empty.style.display = shown ? 'none' : 'block'; empty.textContent = q ? 'Không có nhà cung cấp nào khớp “' + q + '”' : 'Không có nhà cung cấp nào'; }
+  };
 
   /* ===== POPUP xếp nhóm — sổ ra khi bấm nút thông báo ===== */
   window.supOpenUnassigned = function () {
@@ -413,7 +439,7 @@
   );
   document.getElementById('hbTitle').innerHTML = window.helpTip('NCC khác Khách hàng: NCC là người bán cho mình, KH là người mua từ mình. Mã NCC bắt đầu bằng NCC.', {size:'lg'});
 
-  ['supQ', 'supShowOff'].forEach(id => { const el = document.getElementById(id); if (el) el.oninput = el.onchange = render; });
+  /* Tìm kiếm nay nằm TRONG từng nhóm (supFilterPanel), không còn ô tổng ở toolbar */
   ['suppliers','purchases'].forEach(k => window.STORE.subscribe(k, render));
   /* Preload SẢN PHẨM (cho bộ chọn SP trong form NCC) — lấy từ module Sản phẩm & Giá.
      Gọi sớm để cloud sync xong trước khi user mở form. */
