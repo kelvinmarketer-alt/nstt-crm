@@ -313,7 +313,12 @@
         <div><label style="font-size:11px;color:var(--muted);font-weight:600;text-transform:uppercase">Hao mòn xe</label>${money('pcf_wear', cur.shipBreakdown.wear)}</div>
       </div>
 
-      <div class="section-h" style="margin:16px 0 6px">🛡 Tỉ lệ BHXH</div>
+      <div class="section-h" style="margin:16px 0 6px">🛡 BHXH</div>
+      <div style="margin-bottom:10px">
+        <label style="font-size:11px;color:var(--muted);font-weight:600;text-transform:uppercase">Mức lương cơ sở đóng BH — MẶC ĐỊNH cho mọi NV</label>
+        ${money('pcf_defaultBase', cur.bhxh.defaultBase)}
+        <div style="font-size:11.5px;color:var(--muted);margin-top:4px">Từng NV có thể đặt mức riêng trong hồ sơ; để trống thì dùng mức này.</div>
+      </div>
       <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px">
         <div>
           <label style="font-size:11px;color:var(--muted);font-weight:600;text-transform:uppercase">Cá nhân (%) — TRỪ vào lương</label>
@@ -326,7 +331,7 @@
       </div>
       <div style="font-size:11.5px;color:var(--muted);margin-top:6px">
         Phần <b>doanh nghiệp</b> KHÔNG trừ vào thực lĩnh của NV — chỉ hiện ở cột “BHXH (DN)” để theo dõi chi phí.
-        Tích chọn đóng BH + mức lương cơ sở đặt riêng trong <b>hồ sơ từng NV</b>.
+        Tích chọn đóng BH trong <b>hồ sơ từng NV</b>; mức lương cơ sở lấy theo mặc định ở trên nếu NV không đặt riêng.
       </div>
     `, {
       footer: `<button class="btn btn-ghost" onclick="window.closeModal()">Hủy</button>
@@ -345,7 +350,7 @@
         shipChieu: num('pcf_shipChieu'),
       },
       shipBreakdown: { fuel: num('pcf_fuel'), wear: num('pcf_wear') },
-      bhxh: { empPct: num('pcf_empPct'), comPct: num('pcf_comPct') },
+      bhxh: { empPct: num('pcf_empPct'), comPct: num('pcf_comPct'), defaultBase: num('pcf_defaultBase') },
     });
     window.closeModal();
     window.toast?.('✓ Đã lưu phụ cấp & BHXH — bảng lương tính lại ngay', 'success');
@@ -921,7 +926,10 @@
         if (!ps) {
           const sc = PF.getStaffPayCfg(s.id);
           _psIn.bhxhOn = sc.bhxhOn;
-          _psIn.bhxhBase = sc.bhxhBase || (s.salary || 0);
+          /* Mức đóng BH = mức riêng của NV, nếu trống thì MỨC CƠ SỞ MẶC ĐỊNH (Cài đặt, 5.5tr).
+             PHẢI khớp getOrCreatePayslip bên phiếu lương — nếu lấy s.salary như trước thì
+             bảng và phiếu ra 2 số BHXH khác nhau cho cùng 1 người. */
+          _psIn.bhxhBase = sc.bhxhBase || (+PF.getPayrollConfig().bhxh.defaultBase || 0);
           _psIn.commMode = sc.commMode;
           _psIn.commPct = sc.commPct;
           _psIn.commScope = sc.commScope;

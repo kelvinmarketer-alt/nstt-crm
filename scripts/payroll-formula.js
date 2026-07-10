@@ -83,7 +83,9 @@
     shipChieu:1500000,
   };
   const SHIP_BREAKDOWN_DEFAULT = { fuel: 1200000, wear: 300000 };
-  const BHXH_DEFAULT = { empPct: 10.5, comPct: 21.5 };
+  /* defaultBase = MỨC LƯƠNG CƠ SỞ đóng BHXH mặc định cho mọi NV (sửa ở Cài đặt,
+     hoặc đặt riêng từng người trong hồ sơ NV). */
+  const BHXH_DEFAULT = { empPct: 10.5, comPct: 21.5, defaultBase: 5500000 };
 
   const ALLOWANCE_LABEL = {
     office:   'Văn phòng',
@@ -121,6 +123,36 @@
     if (dept === 'Kho' && contractType === 'parttime') return 0;
     const cfg = getPayrollConfig();
     return +cfg.allowance[allowanceKeyFor(dept, role)] || 0;
+  }
+
+  /* === Giải thích PHỤ CẤP: vì sao ra con số đó ===
+     Nhận `c` = kết quả computePayslip. Trả về mọi mảnh ghép để phiếu lương hiển thị. */
+  function allowanceExplain(c) {
+    const cfg  = getPayrollConfig();
+    const key  = c.allowanceKey || allowanceKeyFor(c.dept, c.role);
+    const isShip = (key === 'shipSang' || key === 'shipChieu');
+    const ptKho  = (c.dept === 'Kho' && c.contractType === 'parttime');
+    const overridden = (c.allowanceOverride != null && +c.allowanceOverride > 0);
+    const ws = +c.workStandard || 0;
+    const wa = +c.workActual || 0;
+    return {
+      key,
+      label: ALLOWANCE_LABEL[key] || '',
+      shift: shiftOf(c.role),                      /* 'sang' | 'chieu' | '' */
+      dept: c.dept, role: c.role,
+      monthly: +c.allowanceMonthly || 0,           /* mức tháng ĐANG áp (đã tính override) */
+      configMonthly: getAllowanceMonthly(c.dept, c.role, c.contractType),  /* mức theo Cài đặt */
+      overridden, ptKho, isShip,
+      fuel: isShip ? (+cfg.shipBreakdown.fuel || 0) : 0,
+      wear: isShip ? (+cfg.shipBreakdown.wear || 0) : 0,
+      workStandard: ws,
+      workActual: wa,
+      perDay: ws ? Math.round((+c.allowanceMonthly || 0) / ws) : 0,
+      amount: +c.allowance || 0,
+      /* Công thực tế > công chuẩn (vd tháng 31 ngày, Ship làm cả 7 ngày/tuần)
+         → phụ cấp chia theo công sẽ VƯỢT mức tháng. Không phải lỗi, nhưng phải nói rõ. */
+      overCap: (+c.allowance || 0) > (+c.allowanceMonthly || 0),
+    };
   }
 
   /* === Cấu hình lương RIÊNG từng NV (KV 'payrollStaffCfg') ===
@@ -206,8 +238,10 @@
     if (!input.bhxhOn) {
       return { on: false, base: 0, emp: 0, com: 0, empPct: rates.empPct, comPct: rates.comPct, legacy: false };
     }
+    /* Ưu tiên: mức ghi trên PHIẾU → mức riêng của NV → mức cơ sở MẶC ĐỊNH (Cài đặt, 5.5tr).
+       KHÔNG lấy lương cơ bản làm mức đóng BH (mỗi người một LCB → sai chuẩn). */
     const base = (input.bhxhBase != null && +input.bhxhBase > 0) ? +input.bhxhBase
-               : (cfg.bhxhBase > 0 ? cfg.bhxhBase : (+input.basicSalary || 0));
+               : (cfg.bhxhBase > 0 ? cfg.bhxhBase : (+rates.defaultBase || 0));
     return {
       on: true, base,
       emp: Math.round(base * rates.empPct / 100),
@@ -478,6 +512,7 @@
     SHIP_BREAKDOWN_DEFAULT,
     getPayrollConfig,
     getAllowanceMonthly,
+    allowanceExplain,
     allowanceKeyFor,
     shiftOf,
     getStaffPayCfg,

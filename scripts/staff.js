@@ -315,8 +315,8 @@
   function payCfgHTML(staffId, basicSalary) {
     const PF = window.PayrollFormula;
     const c = PF ? PF.getStaffPayCfg(staffId) : { bhxhOn:false, bhxhBase:0, commMode:'none', commPct:0, commScope:'ownedCusts' };
-    const rates = PF ? PF.getPayrollConfig().bhxh : { empPct:10.5, comPct:21.5 };
-    const base = c.bhxhBase || basicSalary || 0;
+    const rates = PF ? PF.getPayrollConfig().bhxh : { empPct:10.5, comPct:21.5, defaultBase:5500000 };
+    const base = c.bhxhBase || (+rates.defaultBase || 5500000);   /* mặc định 5.5tr, không lấy theo LCB */
     const sel = (a, b) => a === b ? 'selected' : '';
     return `
       <div class="section-h" style="margin-top:14px">🛡 Bảo hiểm xã hội</div>
@@ -329,7 +329,7 @@
       <div id="sBhxhBox" style="display:${c.bhxhOn ? '' : 'none'}">
         <div class="form-row">
           <div><label>Mức lương cơ sở đóng BH (₫)</label>
-            <input id="sBhxhBase" type="number" value="${base}" oninput="window._sBhxhPreview()" placeholder="VD: 5000000"></div>
+            <input id="sBhxhBase" type="number" value="${base}" oninput="window._sBhxhPreview()" placeholder="5500000"></div>
           <div><label>Trích theo mức trên</label>
             <div id="sBhxhPreview" style="padding:9px 11px;border:1px dashed var(--line);border-radius:7px;font-size:12px;background:#FAF5FF;color:#6B21A8;line-height:1.6"></div></div>
         </div>
@@ -368,7 +368,7 @@
     const el = document.getElementById('sBhxhPreview');
     if (!el) return;
     const PF = window.PayrollFormula;
-    const rates = PF ? PF.getPayrollConfig().bhxh : { empPct:10.5, comPct:21.5 };
+    const rates = PF ? PF.getPayrollConfig().bhxh : { empPct:10.5, comPct:21.5, defaultBase:5500000 };
     const base = parseFloat((document.getElementById('sBhxhBase') || {}).value) || 0;
     const emp = Math.round(base * rates.empPct / 100);
     const com = Math.round(base * rates.comPct / 100);

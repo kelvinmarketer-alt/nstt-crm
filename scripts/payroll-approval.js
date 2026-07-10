@@ -47,6 +47,63 @@
     const cls = opts.cls || 'ps-money';
     return `<input id="${id}" type="text" inputmode="numeric" class="${cls}" value="${fmtMoney(value)}" data-raw="${parseMoney(value)}" placeholder="${placeholder}" ${readonly} style="${style}">`;
   }
+  /* Mức lương cơ sở đóng BHXH mặc định (Cài đặt → payrollConfig.bhxh.defaultBase, mặc định 5.5tr) */
+  const _bhxhDefaultBase = () => (PF.getPayrollConfig ? (+PF.getPayrollConfig().bhxh.defaultBase || 0) : 5500000);
+  const _esc = v => String(v == null ? '' : v).replace(/[&<>"]/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]));
+
+  /* Bỏ dấu để so tên khoản thưởng ("Hoa hồng" / "doanh số" / "commission") */
+  const _noAccent = s => String(s == null ? '' : s).normalize('NFD').replace(/[̀-ͯ]/g, '').replace(/đ/gi, 'd').toLowerCase();
+  /* Phiếu đã có dòng THƯỞNG là hoa hồng → không bật hoa hồng tự động (tránh cộng trùng) */
+  function _hasCommissionBonus(ps) {
+    return (ps && Array.isArray(ps.bonuses) ? ps.bonuses : [])
+      .some(b => /hoa hong|commission|doanh so/.test(_noAccent(b && b.name)));
+  }
+
+  /* === GIẢI THÍCH PHỤ CẤP: vì sao ra đúng con số đó === */
+  function allowanceDetailHTML(c) {
+    if (!PF.allowanceExplain) return '';
+    const x = PF.allowanceExplain(c);
+    const f = PF.formatVND;
+    const rows = [];
+
+    /* Kho part-time: mặc định 0đ. Nhưng nếu phiếu GHI ĐÈ thủ công thì vẫn có tiền
+       → không được in "0 ₫" (sẽ mâu thuẫn với con số hiển thị bên cạnh). */
+    if (x.ptKho && !x.overridden) {
+      rows.push(`<div>📌 Bộ phận <b>Kho</b> · hợp đồng <b>part-time</b> → theo quy định <b>không có phụ cấp (0 ₫)</b>.</div>`);
+      return rows.join('');
+    }
+    const caLbl = x.shift === 'sang' ? 'sáng' : x.shift === 'chieu' ? 'chiều' : '';
+    if (x.ptKho) {
+      rows.push(`<div>📌 Bộ phận <b>Kho</b> · hợp đồng <b>part-time</b> (quy định 0 ₫) — nhưng phiếu này đang <b>ghi đè thủ công</b>.</div>`);
+    } else {
+      rows.push(`<div>📌 Bộ phận <b>${_esc(x.dept || '—')}</b>${caLbl
+        ? ` · vị trí “${_esc(x.role || '')}” có chữ <b>${caLbl}</b>`
+        : (x.role ? ` · vị trí “${_esc(x.role)}”` : '')} → áp mức <b>${_esc(x.label)}</b>.</div>`);
+    }
+
+    if (x.overridden) {
+      rows.push(`<div>✍️ <b>Ghi đè thủ công</b>: ${f(x.monthly)} ₫/tháng <span style="opacity:.7">(mức theo Cài đặt: ${f(x.configMonthly)} ₫)</span></div>`);
+    } else {
+      rows.push(`<div>💰 Mức tháng: <b>${f(x.monthly)} ₫</b>${x.isShip && (x.fuel || x.wear)
+        ? ` <span style="opacity:.8">= ${f(x.fuel)} tiền xăng + ${f(x.wear)} hao mòn xe</span>` : ''}</div>`);
+    }
+
+    if (x.workStandard > 0) {
+      rows.push(`<div>🧮 Chia theo công: <b>${f(x.monthly)}</b> ÷ <b>${x.workStandard}</b> <span style="opacity:.7">(công chuẩn)</span> × <b>${x.workActual}</b> <span style="opacity:.7">(công thực tế)</span> = <b style="color:#1E40AF">${f(x.amount)} ₫</b></div>`);
+      rows.push(`<div style="opacity:.75">≈ ${f(x.perDay)} ₫ / 1 công${x.isShip ? ' (xăng + hao mòn)' : ''}</div>`);
+    } else {
+      rows.push(`<div>🧮 Công chuẩn = 0 → phụ cấp <b>0 ₫</b>.</div>`);
+    }
+
+    if (x.overCap) {
+      rows.push(`<div style="color:#B45309;margin-top:3px">⚠ Công thực tế <b>${x.workActual}</b> &gt; công chuẩn <b>${x.workStandard}</b> nên phụ cấp <b>vượt mức tháng</b> (${f(x.monthly)} ₫). Muốn chặn trần thì báo để chỉnh công thức.</div>`);
+    }
+    if (x.workActual === 0) {
+      rows.push(`<div style="opacity:.75">Chưa có công thực tế → phụ cấp 0 ₫.</div>`);
+    }
+    return rows.join('');
+  }
+
   /* Wire money inputs trong drawer — focus=raw, blur=format */
   function wireMoneyInputs(root) {
     if (!root) return;
@@ -107,13 +164,19 @@
       /* Phiếu NHÁP (chưa chốt) → nạp cấu hình BHXH/hoa hồng mới nhất của NV.
          Phiếu ĐÃ NỘP / DUYỆT / TRẢ → GIỮ NGUYÊN, KHÔNG tự tính lại (bảo toàn số đã chốt). */
       if (existing.status === 'draft') {
-        if (existing.bhxhOn == null) {
+        /* BHXH: CHỈ nạp cấu hình khi phiếu chưa ghi số BHXH nào. Nếu phiếu cũ đã có bhxh > 0
+           mà NV chưa bật BHXH trong hồ sơ, gán bhxhOn=false sẽ THỔI BAY số đó
+           → giữ nguyên dạng legacy, để kế toán tự quyết. */
+        if (existing.bhxhOn == null && !(+existing.bhxh > 0)) {
           existing.bhxhOn = cfg.bhxhOn;
-          existing.bhxhBase = cfg.bhxhBase || existing.basicSalary || 0;
+          existing.bhxhBase = cfg.bhxhBase || _bhxhDefaultBase();
         }
+        /* Hoa hồng: phiếu ĐÃ có dòng thưởng tên "hoa hồng / doanh số" → KHÔNG bật hoa hồng tự động,
+           nếu không sẽ CỘNG TRÙNG với dòng thưởng đó (vd phiếu nháp "Hoa hồng tuyển dụng 290k"). */
         if (existing.commMode == null) {
-          existing.commMode = cfg.commMode;
-          existing.commissionPct = cfg.commPct;
+          const _dup = _hasCommissionBonus(existing);
+          existing.commMode = _dup ? 'none' : cfg.commMode;
+          existing.commissionPct = _dup ? 0 : cfg.commPct;
           existing.commScope = cfg.commScope;
         }
       }
@@ -135,7 +198,7 @@
       penalties: [],
       /* BHXH — tích chọn + mức lương cơ sở lấy từ hồ sơ NV (sửa được ngay trên phiếu) */
       bhxhOn: cfg.bhxhOn,
-      bhxhBase: cfg.bhxhBase || staff.salary || 0,
+      bhxhBase: cfg.bhxhBase || _bhxhDefaultBase(),
       bhxh: 0,
       /* Hoa hồng — auto (% × doanh thu) hoặc manual (gõ tay), theo hồ sơ NV */
       commMode: cfg.commMode,
@@ -347,6 +410,7 @@
             </div>
             <span style="font-size:15px;font-weight:800;color:#1E40AF" id="psAllowance">${PF.formatVND(computed.allowance)} ₫</span>
           </div>
+          <div id="psAllowanceDetail" style="font-size:11.5px;color:#1E40AF;line-height:1.8;background:#fff;border:1px dashed #BFDBFE;border-radius:7px;padding:8px 11px;margin-bottom:8px">${allowanceDetailHTML(computed)}</div>
           ${canEdit ? moneyInput('psAllowanceOverride', p.allowanceOverride || 0, {
             placeholder: 'Ghi đè mức phụ cấp (để trống/0 = mặc định)',
             style: 'width:100%;padding:6px 10px;font-size:12px;border:1px solid #BFDBFE;border-radius:6px;background:#fff;text-align:right'
@@ -435,7 +499,11 @@
             ${moneyInput('psCommAmount', computed.commission.amount, { readonly: !canEdit || p.commMode !== 'manual', placeholder: '0' })}
           </div>
         </div>
-        <div id="psCommHint" style="font-size:11.5px;color:var(--muted);margin-bottom:14px"></div>`}
+        <div id="psCommHint" style="font-size:11.5px;color:var(--muted);margin-bottom:6px"></div>
+        ${_hasCommissionBonus(p) ? `<div style="background:#FFFBEB;border:1px solid #FDE68A;border-radius:7px;padding:7px 10px;font-size:11.5px;color:#92400E;margin-bottom:14px">
+          ⚠ Phiếu này đã có khoản <b>thưởng</b> mang tên hoa hồng — nên hoa hồng tự động đang <b>tắt</b> để không cộng trùng.
+          Muốn dùng hoa hồng tự động thì <b>xoá dòng thưởng đó</b> ở mục ③ trước.
+        </div>` : '<div style="margin-bottom:8px"></div>'}`}
 
         <!-- ⑥ BHXH + TẠM ỨNG -->
         <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:14px;align-items:start">
@@ -452,7 +520,7 @@
             </label>
             <div id="psBhxhBox" style="display:${p.bhxhOn?'':'none'};margin-top:8px">
               <label style="font-size:11px;color:var(--muted);text-transform:uppercase;font-weight:600">Mức lương cơ sở đóng BH</label>
-              ${moneyInput('psBhxhBase', p.bhxhBase || 0, { readonly: !canEdit, placeholder: '5.000.000' })}
+              ${moneyInput('psBhxhBase', p.bhxhBase || _bhxhDefaultBase(), { readonly: !canEdit, placeholder: '5.500.000' })}
               <div style="font-size:11.5px;margin-top:6px;line-height:1.65">
                 NV <b>${computed.bhxhRates.empPct}%</b>: <b style="color:#7C3AED" id="psBhxhEmp">−${PF.formatVND(computed.bhxhEmp)} ₫</b><br>
                 DN <b>${computed.bhxhRates.comPct}%</b>: <span style="color:#6B7280" id="psBhxhCom">${PF.formatVND(computed.bhxhCom)} ₫</span>
@@ -599,6 +667,8 @@
       document.getElementById('psBaseSalary').textContent = PF.formatVND(c.baseSalary) + ' ₫';
       document.getElementById('psBaseFormula').textContent = c.breakdown.baseSalaryDetail;
       document.getElementById('psAllowance').textContent = PF.formatVND(c.allowance) + ' ₫';
+      const adEl = document.getElementById('psAllowanceDetail');
+      if (adEl) adEl.innerHTML = allowanceDetailHTML(c);   /* giải thích phụ cấp cập nhật theo công/mức mới */
       document.getElementById('psBonusTotal').textContent = '+ ' + PF.formatVND(c.totalBonus) + ' ₫';
       document.getElementById('psPenaltyTotal').textContent = '− ' + PF.formatVND(c.totalPenalty) + ' ₫';
       document.getElementById('psTotal').textContent = PF.formatVND(c.total) + ' ₫';
