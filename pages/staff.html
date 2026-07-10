@@ -150,6 +150,7 @@
         <input type="month" id="payMonth" value="2026-05" onchange="window.setPayMonth(this.value)" style="padding:7px 10px;border:1px solid var(--line);border-radius:7px">
         <div class="pay-spacer" style="flex:1"></div>
         <button class="btn btn-ghost" onclick="window.openLatePolicySettings && window.openLatePolicySettings()" title="Cấu hình mức phạt đi muộn (admin)">⚙ Khung phạt muộn</button>
+        <button class="btn btn-ghost" onclick="window.openAllowanceSettings && window.openAllowanceSettings()" title="Cấu hình phụ cấp theo ca + tỉ lệ BHXH (admin)">⚙ Phụ cấp &amp; BHXH</button>
         <button class="btn btn-ghost pay-upload" onclick="window.openAliasManager && window.openAliasManager()" title="Gán/sửa tên viết tắt máy chấm công cho từng NV (khoá để khớp file)">🔤 Tên viết tắt</button>
         <button class="btn btn-primary pay-upload" onclick="window.openUploadTimesheet && window.openUploadTimesheet()" title="Up file Excel từ máy chấm công → tự cập nhật công + tính lương">📥 Upload Excel chấm công</button>
         <button class="btn btn-navy cfo-act" onclick="window.submitAllDrafts && window.submitAllDrafts(document.getElementById('payMonth').value)" title="HR gửi tất cả phiếu draft + tự lập phiếu cho NV chưa có">📤 Gửi tất cả CFO duyệt</button>

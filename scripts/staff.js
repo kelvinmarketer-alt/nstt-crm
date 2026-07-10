@@ -298,6 +298,90 @@
     });
   };
 
+  /* joinDate có thể là ISO ('2026-06-25' từ cloud hire_date) hoặc 'dd/mm/yyyy' (nhập cũ) → ép về ISO cho <input type=date> */
+  function _toISODate(v) {
+    if (!v) return '';
+    const s = String(v).trim();
+    if (/^\d{4}-\d{2}-\d{2}/.test(s)) return s.slice(0, 10);
+    const m = s.match(/^(\d{1,2})\/(\d{1,2})\/(\d{4})$/);
+    if (m) return `${m[3]}-${m[2].padStart(2, '0')}-${m[1].padStart(2, '0')}`;
+    const d = new Date(s);
+    return isNaN(d.getTime()) ? '' : d.toISOString().slice(0, 10);
+  }
+  window._nsToISODate = _toISODate;
+
+  /* BHXH + hoa hồng RIÊNG từng NV — lưu ở KV 'payrollStaffCfg'
+     (bảng staff trên cloud KHÔNG có cột salary_config/bhxh_base → lưu vào staff sẽ bị strip mất). */
+  function payCfgHTML(staffId, basicSalary) {
+    const PF = window.PayrollFormula;
+    const c = PF ? PF.getStaffPayCfg(staffId) : { bhxhOn:false, bhxhBase:0, commMode:'none', commPct:0, commScope:'ownedCusts' };
+    const rates = PF ? PF.getPayrollConfig().bhxh : { empPct:10.5, comPct:21.5 };
+    const base = c.bhxhBase || basicSalary || 0;
+    const sel = (a, b) => a === b ? 'selected' : '';
+    return `
+      <div class="section-h" style="margin-top:14px">🛡 Bảo hiểm xã hội</div>
+      <div class="form-row wide">
+        <label class="check-item" style="font-weight:600">
+          <input type="checkbox" id="sBhxhOn" ${c.bhxhOn ? 'checked' : ''} onchange="window._sBhxhToggle(this.checked)">
+          <span>Nhân viên này <b>có đóng BHXH</b></span>
+        </label>
+      </div>
+      <div id="sBhxhBox" style="display:${c.bhxhOn ? '' : 'none'}">
+        <div class="form-row">
+          <div><label>Mức lương cơ sở đóng BH (₫)</label>
+            <input id="sBhxhBase" type="number" value="${base}" oninput="window._sBhxhPreview()" placeholder="VD: 5000000"></div>
+          <div><label>Trích theo mức trên</label>
+            <div id="sBhxhPreview" style="padding:9px 11px;border:1px dashed var(--line);border-radius:7px;font-size:12px;background:#FAF5FF;color:#6B21A8;line-height:1.6"></div></div>
+        </div>
+        <div style="font-size:11.5px;color:var(--muted);margin:-4px 0 8px">
+          Cá nhân <b>${rates.empPct}%</b> → TRỪ vào thực lĩnh · Doanh nghiệp <b>${rates.comPct}%</b> → công ty chi, <b>không</b> trừ NV.
+        </div>
+      </div>
+
+      <div class="section-h" style="margin-top:14px">💵 Hoa hồng</div>
+      <div class="form-row">
+        <div><label>Cách tính</label>
+          <select id="sCommMode" onchange="window._sCommToggle(this.value)">
+            <option value="none"   ${sel(c.commMode,'none')}>— Không có hoa hồng —</option>
+            <option value="auto"   ${sel(c.commMode,'auto')}>📈 Tự tính: % × doanh thu</option>
+            <option value="manual" ${sel(c.commMode,'manual')}>✍️ Gõ tay số tiền ở phiếu lương</option>
+          </select></div>
+        <div id="sCommPctWrap" style="display:${c.commMode === 'auto' ? '' : 'none'}">
+          <label>% hoa hồng</label>
+          <input id="sCommPct" type="number" step="0.1" min="0" max="100" value="${c.commPct}" placeholder="VD: 1.5"></div>
+      </div>
+      <div class="form-row wide" id="sCommScopeWrap" style="display:${c.commMode === 'auto' ? '' : 'none'}">
+        <label>Tính trên doanh thu</label>
+        <select id="sCommScope">
+          <option value="ownedCusts" ${sel(c.commScope,'ownedCusts')}>Đơn của KH nhân viên này phụ trách</option>
+          <option value="ownOrders"  ${sel(c.commScope,'ownOrders')}>Đơn nhân viên này tự tạo</option>
+          <option value="allOrders"  ${sel(c.commScope,'allOrders')}>TẤT CẢ đơn (Giám đốc / Trưởng phòng)</option>
+        </select>
+      </div>`;
+  }
+  window._sBhxhToggle = function (on) {
+    const box = document.getElementById('sBhxhBox');
+    if (box) box.style.display = on ? '' : 'none';
+    if (on) window._sBhxhPreview();
+  };
+  window._sBhxhPreview = function () {
+    const el = document.getElementById('sBhxhPreview');
+    if (!el) return;
+    const PF = window.PayrollFormula;
+    const rates = PF ? PF.getPayrollConfig().bhxh : { empPct:10.5, comPct:21.5 };
+    const base = parseFloat((document.getElementById('sBhxhBase') || {}).value) || 0;
+    const emp = Math.round(base * rates.empPct / 100);
+    const com = Math.round(base * rates.comPct / 100);
+    el.innerHTML = `NV <b>${rates.empPct}%</b> = <b>−${window.fmt(emp)}₫</b><br>DN <b>${rates.comPct}%</b> = ${window.fmt(com)}₫`;
+  };
+  window._sCommToggle = function (mode) {
+    const isAuto = mode === 'auto';
+    const p = document.getElementById('sCommPctWrap');
+    const s = document.getElementById('sCommScopeWrap');
+    if (p) p.style.display = isAuto ? '' : 'none';
+    if (s) s.style.display = isAuto ? '' : 'none';
+  };
+
   window.openStaff = function(id) {
     const s = staffs.find(x => x.id === id);
     if (!s) return;
@@ -326,7 +410,12 @@
         <div><label>Lương cơ bản (₫)</label><input id="sSalary" type="number" value="${s.salary||0}"></div>
         <div><label>KPI</label><input id="sKpi" value="${s.kpi||''}" placeholder="VD: 90%"></div>
       </div>
-      <div class="form-row wide"><label>Địa chỉ</label><input id="sAddress" value="${s.address||''}"></div>
+      <div class="form-row">
+        <div><label>Ngày bắt đầu làm việc</label><input id="sJoin" type="date" value="${_toISODate(s.joinDate)}"></div>
+        <div><label>Địa chỉ</label><input id="sAddress" value="${s.address||''}"></div>
+      </div>
+
+      ${payCfgHTML(id, s.salary || 0)}
 
       <div class="section-h" style="margin-top:14px">💰 Cấu hình lương — tùy chỉnh công thức</div>
       ${salaryConfigHTML(s.salaryConfig, 's')}
@@ -341,6 +430,7 @@
                <button class="btn btn-primary" onclick="window.submitEditStaff('${id}')">💾 Lưu thay đổi</button>`,
       width:'680px'
     });
+    setTimeout(() => { try { window._sBhxhPreview(); } catch (e) {} }, 30);   /* điền ô xem trước BHXH */
   };
 
   /* === Reset mật khẩu === */
@@ -398,7 +488,7 @@
   window.submitEditStaff = function(id) {
     const perms = collectPerms('#sPerms');
     const salaryConfig = collectSalaryConfig('s');
-    window.STORE.update('staff', id, {
+    const patch = {
       name: window.formVal('#sName'),
       dept: window.formVal('#sDept'),
       role: window.formVal('#sRole'),
@@ -410,9 +500,25 @@
       address: window.formVal('#sAddress'),
       permissions: perms,
       salaryConfig,
-    });
+    };
+    /* Ngày bắt đầu làm việc → lưu ISO (khớp cột cloud `hire_date`). Bỏ trống thì GIỮ giá trị cũ. */
+    const join = window.formVal('#sJoin');
+    if (join) patch.joinDate = join;
+    window.STORE.update('staff', id, patch);
+
+    /* BHXH + hoa hồng → KV payrollStaffCfg (không nhét vào bảng staff kẻo bị strip mất) */
+    if (window.PayrollFormula) {
+      const bhxhOn = !!(document.getElementById('sBhxhOn') || {}).checked;
+      window.PayrollFormula.setStaffPayCfg(id, {
+        bhxhOn,
+        bhxhBase: bhxhOn ? (parseFloat(window.formVal('#sBhxhBase')) || 0) : 0,
+        commMode: window.formVal('#sCommMode') || 'none',
+        commPct:  parseFloat(window.formVal('#sCommPct')) || 0,
+        commScope: window.formVal('#sCommScope') || 'ownedCusts',
+      });
+    }
     window.closeModal();
-    window.toast('✓ Đã cập nhật NV + công thức lương', 'success');
+    window.toast('✓ Đã cập nhật NV + BHXH + hoa hồng', 'success');
   };
 
   /* Build chips phòng ban động từ data thật */
@@ -554,7 +660,7 @@
       permissions: perms,
       salary: parseInt(window.formVal('#nSalary'), 10) || 0,
       kpi: null, status: 'active',
-      joinDate: new Date(window.formVal('#nJoin')).toLocaleDateString('vi-VN'),
+      joinDate: window.formVal('#nJoin') || new Date().toISOString().slice(0, 10),   /* ISO — khớp cột cloud hire_date */
       address: window.formVal('#nAddress') || '',
     };
 

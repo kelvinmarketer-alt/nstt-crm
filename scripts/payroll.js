@@ -279,6 +279,79 @@
   /* =========================================================
      SETTINGS — Cấu hình khung phạt đi muộn (admin only)
      ========================================================= */
+  /* === Cài đặt PHỤ CẤP theo ca + % BHXH (admin) === */
+  window.openAllowanceSettings = function () {
+    if (!(hasP('all') || hasP('payroll.edit'))) {
+      window.toast?.('🔒 Bạn không có quyền sửa phụ cấp/BHXH (cần payroll.edit hoặc all)', 'warn');
+      return;
+    }
+    const PF = window.PayrollFormula;
+    const cur = PF.getPayrollConfig();
+    const money = (id, v) => `<input id="${id}" type="number" min="0" step="10000" value="${v}" style="width:100%;padding:8px 10px;font-size:13px;border:1px solid var(--line);border-radius:6px;text-align:right;font-weight:700;box-sizing:border-box">`;
+    const row = (key, label, hint) => `
+      <div style="display:grid;grid-template-columns:1fr 170px;gap:10px;align-items:center;padding:8px 0;border-bottom:1px dashed var(--line)">
+        <div><b style="font-size:13px">${label}</b>${hint ? `<div style="font-size:11px;color:var(--muted)">${hint}</div>` : ''}</div>
+        ${money('pcf_' + key, cur.allowance[key])}
+      </div>`;
+
+    window.openModal('⚙ Phụ cấp & BHXH', `
+      <div style="font-size:12.5px;color:var(--muted);line-height:1.7;background:#F0FDFA;border:1px solid #99F6E4;border-radius:8px;padding:10px 12px;margin-bottom:14px">
+        💡 Phụ cấp <b>chia theo công thực tế</b>: <code>mức tháng ÷ công chuẩn × công thực tế</code>.<br>
+        Ca làm nhận diện theo <b>Vị trí</b> của NV (có chữ “sáng” / “chiều”). Kho <b>part-time</b> luôn 0đ.
+      </div>
+
+      <div class="section-h" style="margin-bottom:6px">Mức phụ cấp / tháng</div>
+      ${row('office',   'Văn phòng',     'Sale · Kế toán · Ban GĐ · Nhân sự · Marketing')}
+      ${row('khoSang',  'Kho ca sáng',   'Vị trí có chữ “sáng”')}
+      ${row('khoChieu', 'Kho ca chiều',  'Vị trí có chữ “chiều”')}
+      ${row('shipSang', 'Ship ca sáng',  'Gồm tiền xăng + hao mòn xe')}
+      ${row('shipChieu','Ship ca chiều', 'Gồm tiền xăng + hao mòn xe')}
+
+      <div class="section-h" style="margin:16px 0 6px">Ship — tách chi tiết (chỉ để ghi chú trên phiếu)</div>
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px">
+        <div><label style="font-size:11px;color:var(--muted);font-weight:600;text-transform:uppercase">Tiền xăng</label>${money('pcf_fuel', cur.shipBreakdown.fuel)}</div>
+        <div><label style="font-size:11px;color:var(--muted);font-weight:600;text-transform:uppercase">Hao mòn xe</label>${money('pcf_wear', cur.shipBreakdown.wear)}</div>
+      </div>
+
+      <div class="section-h" style="margin:16px 0 6px">🛡 Tỉ lệ BHXH</div>
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px">
+        <div>
+          <label style="font-size:11px;color:var(--muted);font-weight:600;text-transform:uppercase">Cá nhân (%) — TRỪ vào lương</label>
+          <input id="pcf_empPct" type="number" min="0" max="100" step="0.1" value="${cur.bhxh.empPct}" style="width:100%;padding:8px 10px;font-size:13px;border:1px solid var(--line);border-radius:6px;text-align:right;font-weight:700;color:#7C3AED;box-sizing:border-box">
+        </div>
+        <div>
+          <label style="font-size:11px;color:var(--muted);font-weight:600;text-transform:uppercase">Doanh nghiệp (%) — cty chi</label>
+          <input id="pcf_comPct" type="number" min="0" max="100" step="0.1" value="${cur.bhxh.comPct}" style="width:100%;padding:8px 10px;font-size:13px;border:1px solid var(--line);border-radius:6px;text-align:right;font-weight:700;color:#6B7280;box-sizing:border-box">
+        </div>
+      </div>
+      <div style="font-size:11.5px;color:var(--muted);margin-top:6px">
+        Phần <b>doanh nghiệp</b> KHÔNG trừ vào thực lĩnh của NV — chỉ hiện ở cột “BHXH (DN)” để theo dõi chi phí.
+        Tích chọn đóng BH + mức lương cơ sở đặt riêng trong <b>hồ sơ từng NV</b>.
+      </div>
+    `, {
+      footer: `<button class="btn btn-ghost" onclick="window.closeModal()">Hủy</button>
+               <button class="btn btn-primary" onclick="window._saveAllowanceSettings()">💾 Lưu cấu hình</button>`,
+      width: '620px',
+    });
+  };
+  window._saveAllowanceSettings = function () {
+    const num = id => parseFloat((document.getElementById(id) || {}).value) || 0;
+    window.STORE.set('payrollConfig', {
+      allowance: {
+        office:    num('pcf_office'),
+        khoSang:   num('pcf_khoSang'),
+        khoChieu:  num('pcf_khoChieu'),
+        shipSang:  num('pcf_shipSang'),
+        shipChieu: num('pcf_shipChieu'),
+      },
+      shipBreakdown: { fuel: num('pcf_fuel'), wear: num('pcf_wear') },
+      bhxh: { empPct: num('pcf_empPct'), comPct: num('pcf_comPct') },
+    });
+    window.closeModal();
+    window.toast?.('✓ Đã lưu phụ cấp & BHXH — bảng lương tính lại ngay', 'success');
+    if (typeof renderPayroll === 'function') { try { renderPayroll(); } catch (e) {} }
+  };
+
   window.openLatePolicySettings = function () {
     if (!(hasP('all') || hasP('payroll.edit'))) {
       window.toast?.('🔒 Bạn không có quyền sửa khung phạt (cần payroll.edit hoặc all)', 'warn');
@@ -806,6 +879,7 @@
 
     let totalAll = 0; let totalBonusAll = 0; let totalPenAll = 0;
     let totalBhxhAll = 0; let totalAdvAll = 0; let totalCongAll = 0;
+    let totalBhxhComAll = 0; let totalAllowAll = 0; let totalCommAll = 0;
     let countByStatus = { draft: 0, submitted: 0, approved: 0, paid: 0, none: 0 };
 
     const empData = staffs.map(s => {
@@ -818,7 +892,7 @@
       const luongCo = Math.round(luongNgay * paid);
 
       const ps = psByStaff[s.id];
-      let workActual, bonusSum, penSum, bhxh, advance, baseSalary, total, statusBadge, hasPhieu;
+      const hasPhieu = !!(ps && typeof ps.total === 'number');
 
       /* Phạt muộn auto từ chấm công + latePolicy */
       const lateAuto = PF
@@ -827,34 +901,55 @@
 
       /* Thưởng hỗ trợ Kho/Ship — TỰ tính từ sổ ghi (bonusLog), cộng thẳng vào cột Thưởng */
       const helperBonus = window.BONUS ? (window.BONUS.helperFor(s.id, month).total || 0) : 0;
-      if (ps && typeof ps.total === 'number') {
-        hasPhieu = true;
-        countByStatus[ps.status] = (countByStatus[ps.status] || 0) + 1;
-        workActual = ps.workActual || 0;
-        bonusSum = (ps.bonuses || []).reduce((sum, b) => sum + (+b.amount || 0), 0) + helperBonus;
-        const manualPen = (ps.penalties || []).reduce((sum, p) => sum + (+p.amount || 0), 0);
-        penSum = manualPen + lateAuto.total;
-        bhxh = +ps.bhxh || 0;
-        advance = +ps.advance || 0;
-        baseSalary = +ps.baseSalary || luongCo;
-        /* Recompute total tính cả lateAuto — đảm bảo chấm muộn mới luôn áp dụng */
-        total = Math.max(0, baseSalary + (+ps.allowance || 0) + bonusSum - manualPen - lateAuto.total - bhxh - advance);
-        statusBadge = STATUS_BADGE[ps.status] || '';
-      } else {
-        hasPhieu = false;
-        countByStatus.none++;
-        workActual = paid;
-        bonusSum = helperBonus; penSum = lateAuto.total; bhxh = 0; advance = 0;
-        baseSalary = luongCo;
-        total = Math.max(0, luongCo + helperBonus - lateAuto.total);
-        statusBadge = '<span style="color:var(--muted);font-size:10.5px">— chưa lập</span>';
+
+      /* Dùng CHUNG engine với phiếu lương → bảng & phiếu KHÔNG BAO GIỜ lệch số.
+         Chưa lập phiếu → dựng input tạm từ hồ sơ NV + chấm công để XEM TRƯỚC
+         phụ cấp / hoa hồng / BHXH (trước đây cột này bỏ trống). */
+      let _psIn = null;
+      if (PF) {
+        _psIn = Object.assign({
+          dept: s.dept, role: s.role, contractType: s.contractType || 'official',
+          basicSalary: s.salary || 0, workActual: paid,
+          bonuses: [], penalties: [], advance: 0,
+        }, ps || {}, { staffId: s.id, staffName: s.name, month, helperBonus });
+        /* CHƯA lập phiếu → xem trước theo cấu hình NV (BHXH + hoa hồng).
+           ĐÃ có phiếu → KHÔNG tự áp; giữ đúng số đã chốt trên phiếu (phiếu cũ = legacy). */
+        if (!ps) {
+          const sc = PF.getStaffPayCfg(s.id);
+          _psIn.bhxhOn = sc.bhxhOn;
+          _psIn.bhxhBase = sc.bhxhBase || (s.salary || 0);
+          _psIn.commMode = sc.commMode;
+          _psIn.commPct = sc.commPct;
+          _psIn.commScope = sc.commScope;
+        }
       }
+      const c = _psIn ? PF.computePayslip(_psIn) : null;
+
+      const workActual = c ? (+c.workActual || 0) : paid;
+      const baseSalary = c ? c.baseSalary : luongCo;
+      const allowance  = c ? c.allowance : 0;
+      const comm       = (c && c.commission) || { amount: 0, pct: 0, mode: 'none', revenue: 0 };
+      const bonusSum   = c ? c.totalBonus : helperBonus;
+      const penSum     = (c ? c.totalPenalty : 0) + lateAuto.total;
+      const bhxhEmp    = c ? c.bhxhEmp : 0;
+      const bhxhCom    = c ? c.bhxhCom : 0;
+      const advance    = c ? c.advance : 0;
+      const total      = c ? c.total : Math.max(0, luongCo + helperBonus - lateAuto.total);
+
+      if (hasPhieu) countByStatus[ps.status] = (countByStatus[ps.status] || 0) + 1;
+      else countByStatus.none++;
+      const statusBadge = hasPhieu
+        ? (STATUS_BADGE[ps.status] || '')
+        : '<span style="color:var(--muted);font-size:10.5px">— chưa lập</span>';
 
       totalAll += total;
       totalBonusAll += bonusSum;
       totalPenAll += penSum;
-      totalBhxhAll += bhxh;
+      totalBhxhAll += bhxhEmp;
+      totalBhxhComAll += bhxhCom;
       totalAdvAll += advance;
+      totalAllowAll += allowance;
+      totalCommAll += comm.amount;
       totalCongAll += workActual;
 
       const deptKey = _payDeptKey(s.dept);
@@ -866,10 +961,13 @@
         <td class="num"><b>${window.fmt(s.salary || 0)}</b></td>
         <td class="num"><b style="color:#0369A1">${workActual % 1 === 0 ? workActual : workActual.toFixed(2)}</b><div style="font-size:10px;color:var(--muted)">/${wd % 1 === 0 ? wd : wd.toFixed(1)}</div></td>
         <td class="num"><b>${window.fmt(baseSalary)}</b></td>
+        <td class="num" style="color:#0F766E" title="Phụ cấp ${PF ? (PF.ALLOWANCE_LABEL[c && c.allowanceKey] || '') : ''} — chia theo công thực tế">${allowance ? '<b>+' + window.fmt(allowance) + '</b>' : '<span style="color:var(--muted)">—</span>'}</td>
+        <td class="num" style="color:#B45309" title="${comm.mode === 'auto' ? comm.pct + '% × doanh thu ' + window.fmt(comm.revenue) + 'đ' : comm.mode === 'manual' ? 'Nhập tay ở phiếu lương' : 'NV này không có hoa hồng'}">${comm.amount ? '<b>+' + window.fmt(comm.amount) + '</b>' + (comm.mode === 'auto' ? '<div style="font-size:10px;color:var(--muted);font-weight:400">' + comm.pct + '%</div>' : '') : '<span style="color:var(--muted)">—</span>'}</td>
         <td class="num" style="color:#15803D" title="${helperBonus ? 'Gồm thưởng hỗ trợ (sổ ghi): ' + window.fmt(helperBonus) + 'đ' : ''}">${bonusSum ? '<b>+' + window.fmt(bonusSum) + '</b>' + (helperBonus ? '<div style="font-size:10px;color:#0369A1;font-weight:400">🎁 ' + window.fmt(helperBonus) + '</div>' : '') : '<span style="color:var(--muted)">—</span>'}</td>
         <td class="num" style="color:#DC2626" title="${lateAuto.count ? lateAuto.count + ' lần muộn = ' + window.fmt(lateAuto.total) + 'đ (auto từ chấm công) + phạt khác' : 'Phạt thủ công'}">${penSum ? '<b>−' + window.fmt(penSum) + '</b>' + (lateAuto.count ? '<div style="font-size:10px;color:#A16207;font-weight:400">⏰ ' + lateAuto.count + ' lần muộn</div>' : '') : '<span style="color:var(--muted)">—</span>'}</td>
-        <td class="num" style="color:#7C3AED">${bhxh ? '<b>−' + window.fmt(bhxh) + '</b>' : '<span style="color:var(--muted)">—</span>'}</td>
         <td class="num" style="color:#A16207">${advance ? '<b>−' + window.fmt(advance) + '</b>' : '<span style="color:var(--muted)">—</span>'}</td>
+        <td class="num" style="color:#7C3AED" title="Nhân viên đóng ${c && c.bhxhRates ? c.bhxhRates.empPct : 10.5}% — TRỪ vào thực lĩnh">${bhxhEmp ? '<b>−' + window.fmt(bhxhEmp) + '</b>' : '<span style="color:var(--muted)">—</span>'}</td>
+        <td class="num" style="color:#6B7280" title="Doanh nghiệp đóng ${c && c.bhxhRates ? c.bhxhRates.comPct : 21.5}% — công ty chi, KHÔNG trừ vào lương NV">${bhxhCom ? window.fmt(bhxhCom) : '<span style="color:var(--muted)">—</span>'}</td>
         <td class="num"><b style="color:var(--red);font-size:14px">${window.fmt(total)}</b></td>
         <td class="num">${statusBadge}</td>
         <td class="num">
@@ -888,7 +986,7 @@
     const rows = _dgList.map(g => {
       const open = _payDeptOpen.has(g.key);
       const hdr = `<tr class="pay-dept-hdr${open ? ' open' : ''}" data-deptkey="${g.key}" onclick="window.togglePayDept('${g.key}')">
-        <td colspan="11">
+        <td colspan="14">
           <div style="display:flex;align-items:center;gap:8px">
             <span class="dept-chev" style="color:#15803D;font-size:12px;width:12px">${open ? '▾' : '▸'}</span>
             <b style="font-size:13px">${g.name}</b>
@@ -968,16 +1066,19 @@
           .pay-table tbody td:nth-child(2)::before{content:"Lương CB: "}
           .pay-table tbody td:nth-child(3)::before{content:"Công: "}
           .pay-table tbody td:nth-child(4)::before{content:"Lương theo công: "}
-          .pay-table tbody td:nth-child(5)::before{content:"Thưởng: "}
-          .pay-table tbody td:nth-child(6)::before{content:"Phạt: "}
-          .pay-table tbody td:nth-child(7)::before{content:"BHXH: "}
-          .pay-table tbody td:nth-child(8)::before{content:"Tạm ứng: "}
-          .pay-table tbody td:nth-child(10)::before{content:"Trạng thái: "}
-          /* Thực lĩnh (cột 9) = số chính, ghim góc phải */
-          .pay-table tbody td:nth-child(9){position:absolute!important;top:11px;right:13px;width:auto;font-weight:800;color:#DC2626;font-size:16px}
-          /* nút Phiếu (cột 11) = hàng đáy full-width */
-          .pay-table tbody td:nth-child(11){margin-top:8px;text-align:center!important}
-          .pay-table tbody td:nth-child(11) .btn{width:100%}
+          .pay-table tbody td:nth-child(5)::before{content:"Phụ cấp: "}
+          .pay-table tbody td:nth-child(6)::before{content:"Hoa hồng: "}
+          .pay-table tbody td:nth-child(7)::before{content:"Thưởng: "}
+          .pay-table tbody td:nth-child(8)::before{content:"Phạt: "}
+          .pay-table tbody td:nth-child(9)::before{content:"Tạm ứng: "}
+          .pay-table tbody td:nth-child(10)::before{content:"BHXH (NV): "}
+          .pay-table tbody td:nth-child(11)::before{content:"BHXH (DN): "}
+          .pay-table tbody td:nth-child(13)::before{content:"Trạng thái: "}
+          /* Thực lĩnh (cột 12) = số chính, ghim góc phải */
+          .pay-table tbody td:nth-child(12){position:absolute!important;top:11px;right:13px;width:auto;font-weight:800;color:#DC2626;font-size:16px}
+          /* nút Phiếu (cột 14) = hàng đáy full-width */
+          .pay-table tbody td:nth-child(14){margin-top:8px;text-align:center!important}
+          .pay-table tbody td:nth-child(14) .btn{width:100%}
           /* Header phòng ban trên ĐT: 1 dòng gọn, bỏ style card của cột 1 */
           .pay-table tr.pay-dept-hdr td{padding:10px 12px!important;padding-right:12px!important;font-size:13px;border-bottom:none!important;margin-bottom:0!important}
           .pay-table tr.pay-dept-hdr td::before{content:""!important}
@@ -989,11 +1090,14 @@
             <th style="min-width:190px">Nhân viên</th>
             <th class="num" title="Lương cơ bản hợp đồng">Lương CB</th>
             <th class="num" title="Công thực tế / NC chuẩn">Công</th>
-            <th class="num" title="LCB ÷ NC × công × hệ số HĐ + phụ cấp">Lương theo công</th>
+            <th class="num" title="LCB × hệ số HĐ ÷ NC chuẩn × công thực tế">Lương theo công</th>
+            <th class="num" style="background:#F0FDFA;color:#0F766E" title="VP 650k · Kho 500k · Ship 1.5tr (1.2tr xăng + 300k hao mòn) — chia theo công">Phụ cấp</th>
+            <th class="num" style="background:#FFFBEB;color:#B45309" title="% × doanh thu (tự tính) hoặc nhập tay — cấu hình trong hồ sơ NV">% Hoa hồng</th>
             <th class="num" style="background:#F0FDF4;color:#15803D">Thưởng</th>
             <th class="num" style="background:#FEF2F2;color:#DC2626">Phạt</th>
-            <th class="num" style="background:#FAF5FF;color:#7C3AED">BHXH</th>
             <th class="num" style="background:#FFFBEB;color:#A16207">Tạm ứng</th>
+            <th class="num" style="background:#FAF5FF;color:#7C3AED" title="Nhân viên đóng 10,5% — TRỪ vào thực lĩnh">BHXH (NV)</th>
+            <th class="num" style="background:#F3F4F6;color:#6B7280" title="Doanh nghiệp đóng 21,5% — công ty chi, KHÔNG trừ lương NV">BHXH (DN)</th>
             <th class="num" style="background:#FEE2E2">💰 Thực lĩnh</th>
             <th class="num">Trạng thái</th>
             <th class="num">Phiếu</th>
@@ -1004,10 +1108,13 @@
             <td class="num">—</td>
             <td class="num">${totalCongAll.toFixed(1)}</td>
             <td class="num">—</td>
-            <td class="num" style="color:#15803D">${window.fmt(totalBonusAll)}</td>
+            <td class="num" style="color:#0F766E">+${window.fmt(totalAllowAll)}</td>
+            <td class="num" style="color:#B45309">+${window.fmt(totalCommAll)}</td>
+            <td class="num" style="color:#15803D">+${window.fmt(totalBonusAll)}</td>
             <td class="num" style="color:#DC2626">−${window.fmt(totalPenAll)}</td>
-            <td class="num" style="color:#7C3AED">−${window.fmt(totalBhxhAll)}</td>
             <td class="num" style="color:#A16207">−${window.fmt(totalAdvAll)}</td>
+            <td class="num" style="color:#7C3AED">−${window.fmt(totalBhxhAll)}</td>
+            <td class="num" style="color:#6B7280" title="Chi phí công ty (không trừ NV)">${window.fmt(totalBhxhComAll)}</td>
             <td class="num"><b style="color:var(--red);font-size:14px">${window.fmt(totalAll)}</b></td>
             <td class="num">—</td>
             <td class="num">—</td>
@@ -1016,10 +1123,12 @@
       </div>
 
       <div style="font-size:12px;color:var(--muted);margin-top:10px;padding:12px 14px;background:#F0FDF4;border-radius:7px;border-left:3px solid #15803D;line-height:1.7">
-        🧮 <b>Cách tính lương theo công thức NSTT:</b> Lương thực lĩnh = <b>(LCB × hệ số HĐ ÷ Công chuẩn × Công thực tế)</b> + <b>Phụ cấp</b> + <b>Thưởng</b> − <b>Phạt</b> − <b>BHXH</b> − <b>Tạm ứng</b><br>
+        🧮 <b>Cách tính lương theo công thức NSTT:</b> Thực lĩnh = <b>(LCB × hệ số HĐ ÷ Công chuẩn × Công thực tế)</b> + <b>Phụ cấp</b> + <b>Thưởng</b> + <b>Hoa hồng</b> − <b>Phạt</b> − <b>BHXH (NV)</b> − <b>Tạm ứng</b><br>
         • <b>Công chuẩn:</b> Văn phòng 24 · Kho chính thức 29 · Kho thử việc / Part-time / Ship 30<br>
         • <b>Hệ số HĐ:</b> Chính thức 100% · Thử việc 85% · Thực tập / Part-time 100%<br>
-        • <b>Phụ cấp mặc định:</b> VP 650k · Kho 500k · Ship 1.5M · Part-time 0<br>
+        • <b>Phụ cấp</b> (chia theo công): VP 650k · Kho sáng/chiều 500k · Ship sáng/chiều 1.5M (1.2M xăng + 300k hao mòn) · Kho part-time 0 — <i>sửa mức trong Cài đặt</i><br>
+        • <b>BHXH:</b> Nhân viên <b>10,5%</b> (trừ vào lương) · Doanh nghiệp <b>21,5%</b> (công ty chi, <b>không</b> trừ NV) — tích chọn + đặt mức lương cơ sở trong hồ sơ từng NV<br>
+        • <b>Hoa hồng:</b> tự tính <b>% × doanh thu</b> hoặc <b>gõ tay</b> — chọn cách tính trong hồ sơ NV<br>
         • <b>Chi tiết thưởng/phạt/BHXH/tạm ứng</b> được cấu hình trong phiếu lương (bấm nút <b>Phiếu</b> bên phải mỗi NV)
       </div>`;
   }

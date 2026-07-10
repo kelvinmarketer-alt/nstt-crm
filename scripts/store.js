@@ -210,6 +210,8 @@
     'timesheet',       /* Chấm công NV — CRITICAL */
     'timesheetMeta',   /* Giờ vào muộn, lý do — CRITICAL */
     'payrollExtra',    /* Bảng lương chi tiết — CRITICAL */
+    'payrollConfig',   /* Mức phụ cấp theo ca (VP/Kho sáng-chiều/Ship sáng-chiều) + % BHXH — CRITICAL */
+    'payrollStaffCfg', /* Cấu hình lương RIÊNG từng NV {bhxhOn,bhxhBase,commMode,commPct,commScope} — CRITICAL (bảng staff cloud KHÔNG có cột salary_config) */
     'latePolicy',      /* Khung phạt đi muộn — CRITICAL (admin cấu hình) */
     'staffAuth',       /* Mật khẩu cá nhân NV (HASH SHA-256, KHÔNG lưu thô) — CRITICAL */
     'staffUsernames',  /* Tên đăng nhập tuỳ chọn {staffId: username} — login bằng email/SĐT/username */

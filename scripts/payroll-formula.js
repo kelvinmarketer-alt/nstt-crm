@@ -68,6 +68,155 @@
   function roundK(n) { return Math.round(n / 1000) * 1000; }
 
   /* =========================================================
+     PHỤ CẤP theo BỘ PHẬN + CA · BHXH — cấu hình ở Cài đặt
+     (KV 'payrollConfig'; thiếu key nào thì lấy mặc định dưới đây)
+     - Văn phòng            650.000 ₫/tháng
+     - Kho sáng / Kho chiều 500.000 ₫/tháng
+     - Ship sáng / chiều  1.500.000 ₫/tháng (1.200k xăng + 300k hao mòn xe)
+     BHXH: Cá nhân 10,5% (TRỪ vào lương) · Doanh nghiệp 21,5% (cty chi, KHÔNG trừ NV)
+     ========================================================= */
+  const ALLOWANCE_DEFAULT = {
+    office:    650000,
+    khoSang:   500000,
+    khoChieu:  500000,
+    shipSang: 1500000,
+    shipChieu:1500000,
+  };
+  const SHIP_BREAKDOWN_DEFAULT = { fuel: 1200000, wear: 300000 };
+  const BHXH_DEFAULT = { empPct: 10.5, comPct: 21.5 };
+
+  const ALLOWANCE_LABEL = {
+    office:   'Văn phòng',
+    khoSang:  'Kho ca sáng',
+    khoChieu: 'Kho ca chiều',
+    shipSang: 'Ship ca sáng',
+    shipChieu:'Ship ca chiều',
+  };
+
+  function getPayrollConfig() {
+    const s = (window.STORE && window.STORE.get('payrollConfig', null)) || {};
+    return {
+      allowance:     Object.assign({}, ALLOWANCE_DEFAULT, s.allowance || {}),
+      shipBreakdown: Object.assign({}, SHIP_BREAKDOWN_DEFAULT, s.shipBreakdown || {}),
+      bhxh:          Object.assign({}, BHXH_DEFAULT, s.bhxh || {}),
+    };
+  }
+
+  /* Ca làm suy từ role: "Nhân viên Kho sáng" / "Nhân viên Giao hàng chiều" */
+  function shiftOf(role) {
+    const r = (role || '').toLowerCase();
+    if (/chi[eề]u/.test(r)) return 'chieu';
+    if (/s[aá]ng/.test(r))  return 'sang';
+    return '';
+  }
+  /* Bộ phận + ca → key phụ cấp */
+  function allowanceKeyFor(dept, role) {
+    const sh = shiftOf(role);
+    if (dept === 'Kho') return sh === 'chieu' ? 'khoChieu' : 'khoSang';
+    if (dept === 'Ship' || dept === 'Giao hàng' || dept === 'Vận hành') return sh === 'chieu' ? 'shipChieu' : 'shipSang';
+    return 'office';
+  }
+  /* Mức phụ cấp tháng của 1 NV. Kho PART-TIME giữ nguyên quy tắc cũ = 0đ. */
+  function getAllowanceMonthly(dept, role, contractType) {
+    if (dept === 'Kho' && contractType === 'parttime') return 0;
+    const cfg = getPayrollConfig();
+    return +cfg.allowance[allowanceKeyFor(dept, role)] || 0;
+  }
+
+  /* === Cấu hình lương RIÊNG từng NV (KV 'payrollStaffCfg') ===
+     { [staffId]: { bhxhOn, bhxhBase, commMode:'none'|'auto'|'manual', commPct, commScope } }
+     Để ở KV vì bảng `staff` trên cloud KHÔNG có cột salary_config (insert sẽ tự strip → mất). */
+  function getStaffPayCfg(staffId) {
+    const all = (window.STORE && window.STORE.get('payrollStaffCfg', {})) || {};
+    const c = all[staffId] || {};
+    return {
+      bhxhOn:   !!c.bhxhOn,
+      bhxhBase: +c.bhxhBase || 0,
+      commMode: c.commMode || 'none',
+      commPct:  +c.commPct || 0,
+      commScope: c.commScope || 'ownedCusts',
+    };
+  }
+  function setStaffPayCfg(staffId, patch) {
+    const all = (window.STORE && window.STORE.get('payrollStaffCfg', {})) || {};
+    all[staffId] = Object.assign({}, all[staffId] || {}, patch);
+    window.STORE.set('payrollStaffCfg', all);
+    return all[staffId];
+  }
+
+  /* === Doanh thu của 1 NV trong tháng (để tính hoa hồng tự động) ===
+     scope: ownOrders = đơn NV tự tạo · ownedCusts = đơn của KH NV phụ trách · allOrders = tất cả
+     Chỉ tính đơn KHÔNG huỷ, theo ngày giao (deliverDate) rơi vào tháng. */
+  function staffRevenue(staffName, scope, month) {
+    if (!window.STORE || !staffName || !month) return 0;
+    const orders = window.STORE.get('orders', []) || [];
+    const custs  = window.STORE.get('customers', []) || [];
+    const owned  = new Set(custs.filter(c => (c.staffOwner || '') === staffName).map(c => c.id));
+    const inMonth = o => {
+      const d = o.deliverDate || o.date || '';
+      if (/^\d{4}-\d{2}/.test(d)) return d.slice(0, 7) === month;
+      const m = String(d).match(/(\d{1,2})\/(\d{4})/);          /* dd/mm/yyyy kiểu VN */
+      const m2 = String(d).match(/^(\d{1,2})\/(\d{1,2})\/(\d{4})/);
+      if (m2) return `${m2[3]}-${String(m2[2]).padStart(2,'0')}` === month;
+      return m ? `${m[2]}-${String(m[1]).padStart(2,'0')}` === month : false;
+    };
+    return orders.reduce((sum, o) => {
+      if (o.status === 'cancelled' || o.status === 'canceled') return sum;
+      if (!inMonth(o)) return sum;
+      const cid = o.custId || o.cust;
+      const hit = scope === 'allOrders' ? true
+              : scope === 'ownOrders'  ? (o.staff === staffName)
+              : owned.has(cid);
+      return hit ? sum + (+o.freight || 0) : sum;
+    }, 0);
+  }
+
+  /* === Hoa hồng ===
+     auto   → % × doanh thu (theo phạm vi khai ở hồ sơ NV)
+     manual → kế toán gõ thẳng số tiền vào phiếu (commissionAmount)
+     Phiếu lương được override % (input.commissionPct) so với hồ sơ. */
+  function computeCommission(input) {
+    const cfg  = getStaffPayCfg(input.staffId);
+    /* commMode CHƯA KHAI (phiếu lập trước v418) → coi như KHÔNG có hoa hồng.
+       Nếu lấy theo cấu hình NV thì phiếu cũ (vốn đã ghi hoa hồng ở dòng Thưởng)
+       sẽ bị CỘNG TRÙNG. Phiếu mới / bản xem trước luôn truyền commMode rõ ràng. */
+    if (input.commMode == null) return { mode: 'none', pct: 0, revenue: 0, amount: 0, legacy: true };
+    const mode = input.commMode;
+    if (mode === 'manual') {
+      return { mode, pct: 0, revenue: 0, amount: Math.round(+input.commissionAmount || 0) };
+    }
+    if (mode !== 'auto') return { mode: 'none', pct: 0, revenue: 0, amount: 0 };
+    const pct   = (input.commissionPct != null && input.commissionPct !== '') ? +input.commissionPct : cfg.commPct;
+    const scope = input.commScope || cfg.commScope;
+    const revenue = staffRevenue(input.staffName, scope, input.month);
+    return { mode, pct, scope, revenue, amount: roundK(revenue * pct / 100) };
+  }
+
+  /* === BHXH === base = "mức lương cơ sở" đóng BH (tuỳ chỉnh từng NV).
+     Trả về { on, base, emp, com }. CHỈ `emp` bị trừ vào thực lĩnh. */
+  function computeBhxh(input) {
+    const rates = getPayrollConfig().bhxh;
+    const cfg   = getStaffPayCfg(input.staffId);
+    /* bhxhOn CHƯA KHAI (phiếu lập trước v418) → GIỮ NGUYÊN số `bhxh` đã lưu,
+       KHÔNG tự tính lại (tránh đổi số liệu phiếu đã duyệt/đã trả). */
+    if (input.bhxhOn == null) {
+      const legacy = +input.bhxh || 0;
+      return { on: false, base: 0, emp: legacy, com: 0, empPct: rates.empPct, comPct: rates.comPct, legacy: true };
+    }
+    if (!input.bhxhOn) {
+      return { on: false, base: 0, emp: 0, com: 0, empPct: rates.empPct, comPct: rates.comPct, legacy: false };
+    }
+    const base = (input.bhxhBase != null && +input.bhxhBase > 0) ? +input.bhxhBase
+               : (cfg.bhxhBase > 0 ? cfg.bhxhBase : (+input.basicSalary || 0));
+    return {
+      on: true, base,
+      emp: Math.round(base * rates.empPct / 100),
+      com: Math.round(base * rates.comPct / 100),
+      empPct: rates.empPct, comPct: rates.comPct, legacy: false,
+    };
+  }
+
+  /* =========================================================
      CHÍNH SÁCH PHẠT ĐI MUỘN (link chấm công ↔ phiếu lương)
      - mode='tier' (mặc định): mỗi lần muộn áp 1 mức theo tier cao nhất NV vượt qua
      - mode='perMinute': phạt theo phút sau grace
@@ -159,8 +308,9 @@
       ? window.workStandardFor(input.dept, input.contractType, input.month, input.role)
       : cfg.workStandard;
     const workStandardDefault = input.workStandardOverride || _autoWS;
+    /* Phụ cấp: theo BỘ PHẬN + CA (Cài đặt). Override thủ công ở phiếu vẫn thắng. */
     const allowanceMonthly = (input.allowanceOverride != null)
-      ? input.allowanceOverride : cfg.allowanceMonthly;
+      ? input.allowanceOverride : getAllowanceMonthly(input.dept, input.role, input.contractType);
 
     let baseSalary = 0, workActual = 0, ratio = 1, basicSalary = 0, workStandard = workStandardDefault;
     const segDetail = []; /* Breakdown cho mixed mode */
@@ -206,19 +356,40 @@
     /* Tổng thưởng = thưởng thủ công + thưởng hỗ trợ Kho/Ship (sổ ghi, tự tính) */
     const helperBonus = +input.helperBonus || 0;
     const totalBonus = (input.bonuses || []).reduce((s, b) => s + (+b.amount || 0), 0) + helperBonus;
-    /* Tổng phạt */
-    const totalPenalty = (input.penalties || []).reduce((s, p) => s + (+p.amount || 0), 0);
 
-    const bhxh = +input.bhxh || 0;
+    /* Lương 1 NGÀY CÔNG — để quy đổi mức phạt "trừ ½ ngày / 1 ngày công" */
+    const dayWage = workStandard ? roundK(basicSalary * ratio / workStandard) : 0;
+    /* Phạt: khoản unit='cong' TỰ quy đổi ra tiền theo lương ngày hiện tại (không lưu cứng) */
+    const penalties = (input.penalties || []).map(p => {
+      if (p && p.unit === 'cong') {
+        const days = +p.days || 0;
+        return Object.assign({}, p, { days, amount: roundK(dayWage * days) });
+      }
+      return p;
+    });
+    const totalPenalty = penalties.reduce((s, p) => s + (+p.amount || 0), 0);
+
+    /* Hoa hồng — auto (% × doanh thu) hoặc gõ tay, tuỳ vị trí */
+    const commission = computeCommission(input);
+
+    /* BHXH — NV 10,5% (TRỪ vào lương) · DN 21,5% (công ty chi, KHÔNG trừ NV) */
+    const bh = computeBhxh(input);
+    const bhxhEmp = bh.emp;
+    const bhxhCom = bh.com;
+    const bhxh = bhxhEmp;                 /* alias giữ tương thích code/phiếu cũ */
     const advance = +input.advance || 0;
 
-    /* === NEW: Phạt đi muộn (auto từ chấm công + latePolicy) === */
+    /* === Phạt đi muộn (auto từ chấm công + latePolicy) === */
     let lateAuto = { count: 0, total: 0, detail: [] };
     if (input.staffId && input.month) {
       lateAuto = computeLateAutoForMonth(input.staffId, input.month);
     }
 
-    const total = baseSalary + allowance + totalBonus - totalPenalty - bhxh - advance - lateAuto.total;
+    /* THỰC LĨNH = Lương công + Phụ cấp + Thưởng + Hoa hồng
+                   − Phạt − Phạt muộn − BHXH(NV) − Tạm ứng
+       (BHXH doanh nghiệp KHÔNG trừ — là chi phí công ty, chỉ hiển thị để theo dõi) */
+    const total = baseSalary + allowance + totalBonus + commission.amount
+                - totalPenalty - bhxhEmp - advance - lateAuto.total;
 
     /* Breakdown display — mixed mode liệt kê từng segment */
     let baseSalaryDetail;
@@ -234,13 +405,22 @@
       ...input,
       workStandard,
       allowanceMonthly,
+      allowanceKey: allowanceKeyFor(input.dept, input.role),
       ratio,
       baseSalary,
       allowance,
+      dayWage,
+      penalties,            /* đã quy đổi khoản 'cong' → tiền (đè penalties gốc trong ...input) */
       totalBonus,
       helperBonus,
       totalPenalty,
-      bhxh,
+      commission,           /* {mode, pct, scope, revenue, amount} */
+      bhxh,                 /* = bhxhEmp (alias cũ) */
+      bhxhEmp,
+      bhxhCom,
+      bhxhOn: bh.on,
+      bhxhBase: bh.base,
+      bhxhRates: { empPct: bh.empPct, comPct: bh.comPct },
       advance,
       lateAuto,
       segDetail, /* Mixed mode breakdown */
@@ -268,6 +448,10 @@
     { id:'custom',   name:'➕ Khoản khác', placeholder:'Ghi rõ lý do' },
   ];
   const PENALTY_TEMPLATES = [
+    /* Phạt theo NGÀY CÔNG — tự quy đổi ra tiền theo lương ngày của chính NV đó
+       (lương ngày = LCB × hệ số HĐ ÷ công chuẩn). Không cần gõ số tiền. */
+    { id:'half_day', name:'➖ Trừ ½ ngày công', unit:'cong', days:0.5, placeholder:'Tự tính = ½ × lương 1 ngày' },
+    { id:'one_day',  name:'➖ Trừ 1 ngày công', unit:'cong', days:1,   placeholder:'Tự tính = lương 1 ngày' },
     { id:'late10',   name:'⏰ Đi muộn > 10 phút', placeholder:'20.000 ₫/lần' },
     { id:'late30',   name:'⏰ Đi muộn > 30 phút', placeholder:'50.000 ₫/lần' },
     { id:'late60',   name:'⏰ Đi muộn > 1 tiếng', placeholder:'100.000 ₫/lần' },
@@ -287,6 +471,20 @@
     DEPT_CONFIG,
     formatVND,
     roundK,
+    /* Phụ cấp theo ca + BHXH + hoa hồng (v418) */
+    ALLOWANCE_DEFAULT,
+    ALLOWANCE_LABEL,
+    BHXH_DEFAULT,
+    SHIP_BREAKDOWN_DEFAULT,
+    getPayrollConfig,
+    getAllowanceMonthly,
+    allowanceKeyFor,
+    shiftOf,
+    getStaffPayCfg,
+    setStaffPayCfg,
+    staffRevenue,
+    computeCommission,
+    computeBhxh,
     /* Late policy */
     LATE_POLICY_DEFAULT,
     getLatePolicy,

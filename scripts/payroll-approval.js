@@ -74,6 +74,24 @@
   function getPayslips()      { return window.STORE.get('payrollExtra', []) || []; }
   function savePayslips(list) { window.STORE.set('payrollExtra', list); }
 
+  /* Đóng băng các số ĐÃ TÍNH vào phiếu khi lưu (báo cáo/đối soát đọc trực tiếp,
+     không phải tính lại). Dùng CHUNG cho: lưu nháp / nộp / duyệt / nộp hàng loạt. */
+  function computedSnapshot(c) {
+    return {
+      baseSalary: c.baseSalary,
+      allowance: c.allowance,
+      total: c.total,
+      dayWage: c.dayWage,
+      penalties: c.penalties,                                   /* khoản 'ngày công' đã quy đổi ra tiền */
+      commissionAmount: c.commission ? c.commission.amount : 0,
+      commissionPct:    c.commission ? c.commission.pct : 0,
+      commissionRevenue:c.commission ? c.commission.revenue : 0,
+      bhxhEmp: c.bhxhEmp,
+      bhxhCom: c.bhxhCom,
+      bhxh:    c.bhxhEmp,                                       /* alias cho code/báo cáo cũ */
+    };
+  }
+
   /* === Tìm phiếu theo NV + tháng === */
   function findPayslip(staffId, month) {
     return getPayslips().find(p => p.staffId === staffId && p.month === month);
@@ -82,8 +100,25 @@
   /* === Tạo hoặc lấy phiếu cho NV trong tháng === */
   function getOrCreatePayslip(staffId, month) {
     const existing = findPayslip(staffId, month);
-    if (existing) return existing;
     const staff = (window.STORE.get('staff', []) || []).find(s => s.id === staffId) || {};
+    const cfg = PF.getStaffPayCfg ? PF.getStaffPayCfg(staffId)
+                                  : { bhxhOn:false, bhxhBase:0, commMode:'none', commPct:0, commScope:'ownedCusts' };
+    if (existing) {
+      /* Phiếu NHÁP (chưa chốt) → nạp cấu hình BHXH/hoa hồng mới nhất của NV.
+         Phiếu ĐÃ NỘP / DUYỆT / TRẢ → GIỮ NGUYÊN, KHÔNG tự tính lại (bảo toàn số đã chốt). */
+      if (existing.status === 'draft') {
+        if (existing.bhxhOn == null) {
+          existing.bhxhOn = cfg.bhxhOn;
+          existing.bhxhBase = cfg.bhxhBase || existing.basicSalary || 0;
+        }
+        if (existing.commMode == null) {
+          existing.commMode = cfg.commMode;
+          existing.commissionPct = cfg.commPct;
+          existing.commScope = cfg.commScope;
+        }
+      }
+      return existing;
+    }
     return {
       id: 'PR-' + month + '-' + staffId,
       month,
@@ -98,7 +133,15 @@
       allowanceOverride: null,
       bonuses: [],
       penalties: [],
-      bhxh: staff.hasBHXH ? 578000 : 0,
+      /* BHXH — tích chọn + mức lương cơ sở lấy từ hồ sơ NV (sửa được ngay trên phiếu) */
+      bhxhOn: cfg.bhxhOn,
+      bhxhBase: cfg.bhxhBase || staff.salary || 0,
+      bhxh: 0,
+      /* Hoa hồng — auto (% × doanh thu) hoặc manual (gõ tay), theo hồ sơ NV */
+      commMode: cfg.commMode,
+      commissionPct: cfg.commPct,
+      commScope: cfg.commScope,
+      commissionAmount: 0,
       advance: 0,
       notes: '',
       status: 'draft',
@@ -121,6 +164,14 @@
     p.helperBonus = _helper.total;
     const computed = PF.computePayslip(p);
     const lateAuto = computed.lateAuto || { count: 0, total: 0, detail: [] };
+    /* Phiếu lập TRƯỚC v418 chưa khai bhxhOn/commMode → giữ nguyên UI + số cũ, KHÔNG tự tính lại */
+    const isLegacyBhxh = (p.bhxhOn == null);
+    const isLegacyComm = (p.commMode == null);
+    const SCOPE_LABEL = {
+      ownedCusts: 'đơn của KH NV phụ trách',
+      ownOrders:  'đơn NV tự tạo',
+      allOrders:  'tất cả đơn',
+    };
 
     /* === Permission detection === */
     const hasPerm = (perm) => !!(window.AUTH && window.AUTH.hasPerm && window.AUTH.hasPerm(perm));
@@ -187,14 +238,27 @@
         </div>
       `).join('') || `<div style="padding:8px;color:var(--muted);text-align:center;font-size:12px">Chưa có khoản thưởng</div>`;
     }
+    /* Lương 1 ngày công hiện tại của NV — để quy đổi khoản phạt theo NGÀY CÔNG */
+    function currentDayWage() {
+      try {
+        const d = window._psCurrentDraft || p;
+        return PF.computePayslip(Object.assign({}, d, { staffId: d.staffId || staffId, month: d.month || month })).dayWage || 0;
+      } catch (e) { return 0; }
+    }
     function penaltyRows(arr) {
-      return (arr || []).map((p, i) => `
-        <div class="ps-line ps-pen" data-idx="${i}" style="display:grid;grid-template-columns:1fr 160px 32px;gap:8px;padding:6px 0;border-bottom:1px dashed var(--line)">
-          <input class="ps-pen-name" data-idx="${i}" value="${(p.name||'').replace(/"/g,'&quot;')}" placeholder="VD: Đi muộn > 10p × 3 ngày" ${canEdit?'':'readonly'} style="border:1px solid var(--line);border-radius:6px;padding:5px 8px;font-size:12.5px">
-          <input class="ps-pen-amount ps-money" data-idx="${i}" type="text" inputmode="numeric" value="${fmtMoney(p.amount||0)}" data-raw="${parseMoney(p.amount||0)}" placeholder="0" ${canEdit?'':'readonly'} style="border:1px solid var(--line);border-radius:6px;padding:5px 8px;text-align:right;font-size:12.5px;font-weight:700;color:#DC2626">
+      const dw = currentDayWage();
+      return (arr || []).map((it, i) => {
+        const isCong = it && it.unit === 'cong';
+        const days = +((it || {}).days) || 0;
+        const amt = isCong ? PF.roundK(dw * days) : ((it && it.amount) || 0);
+        const dayLbl = days === 0.5 ? '½' : String(days);
+        return `
+        <div class="ps-line ps-pen" data-idx="${i}" data-unit="${isCong ? 'cong' : ''}" data-days="${isCong ? days : ''}" style="display:grid;grid-template-columns:1fr 160px 32px;gap:8px;padding:6px 0;border-bottom:1px dashed var(--line)">
+          <input class="ps-pen-name" data-idx="${i}" value="${((it && it.name) || '').replace(/"/g,'&quot;')}" placeholder="VD: Đi muộn > 10p × 3 ngày" ${canEdit?'':'readonly'} style="border:1px solid var(--line);border-radius:6px;padding:5px 8px;font-size:12.5px">
+          <input class="ps-pen-amount ps-money" data-idx="${i}" type="text" inputmode="numeric" value="${fmtMoney(amt)}" data-raw="${parseMoney(amt)}" placeholder="0" ${(canEdit && !isCong)?'':'readonly'} title="${isCong ? `Tự tính: ${dayLbl} × lương 1 ngày (${fmtMoney(dw)} ₫) — sửa Lương CB/công thì tự đổi theo` : ''}" style="border:1px solid var(--line);border-radius:6px;padding:5px 8px;text-align:right;font-size:12.5px;font-weight:700;color:#DC2626;background:${isCong ? '#F3F4F6' : '#fff'}">
           ${canEdit ? `<button onclick="window._psRemovePenalty(${i})" style="background:transparent;border:none;color:#DC2626;cursor:pointer;font-size:16px">×</button>` : '<span></span>'}
-        </div>
-      `).join('') || `<div style="padding:8px;color:var(--muted);text-align:center;font-size:12px">Không có khoản phạt</div>`;
+        </div>`;
+      }).join('') || `<div style="padding:8px;color:var(--muted);text-align:center;font-size:12px">Không có khoản phạt</div>`;
     }
 
     /* === HTML drawer === */
@@ -309,7 +373,11 @@
         <!-- PHẠT -->
         <div class="section-h" style="display:flex;justify-content:space-between;align-items:center;margin-bottom:8px">
           <span>④ Phạt/Trừ <span style="color:var(--danger);font-weight:700" id="psPenaltyTotal">− ${PF.formatVND(computed.totalPenalty)} ₫</span></span>
-          ${canEdit ? '<button class="btn btn-ghost btn-sm" onclick="window._psAddPenalty()">➕ Thêm khoản trừ</button>' : ''}
+          ${canEdit ? `<div style="display:flex;gap:6px;flex-wrap:wrap">
+            <button class="btn btn-ghost btn-sm" onclick="window._psAddPenaltyCong(0.5)" title="Trừ ½ ngày công — tự quy đổi theo lương 1 ngày của NV">➖ ½ ngày công</button>
+            <button class="btn btn-ghost btn-sm" onclick="window._psAddPenaltyCong(1)" title="Trừ 1 ngày công — tự quy đổi theo lương 1 ngày của NV">➖ 1 ngày công</button>
+            <button class="btn btn-ghost btn-sm" onclick="window._psAddPenalty()">➕ Khoản trừ khác</button>
+          </div>` : ''}
         </div>
         <div id="psPenaltyList" style="background:#FAFBFC;border:1px solid var(--line);border-radius:8px;padding:8px 12px;margin-bottom:14px">
           ${penaltyRows(p.penalties)}
@@ -334,12 +402,54 @@
             </details>` : ''}
         </div>
 
-        <!-- BHXH + TẠM ỨNG -->
-        <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:14px">
+        <!-- ⑤ HOA HỒNG (phiếu lập từ v418 mới có; phiếu cũ giữ nguyên, không hiện) -->
+        ${isLegacyComm ? '' : `
+        <div class="section-h" style="display:flex;justify-content:space-between;align-items:center;margin-bottom:8px">
+          <span>⑤ Hoa hồng <span style="color:#B45309;font-weight:700" id="psCommTotal">+ ${PF.formatVND(computed.commission.amount)} ₫</span></span>
+        </div>
+        <div style="display:grid;grid-template-columns:1.4fr 96px 1fr;gap:10px;margin-bottom:6px">
+          <div>
+            <label style="font-size:11px;color:var(--muted);text-transform:uppercase;font-weight:600">Cách tính</label>
+            <select id="psCommMode" ${canEdit?'':'disabled'} style="width:100%;padding:8px 10px;font-size:13px;border:1px solid var(--line);border-radius:6px;background:#fff">
+              <option value="none"   ${p.commMode==='none'?'selected':''}>— Không có —</option>
+              <option value="auto"   ${p.commMode==='auto'?'selected':''}>📈 % × doanh thu</option>
+              <option value="manual" ${p.commMode==='manual'?'selected':''}>✍️ Gõ tay</option>
+            </select>
+          </div>
+          <div>
+            <label style="font-size:11px;color:var(--muted);text-transform:uppercase;font-weight:600">% hoa hồng</label>
+            <input id="psCommPct" type="number" step="0.1" min="0" max="100" value="${p.commissionPct||0}" ${(canEdit && p.commMode==='auto')?'':'readonly'} style="width:100%;padding:8px 10px;font-size:13px;border:1px solid var(--line);border-radius:6px;text-align:right;box-sizing:border-box">
+          </div>
+          <div>
+            <label style="font-size:11px;color:var(--muted);text-transform:uppercase;font-weight:600">Số tiền hoa hồng (₫)</label>
+            ${moneyInput('psCommAmount', computed.commission.amount, { readonly: !canEdit || p.commMode !== 'manual', placeholder: '0' })}
+          </div>
+        </div>
+        <div id="psCommHint" style="font-size:11.5px;color:var(--muted);margin-bottom:14px"></div>`}
+
+        <!-- ⑥ BHXH + TẠM ỨNG -->
+        <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:14px;align-items:start">
+          ${isLegacyBhxh ? `
           <div>
             <label style="font-size:11px;color:var(--muted);text-transform:uppercase;font-weight:600">🛡 BHXH (₫/tháng)</label>
             ${moneyInput('psBhxh', p.bhxh, { readonly: !canEdit, placeholder: '0 hoặc 578.000' })}
-          </div>
+            <div style="font-size:11px;color:var(--muted);margin-top:4px">Phiếu lập trước bản v418 — giữ nguyên cách nhập cũ để không đổi số đã chốt.</div>
+          </div>` : `
+          <div style="border:1px solid #E9D5FF;background:#FAF5FF;border-radius:8px;padding:10px 12px">
+            <label class="check-item" style="font-weight:700;color:#6B21A8;font-size:12.5px">
+              <input type="checkbox" id="psBhxhOn" ${p.bhxhOn?'checked':''} ${canEdit?'':'disabled'}>
+              <span>🛡 Đóng BHXH</span>
+            </label>
+            <div id="psBhxhBox" style="display:${p.bhxhOn?'':'none'};margin-top:8px">
+              <label style="font-size:11px;color:var(--muted);text-transform:uppercase;font-weight:600">Mức lương cơ sở đóng BH</label>
+              ${moneyInput('psBhxhBase', p.bhxhBase || 0, { readonly: !canEdit, placeholder: '5.000.000' })}
+              <div style="font-size:11.5px;margin-top:6px;line-height:1.65">
+                NV <b>${computed.bhxhRates.empPct}%</b>: <b style="color:#7C3AED" id="psBhxhEmp">−${PF.formatVND(computed.bhxhEmp)} ₫</b><br>
+                DN <b>${computed.bhxhRates.comPct}%</b>: <span style="color:#6B7280" id="psBhxhCom">${PF.formatVND(computed.bhxhCom)} ₫</span>
+                <span style="color:var(--muted)">— công ty chi, <b>không</b> trừ NV</span>
+              </div>
+            </div>
+          </div>`}
           <div>
             <label style="font-size:11px;color:var(--muted);text-transform:uppercase;font-weight:600">💵 Tạm ứng đã ứng (₫)</label>
             ${moneyInput('psAdvance', p.advance, { readonly: !canEdit, placeholder: '0' })}
@@ -428,7 +538,22 @@
       d.workStandardOverride = wsv ? +wsv : null;
       const ao = getMoneyRaw('psAllowanceOverride');
       d.allowanceOverride = ao || null;
-      d.bhxh = getMoneyRaw('psBhxh');
+      /* BHXH: có checkbox = phiếu mới (tự tính NV/DN) · không có = phiếu cũ (giữ ô nhập tiền cũ) */
+      const bhxhOnEl = document.getElementById('psBhxhOn');
+      if (bhxhOnEl) {
+        d.bhxhOn = !!bhxhOnEl.checked;
+        d.bhxhBase = getMoneyRaw('psBhxhBase');
+        d.bhxh = 0;
+      } else if (document.getElementById('psBhxh')) {
+        d.bhxh = getMoneyRaw('psBhxh');   /* legacy — KHÔNG set bhxhOn để engine giữ nguyên số cũ */
+      }
+      /* Hoa hồng: chỉ ghi khi phiếu có mục này (phiếu cũ không có → không cộng trùng) */
+      const commModeEl = document.getElementById('psCommMode');
+      if (commModeEl) {
+        d.commMode = commModeEl.value;
+        d.commissionPct = parseFloat(document.getElementById('psCommPct')?.value) || 0;
+        d.commissionAmount = getMoneyRaw('psCommAmount');
+      }
       d.advance = getMoneyRaw('psAdvance');
       d.notes = document.getElementById('psNotes')?.value || '';
       /* Collect bonus/penalty từ DOM — đọc raw từ data-raw nếu blur, value nếu đang focus */
@@ -440,10 +565,15 @@
         name: el.querySelector('.ps-bonus-name')?.value || '',
         amount: readAmount(el.querySelector('.ps-bonus-amount')),
       })).filter(b => b.amount > 0 || b.name);
-      d.penalties = Array.from(document.querySelectorAll('.ps-pen')).map(el => ({
-        name: el.querySelector('.ps-pen-name')?.value || '',
-        amount: readAmount(el.querySelector('.ps-pen-amount')),
-      })).filter(p => p.amount > 0 || p.name);
+      d.penalties = Array.from(document.querySelectorAll('.ps-pen')).map(el => {
+        const row = {
+          name: el.querySelector('.ps-pen-name')?.value || '',
+          amount: readAmount(el.querySelector('.ps-pen-amount')),
+        };
+        /* Khoản phạt theo NGÀY CÔNG: giữ unit+days để engine tự quy đổi lại theo lương ngày */
+        if (el.dataset.unit === 'cong') { row.unit = 'cong'; row.days = +el.dataset.days || 0; }
+        return row;
+      }).filter(x => x.amount > 0 || x.name || x.unit === 'cong');
       d.helperBonus = window.BONUS ? window.BONUS.helperFor(d.staffId || staffId, d.month || month).total : 0;
       return d;
     }
@@ -460,8 +590,43 @@
       document.getElementById('psBonusTotal').textContent = '+ ' + PF.formatVND(c.totalBonus) + ' ₫';
       document.getElementById('psPenaltyTotal').textContent = '− ' + PF.formatVND(c.totalPenalty) + ' ₫';
       document.getElementById('psTotal').textContent = PF.formatVND(c.total) + ' ₫';
+
+      /* Khoản phạt theo NGÀY CÔNG → cập nhật lại số tiền khi LCB/công thay đổi */
+      (c.penalties || []).forEach((pp, i) => {
+        if (!pp || pp.unit !== 'cong') return;
+        const el = document.querySelector(`.ps-pen[data-idx="${i}"] .ps-pen-amount`);
+        if (el) { el.value = fmtMoney(pp.amount); el.dataset.raw = pp.amount; }
+      });
+
+      /* Hoa hồng */
+      const cm = c.commission || { mode: 'none', amount: 0, pct: 0, revenue: 0 };
+      const commTotal = document.getElementById('psCommTotal');
+      if (commTotal) commTotal.textContent = '+ ' + PF.formatVND(cm.amount) + ' ₫';
+      const commAmtEl = document.getElementById('psCommAmount');
+      const commPctEl = document.getElementById('psCommPct');
+      if (commAmtEl) {
+        const auto = cm.mode === 'auto';
+        if (auto) { commAmtEl.value = fmtMoney(cm.amount); commAmtEl.dataset.raw = cm.amount; }
+        commAmtEl.readOnly = !canEdit || cm.mode !== 'manual';
+        if (commPctEl) commPctEl.readOnly = !canEdit || !auto;
+      }
+      const hint = document.getElementById('psCommHint');
+      if (hint) {
+        hint.innerHTML = cm.mode === 'auto'
+          ? `${cm.pct}% × doanh thu <b>${PF.formatVND(cm.revenue)} ₫</b> (${SCOPE_LABEL[cm.scope] || ''}) = <b style="color:#B45309">${PF.formatVND(cm.amount)} ₫</b>`
+          : cm.mode === 'manual'
+            ? 'Kế toán tự nhập số tiền hoa hồng cho vị trí này.'
+            : 'NV này không tính hoa hồng — đổi cách tính trong hồ sơ NV.';
+      }
+
+      /* BHXH NV / DN */
+      const empEl = document.getElementById('psBhxhEmp');
+      if (empEl) empEl.textContent = '−' + PF.formatVND(c.bhxhEmp) + ' ₫';
+      const comEl = document.getElementById('psBhxhCom');
+      if (comEl) comEl.textContent = PF.formatVND(c.bhxhCom) + ' ₫';
+
       const bt = document.getElementById('psBreakdownText');
-      if (bt) bt.innerHTML = `${PF.formatVND(c.baseSalary)} + ${PF.formatVND(c.allowance)} + ${PF.formatVND(c.totalBonus)} − ${PF.formatVND(c.totalPenalty)} − ${PF.formatVND(la.total)}<sub>muộn</sub> − ${PF.formatVND(c.bhxh)} − ${PF.formatVND(c.advance)}`;
+      if (bt) bt.innerHTML = `${PF.formatVND(c.baseSalary)} + ${PF.formatVND(c.allowance)}<sub>PC</sub> + ${PF.formatVND(c.totalBonus)}<sub>thưởng</sub>${cm.amount ? ' + ' + PF.formatVND(cm.amount) + '<sub>HH</sub>' : ''} − ${PF.formatVND(c.totalPenalty)}<sub>phạt</sub> − ${PF.formatVND(la.total)}<sub>muộn</sub> − ${PF.formatVND(c.bhxhEmp)}<sub>BHXH NV</sub> − ${PF.formatVND(c.advance)}<sub>ứng</sub>`;
     }
 
     /* Bind inputs */
@@ -471,6 +636,14 @@
     });
     /* Money inputs: format on blur, raw on focus */
     wireMoneyInputs(dc);
+
+    /* Bật/tắt ô "mức lương cơ sở" theo checkbox BHXH */
+    document.getElementById('psBhxhOn')?.addEventListener('change', e => {
+      const box = document.getElementById('psBhxhBox');
+      if (box) box.style.display = e.target.checked ? '' : 'none';
+    });
+    /* Điền hint hoa hồng + trạng thái readonly ngay khi mở phiếu */
+    try { refreshComputed(); } catch (e) {}
 
     /* === Toggle Mixed Mode === */
     document.getElementById('psMixedMode')?.addEventListener('change', e => {
@@ -558,6 +731,20 @@
       });
       wireMoneyInputs(list);
     };
+    /* Phạt theo NGÀY CÔNG (½ hoặc 1 ngày) — số tiền tự quy đổi từ lương 1 ngày, không gõ tay */
+    window._psAddPenaltyCong = function (days) {
+      const d = collect();
+      d.penalties.push({ name: `Trừ ${days === 0.5 ? '½' : days} ngày công`, unit: 'cong', days, amount: 0 });
+      window._psCurrentDraft = d;
+      const list = document.getElementById('psPenaltyList');
+      list.innerHTML = penaltyRows(d.penalties);
+      list.querySelectorAll('input').forEach(el => {
+        el.addEventListener('input', refreshComputed);
+        el.addEventListener('change', refreshComputed);
+      });
+      wireMoneyInputs(list);
+      refreshComputed();
+    };
     window._psRemovePenalty = function (idx) {
       const d = collect();
       d.penalties.splice(idx, 1);
@@ -575,7 +762,7 @@
     window._psSave = function () {
       const d = collect();
       const c = PF.computePayslip(d);
-      const final = { ...d, baseSalary: c.baseSalary, allowance: c.allowance, total: c.total };
+      const final = { ...d, ...computedSnapshot(c) };
       const list = getPayslips();
       const i = list.findIndex(x => x.id === final.id);
       if (i >= 0) list[i] = final; else list.push(final);
@@ -591,7 +778,7 @@
       const user = (window.AUTH && window.AUTH.currentUser()) || {};
       const final = {
         ...d,
-        baseSalary: c.baseSalary, allowance: c.allowance, total: c.total,
+        ...computedSnapshot(c),
         status: 'submitted',
         submittedBy: user.name || user.email || 'NS',
         submittedAt: new Date().toISOString(),
@@ -612,7 +799,7 @@
       const user = (window.AUTH && window.AUTH.currentUser()) || {};
       const final = {
         ...d,
-        baseSalary: c.baseSalary, allowance: c.allowance, total: c.total,
+        ...computedSnapshot(c),
         status: 'approved',
         approvedBy: user.name || user.email || 'CFO',
         approvedAt: new Date().toISOString(),
@@ -855,7 +1042,7 @@
     toSubmit.forEach(ps => {
       const c = PF.computePayslip(ps);
       Object.assign(ps, {
-        baseSalary: c.baseSalary, allowance: c.allowance, total: c.total,
+        ...computedSnapshot(c),
         status: 'submitted',
         submittedBy: submitterName,
         submittedAt: now,
