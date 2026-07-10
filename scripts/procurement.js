@@ -41,6 +41,12 @@
   const fmtQty = q => (+q || 0).toFixed(2).replace(/\.00$/, '').replace(/(\.\d)0$/, '$1');
   const money = n => (window.fmt ? window.fmt(n) : (+n || 0).toLocaleString('vi-VN'));
   const esc = v => String(v == null ? '' : v).replace(/[&<>"]/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]));
+  /* Chuỗi JS đặt trong thuộc tính HTML (onclick="fn(...)").
+     `esc` KHÔNG thoát dấu nháy đơn → tên mặt hàng như  Cà chua bi 'Đà Lạt'  sẽ phá vỡ handler
+     (im lặng không lưu), tệ hơn là chèn được JS vì tên hàng đến từ đơn web. */
+  const jsq = v => "'" + String(v == null ? '' : v)
+    .replace(/\\/g, '\\\\').replace(/'/g, "\\'").replace(/"/g, '&quot;')
+    .replace(/</g, '\\x3c').replace(/\r/g, '').replace(/\n/g, '\\n') + "'";
 
   /* Ngày giao → khoá so sánh 'YYYYMMDD' (nhận cả ISO 2026-07-06 lẫn dd/mm/yyyy). Rỗng → '' */
   function _dateKey(v) {
@@ -169,12 +175,15 @@
     line.allocations = [{ supplierId: top.id, supplierName: top.name, qty: line.totalQty, unitCost: top.price, confirmedQty: null }];
   }
   const autoStarAllocate = autoAllocate;   /* tên cũ — giữ để không vỡ chỗ gọi khác */
-  /* Migrate dòng cũ (supplierId đơn) → allocations[]; đảm bảo luôn có mảng */
+  /* Migrate dòng cũ (supplierId đơn) → allocations[]; đảm bảo luôn có mảng.
+     `_normDirty` = có thay đổi thật → chỉ khi đó mới cần ghi lên cloud. */
+  let _normDirty = false;
   function normalizeLine(l) {
-    if (!Array.isArray(l.allocations)) l.allocations = [];
+    if (!Array.isArray(l.allocations)) { l.allocations = []; _normDirty = true; }
     if (!l.allocations.length && l.supplierId) {
       l.allocations = [{ supplierId: l.supplierId, supplierName: l.supplierName || '', qty: l.totalQty,
         unitCost: l.unitCost || 0, confirmedQty: (l.confirmedQty != null ? l.confirmedQty : null) }];
+      _normDirty = true;
     }
     return l;
   }
@@ -222,7 +231,7 @@
       g.breakdown.push({ code: o.code, custName: o.custName, qty: +it.qty || 0, createdAt: o.createdAt || o.date || '' });
     }));
     const lines = [...map.values()];
-    lines.forEach(autoStarAllocate);  /* tự gán NCC sao cao nhất */
+    lines.forEach(autoAllocate);      /* tự gán NCC mặc định của từng mặt hàng */
     return lines;
   }
 
@@ -375,7 +384,7 @@
       const bd = l.breakdown || [];
       const supCell = out
         ? `<span class="tag" style="background:#FEF3C7;color:#92400E;font-weight:700">Mua ngoài</span>`
-        : `<select onchange="window.pcSumSetSup('${esc(l.productId)}',this.value)"
+        : `<select onchange="window.pcSumSetSup(${jsq(l.productId)},this.value)"
              style="width:100%;max-width:200px;padding:4px 6px;border:1px solid ${sup ? 'var(--line)' : '#FCA5A5'};border-radius:6px;font-size:12px;background:${sup ? '#fff' : '#FEF2F2'}">
              <option value="">— chưa gán NCC —</option>
              ${sups.map(x => `<option value="${x.id}" ${x.id === sup ? 'selected' : ''}>${esc(x.name)} · ${TYPE_LABEL[supplyTypeOf(x.id)]}</option>`).join('')}
@@ -451,7 +460,7 @@
         <div style="border:1px solid var(--line);border-radius:8px;padding:9px 11px;background:#fff">
           <div style="display:flex;align-items:center;gap:8px;margin-bottom:5px">
             <b style="font-size:12.5px;color:var(--navy);flex:1">${esc(c)}</b>
-            <button class="btn btn-ghost btn-sm" style="padding:2px 8px;font-size:11px" onclick='window.pcCopy(${JSON.stringify(leBlock(c, items))},this)'>Chép</button>
+            <button class="btn btn-ghost btn-sm" style="padding:2px 8px;font-size:11px" onclick="window.pcCopy(${jsq(leBlock(c, items))},this)">Chép</button>
           </div>
           <div style="font-family:ui-monospace,Menlo,monospace;font-size:12px;color:var(--muted);line-height:1.65;white-space:pre-wrap">${esc(items.map(it => `${it.name} ${fmtQty(it.qty)} ${it.unit}`).join('\n'))}</div>
         </div>`).join('');
@@ -461,7 +470,7 @@
           ${g.paused ? '<span class="tag" style="background:#FEE2E2;color:#B91C1C;font-weight:700">Ngừng nhập</span>' : ''}
           <span class="tag" style="background:#DCFCE7;color:#15803D;font-weight:700">Lẻ · ${g.custs.size} khách</span>
           <div style="flex:1"></div>
-          <button class="btn btn-primary btn-sm" onclick='window.pcCopy(${JSON.stringify(all)},this)'>📋 Chép cả ${g.custs.size} khách</button>
+          <button class="btn btn-primary btn-sm" onclick="window.pcCopy(${jsq(all)},this)">📋 Chép cả ${g.custs.size} khách</button>
         </div>
         <div style="display:grid;gap:8px">${blocks}</div>
       </div>`;
@@ -476,7 +485,7 @@
           <td style="padding:6px 8px"><b>${esc(l.name)}</b></td>
           <td class="num" style="padding:6px 8px;font-weight:700;color:var(--navy)">${p.kg ? fmtQty(p.kg) + ' kg' : '—'}</td>
           <td class="num" style="padding:6px 8px;color:#1E40AF">${Object.keys(p.units).map(u => fmtQty(p.units[u]) + ' ' + u).join(' · ') || '—'}
-            ${noFactor ? `<button title="Chưa khai hệ số quy đổi kg — bấm để khai" onclick="window.pcAskKg('${esc(l.productId)}','${esc(l.name)}','${esc(l.unit)}')" style="border:none;background:none;color:#B45309;cursor:pointer;font-size:13px">⚠</button>` : ''}</td>
+            ${noFactor ? `<button title="Chưa khai hệ số quy đổi kg — bấm để khai" onclick="window.pcAskKg(${jsq(l.productId)},${jsq(l.name)},${jsq(l.unit)})" style="border:none;background:none;color:#B45309;cursor:pointer;font-size:13px">⚠</button>` : ''}</td>
         </tr>`;
       }).join('');
       return `<div style="border:1px solid #BFDBFE;background:#EFF6FF;border-radius:10px;padding:12px;margin-bottom:12px">
@@ -485,7 +494,7 @@
           ${g.paused ? '<span class="tag" style="background:#FEE2E2;color:#B91C1C;font-weight:700">Ngừng nhập</span>' : ''}
           <span class="tag" style="background:#DBEAFE;color:#1E40AF;font-weight:700">${g.type === 'both' ? 'Chưa phân loại sỉ/lẻ' : 'Sỉ'} · ${g.lines.length} mã</span>
           <div style="flex:1"></div>
-          <button class="btn btn-primary btn-sm" onclick='window.pcCopy(${JSON.stringify(siText(g))},this)'>📋 Chép danh sách</button>
+          <button class="btn btn-primary btn-sm" onclick="window.pcCopy(${jsq(siText(g))},this)">📋 Chép danh sách</button>
         </div>
         <div style="overflow-x:auto;background:#fff;border:1px solid var(--line);border-radius:8px">
           <table class="mini-table" style="width:100%;border-collapse:collapse;font-size:13px">
@@ -729,41 +738,147 @@
     }).join('');
   }
 
+  /* ===================================================================
+     ② NHẬN HÀNG — NCC giao tới, kho cân rồi ghi SỐ THỰC NHẬN. Chỉ vậy.
+
+     Nguyên tắc: ô số điền SẴN = số đã đặt. Hàng về đủ → không gõ gì, bấm XONG.
+     Chỉ mã nào thiếu mới phải sửa. Thiếu bao nhiêu, khách nào bị cắt — hiện ngay
+     dưới ô số bằng tiếng Việt, không bắt kho tự suy.
+     Mọi thứ nâng cao (chia 1 mã cho 2 nhà, in phiếu đặt) nằm trong ⚙ thu gọn.
+     =================================================================== */
+  let _recvRunId = null;
+  window.pcRecvRun = function (rid) { _recvRunId = rid; renderRuns(); };
+
+  /* Ghi số thực nhận. Bằng số đã đặt → lưu null ("giao đủ"), khỏi bẩn dữ liệu. */
+  window.pcRecv = function (runId, key, ai, val) {
+    const run = getRuns().find(r => r.id === runId); if (!run) return;
+    const l = _line(run, key); if (!l || !l.allocations[ai]) return;
+    const a = l.allocations[ai];
+    const v = String(val).trim();
+    const n = +v;
+    /* '' hoặc đúng bằng số đã đặt → null ("giao đủ"). Số âm/không hợp lệ → kẹp về 0. */
+    a.confirmedQty = (v === '' || !isFinite(n) || n === +a.qty) ? null : Math.max(0, n);
+    saveRun(run); renderRuns();
+  };
+  /* "Nhận đủ tất cả" — xoá mọi số thực nhận đã gõ, quay về mặc định giao đủ */
+  window.pcRecvAllFull = function (runId) {
+    const run = getRuns().find(r => r.id === runId); if (!run) return;
+    run.lines.forEach(l => (l.allocations || []).forEach(a => { a.confirmedQty = null; }));
+    saveRun(run);
+    window.toast?.('✓ Đánh dấu nhận đủ tất cả', 'success');
+    renderRuns();
+  };
+  window.pcRecvAdv = function (rid) { window.pcOpenRun(rid); };
+
+  let _runsRendering = false;   /* chống đệ quy: renderRuns → pcOpenRun → saveRuns → subscriber → renderRuns */
   function renderRuns() {
+    if (_runsRendering) return;
+    _runsRendering = true;
+    try { _renderRunsInner(); } finally { _runsRendering = false; }
+  }
+  function _renderRunsInner() {
     const host = document.getElementById('pcRunList');
     if (!host) return;
     const allRuns = getRuns();
-    const runs = allRuns.filter(r => !_isDoneRun(r));   /* chỉ phiên ĐANG gom */
+    const runs = allRuns.filter(r => !_isDoneRun(r));
+    const det = document.getElementById('pcRunDetail');
+
     if (!runs.length) {
-      const doneNote = allRuns.length ? '<br><span style="font-size:11px">Các phiên đã chốt xem ở <b>Lịch sử đã gom</b> bên dưới.</span>' : '';
-      host.innerHTML = `<div style="background:#fff;border:1px solid var(--line);border-radius:10px;padding:24px;text-align:center;color:var(--muted);font-size:12.5px">Chưa có phiên gom đang xử lý.<br>Chọn đơn ở bước ① để tạo.${doneNote}</div>`;
-      const det = document.getElementById('pcRunDetail');
-      if (det && !window._pcActiveRun) det.innerHTML = `<div class="pc-detail-empty">← Tạo / chọn một phiên gom để gán NCC.</div>`;
+      host.innerHTML = _emptyBox('Chưa có phiên nào chờ nhận hàng.<br><span style="font-size:12px">Sang tab <b>📞 Tổng hợp &amp; Gọi hàng</b>, gọi hàng xong bấm <b>🧺 Chốt &amp; nhận hàng</b>.</span>');
+      if (det) { det.innerHTML = ''; window._pcActiveRun = null; }
       return;
     }
-    const stLabel = { draft: ['Nháp', '#64748B'], sent: ['Đã gửi NCC', '#0EA5E9'], confirmed: ['Đã xác nhận', '#15803D'], closed: ['Đã xuất kho', '#1B5E20'] };
-    host.innerHTML = _bulkBar() + runs.map(r => {
-      const [lb, clr] = stLabel[r.status] || stLabel.draft;
-      normalizeRun(r);
-      const nNone = r.lines.filter(l => remainOf(l) > 0.001).length;
-      const totalKg = r.lines.reduce((s, l) => s + l.totalQty, 0);
-      const sel = window._pcActiveRun === r.id ? ' pc-sel' : '';
-      return `<div class="run-card${sel}" data-runid="${r.id}" onclick="window.pcOpenRun('${r.id}')" style="padding:11px 13px">
-        <div style="display:flex;align-items:center;gap:7px;flex-wrap:wrap">
-          ${_runCardCtrls(r.id)}
-          <div style="font-weight:800;font-size:14px;color:var(--navy)">${r.id}</div>
-          <span class="tag" style="background:${clr}1f;color:${clr};font-weight:700;font-size:10.5px">${lb}</span>
-          <div style="flex:1"></div>
-          ${_runDelBtn(r.id)}
+    if (!_recvRunId || !runs.some(r => r.id === _recvRunId)) _recvRunId = runs[0].id;
+    const run = normalizeRun(runs.find(r => r.id === _recvRunId));
+
+    const picker = runs.length > 1
+      ? `<select onchange="window.pcRecvRun(this.value)" style="padding:7px 10px;border:1px solid var(--line);border-radius:7px;font-size:13px;font-weight:700;color:var(--navy)">
+           ${runs.map(r => `<option value="${r.id}" ${r.id === _recvRunId ? 'selected' : ''}>${r.id} · ${r.orderCodes.length} đơn</option>`).join('')}
+         </select>`
+      : `<b style="color:var(--navy);font-size:15px">${run.id}</b>`;
+
+    let nShort = 0, nTyped = 0;
+    const cards = run.lines.map(l => {
+      const allocs = l.allocations || [];
+      const out = isBuyOutside(l.productId);
+      /* Không có NCC (mua ngoài / chưa gán) → không có gì để "nhận" từ NCC, đừng báo thiếu */
+      const got = allocs.length ? confirmedOf(l) : l.totalQty;
+      const short = allocs.length ? +(l.totalQty - got).toFixed(2) : 0;
+      if (short > 0.001) nShort++;
+      if (allocs.some(a => a.confirmedQty != null)) nTyped++;
+
+      const supChips = allocs.length
+        ? allocs.map(a => `<span class="tag" style="background:#F1F5F9;color:#475569;font-weight:600">${esc(a.supplierName || a.supplierId)} · ${TYPE_LABEL[supplyTypeOf(a.supplierId)]}</span>`).join(' ')
+        : out ? `<span class="tag" style="background:#FEF3C7;color:#92400E;font-weight:700">🛒 Mua ngoài</span>`
+              : `<span class="tag" style="background:#FEE2E2;color:#B91C1C;font-weight:700">Chưa gán NCC</span>`;
+
+      /* Ô số: 1 NCC → 1 ô. Nhiều NCC → mỗi nhà 1 ô (hiếm). */
+      const inputs = allocs.length
+        ? allocs.map((a, ai) => `<div style="display:flex;align-items:center;gap:6px">
+            ${allocs.length > 1 ? `<span style="font-size:11px;color:var(--muted);min-width:80px;text-align:right">${esc(a.supplierName || '')}</span>` : ''}
+            <input type="number" step="any" min="0" inputmode="decimal"
+              value="${a.confirmedQty != null ? a.confirmedQty : (+a.qty || 0)}"
+              onfocus="this.select()" onchange="window.pcRecv(${jsq(run.id)},${jsq(l.key)},${ai},this.value)"
+              style="width:96px;padding:9px 10px;font-size:17px;font-weight:800;text-align:right;color:var(--navy);
+                     border:2px solid ${a.confirmedQty != null && +a.confirmedQty < +a.qty ? '#FCA5A5' : '#D1D5DB'};border-radius:8px">
+            <span style="font-size:13px;color:var(--muted);font-weight:600">${esc(l.unit)}</span>
+          </div>`).join('')
+        : out ? `<span style="font-size:12px;color:#92400E">Kho tự đi mua</span>`
+              : `<span style="font-size:12px;color:#B91C1C">Gán NCC ở tab Tổng hợp</span>`;
+
+      /* Thiếu bao nhiêu → khách nào bị cắt (luật R6: đơn đặt trước nhận đủ trước) */
+      let impact = '';
+      if (short > 0.001) {
+        const cut = allocateLine(l).filter(x => x.short > 0.001);
+        impact = `<div style="margin-top:7px;background:#FEF2F2;border:1px solid #FECACA;border-radius:7px;padding:7px 9px;font-size:12px;color:#B91C1C;line-height:1.6">
+          <b>Thiếu ${fmtQty(short)} ${esc(l.unit)}</b>${cut.length ? ' → ' + cut.map(x => `${esc(x.custName || x.code)} chỉ nhận <b>${fmtQty(x.give)}/${fmtQty(x.want)}</b>`).join(' · ') : ''}
+        </div>`;
+      } else if (got > l.totalQty + 0.001) {
+        impact = `<div style="margin-top:7px;font-size:12px;color:#15803D">Nhận dư ${fmtQty(got - l.totalQty)} ${esc(l.unit)}</div>`;
+      }
+
+      return `<div style="background:${out ? '#FFFDF5' : '#fff'};border:1px solid ${short > 0.001 ? '#FECACA' : out ? '#FDE68A' : 'var(--line)'};border-radius:10px;padding:12px 14px">
+        <div style="display:flex;align-items:center;gap:12px;flex-wrap:wrap">
+          <div style="flex:1;min-width:160px">
+            <div style="font-weight:800;font-size:15px;color:var(--navy)">${esc(l.name)}</div>
+            <div style="font-size:11.5px;color:var(--muted);margin-top:3px">Đặt <b>${fmtQty(l.totalQty)} ${esc(l.unit)}</b> · ${supChips}</div>
+          </div>
+          <div style="text-align:right">
+            <div style="font-size:10.5px;color:var(--muted);text-transform:uppercase;font-weight:700;letter-spacing:.3px;margin-bottom:4px">Thực nhận</div>
+            <div style="display:grid;gap:6px">${inputs}</div>
+          </div>
         </div>
-        <div style="font-size:11.5px;color:var(--muted);margin-top:5px">${r.orderCodes.length} đơn · ${r.lines.length} mã · ${fmtQty(totalKg)} kg</div>
-        ${nNone > 0 ? `<div style="margin-top:6px"><span class="tag" style="background:#FEF3C7;color:#B45309;font-weight:700;font-size:10.5px">⚠ ${nNone} mã chưa phân bổ đủ NCC</span></div>` : `<div style="margin-top:6px"><span style="font-size:11px;color:#15803D;font-weight:700">✓ đã phân bổ đủ NCC</span></div>`}
+        ${impact}
       </div>`;
     }).join('');
-    /* nếu phiên đang chọn không còn → mở phiên đầu */
-    if (!window._pcActiveRun || !runs.find(r => r.id === window._pcActiveRun)) {
-      /* giữ panel trống, để user tự chọn */
-    }
+
+    host.innerHTML = `
+      <div style="display:flex;align-items:center;gap:10px;flex-wrap:wrap;margin-bottom:12px">
+        ${picker}
+        <span class="tag" style="background:#F1F5F9;color:#475569;font-weight:700">${run.orderCodes.length} đơn · ${run.lines.length} mã</span>
+        ${nShort ? `<span class="tag" style="background:#FEE2E2;color:#B91C1C;font-weight:700">⚠ ${nShort} mã thiếu</span>`
+                 : `<span class="tag" style="background:#DCFCE7;color:#15803D;font-weight:700">✓ đủ hàng</span>`}
+        <div style="flex:1"></div>
+        ${nTyped ? `<button class="btn btn-ghost btn-sm" onclick="window.pcRecvAllFull(${jsq(run.id)})">↺ Nhận đủ tất cả</button>` : ''}
+      </div>
+
+      <div style="background:#EFF6FF;border:1px solid #BFDBFE;border-radius:9px;padding:9px 12px;margin-bottom:12px;font-size:12.5px;color:#1E40AF">
+        Ô số đã điền sẵn <b>số đã đặt</b>. Hàng về đủ thì <b>không phải gõ gì</b> — bấm thẳng <b>Xong</b>.
+        Mã nào thiếu thì sửa lại số, app tự cắt của khách đặt sau.
+      </div>
+
+      <div style="display:grid;gap:10px">${cards}</div>
+
+      <div style="display:flex;gap:10px;flex-wrap:wrap;margin-top:16px;align-items:center">
+        <button class="btn btn-primary" style="font-size:15px;padding:11px 24px;font-weight:800" onclick="window.pcApplyAlloc(${jsq(run.id)})">✓ Xong — chốt sản lượng</button>
+        <span style="font-size:12px;color:var(--muted)">Chốt xong đơn chuyển sang <b>🚚 Xuất kho</b>.</span>
+        <div style="flex:1"></div>
+        <button class="btn btn-ghost btn-sm" onclick="window.pcRecvAdv(${jsq(run.id)})" title="Chia 1 mã cho 2 nhà cung cấp · in phiếu đặt · xem chia khách">⚙ Nâng cao</button>
+        ${_runDelBtn(run.id)}
+      </div>`;
+    /* Khối "Nâng cao" chỉ hiện khi user tự bấm mở (pcOpenRun đặt _pcActiveRun) */
+    if (det && window._pcActiveRun !== run.id) det.innerHTML = '';
+    else if (det && window._pcActiveRun === run.id) window.pcOpenRun(run.id);
   }
 
   function _supOpts(selId) {
@@ -816,7 +931,9 @@
     const run = normalizeRun(runs.find(r => r.id === runId));
     if (!run) return;
     if (window._pcActiveRun !== runId) _pcDetailTab = 'assign';   /* mở phiên KHÁC → về tab Gán NCC (giữ tab khi re-render cùng phiên) */
-    saveRuns(runs);  /* lưu migration allocations nếu có */
+    /* CHỈ ghi khi migration thật sự đổi dữ liệu. Ghi vô điều kiện = bắn subscriber
+       procurementRuns mỗi lần vẽ → renderRuns gọi lại pcOpenRun → đệ quy vô hạn. */
+    if (_normDirty) { _normDirty = false; saveRuns(runs); }
     const sups = getSuppliers().filter(s => s.active !== false);
     const supDL = `<datalist id="pcSupDL">${sups.map(s => `<option value="${esc(s.name)}">`).join('')}</datalist>`;
     const totalKg = run.lines.reduce((s, l) => s + l.totalQty, 0);
@@ -863,20 +980,20 @@
     </div>`;
 
     /* ===== PHÂN BỔ NCC THEO TỪNG MÃ (chia nhiều NCC được) ===== */
-    body += `<div style="font-weight:800;color:var(--navy);font-size:12.5px;margin:4px 0 8px">🧮 PHÂN BỔ NCC THEO TỪNG MÃ <span style="font-weight:400;color:var(--muted)">(1 mã có thể chia nhiều NCC · tự gán NCC theo ⭐ sao)</span></div>`;
+    body += `<div style="font-weight:800;color:var(--navy);font-size:12.5px;margin:4px 0 8px">🧮 PHÂN BỔ NCC THEO TỪNG MÃ <span style="font-weight:400;color:var(--muted)">(1 mã có thể chia cho nhiều NCC)</span></div>`;
     /* ===== THANH CHỌN NHIỀU + GÁN HÀNG LOẠT ===== */
     if (!_isDoneRun(run)) {
       body += `<div class="pc-bulkbar" style="display:flex;align-items:center;gap:8px;flex-wrap:wrap;background:#EFF6FF;border:1px solid #BFDBFE;border-radius:8px;padding:8px 10px;margin-bottom:10px;font-size:12px">
         <label style="display:flex;align-items:center;gap:5px;cursor:pointer;font-weight:700;color:#1D4ED8"><input type="checkbox" id="pcChkAll" onclick="window.pcToggleAllLines(this.checked)" style="width:15px;height:15px;cursor:pointer"> Chọn tất cả</label>
         <span id="pcSelCount" style="color:var(--muted)">0 mã chọn</span>
         <div style="flex:1;min-width:8px"></div>
-        <button class="btn btn-ghost btn-sm" style="font-size:11.5px;padding:3px 9px" onclick="window.pcAutoStarSelected('${run.id}')" title="Tự gán NCC sao cao nhất — cho mã đã chọn, hoặc TẤT CẢ nếu chưa chọn">⭐ Tự chọn theo sao</button>
+        <button class="btn btn-ghost btn-sm" style="font-size:11.5px;padding:3px 9px" onclick="window.pcAutoStarSelected('${run.id}')" title="Tự gán NCC mặc định của từng mặt hàng — cho mã đã chọn, hoặc TẤT CẢ nếu chưa chọn">↻ Tự gán NCC mặc định</button>
         <select id="pcBulkSup" style="font-size:11.5px;border:1px solid var(--line);border-radius:5px;padding:4px 6px;max-width:180px">
           <option value="">— gán NCC cho mã đã chọn… —</option>
           ${sups.map(s => `<option value="${esc(s.id)}">${esc(s.name)}${isPaused(s.id) ? ' (ngừng nhập)' : ''}</option>`).join('')}
         </select>
         <button class="btn btn-primary btn-sm" style="font-size:11.5px;padding:3px 9px" onclick="window.pcBulkAssign('${run.id}')">Gán NCC</button>
-        <label style="display:flex;align-items:center;gap:4px;cursor:pointer;color:#1D4ED8;font-size:11px" title="Lưu mã này vào danh sách NCC cung cấp → lần gom sau tự gán theo sao"><input type="checkbox" id="pcBulkRemember" checked style="cursor:pointer"> 🧠 Ghi nhớ (lần sau tự gán)</label>
+        <label style="display:flex;align-items:center;gap:4px;cursor:pointer;color:#1D4ED8;font-size:11px" title="Lưu mã này vào danh sách NCC cung cấp → lần gom sau tự gán"><input type="checkbox" id="pcBulkRemember" checked style="cursor:pointer"> 🧠 Ghi nhớ (lần sau tự gán)</label>
       </div>`;
     }
     run.lines.forEach(l => {
@@ -1010,7 +1127,7 @@
     } else {
       body += `<div style="position:sticky;bottom:0;background:#fff;padding-top:10px;border-top:1px solid var(--line);display:flex;gap:8px;flex-wrap:wrap">
         <button class="btn btn-navy" onclick="window.pcSaveConfirm('${run.id}')">💾 Lưu</button>
-        <button class="btn btn-primary" onclick="window.pcApplyAlloc('${run.id}')">✅ Chốt &amp; phân bổ về đơn + báo Sale</button>
+        <button class="btn btn-primary" onclick="window.pcApplyAlloc(${jsq(run.id)})">✅ Chốt &amp; phân bổ về đơn + báo Sale</button>
       </div>
       <div style="font-size:11px;color:var(--muted);margin-top:8px">💡 Bấm <b>chip NCC</b> để gán (chỉ hiện NCC bán mã đó, kèm giá · sỉ/lẻ, NCC mặc định đứng đầu) — 1 chạm. Cần 2 NCC cho 1 mã → <b>➕ Chia cho NCC thứ 2</b> rồi nhập số kg. <b>Tự cân:</b> NCC cuối tự nhận phần dư cho đủ tổng. "Giao thực" để trống = giao đủ.</div>
     </div>`;
@@ -1025,7 +1142,7 @@
   window.pcCloseDetail = function () {
     window._pcActiveRun = null;
     const dc = document.getElementById('pcRunDetail');
-    if (dc) dc.innerHTML = `<div class="pc-detail-empty">← Chọn một phiên gom bên trái để gán NCC & xác nhận hàng.</div>`;
+    if (dc) dc.innerHTML = '';
     document.querySelectorAll('.run-card[data-runid]').forEach(c => c.classList.remove('pc-sel'));
   };
 
@@ -1043,7 +1160,7 @@
   const _line = (run, key) => run.lines.find(x => x.key === key);
 
   /* ===== Thao tác phân bổ NCC cho 1 mã ===== */
-  /* Tự chọn NCC sao cao nhất nhận toàn bộ */
+  /* Tự gán NCC mặc định của mặt hàng, nhận toàn bộ */
   window.pcAutoStar = function (runId, key) {
     const runs = getRuns(); const run = runs.find(r => r.id === runId); if (!run) return;
     readConfirmInputs(run);
@@ -1083,7 +1200,7 @@
       const p = (sup.products || []).find(pp => (l.productId && pp.id === l.productId) || norm(pp.name) === norm(l.name));
       l.allocations = [{ supplierId: sup.id, supplierName: sup.name, qty: l.totalQty, unitCost: p ? (+p.price || 0) : 0, confirmedQty: null }];
       n++;
-      /* Ghi nhớ mapping NCC↔mã (chỉ khi NCC chưa khai mã này + có productId) → lần sau tự gán theo sao */
+      /* Ghi nhớ mapping NCC↔mã (chỉ khi NCC chưa khai mã này + có productId) → lần sau tự gán */
       if (remember && l.productId && !newProds.some(pp => pp.id === l.productId)) {
         newProds.push({ id: l.productId, name: l.name, price: 0 });
         learned++;
@@ -1093,7 +1210,7 @@
     saveRuns(runs); renderRuns(); window.pcOpenRun(runId);
     window.toast?.(`✓ Đã gán NCC "${sup.name}" cho ${n} mã${learned ? ` · 🧠 ghi nhớ ${learned} mã mới` : ''}`, 'success');
   };
-  /* Tự gán NCC sao cao nhất cho mã đã tick (không tick → áp dụng cho TẤT CẢ mã) */
+  /* Tự gán NCC mặc định cho mã đã tick (không tick → áp dụng cho TẤT CẢ mã) */
   window.pcAutoStarSelected = function (runId) {
     const runs = getRuns(); const run = runs.find(r => r.id === runId); if (!run) return;
     readConfirmInputs(run);
@@ -1106,7 +1223,7 @@
       if (suppliersForProduct(l.productId, l.name).length) { autoStarAllocate(l); n++; } else miss++;
     });
     saveRuns(runs); renderRuns(); window.pcOpenRun(runId);
-    window.toast?.(`⭐ Tự gán ${n} mã theo sao${applyAll ? ' (tất cả)' : ''}${miss ? ` · ${miss} mã chưa có NCC → thu mua ngoài` : ''}`, n ? 'success' : 'warn');
+    window.toast?.(`↻ Tự gán ${n} mã${applyAll ? ' (tất cả)' : ''}${miss ? ` · ${miss} mã chưa có NCC → thu mua ngoài` : ''}`, n ? 'success' : 'warn');
   };
   /* Thêm 1 dòng NCC chia phần (qty = phần còn thiếu) */
   window.pcAddAlloc = function (runId, key) {
@@ -1180,7 +1297,8 @@
     const runs = getRuns(); const run = runs.find(r => r.id === runId); if (!run) return;
     readConfirmInputs(run);
     const l = _line(run, key); if (!l || !l.allocations[ai]) return;
-    l.allocations[ai].confirmedQty = val === '' ? null : +val;
+    const _n = +val;
+    l.allocations[ai].confirmedQty = (val === '' || !isFinite(_n)) ? null : Math.max(0, _n);
     saveRun(run); window.pcOpenRun(runId);
   };
 
@@ -1646,7 +1764,7 @@ ${o.shortages && o.shortages.length ? `<div style="margin-top:10px;font-size:11.
   /* Hook cho bộ test node (scratchpad/test_wh_procure.js). Không dùng lúc chạy thật. */
   window.__whTest = { kgPair, pairLabel, kgFactorOf, whCfg, targetDeliverKey, cutoffHourFor,
     suppliersForProduct, autoAllocate, callDataForRun, leAllText, siText, isBuyOutside, supplyTypeOf, isPaused,
-    callPanesHTML, ordersForDate };
+    callPanesHTML, ordersForDate, confirmedOf, allocateLine };
 
   /* ===== Init ===== */
   function init() {
