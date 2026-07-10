@@ -422,7 +422,12 @@
     const c = window.STORE.get('mktPrices', { offset: 0, override: {} }) || {};
     return { offset: +c.offset || 0, override: c.override || {} };
   }
-  function saveMkt(c) { window.STORE.set('mktPrices', c); }
+  /* Thay CẢ khối (dùng cho nút reset). Đi qua rmwKv để flush lên bản cloud mới nhất
+     thay vì ghi đè từ cache có thể đang cũ. */
+  function saveMkt(c) {
+    if (window.STORE.rmwKv) window.STORE.rmwKv('mktPrices', () => c, { offset: 0, override: {} });
+    else window.STORE.set('mktPrices', c);
+  }
   /* Coerce về đúng kiểu object {offset, override} — dùng trong mutate của rmwKv */
   function _mktCoerce(o) {
     o = (o && typeof o === 'object' && !Array.isArray(o)) ? o : {};

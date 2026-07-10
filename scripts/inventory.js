@@ -27,11 +27,14 @@
     return Math.floor(item.stock / item.avgDaily);
   }
 
-  /* Ghi 1 movement (vào/ra/điều chỉnh) */
+  /* Ghi 1 movement (vào/ra/điều chỉnh).
+     Ghi CẢ SỔ bằng STORE.set từng làm mất phiếu kho của NV khác (tab vừa mở = sổ cũ).
+     Nay ghi 1 dòng qua rmwKv → áp lên bản cloud mới nhất. cross-module-hooks.js cũng dùng rmwKv
+     cho key này nên 2 luồng không đè nhau. mutate IDEMPOTENT: chỉ chèn khi chưa có id. */
+  let _mvSeq = 0;
   window.invRecordMovement = function (productId, qty, type, note, refId) {
-    const moves = getMoves();
-    moves.unshift({
-      id: 'MV' + Date.now().toString(36),
+    const rec = {
+      id: 'MV' + Date.now().toString(36) + (++_mvSeq).toString(36),   /* 2 dòng cùng mili-giây vẫn khác id */
       ts: new Date().toISOString(),
       productId,
       qty,       /* dương = nhập, âm = xuất */
@@ -39,9 +42,15 @@
       note: note || '',
       refId: refId || '',
       user: (window.CURRENT_USER || {}).name || 'Hệ thống',
-    });
-    if (moves.length > 500) moves.length = 500;
-    setMoves(moves);
+    };
+    const mut = arr => {
+      arr = Array.isArray(arr) ? arr : [];
+      if (!arr.some(m => m && m.id === rec.id)) arr.unshift(rec);
+      if (arr.length > 500) arr.length = 500;
+      return arr;
+    };
+    if (window.STORE.rmwKv) window.STORE.rmwKv('inv_movements', mut, []);
+    else setMoves(mut(getMoves().slice()));
   };
 
   /* Apply 1 movement vào stock (không ghi log — log ở chỗ gọi) */

@@ -566,6 +566,7 @@
               <input type="checkbox" id="psBhxhOn" ${p.bhxhOn?'checked':''} ${canEdit?'':'disabled'}>
               <span>🛡 Đóng BHXH</span>
             </label>
+            <div style="font-size:11px;color:#6B21A8;opacity:.8;margin-top:3px">Tích 1 lần → ghi vào hồ sơ NV, <b>các tháng sau tự áp</b> (không phải tích lại).</div>
             <div id="psBhxhBox" style="display:${p.bhxhOn?'':'none'};margin-top:8px">
               <label style="font-size:11px;color:var(--muted);text-transform:uppercase;font-weight:600">Mức lương cơ sở đóng BH</label>
               ${moneyInput('psBhxhBase', p.bhxhBase || _bhxhDefaultBase(), { readonly: !canEdit, placeholder: '5.500.000' })}
@@ -898,11 +899,35 @@
       refreshComputed();
     };
 
+    /* Tích BHXH / đổi cách tính hoa hồng NGAY TRÊN PHIẾU → ghi ngược về hồ sơ NV
+       (KV payrollStaffCfg) để THÁNG SAU tự áp, khỏi phải tích lại mỗi tháng.
+       Chỉ chạy khi phiếu còn NHÁP hoặc vừa gửi — phiếu đã duyệt/đã trả không đụng tới,
+       và việc ghi cấu hình KHÔNG làm đổi một đồng nào của các phiếu đã chốt (chúng lưu số riêng). */
+    function _syncCfgToStaff(d) {
+      if (!PF.setStaffPayCfg || !d.staffId) return;
+      if (d.bhxhOn == null && d.commMode == null) return;    /* phiếu legacy — không có 2 mục này */
+      const cur = PF.getStaffPayCfg(d.staffId);
+      const next = {
+        bhxhOn:   !!d.bhxhOn,
+        bhxhBase: d.bhxhOn ? (+d.bhxhBase || _bhxhDefaultBase()) : 0,
+        commMode: d.commMode || 'none',
+        commPct:  +d.commissionPct || 0,
+        commScope: d.commScope || cur.commScope,
+      };
+      const same = cur.bhxhOn === next.bhxhOn && cur.bhxhBase === next.bhxhBase &&
+                   cur.commMode === next.commMode && cur.commPct === next.commPct &&
+                   cur.commScope === next.commScope;
+      if (same) return;
+      PF.setStaffPayCfg(d.staffId, next);
+      window.toast?.(`💾 Đã ghi vào hồ sơ ${d.staffName} — các tháng sau tự áp`, 'info');
+    }
+
     window._psSave = function () {
       const d = collect();
       const c = PF.computePayslip(d);
       const final = { ...d, ...computedSnapshot(c) };
       savePayslip(final);
+      _syncCfgToStaff(final);
       window.toast?.('✓ Đã lưu phiếu nháp', 'success');
     };
 
@@ -920,6 +945,7 @@
         submittedAt: new Date().toISOString(),
       };
       savePayslip(final);
+      _syncCfgToStaff(final);
       window.toast?.('📤 Đã gửi CFO · ' + PF.formatVND(c.total) + ' ₫', 'success');
       closeDrawer();
     };

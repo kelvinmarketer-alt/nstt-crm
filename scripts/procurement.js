@@ -11,7 +11,20 @@
 (function () {
   const S = () => window.STORE;
   const getRuns = () => S().get('procurementRuns', []) || [];
-  const saveRuns = (r) => S().set('procurementRuns', r);
+  /* Ghi CẢ danh sách phiên, nhưng KHÔNG ghi đè: upsert theo id lên bản cloud mới nhất, và chỉ
+     xoá đúng những phiên user vừa xoá (so với bản đang cầm) → phiên NV khác vừa tạo giữ nguyên.
+     Idempotent. Nhờ vậy 16 chỗ gọi saveRuns() cũ tự an toàn, không phải sửa từng chỗ. */
+  const saveRuns = (r) => {
+    r = Array.isArray(r) ? r : [];
+    if (!S().rmwKv) { S().set('procurementRuns', r); return; }
+    const keep = new Set(r.map(x => x && x.id));
+    const removed = getRuns().map(x => x && x.id).filter(id => id && !keep.has(id));
+    S().rmwKv('procurementRuns', arr => {
+      arr = Array.isArray(arr) ? arr : [];
+      r.forEach(run => { const i = arr.findIndex(x => x && x.id === run.id); if (i >= 0) arr[i] = run; else arr.unshift(run); });
+      return removed.length ? arr.filter(x => x && removed.indexOf(x.id) < 0) : arr;
+    }, []);
+  };
   /* Lưu 1 PHIÊN qua RMW (idempotent upsert theo run.id) → 2 NV sửa 2 phiên cùng lúc KHÔNG đè của nhau.
      Dùng cho các thao tác biết chắc run.id (tạo/gán SL/xác nhận/chốt). saveRuns() giữ cho xóa/bulk. */
   const saveRun = (run) => window.STORE.rmwKv('procurementRuns', arr => {

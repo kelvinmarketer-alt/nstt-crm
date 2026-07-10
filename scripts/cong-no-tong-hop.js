@@ -533,7 +533,19 @@
     });
   };
   window._cnBrandSave = function () {
-    S().set('custBrands', { ..._brandWork });
+    /* Áp ĐÚNG nhãn user vừa sửa lên bản cloud mới nhất; KH khác vừa được gán nhãn ở máy khác
+       không bị xoá. Idempotent. */
+    const work = { ..._brandWork };
+    if (S().rmwKv) {
+      const before = S().get('custBrands', {}) || {};
+      const removed = Object.keys(before).filter(k => !work[k]);
+      S().rmwKv('custBrands', m => {
+        m = (m && typeof m === 'object' && !Array.isArray(m)) ? m : {};
+        Object.keys(work).forEach(k => { if (work[k]) m[k] = work[k]; });
+        removed.forEach(k => delete m[k]);
+        return m;
+      }, {});
+    } else S().set('custBrands', work);
     window.closeModal();
     window.toast && window.toast('✓ Đã lưu nhãn thương hiệu — bật "Gộp theo thương hiệu" để xem.', 'success');
     if (!cnGroupBrand) window.cnToggleBrand(); else window.cnRender();

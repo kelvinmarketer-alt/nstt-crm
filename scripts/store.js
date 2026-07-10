@@ -277,6 +277,8 @@
     'timesheet', 'timesheetMeta', 'payrollExtra', 'payrollConfig', 'payrollStaffCfg',
     'latePolicy', 'bonusRules', 'bonusLog', 'khoDuty',
     'procurementRuns', 'debtLedger', 'accountOpenings', 'staffAuth', 'staffAliases',
+    'inv_movements', 'custBrands', 'mktPrices', 'autoRecurring',
+    'custPriceTiers', 'custCreditDays', 'priceTiers', 'orderQtyLocks', 'orderQuoteLocks',
   ]);
   /* Cloud đã TRẢ LỜI cho key KV này chưa (khác _preloadDone: done kể cả khi getKv ném lỗi) */
   const _kvLoaded = new Set();
