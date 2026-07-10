@@ -24,19 +24,30 @@
                  'rau-vung-mien':'Rau vùng miền', 'rau-gia-vi':'Rau gia vị', 'hai-san':'Hải sản' };
 
 
+  const _isActive = s => s.active !== false && supplyStatusOf(s.id) !== 'paused';
+  function groupOf(s) {                       /* 'si' | 'le' | 'other' */
+    if (!_isActive(s)) return 'other';
+    const t = supplyTypeOf(s.id);
+    return (t === 'si' || t === 'le') ? t : 'other';
+  }
+
   function renderKpis() {
     const list = getSup();
-    const active = list.filter(s => s.active).length;
+    const si = list.filter(s => groupOf(s) === 'si').length;
+    const le = list.filter(s => groupOf(s) === 'le').length;
     const totalDebt = list.reduce((s, x) => s + (x.debt || 0), 0);
-    const totalSpend = list.reduce((s, x) => s + (x.totalSpend || 0), 0);
-    const overdue = list.filter(s => s.debt > 0 && s.paymentTerm !== 'COD').length;
-    const wrap = document.getElementById('supKpis');
-    wrap.innerHTML = `
-      <div class="ik-kpi" style="background:#fff;border:1px solid var(--line);border-radius:10px;padding:14px"><div style="font-size:11px;color:var(--muted);text-transform:uppercase;font-weight:700">Đang hợp tác ${window.helpTip('NCC bạn đang lấy hàng định kỳ.')}</div><div style="font-size:24px;font-weight:800;color:var(--navy);margin-top:4px">${active}/${list.length}</div></div>
-      <div class="ik-kpi" style="background:#fff;border:1px solid var(--line);border-radius:10px;padding:14px"><div style="font-size:11px;color:var(--muted);text-transform:uppercase;font-weight:700">💸 Công nợ phải trả ${window.helpTip('Tổng tiền hàng đã nhập nhưng chưa thanh toán NCC. Càng cao càng "kẹt" vốn — nên thanh toán dần.')}</div><div style="font-size:24px;font-weight:800;color:#DC2626;margin-top:4px">${window.fmtShort(totalDebt)}</div><div style="font-size:11.5px;color:var(--muted)">${overdue} NCC đang nợ</div></div>
-      <div class="ik-kpi" style="background:#fff;border:1px solid var(--line);border-radius:10px;padding:14px"><div style="font-size:11px;color:var(--muted);text-transform:uppercase;font-weight:700">📊 Tổng chi NCC (lifetime) ${window.helpTip('Tổng tiền đã chi cho tất cả NCC từ khi tạo hệ thống đến nay.')}</div><div style="font-size:24px;font-weight:800;color:var(--ok);margin-top:4px">${window.fmtShort(totalSpend)}</div></div>
-      <div class="ik-kpi sup-kpi-top" style="background:#fff;border:1px solid var(--line);border-radius:10px;padding:14px"><div style="font-size:11px;color:var(--muted);text-transform:uppercase;font-weight:700">⭐ NCC top ${window.helpTip('NCC có lifetime spend cao nhất — đối tác chiến lược.')}</div><div style="font-size:14px;font-weight:700;color:var(--navy);margin-top:4px;line-height:1.3">${list.slice().sort((a,b)=>(b.totalSpend||0)-(a.totalSpend||0))[0]?.name || '—'}</div></div>
-    `;
+    const nDebt = list.filter(s => s.debt > 0).length;
+    document.getElementById('supKpis').innerHTML = `
+      <div class="ik-kpi" style="background:#fff;border:1px solid var(--line);border-radius:10px;padding:14px">
+        <div style="font-size:11px;color:var(--muted);text-transform:uppercase;font-weight:700">📦 Nhà cung cấp SỈ ${window.helpTip('Giao cả lô theo tổng — kho tự chia cho từng khách.')}</div>
+        <div style="font-size:24px;font-weight:800;color:#1E40AF;margin-top:4px">${si}</div></div>
+      <div class="ik-kpi" style="background:#fff;border:1px solid var(--line);border-radius:10px;padding:14px">
+        <div style="font-size:11px;color:var(--muted);text-transform:uppercase;font-weight:700">🛵 Nhà cung cấp LẺ ${window.helpTip('Chia mô sẵn theo từng khách — nhận về là túi đã có tên.')}</div>
+        <div style="font-size:24px;font-weight:800;color:#15803D;margin-top:4px">${le}</div></div>
+      <div class="ik-kpi" style="background:#fff;border:1px solid var(--line);border-radius:10px;padding:14px">
+        <div style="font-size:11px;color:var(--muted);text-transform:uppercase;font-weight:700">💸 Công nợ phải trả ${window.helpTip('Tiền còn nợ NCC (phiếu nhập NET chưa thanh toán).')}</div>
+        <div style="font-size:24px;font-weight:800;color:#DC2626;margin-top:4px">${window.fmtShort(totalDebt)}</div>
+        <div style="font-size:11.5px;color:var(--muted)">${nDebt} NCC đang nợ</div></div>`;
   }
 
   /* Thứ tự hiển thị = thứ tự trong file NCC gốc (mã NCC001..NCC0xx tăng dần) để rà soát cho dễ.
@@ -44,153 +55,172 @@
   function supOrder(s) { const m = String(s && s.id || '').match(/(\d+)/); return m ? +m[1] : 1e9; }
   function render() {
     renderKpis();
-    const list = getSup().slice().sort((a, b) => supOrder(a) - supOrder(b));
-    const q = (document.getElementById('supQ').value || '').toLowerCase();
-    const cat = document.getElementById('supCat').value;
-    const st = document.getElementById('supStatus').value;
-    let rows = list;
-    if (q) rows = rows.filter(s => (s.name+' '+s.contact+' '+s.phone+' '+s.id).toLowerCase().includes(q));
-    if (cat) rows = rows.filter(s => (s.category||[]).includes(cat));
-    if (st === 'active') rows = rows.filter(s => s.active);
-    if (st === 'inactive') rows = rows.filter(s => !s.active);
-
-    const host = document.getElementById('supList');
-    if (!rows.length) {
-      host.innerHTML = `<div style="background:#fff;border:1px solid var(--line);border-radius:10px;padding:40px;text-align:center;color:var(--muted)">Không có NCC nào khớp bộ lọc.</div>`;
-      return;
-    }
+    const q = (document.getElementById('supQ').value || '').trim().toLowerCase();
+    const showOff = !!(document.getElementById('supShowOff') || {}).checked;
     const pur = getPur();
-    host.innerHTML = rows.map(s => {
-      const numPur = pur.filter(p => p.supplierId === s.id).length;
-      /* Hiển thị SẢN PHẨM cung cấp (ưu tiên) — fallback nhóm hàng cũ */
-      const prodList = Array.isArray(s.products) ? s.products : [];
-      const cats = prodList.length
-        ? prodList.slice(0, 3).map(p => `<span class="tag" style="background:#F0FDF4;color:#15803D">${p.name}</span>`).join(' ') + (prodList.length > 3 ? ` <span class="tag" style="background:#F1F5F9;color:#64748B">+${prodList.length - 3} SP</span>` : '')
-        : (s.category||[]).map(c => `<span class="tag" style="background:#F0FDF4;color:#15803D">${CATS[c]||c}</span>`).join(' ');
-      const termClr = { 'COD':'#16A34A', 'NET 7':'#0EA5E9', 'NET 14':'#A16207', 'NET 30':'#DC2626' };
-      const empty = '<span style="color:var(--muted);opacity:.55;font-style:italic">chưa có</span>';
-      const has = v => v && String(v).trim() && String(v).trim().toLowerCase() !== 'null';
-      return `<div class="sup-card" data-id="${s.id}" onclick="window.openSupDrawer('${s.id}')" style="cursor:pointer">
-        <div class="checkbox" onclick="event.stopPropagation();this.classList.toggle('on');window._bulkRefresh_suppliers&&window._bulkRefresh_suppliers()" style="position:absolute;top:16px;left:14px;z-index:2"></div>
-        <div class="sup-head">
-          <div class="sup-av" style="background:${window.avatarColor(s.id)}">${window.initials(s.name)}</div>
-          <div class="sup-info">
-            <div class="n1"><span data-field="name" title="Click để sửa tên NCC">${has(s.name)?s.name:'(chưa đặt tên)'}</span>${s.active ? '' : '<span class="tag" style="background:#F1F5F9;color:#64748B;font-weight:600">Ngưng</span>'}</div>
-            <div class="sup-meta">
-              <span title="Người liên hệ">👤 <span data-field="contact" title="Click để sửa người liên hệ">${has(s.contact)?s.contact:empty}</span></span>
-              <span title="Số điện thoại">📞 <span data-field="phone" title="Click để sửa SĐT">${has(s.phone)?s.phone:empty}</span></span>
-              <span title="Địa chỉ">📍 <span data-field="address" title="Click để sửa địa chỉ">${has(s.address)?s.address:empty}</span></span>
-            </div>
+
+    const all = getSup().slice().sort((a, b) => supOrder(a) - supOrder(b));
+    const match = s => !q || (s.name + ' ' + (s.phone || '') + ' ' + s.id).toLowerCase().includes(q);
+    const si = all.filter(s => groupOf(s) === 'si' && match(s));
+    const le = all.filter(s => groupOf(s) === 'le' && match(s));
+    const other = all.filter(s => groupOf(s) === 'other' && match(s));
+
+    const has = v => v && String(v).trim() && String(v).trim().toLowerCase() !== 'null';
+    const empty = '<span style="color:var(--muted);opacity:.5">—</span>';
+
+    /* 1 dòng = 1 NCC. Ô Tên và SĐT sửa tại chỗ (inline edit). */
+    const row = (s, i) => {
+      const nProd = (s.products || []).length;
+      const nPur = pur.filter(p => p.supplierId === s.id).length;
+      return `<tr class="sup-row" data-id="${s.id}" onclick="window.openSupDrawer('${s.id}')" style="cursor:pointer">
+        <td style="padding:7px 8px;color:var(--muted);font-variant-numeric:tabular-nums;text-align:right">${i + 1}</td>
+        <td style="padding:7px 8px;font-weight:700;color:var(--navy)">
+          <span data-field="name" title="Bấm để sửa tên">${has(s.name) ? s.name : '(chưa đặt tên)'}</span>
+          ${supplyStatusOf(s.id) === 'paused' ? '<span class="tag" style="background:#FEE2E2;color:#B91C1C;font-weight:700;margin-left:5px">Ngừng nhập</span>' : ''}
+          ${!s.active ? '<span class="tag" style="background:#F1F5F9;color:#64748B;margin-left:5px">Ngưng</span>' : ''}
+        </td>
+        <td style="padding:7px 8px;font-variant-numeric:tabular-nums;white-space:nowrap">
+          <span data-field="phone" title="Bấm để sửa SĐT">${has(s.phone) ? s.phone : empty}</span></td>
+        <td style="padding:7px 8px;text-align:right;color:${nProd ? 'var(--navy)' : 'var(--muted)'};font-variant-numeric:tabular-nums"
+            title="${nProd} sản phẩm · ${nPur} phiếu nhập">${nProd || '—'}</td>
+        <td style="padding:7px 8px;text-align:right;font-variant-numeric:tabular-nums;white-space:nowrap;font-weight:${s.debt > 0 ? '700' : '400'};color:${s.debt > 0 ? '#DC2626' : 'var(--muted)'}">
+          ${s.debt > 0 ? window.fmtShort(s.debt) : '—'}</td>
+      </tr>`;
+    };
+
+    const table = (id, title, sub, color, bg, arr) => `
+      <div style="border:1px solid var(--line);border-radius:11px;overflow:hidden;background:#fff;display:flex;flex-direction:column;min-width:0">
+        <div style="background:${bg};padding:10px 13px;border-bottom:1px solid var(--line)">
+          <div style="display:flex;align-items:baseline;gap:8px;flex-wrap:wrap">
+            <b style="color:${color};font-size:13.5px">${title}</b>
+            <span style="background:#fff;border:1px solid ${color}33;color:${color};font-weight:800;font-size:11.5px;border-radius:20px;padding:1px 9px">${arr.length}</span>
           </div>
-          <div title="${supplyStatusOf(s.id)==='paused' ? 'Ngừng nhập hàng — không hiện ở lệnh gọi hàng của Kho' : 'Đang nhập hàng bình thường'}"
-               style="font-size:11px;font-weight:700;white-space:nowrap;padding:3px 9px;border-radius:20px;border:1px solid ${supplyStatusOf(s.id)==='paused'?'#FCA5A5':'#BBF7D0'};background:${supplyStatusOf(s.id)==='paused'?'#FEF2F2':'#F0FDF4'};color:${supplyStatusOf(s.id)==='paused'?'#B91C1C':'#15803D'}">
-            ${ST_LABEL[supplyStatusOf(s.id)]}
-          </div>
+          <div style="font-size:11px;color:var(--muted);margin-top:2px">${sub}</div>
         </div>
-        <div class="sup-foot">
-          <div class="sup-tags">${cats}
-            <span class="tag" data-field="paymentTerm" title="Click để đổi điều khoản TT" style="background:${termClr[s.paymentTerm]||'#F1F5F9'}1f;color:${termClr[s.paymentTerm]||'#475569'};font-weight:700">${s.paymentTerm||'—'}</span>
-            <span class="tag" title="${TYPE_DESC[supplyTypeOf(s.id)]}" style="background:#FEF3C7;color:#92400E;font-weight:700">${TYPE_LABEL[supplyTypeOf(s.id)]}</span>
-          </div>
-          <div class="sup-stat">
-            <div class="v">${window.fmtShort(s.totalSpend)} ₫</div>
-            ${s.debt > 0 ? `<div class="s" style="color:#DC2626;font-weight:700">Nợ ${window.fmtShort(s.debt)} ₫</div>` : `<div class="s" style="color:var(--ok)">✓ ${numPur} phiếu · đã TT</div>`}
-          </div>
+        <div style="overflow:auto;max-height:64vh">
+          <table id="${id}" class="mini-table" style="width:100%;border-collapse:collapse;font-size:12.5px">
+            <thead><tr style="background:#FAFBFA;position:sticky;top:0;z-index:1">
+              <th style="width:34px;padding:7px 8px;text-align:right;color:var(--muted);font-size:10.5px">#</th>
+              <th style="text-align:left;padding:7px 8px">Tên nhà cung cấp</th>
+              <th style="text-align:left;padding:7px 8px;width:118px">SĐT liên hệ</th>
+              <th style="text-align:right;padding:7px 8px;width:46px" title="Số sản phẩm cung cấp">SP</th>
+              <th style="text-align:right;padding:7px 8px;width:86px">Công nợ</th>
+            </tr></thead>
+            <tbody>${arr.length ? arr.map(row).join('')
+              : '<tr><td colspan="5" style="padding:26px;text-align:center;color:var(--muted);font-size:12px">Chưa có nhà cung cấp nào</td></tr>'}</tbody>
+          </table>
         </div>
       </div>`;
-    }).join('');
 
-    /* Bulk + Inline edit */
-    if (!host.id) host.id = 'supList';
+    const otherRows = other.map((s, i) => `<tr class="sup-row" data-id="${s.id}" style="cursor:pointer">
+      <td style="padding:6px 8px;color:var(--muted);text-align:right">${i + 1}</td>
+      <td style="padding:6px 8px;font-weight:600" onclick="window.openSupDrawer('${s.id}')">${has(s.name) ? s.name : '(chưa đặt tên)'}</td>
+      <td style="padding:6px 8px" onclick="window.openSupDrawer('${s.id}')">${has(s.phone) ? s.phone : empty}</td>
+      <td style="padding:6px 8px">
+        <select onchange="window.supSetGroup('${s.id}',this.value)" style="padding:3px 6px;border:1px solid var(--line);border-radius:6px;font-size:11.5px">
+          <option value="">— xếp nhóm —</option>
+          <option value="si">📦 Sỉ</option>
+          <option value="le">🛵 Lẻ</option>
+        </select></td>
+      <td style="padding:6px 8px;text-align:right;color:${s.debt > 0 ? '#DC2626' : 'var(--muted)'};font-weight:${s.debt > 0 ? '700' : '400'}">${s.debt > 0 ? window.fmtShort(s.debt) : '—'}</td>
+    </tr>`).join('');
 
-    if (window.attachBulkOps) {
-      window.attachBulkOps({
-        tableSelector: '#' + host.id,
-        store: 'suppliers',
-        label: 'NCC',
-        actions: {
-          changeStatus: {
-            label: '🔄 Đổi điều khoản',
-            field: 'paymentTerm',
-            options: ['COD', 'NET 7', 'NET 14', 'NET 30']
-          }
-        }
-      });
-    }
+    document.getElementById('supList').innerHTML = `
+      <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(340px,1fr));gap:14px;align-items:start">
+        ${table('supTblSi', '📦 NHÀ CUNG CẤP SỈ', 'Giao cả lô theo tổng — kho tự chia', '#1E40AF', '#EFF6FF', si)}
+        ${table('supTblLe', '🛵 NHÀ CUNG CẤP LẺ', 'Chia mô sẵn theo từng khách', '#15803D', '#F0FDF4', le)}
+      </div>
+      ${other.length ? `<details ${showOff ? 'open' : ''} style="margin-top:14px">
+        <summary style="cursor:pointer;font-size:12.5px;font-weight:700;color:#92400E">⚠ ${other.length} nhà chưa xếp nhóm hoặc đã ngừng nhập — bấm để xem</summary>
+        <div style="border:1px solid #FDE68A;border-radius:10px;background:#FFFBEB;margin-top:8px;overflow:auto">
+          <table class="mini-table" style="width:100%;border-collapse:collapse;font-size:12.5px">
+            <thead><tr style="background:#FEF9E7">
+              <th style="width:34px;padding:6px 8px;text-align:right;color:var(--muted)">#</th>
+              <th style="text-align:left;padding:6px 8px">Tên nhà cung cấp</th>
+              <th style="text-align:left;padding:6px 8px;width:118px">SĐT</th>
+              <th style="text-align:left;padding:6px 8px;width:130px">Xếp vào nhóm</th>
+              <th style="text-align:right;padding:6px 8px;width:86px">Công nợ</th>
+            </tr></thead><tbody>${otherRows}</tbody>
+          </table>
+        </div>
+      </details>` : ''}`;
 
-    /* Inline edit (click cell = sửa nhanh) */
+    /* Sửa nhanh tên / SĐT ngay trên lưới */
     if (window.attachInlineEdit) {
-      window.attachInlineEdit('#' + host.id, {
+      ['#supTblSi', '#supTblLe'].forEach(sel => window.attachInlineEdit(sel, {
         store: 'suppliers',
-        fields: {
-          name:        { type: 'text', format: (v, row) => `${v} ${row?.active ? '' : '<span style="color:var(--muted);font-weight:500;font-size:11px">· Ngưng</span>'}` },
-          contact:     { type: 'text' },
-          phone:       { type: 'text' },
-          address:     { type: 'text' },
-          paymentTerm: { type: 'select',
-                         options: () => ['COD', 'NET 7', 'NET 14', 'NET 30'],
-                         format: v => v },
-        }
-      });
+        fields: { name: { type: 'text' }, phone: { type: 'text' } },
+      }));
     }
   }
+
+  /* Xếp NCC vào nhóm Sỉ / Lẻ ngay trên lưới (ghi kv supplierMeta, không đụng bảng suppliers) */
+  window.supSetGroup = function (id, type) {
+    if (!type) return;
+    saveSupplyMeta(id, { type, status: 'active' });
+    const s = getSup().find(x => x.id === id);
+    window.toast(`✓ ${s ? s.name : id} → nhóm ${type === 'si' ? 'SỈ' : 'LẺ'}`, 'success');
+    render();
+  };
 
   window.openSupDrawer = function (id) {
     const s = getSup().find(x => x.id === id);
     if (!s) return;
     const pur = getPur().filter(p => p.supplierId === id);
-    const drawer = document.getElementById('drawer');
+    const typ = supplyTypeOf(s.id);
+    const paused = supplyStatusOf(s.id) === 'paused';
+    const prods = s.products || [];
     const dc = document.getElementById('drawerContent');
+
+    /* CHỈ hiện: tên · SĐT · công nợ · sản phẩm cung cấp.
+       Địa chỉ, người liên hệ, điều khoản TT, tổng chi, ghi chú → ẩn (vẫn còn trong DB, sửa ở form). */
     dc.innerHTML = `
       <div style="background:linear-gradient(135deg,${window.avatarColor(s.id)} 0%,#1B5E20 100%);color:#fff;padding:20px;position:relative">
-        <button onclick="closeDrawer()" style="position:absolute;top:14px;right:14px;background:rgba(255,255,255,0.15);border:none;color:#fff;width:30px;height:30px;border-radius:6px;cursor:pointer">✕</button>
+        <button onclick="closeDrawer()" style="position:absolute;top:14px;right:14px;background:rgba(255,255,255,.15);border:none;color:#fff;width:30px;height:30px;border-radius:6px;cursor:pointer">✕</button>
         <div style="display:flex;align-items:center;gap:12px">
-          <div style="width:54px;height:54px;border-radius:11px;background:rgba(255,255,255,0.2);display:grid;place-items:center;font-size:22px;font-weight:800">${window.initials(s.name)}</div>
-          <div>
-            <h2 style="margin:0;font-size:18px">${s.name}</h2>
-            <div style="opacity:0.85;font-size:12.5px;margin-top:2px">${s.id} · ${s.contact} · ${s.phone}</div>
+          <div style="width:54px;height:54px;border-radius:11px;background:rgba(255,255,255,.2);display:grid;place-items:center;font-size:22px;font-weight:800">${window.initials(s.name)}</div>
+          <div style="min-width:0">
+            <h2 style="margin:0;font-size:18px;line-height:1.25">${s.name}</h2>
+            <div style="opacity:.9;font-size:13px;margin-top:3px">📞 ${s.phone || '— chưa có số'}</div>
           </div>
         </div>
+        <div style="display:flex;gap:6px;margin-top:12px;flex-wrap:wrap">
+          <span style="background:rgba(255,255,255,.2);border-radius:20px;padding:2px 10px;font-size:11.5px;font-weight:700">${typ === 'si' ? '📦 Sỉ' : typ === 'le' ? '🛵 Lẻ' : '⚠ Chưa xếp nhóm'}</span>
+          ${paused ? '<span style="background:rgba(220,38,38,.55);border-radius:20px;padding:2px 10px;font-size:11.5px;font-weight:700">Ngừng nhập</span>' : ''}
+        </div>
       </div>
+
       <div style="padding:18px 20px">
-        <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:14px">
-          <div style="padding:10px;background:#F0FDF4;border-radius:8px"><div style="font-size:11px;color:var(--muted);text-transform:uppercase;font-weight:700">Lifetime Spend</div><div style="font-size:16px;font-weight:800;color:var(--ok)">${window.fmt(s.totalSpend)} ₫</div></div>
-          <div style="padding:10px;background:${s.debt>0?'#FEE2E2':'#F0FDF4'};border-radius:8px"><div style="font-size:11px;color:var(--muted);text-transform:uppercase;font-weight:700">Công nợ phải trả ${window.helpTip('Tiền bạn còn nợ NCC này (chưa thanh toán phiếu nhập NET).')}</div><div style="font-size:16px;font-weight:800;color:${s.debt>0?'#DC2626':'var(--ok)'}">${s.debt ? window.fmt(s.debt) + ' ₫' : '— Hết nợ'}</div></div>
+        <div style="padding:12px 14px;border-radius:9px;background:${s.debt > 0 ? '#FEE2E2' : '#F0FDF4'};border:1px solid ${s.debt > 0 ? '#FECACA' : '#BBF7D0'};margin-bottom:16px">
+          <div style="font-size:11px;color:var(--muted);text-transform:uppercase;font-weight:700">Công nợ phải trả ${window.helpTip('Tiền bạn còn nợ NCC này (phiếu nhập NET chưa thanh toán).')}</div>
+          <div style="font-size:21px;font-weight:800;color:${s.debt > 0 ? '#DC2626' : 'var(--ok)'};margin-top:2px">${s.debt > 0 ? window.fmt(s.debt) + ' ₫' : '— Hết nợ'}</div>
         </div>
 
-        <h3 style="margin:14px 0 8px;font-size:12px;color:var(--muted);text-transform:uppercase;letter-spacing:0.5px">📋 Thông tin chi tiết</h3>
-        <div style="background:#FAFBFC;padding:12px;border-radius:8px;font-size:13px;line-height:1.7">
-          <div><b>Địa chỉ:</b> ${s.address}</div>
-          <div><b>Điều khoản TT:</b> <span class="tag" style="background:#DBEAFE;color:#1E40AF">${s.paymentTerm}</span> ${window.helpTip('COD = trả ngay khi nhận hàng. NET X = thanh toán trong X ngày.')}</div>
-          <div><b>Trạng thái nhập:</b> <span class="tag" style="background:${supplyStatusOf(s.id)==='paused'?'#FEE2E2':'#DCFCE7'};color:${supplyStatusOf(s.id)==='paused'?'#B91C1C':'#15803D'};font-weight:700">${ST_LABEL[supplyStatusOf(s.id)]}</span> ${window.helpTip('Ngừng nhập = ẩn khỏi lệnh gọi hàng của Kho, vẫn giữ lịch sử và công nợ.')}</div>
-          <div><b>Loại cung cấp:</b> <span class="tag" style="background:#FEF3C7;color:#92400E;font-weight:700">${TYPE_LABEL[supplyTypeOf(s.id)]}</span> <span style="color:var(--muted);font-size:12px">${TYPE_DESC[supplyTypeOf(s.id)]}</span></div>
-          <div><b>Ghi chú:</b> ${s.note || '—'}</div>
-        </div>
-
-        <h3 style="margin:18px 0 8px;font-size:12px;color:var(--muted);text-transform:uppercase;letter-spacing:0.5px">🥬 Sản phẩm cung cấp (${(s.products||[]).length})</h3>
-        <div style="background:#FAFBFC;border-radius:8px;overflow:hidden">
-          ${(s.products||[]).length ? (s.products||[]).map(p => `<div style="display:flex;align-items:center;gap:10px;padding:9px 12px;border-bottom:1px solid #F1F5F9;font-size:12.5px">
+        <h3 style="margin:0 0 8px;font-size:12px;color:var(--muted);text-transform:uppercase;letter-spacing:.5px">🥬 Sản phẩm cung cấp (${prods.length})</h3>
+        <div style="border:1px solid var(--line);border-radius:9px;overflow:hidden">
+          ${prods.length ? prods.map(p => `<div style="display:flex;align-items:center;gap:10px;padding:9px 12px;border-bottom:1px solid #F1F5F9;font-size:12.5px">
             <span style="flex:1"><b>${p.name}</b></span>
-            <span style="color:${p.price?'var(--navy)':'var(--muted)'};font-weight:${p.price?'700':'400'}">${p.price?window.fmt(p.price)+' ₫':'— chưa có giá nhập'}</span>
-          </div>`).join('') : '<div style="padding:14px;text-align:center;color:var(--muted);font-size:12px">Chưa gán sản phẩm — bấm "✏️ Sửa NCC" để chọn SP cung cấp</div>'}
+            <span style="color:${p.price ? 'var(--navy)' : 'var(--muted)'};font-weight:${p.price ? '700' : '400'};white-space:nowrap">${p.price ? window.fmt(p.price) + ' ₫' : '— chưa có giá'}</span>
+          </div>`).join('') : '<div style="padding:16px;text-align:center;color:var(--muted);font-size:12px">Chưa gán sản phẩm — bấm “✏️ Sửa NCC” để chọn</div>'}
         </div>
 
-        <h3 style="margin:18px 0 8px;font-size:12px;color:var(--muted);text-transform:uppercase;letter-spacing:0.5px">📦 Lịch sử nhập hàng (${pur.length})</h3>
-        <div style="background:#FAFBFC;border-radius:8px;overflow:hidden">
-          ${pur.length ? pur.map(p => `<a href="purchases.html?focus=${p.id}" style="display:flex;align-items:center;gap:10px;padding:10px 12px;border-bottom:1px solid #F1F5F9;text-decoration:none;color:inherit;font-size:12.5px">
-            <div style="flex:1"><b>${p.id}</b><div style="font-size:11px;color:var(--muted)">${p.date} · ${(p.items||[]).length} mặt hàng · ${p.status==='received'?'✓ Đã nhận':'⏳ Đang chờ'}</div></div>
-            <div style="font-weight:700;color:var(--navy)">${window.fmt(p.total)} ₫</div>
-          </a>`).join('') : '<div style="padding:20px;text-align:center;color:var(--muted);font-size:12px">Chưa có phiếu nhập nào</div>'}
-        </div>
+        <details style="margin-top:14px">
+          <summary style="cursor:pointer;font-size:12px;color:var(--muted);font-weight:600">📦 Lịch sử nhập hàng (${pur.length})</summary>
+          <div style="border:1px solid var(--line);border-radius:9px;overflow:hidden;margin-top:8px">
+            ${pur.length ? pur.map(p => `<a href="purchases.html?focus=${p.id}" style="display:flex;align-items:center;gap:10px;padding:10px 12px;border-bottom:1px solid #F1F5F9;text-decoration:none;color:inherit;font-size:12.5px">
+              <div style="flex:1"><b>${p.id}</b><div style="font-size:11px;color:var(--muted)">${p.date} · ${(p.items || []).length} mặt hàng · ${p.status === 'received' ? '✓ Đã nhận' : '⏳ Đang chờ'}</div></div>
+              <div style="font-weight:700;color:var(--navy)">${window.fmt(p.total)} ₫</div>
+            </a>`).join('') : '<div style="padding:16px;text-align:center;color:var(--muted);font-size:12px">Chưa có phiếu nhập nào</div>'}
+          </div>
+        </details>
 
         <div style="display:flex;gap:8px;margin-top:18px">
           <button class="btn btn-ghost" style="flex:1" onclick="window.openSupModal('${s.id}')">✏️ Sửa NCC</button>
           <button class="btn btn-primary" style="flex:1" onclick="${window.openPurForSup ? `window.openPurForSup('${s.id}')` : `window.location.href='purchases.html?createForSup=${s.id}'`}">+ Tạo phiếu nhập</button>
         </div>
-        ${s.debt > 0 ? `<button class="btn btn-ghost" style="width:100%;margin-top:8px;color:var(--ok)" onclick="window.paySupplier('${s.id}')">💰 Ghi thanh toán NCC ${window.helpTip('Mở phiếu chi để trả NCC này — số dư công nợ sẽ giảm tương ứng.')}</button>` : ''}
-      </div>
-    `;
-    drawer.classList.add('open');
+        ${s.debt > 0 ? `<button class="btn btn-ghost" style="width:100%;margin-top:8px;color:var(--ok)" onclick="window.paySupplier('${s.id}')">💰 Ghi thanh toán NCC</button>` : ''}
+      </div>`;
+    document.getElementById('drawer').classList.add('open');
     document.getElementById('drawerBg').classList.add('open');
   };
 
@@ -397,7 +427,7 @@
   );
   document.getElementById('hbTitle').innerHTML = window.helpTip('NCC khác Khách hàng: NCC là người bán cho mình, KH là người mua từ mình. Mã NCC bắt đầu bằng NCC.', {size:'lg'});
 
-  ['supQ','supCat','supStatus'].forEach(id => document.getElementById(id).oninput = render);
+  ['supQ', 'supShowOff'].forEach(id => { const el = document.getElementById(id); if (el) el.oninput = el.onchange = render; });
   ['suppliers','purchases'].forEach(k => window.STORE.subscribe(k, render));
   /* Preload SẢN PHẨM (cho bộ chọn SP trong form NCC) — lấy từ module Sản phẩm & Giá.
      Gọi sớm để cloud sync xong trước khi user mở form. */

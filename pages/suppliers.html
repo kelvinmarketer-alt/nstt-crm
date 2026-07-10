@@ -160,24 +160,12 @@
         <button class="btn btn-primary" onclick="window.openSupModal()">+ Thêm NCC</button>
       </div>
       <div id="hbHost"></div>
-      <div style="display:grid;grid-template-columns:repeat(4,1fr);gap:10px;margin-bottom:14px" id="supKpis"></div>
-      <div style="display:flex;gap:10px;margin-bottom:10px;flex-wrap:wrap">
-        <input id="supQ" placeholder="🔍 Tìm NCC, liên hệ, SĐT..." style="flex:1;min-width:240px;border:1px solid var(--line);border-radius:7px;padding:7px 11px;font-size:13px">
-        <select id="supCat" style="border:1px solid var(--line);border-radius:7px;padding:7px 11px;font-size:13px">
-          <option value="">Tất cả nhóm hàng</option>
-          <option value="rau-cu">Rau củ</option>
-          <option value="rau-la">Rau lá</option>
-          <option value="rau-dalat">Rau Đà Lạt</option>
-          <option value="nam">Nấm</option>
-          <option value="rau-vung-mien">Rau vùng miền</option>
-          <option value="rau-gia-vi">Rau gia vị</option>
-          <option value="hoa-qua">Hoa quả</option>
-        </select>
-        <select id="supStatus" style="border:1px solid var(--line);border-radius:7px;padding:7px 11px;font-size:13px">
-          <option value="">Tất cả</option>
-          <option value="active">Đang hợp tác</option>
-          <option value="inactive">Ngưng</option>
-        </select>
+      <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(200px,1fr));gap:10px;margin-bottom:14px" id="supKpis"></div>
+      <div style="display:flex;gap:10px;margin-bottom:12px;flex-wrap:wrap;align-items:center">
+        <input id="supQ" placeholder="🔍 Tìm theo tên hoặc số điện thoại…" style="flex:1;min-width:240px;border:1px solid var(--line);border-radius:7px;padding:8px 12px;font-size:13px">
+        <label style="display:flex;align-items:center;gap:6px;font-size:12.5px;color:var(--muted);cursor:pointer;white-space:nowrap">
+          <input type="checkbox" id="supShowOff" style="cursor:pointer"> Mở sẵn nhóm chưa xếp / ngừng nhập
+        </label>
       </div>
       <div id="supList"></div>
     </div>
