@@ -455,6 +455,8 @@
   /* Tab trong màn phiên gom: 'assign' = gán NCC theo mã · 'order' = đặt hàng theo NCC.
      Giữ qua các lần re-render (bấm chip → render lại vẫn ở tab đang xem). */
   let _pcDetailTab = 'assign';
+  let _pcAddSupKey = null;   /* line.key đang mở ô "thêm NCC" gọn — null = không mở ô nào */
+  let _pcAddSupFocus = false; /* chỉ tự focus ô nhập 1 lần lúc mới mở (tránh giật focus khi re-render vì thao tác mã khác) */
   window.pcDetailTab = function (tab) {
     _pcDetailTab = (tab === 'order') ? 'order' : 'assign';
     document.querySelectorAll('.pc-dpane').forEach(p => { p.style.display = (p.dataset.dpane === _pcDetailTab) ? 'block' : 'none'; });
@@ -474,7 +476,7 @@
     const runs = getRuns();
     const run = normalizeRun(runs.find(r => r.id === runId));
     if (!run) return;
-    if (window._pcActiveRun !== runId) _pcDetailTab = 'assign';   /* mở phiên KHÁC → về tab Gán NCC (giữ tab khi re-render cùng phiên) */
+    if (window._pcActiveRun !== runId) { _pcDetailTab = 'assign'; _pcAddSupKey = null; }   /* mở phiên KHÁC → về tab Gán NCC + đóng ô thêm NCC */
     saveRuns(runs);  /* lưu migration allocations nếu có */
     const sups = getSuppliers().filter(s => s.active !== false);
     const supDL = `<datalist id="pcSupDL">${sups.map(s => `<option value="${esc(s.name)}">`).join('')}</datalist>`;
@@ -541,16 +543,29 @@
           <div style="flex:1;min-width:120px"><b style="font-size:13px">${esc(l.name)}</b> <span style="color:var(--muted);font-size:12px">· ${fmtQty(l.totalQty)} ${l.unit}</span></div>
           <span class="tag" style="background:${okAlloc ? '#DCFCE7' : '#FEF3C7'};color:${okAlloc ? '#15803D' : '#B45309'};font-weight:700;font-size:10.5px;white-space:nowrap">${okAlloc ? '✓ đủ' : `còn ${fmtQty(remain)} ${l.unit}`}</span>
         </div>`;
-      /* ===== CHIP chọn NCC (chỉ NCC bán mã này) + nút ⚙ chi tiết ===== */
+      /* ===== CHIP chọn NCC (1 chạm) · ＋ thêm NCC gõ tên · ⚙ chi tiết ===== */
       if (!_isDoneRun(run)) {
-        if (cands.length) {
+        if (_pcAddSupKey === l.key) {
+          /* Ô THÊM NCC gọn — 1 việc duy nhất: gõ tên → Lưu. Không lẫn qty/giao thực/ghi chú. */
+          body += `<div style="margin-top:8px;background:#EFF6FF;border:1px solid #BFDBFE;border-radius:10px;padding:10px 12px">
+            <div style="font-size:11.5px;color:#1D4ED8;font-weight:700;margin-bottom:7px">🏭 Nhà cung cấp cho «${esc(l.name)}»</div>
+            <div style="display:flex;gap:7px;align-items:center;flex-wrap:wrap">
+              <input id="pcAddSup_${l.key}" list="pcSupDL" placeholder="Gõ tên NCC…" autocomplete="off"
+                onkeydown="if(event.key==='Enter'){event.preventDefault();window.pcConfirmAddSup('${run.id}','${l.key}')}else if(event.key==='Escape'){window.pcCancelAddSup('${run.id}')}"
+                style="flex:1;min-width:160px;font-size:13.5px;border:1.5px solid #93C5FD;border-radius:8px;padding:8px 12px;background:#fff;outline:none">
+              <button onclick="window.pcConfirmAddSup('${run.id}','${l.key}')" style="border:none;background:#15803D;color:#fff;border-radius:8px;padding:8px 16px;font-size:13px;font-weight:700;cursor:pointer">✓ Lưu</button>
+              <button onclick="window.pcCancelAddSup('${run.id}')" style="border:1px solid #D1D5DB;background:#fff;color:#6B7280;border-radius:8px;padding:8px 13px;font-size:13px;cursor:pointer">Huỷ</button>
+            </div>
+            <div style="font-size:10.5px;color:#64748B;margin-top:6px">↵ Enter để lưu · gõ tên có sẵn để chọn nhanh, tên mới sẽ tự tạo NCC.</div>
+          </div>`;
+        } else if (cands.length) {
           body += `<div style="display:flex;gap:6px;flex-wrap:wrap;align-items:center;margin-top:7px">
             ${cands.map(c => { const on = pickedIds.has(c.id);
               return `<button onclick="window.pcPickAllocSup('${run.id}','${l.key}','${c.id}')" title="Gán ${esc(c.name)} (1 chạm)"
                 style="display:inline-flex;align-items:center;gap:5px;border:1.5px solid ${on ? '#15803D' : '#D1D5DB'};background:${on ? '#DCFCE7' : '#fff'};color:${on ? '#166534' : '#374151'};border-radius:16px;padding:4px 11px;font-size:12px;cursor:pointer;font-weight:${on ? '700' : '500'}">
                 ${on ? '✓ ' : ''}${esc(c.name)}${c.isDefault ? '<span title="NCC quen của mã này" style="font-size:9px;color:#fff;background:#15803D;border-radius:5px;padding:0 5px;line-height:1.7">quen</span>' : ''}${c.price ? `<span style="font-size:10px;color:#6B7280">${money(c.price)}₫</span>` : ''}<span style="font-size:9px;color:#fff;background:${c.type === 'si' ? '#2563EB' : c.type === 'le' ? '#D97706' : '#64748B'};border-radius:5px;padding:0 5px;line-height:1.7">${TYPE_LABEL[c.type]}</span></button>`;
             }).join('')}
-            <button onclick="window.pcRevealFreeSup('${run.id}','${l.key}')" title="NCC khác ngoài danh sách" style="border:1px dashed #9CA3AF;background:#fff;color:#6B7280;border-radius:16px;padding:4px 9px;font-size:11.5px;cursor:pointer">＋ khác</button>
+            <button onclick="window.pcStartAddSup('${run.id}','${l.key}')" title="NCC khác ngoài danh sách" style="border:1px dashed #9CA3AF;background:#fff;color:#6B7280;border-radius:16px;padding:4px 11px;font-size:11.5px;cursor:pointer">＋ NCC khác</button>
             <div style="flex:1;min-width:6px"></div>
             <button onclick="window.pcToggleAdv(this)" style="border:none;background:none;color:#2563EB;font-size:11px;cursor:pointer;white-space:nowrap" title="Chia 2 NCC · báo thiếu · xem chia khách">⚙ ${showAdv ? 'thu gọn ▲' : 'chi tiết ▾'}</button>
           </div>`;
@@ -558,7 +573,7 @@
           body += `<div style="display:flex;gap:8px;flex-wrap:wrap;align-items:center;margin-top:7px">
             <span style="display:inline-flex;align-items:center;gap:6px;background:#FEF3C7;border:1px solid #FCD34D;color:#92400E;border-radius:16px;padding:4px 12px;font-size:12px;font-weight:700">🛒 Thu mua ngoài</span>
             <span style="font-size:11px;color:var(--muted)">chưa NCC nào bán mã này — kho tự đi mua</span>
-            <button onclick="window.pcRevealFreeSup('${run.id}','${l.key}')" style="border:1px dashed #9CA3AF;background:#fff;color:#6B7280;border-radius:16px;padding:3px 9px;font-size:11.5px;cursor:pointer">＋ có NCC? gõ tên</button>
+            <button onclick="window.pcStartAddSup('${run.id}','${l.key}')" style="border:1px dashed #9CA3AF;background:#fff;color:#6B7280;border-radius:16px;padding:3px 11px;font-size:11.5px;cursor:pointer">＋ có NCC? gõ tên</button>
           </div>`;
         }
       }
@@ -601,7 +616,6 @@
       return `<div class="sup-block" style="margin-bottom:12px">
         <div class="hd">${isLe ? '🛵' : '📦'} ${esc(b.name)} <span style="opacity:.85;font-weight:400;font-size:11px">${TYPE_LABEL[typ]} · ${b.items.length} mã · ${fmtQty(b.kg)}kg${b.cost ? ' · ' + money(b.cost) + '₫' : ''}</span>
           <div style="flex:1"></div>
-          <button class="btn btn-ghost btn-sm" style="background:rgba(255,255,255,.2);color:#fff;border:none" onclick="window.pcPrintSupReq('${run.id}','${b.id}')">🖨 In</button>
           <button class="btn btn-ghost btn-sm" style="background:rgba(255,255,255,.2);color:#fff;border:none" onclick="window.pcCopySupReq('${run.id}','${b.id}')">📋 Copy cú pháp</button>
         </div>
         <div style="padding:8px 12px">
@@ -630,8 +644,7 @@
         <div class="sup-block" style="margin-bottom:12px;border:1px solid #FDE68A">
           <div class="hd" style="background:linear-gradient(135deg,#B45309,#D97706)">🛒 Danh sách thu mua ngoài <span style="opacity:.85;font-weight:400;font-size:11px">${extData.lines.length} mã · ${fmtQty(extKg)}kg</span>
             <div style="flex:1"></div>
-            <button class="btn btn-ghost btn-sm" style="background:rgba(255,255,255,.2);color:#fff;border:none" onclick="window.pcPrintExtReq('${run.id}')">🖨 In phiếu</button>
-            <button class="btn btn-ghost btn-sm" style="background:rgba(255,255,255,.2);color:#fff;border:none" onclick="window.pcCopyExtReq('${run.id}')">📋 Copy Zalo</button>
+            <button class="btn btn-ghost btn-sm" style="background:rgba(255,255,255,.2);color:#fff;border:none" onclick="window.pcCopyExtReq('${run.id}')">📋 Copy danh sách</button>
           </div>
           <div style="padding:8px 12px">
           ${extData.lines.map(it => `<div style="font-size:12px;padding:3px 0;border-bottom:1px dashed #EEF2F0">
@@ -651,7 +664,7 @@
       /* Phiên đã chốt (xem lại từ Lịch sử) — không cho chốt lại, chỉ xem + in phiếu NCC */
       body += `<div style="position:sticky;bottom:0;background:#fff;padding-top:10px;border-top:1px solid var(--line)">
         <div style="background:#F0FDF4;border:1px solid #BBF7D0;border-radius:8px;padding:10px 12px;font-size:12px;color:#15803D">
-          ✓ <b>Phiên đã chốt &amp; phân bổ</b>${run.confirmedAt ? ' lúc ' + new Date(run.confirmedAt).toLocaleString('vi-VN') : ''}. Xem lại phân bổ + in phiếu NCC ở trên. Xuất kho → giao shipper ở <b>bước ③</b>.
+          ✓ <b>Phiên đã chốt &amp; phân bổ</b>${run.confirmedAt ? ' lúc ' + new Date(run.confirmedAt).toLocaleString('vi-VN') : ''}. Xem lại phân bổ + copy cú pháp gọi hàng ở trên. Xuất kho → giao shipper ở <b>bước ③</b>.
         </div>
       </div>
     </div>`;
@@ -668,10 +681,12 @@
     if (dc) dc.innerHTML = body;
     window._pcActiveRun = runId;
     document.querySelectorAll('.run-card[data-runid]').forEach(c => c.classList.toggle('pc-sel', c.dataset.runid === runId));
+    if (_pcAddSupKey && _pcAddSupFocus) { const _ai = document.getElementById('pcAddSup_' + _pcAddSupKey); if (_ai) { _ai.focus(); _ai.select && _ai.select(); } _pcAddSupFocus = false; }
   };
 
   window.pcCloseDetail = function () {
     window._pcActiveRun = null;
+    _pcAddSupKey = null;
     const dc = document.getElementById('pcRunDetail');
     if (dc) dc.innerHTML = `<div class="pc-detail-empty">← Chọn một phiên gom bên trái để gán NCC & xác nhận hàng.</div>`;
     document.querySelectorAll('.run-card[data-runid]').forEach(c => c.classList.remove('pc-sel'));
@@ -809,6 +824,39 @@
     if (!Array.isArray(l.allocations) || !l.allocations.length) {
       l.allocations = [{ supplierId: '', supplierName: '', qty: l.totalQty, unitCost: 0, confirmedQty: null }];
     } else { const a = l.allocations[0]; a.supplierId = ''; a.supplierName = ''; }
+    saveRuns(runs); window.pcOpenRun(runId);
+  };
+  /* ===== Ô "Thêm NCC" gọn (1 việc: gõ tên → Lưu) — tách khỏi pane chi tiết cho dễ nhìn ===== */
+  window.pcStartAddSup = function (runId, key) {
+    const runs = getRuns(); const run = runs.find(r => r.id === runId); if (!run) return;
+    readConfirmInputs(run); saveRuns(runs);   /* giữ ghi chú/lý do đang gõ trước khi re-render */
+    _pcAddSupKey = key; _pcAddSupFocus = true;
+    window.pcOpenRun(runId);
+  };
+  window.pcCancelAddSup = function (runId) {
+    _pcAddSupKey = null;
+    window.pcOpenRun(runId);
+  };
+  window.pcConfirmAddSup = function (runId, key) {
+    const inp = document.getElementById('pcAddSup_' + key);
+    const name = inp ? String(inp.value || '').trim() : '';
+    if (!name) { inp && inp.focus(); window.toast && window.toast('Nhập tên nhà cung cấp', 'warn'); return; }
+    const runs = getRuns(); const run = runs.find(r => r.id === runId); if (!run) return;
+    readConfirmInputs(run);
+    const l = _line(run, key); if (!l) return;
+    const s = resolveOrCreateSupplier(name);
+    if (!s) { window.toast && window.toast('Không tạo được NCC', 'error'); return; }
+    const p = (s.products || []).find(pp => (l.productId && pp.id === l.productId) || norm(pp.name) === norm(l.name));
+    const price = p ? (+p.price || 0) : 0;
+    if (!Array.isArray(l.allocations) || !l.allocations.length) {
+      l.allocations = [{ supplierId: s.id, supplierName: s.name, qty: l.totalQty, unitCost: price, confirmedQty: null }];
+    } else {
+      const a = l.allocations[0];
+      a.supplierId = s.id; a.supplierName = s.name; a.unitCost = price;
+      if (!(+a.qty > 0)) a.qty = l.totalQty;
+    }
+    rememberSup(l.productId, s.id);   /* ghi nhớ → lần gom sau tự gán mã này cho NCC vừa nhập */
+    _pcAddSupKey = null;
     saveRuns(runs); window.pcOpenRun(runId);
   };
   window.pcSetAllocQty = function (runId, key, ai, val) {
