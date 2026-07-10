@@ -126,6 +126,14 @@
     #panePur #purSt{grid-column:1;min-width:0!important;width:100%}
     #panePur #purSup{grid-column:2;min-width:0!important;width:100%}
   }
+
+    /* Accordion nhà cung cấp */
+    details.sup-acc > summary::-webkit-details-marker { display: none; }
+    details.sup-acc > summary { list-style: none; }
+    details.sup-acc > summary:hover { background: #F6F9F5; }
+    details.sup-acc[open] > summary { background: #F2F7F1; }
+    details.sup-acc[open] .sup-caret { transform: rotate(90deg); }
+    details.sup-acc .sup-caret { display: inline-block; transition: transform .15s }
 </style>
 </head>
 <body>
