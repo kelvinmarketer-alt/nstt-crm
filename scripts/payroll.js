@@ -172,6 +172,7 @@
     document.getElementById('payTabs').innerHTML =
       `<div class="rpt-tab ${tab === 'attend' ? 'active' : ''}" onclick="window.setPayTab('attend')">📅 Chấm công</div>` +
       `<div class="rpt-tab ${tab === 'calendar' ? 'active' : ''}" onclick="window.setPayTab('calendar')">🗓️ Lịch công</div>` +
+      `<div class="rpt-tab ${tab === 'duty' ? 'active' : ''}" onclick="window.setPayTab('duty')">🏭 Lịch trực kho</div>` +
       `<div class="rpt-tab ${tab === 'bonus' ? 'active' : ''}" onclick="window.setPayTab('bonus')">🎁 Thưởng hỗ trợ</div>` +
       `<div class="rpt-tab ${tab === 'payroll' ? 'active' : ''}" onclick="window.setPayTab('payroll')">💰 Bảng lương</div>`;
     document.getElementById('payMonth').value = month;
@@ -186,11 +187,12 @@
     }
     if (tab === 'attend') renderAttend();
     else if (tab === 'calendar') renderCalendar();
+    else if (tab === 'duty') { if (window.KHODUTY) window.KHODUTY.renderDutyTab(month); }
     else if (tab === 'bonus') { if (window.BONUS) window.BONUS.setBonusMonth(month); }
     else renderPayroll();
   }
   window.setPayTab = t => { tab = t; render(); };
-  window.setPayMonth = m => { month = m; if (window.BONUS) window.BONUS.setBonusMonth(m); render(); };
+  window.setPayMonth = m => { month = m; if (window.BONUS) window.BONUS.setBonusMonth(m); if (window.KHODUTY) window.KHODUTY.setMonth(m); render(); };
   /* Expose để batch submit gọi refresh không cần reload */
   window.renderPayrollPublic = () => { if (tab === 'payroll') renderPayroll(); else render(); };
 
@@ -908,8 +910,10 @@
       /* Thưởng hỗ trợ = tính theo QUY CHẾ phủ ngày từng khoản. Nhưng phiếu ĐÃ nộp/duyệt/trả
          thì GIỮ số đã chốt trên phiếu (sửa quy chế sau này không làm đổi lương đã duyệt). */
       const _liveHelper = window.BONUS ? (window.BONUS.helperFor(s.id, month).total || 0) : 0;
-      const helperBonus = (ps && ps.status && ps.status !== 'draft' && typeof ps.helperBonus === 'number')
-        ? ps.helperBonus : _liveHelper;
+      /* Phiếu ĐÃ nộp/duyệt/trả → LUÔN dùng số đã chốt trên phiếu (thiếu field ⇒ 0).
+         Không dùng `typeof === 'number'` nữa: phiếu cũ có helperBonus = null sẽ rơi về số LIVE,
+         nghĩa là sửa quy chế / lịch trực làm đổi lương đã duyệt. */
+      const helperBonus = (ps && ps.status && ps.status !== 'draft') ? (+ps.helperBonus || 0) : _liveHelper;
 
       /* Dùng CHUNG engine với phiếu lương → bảng & phiếu KHÔNG BAO GIỜ lệch số.
          Chưa lập phiếu → dựng input tạm từ hồ sơ NV + chấm công để XEM TRƯỚC
@@ -1612,7 +1616,8 @@
     window.STORE.subscribe('timesheet', render);
     window.STORE.subscribe('payrollExtra', () => { if (tab === 'payroll') renderPayroll(); });
     window.STORE.subscribe('bonusLog', () => { if (tab === 'bonus' || tab === 'payroll') render(); });
-    window.STORE.subscribe('bonusRules', () => { if (tab === 'bonus' || tab === 'payroll') render(); });
+    window.STORE.subscribe('bonusRules', () => { if (tab === 'bonus' || tab === 'payroll' || tab === 'duty') render(); });
+    window.STORE.subscribe('khoDuty', () => { if (tab === 'duty' || tab === 'bonus' || tab === 'payroll') render(); });
     /* Trang Nhân sự gộp (HR_MERGED) → staff.js đã dựng shell, KHÔNG gọi lại renderAppShell */
     if (!window.HR_MERGED) window.renderAppShell('payroll', 'Chấm công & Lương');
     render();

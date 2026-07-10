@@ -88,19 +88,21 @@
         ? ` <span style="opacity:.8">= ${f(x.fuel)} tiền xăng + ${f(x.wear)} hao mòn xe</span>` : ''}</div>`);
     }
 
-    if (x.workStandard > 0) {
-      rows.push(`<div>🧮 Chia theo công: <b>${f(x.monthly)}</b> ÷ <b>${x.workStandard}</b> <span style="opacity:.7">(công chuẩn)</span> × <b>${x.workActual}</b> <span style="opacity:.7">(công thực tế)</span> = <b style="color:#1E40AF">${f(x.amount)} ₫</b></div>`);
-      rows.push(`<div style="opacity:.75">≈ ${f(x.perDay)} ₫ / 1 công${x.isShip ? ' (xăng + hao mòn)' : ''}</div>`);
-    } else {
+    if (x.workStandard <= 0) {
       rows.push(`<div>🧮 Công chuẩn = 0 → phụ cấp <b>0 ₫</b>.</div>`);
+      return rows.join('');
     }
-
-    if (x.overCap) {
-      rows.push(`<div style="color:#B45309;margin-top:3px">⚠ Công thực tế <b>${x.workActual}</b> &gt; công chuẩn <b>${x.workStandard}</b> nên phụ cấp <b>vượt mức tháng</b> (${f(x.monthly)} ₫). Muốn chặn trần thì báo để chỉnh công thức.</div>`);
+    if (x.full) {
+      /* Đủ hoặc dư công → hưởng TRỌN mức tháng (có trần) */
+      rows.push(`<div>🧮 Công thực tế <b>${x.workActual}</b> ≥ công chuẩn <b>${x.workStandard}</b> → hưởng <b>trọn mức tháng</b> = <b style="color:#1E40AF">${f(x.amount)} ₫</b></div>`);
+      if (x.capped) {
+        rows.push(`<div style="color:#15803D;margin-top:2px">✓ Làm dư ${(x.workActual - x.workStandard).toFixed(1).replace(/\.0$/, '')} công nhưng phụ cấp <b>không cộng thêm</b> — đã chặn trần đúng mức tối đa của vị trí.</div>`);
+      }
+    } else {
+      rows.push(`<div>🧮 Thiếu công → chia theo tỉ lệ: <b>${f(x.monthly)}</b> ÷ <b>${x.workStandard}</b> <span style="opacity:.7">(công chuẩn)</span> × <b>${x.workActual}</b> <span style="opacity:.7">(công thực tế)</span> = <b style="color:#1E40AF">${f(x.amount)} ₫</b></div>`);
+      rows.push(`<div style="opacity:.75">≈ ${f(x.perDay)} ₫ / 1 công${x.isShip ? ' (xăng + hao mòn)' : ''}</div>`);
     }
-    if (x.workActual === 0) {
-      rows.push(`<div style="opacity:.75">Chưa có công thực tế → phụ cấp 0 ₫.</div>`);
-    }
+    if (x.workActual === 0) rows.push(`<div style="opacity:.75">Chưa có công thực tế → phụ cấp 0 ₫.</div>`);
     return rows.join('');
   }
 
@@ -225,8 +227,9 @@
     /* Thưởng hỗ trợ Kho/Ship (sổ ghi hàng ngày) — tính theo QUY CHẾ phủ ngày của từng khoản.
        KHOÁ phiếu đã nộp/duyệt/trả: giữ đúng tổng thưởng đã chốt, dù sau này sửa quy chế. */
     const _helper = window.BONUS ? window.BONUS.helperFor(staffId, month) : { total: 0, entries: [], noPolicy: 0 };
-    const _psLocked = p.status && p.status !== 'draft' && typeof p.helperBonus === 'number';
-    if (!_psLocked) p.helperBonus = _helper.total;
+    const _psLocked = !!(p.status && p.status !== 'draft');   /* đã chốt ⇒ giữ số cũ (thiếu field ⇒ 0) */
+    if (_psLocked) p.helperBonus = +p.helperBonus || 0;
+    else p.helperBonus = _helper.total;
     const computed = PF.computePayslip(p);
     const lateAuto = computed.lateAuto || { count: 0, total: 0, detail: [] };
     /* Phiếu lập TRƯỚC v418 chưa khai bhxhOn/commMode → giữ nguyên UI + số cũ, KHÔNG tự tính lại */
@@ -653,7 +656,7 @@
         return row;
       }).filter(x => x.amount > 0 || x.name || x.unit === 'cong');
       /* Phiếu ĐÃ nộp/duyệt/trả → giữ nguyên tổng thưởng hỗ trợ đã chốt (không tính lại theo quy chế mới) */
-      if (d.status && d.status !== 'draft' && typeof d.helperBonus === 'number') { /* giữ nguyên */ }
+      if (d.status && d.status !== 'draft') d.helperBonus = +d.helperBonus || 0;   /* đã chốt ⇒ giữ nguyên */
       else d.helperBonus = window.BONUS ? window.BONUS.helperFor(d.staffId || staffId, d.month || month).total : 0;
       return d;
     }

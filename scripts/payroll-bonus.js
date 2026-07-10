@@ -12,10 +12,12 @@
   let _uidN = 0;
   const uid = () => 'BN' + (Date.now ? '' : '') + (_uidN++) + Math.random().toString(36).slice(2, 7);
 
-  /* ===== QUY TẮC (mức thưởng) — sửa được ===== */
-  const DEFAULT_RULES = {
+  /* ===== QUY TẮC (mức thưởng) — TÁCH RIÊNG 2 KHỐI: KHO và SHIP ===== */
+  const DEFAULT_KHO = {
     khoShipTiers: [{ min: 31, max: 99, amount: 30000 }],   /* Kho hỗ trợ ship: đơn 31-99kg → 30k */
-    khoTruc: 50000,        /* Kho trực kho / buổi */
+    khoTruc: 50000,        /* Trực kho / BUỔI (sáng hoặc chiều) */
+  };
+  const DEFAULT_SHIP = {
     shipChieu: 50000,      /* Ship sáng hỗ trợ ship chiều / lần */
     shipFar: [             /* Ship đơn xa (thêm/sửa/xoá) */
       { id: 'f_lb', name: 'Lấy hàng Long Biên', amount: 120000 },
@@ -25,49 +27,88 @@
       { id: 'f_panda', name: 'Panda', amount: 20000 },
     ],
   };
+  const DEFAULT_OF = { kho: DEFAULT_KHO, ship: DEFAULT_SHIP };
+  const GROUPS = ['kho', 'ship'];
+  const GROUP_LABEL = { kho: '📦 Kho', ship: '🛵 Ship' };
+  const DEFAULT_RULES = Object.assign({}, DEFAULT_KHO, DEFAULT_SHIP);   /* chỉ dùng cho gợi ý UI */
+
   const clone = o => JSON.parse(JSON.stringify(o));
   const _pid = () => 'qc' + (_uidN++) + Math.random().toString(36).slice(2, 6);
   const _today = () => (window.todayISO ? window.todayISO() : new Date().toISOString()).slice(0, 10);
 
   /* ===== QUY CHẾ THƯỞNG — mỗi quy chế có KHOẢNG NGÀY hiệu lực =====
-     Lưu KV bonusRules = { schema:2, policies:[{id,name,from,to,rules}] }
+     Lưu KV bonusRules = { schema:3, kho:[...], ship:[...] }
+     · Kho và Ship là 2 danh sách quy chế ĐỘC LẬP (ngày hiệu lực riêng, mức riêng).
      · from/to rỗng = mở vô hạn phía đó · bao gồm cả 2 đầu (inclusive)
-     · Tiền của 1 dòng sổ ghi LUÔN tra theo quy chế phủ NGÀY của dòng đó
+     · Tiền của 1 khoản LUÔN tra theo quy chế phủ NGÀY của khoản đó
        → sửa mức hôm nay KHÔNG làm đổi tiền của các ngày thuộc quy chế cũ. */
-  function getPolicies() {
-    const raw = S().get('bonusRules', null);
-    if (raw && Array.isArray(raw.policies) && raw.policies.length) {
-      return raw.policies.map(p => ({
-        id: p.id || _pid(),
-        name: p.name || 'Quy chế',
-        from: p.from || '',
-        to: p.to || '',
-        rules: Object.assign(clone(DEFAULT_RULES), p.rules || {}),
-      }));
-    }
-    /* MIGRATE schema cũ (1 bộ mức phẳng, không có ngày) → 1 quy chế mở vô hạn 2 đầu.
-       Nhờ vậy mọi dòng sổ ghi cũ vẫn tính đúng như trước khi nâng cấp. */
-    const flat = (raw && typeof raw === 'object') ? raw : {};
-    return [{ id: 'qc_base', name: 'Quy chế gốc', from: '', to: '', rules: Object.assign(clone(DEFAULT_RULES), flat) }];
+  function _normPolicy(p, group) {
+    return {
+      id: p.id || _pid(),
+      name: p.name || 'Quy chế',
+      from: p.from || '',
+      to: p.to || '',
+      rules: Object.assign(clone(DEFAULT_OF[group]), p.rules || {}),
+    };
   }
-  function savePolicies(arr) { S().set('bonusRules', { schema: 2, policies: arr }); }
+  function getPolicies(group) {
+    group = GROUPS.indexOf(group) >= 0 ? group : 'kho';
+    const raw = S().get('bonusRules', null);
 
-  /* Quy chế áp dụng cho MỘT NGÀY. Nếu nhiều quy chế cùng phủ → lấy cái BẮT ĐẦU MUỘN NHẤT. */
-  function policyForDate(date) {
+    /* schema 3 — đã tách Kho/Ship */
+    if (raw && Array.isArray(raw[group]) && raw[group].length) {
+      return raw[group].map(p => _normPolicy(p, group));
+    }
+    /* MIGRATE schema 2 (1 danh sách chung, mỗi quy chế chứa cả mức Kho lẫn Ship)
+       → nhân đôi sang 2 khối, GIỮ NGUYÊN ngày hiệu lực + mức của từng khối.
+       Tiền tính ra không đổi một đồng nào. */
+    if (raw && Array.isArray(raw.policies) && raw.policies.length) {
+      return raw.policies.map(p => _normPolicy({
+        id: (p.id || _pid()) + '_' + group,
+        name: p.name, from: p.from, to: p.to,
+        rules: p.rules || {},
+      }, group));
+    }
+    /* MIGRATE schema 1 (1 bộ mức phẳng, không ngày) → 1 quy chế mở vô hạn 2 đầu */
+    const flat = (raw && typeof raw === 'object') ? raw : {};
+    return [_normPolicy({ id: 'qc_base_' + group, name: 'Quy chế gốc', from: '', to: '', rules: flat }, group)];
+  }
+  /* Ghi cả 2 khối (khối không truyền thì giữ nguyên bản đang có) */
+  function saveAllPolicies(map) {
+    S().set('bonusRules', {
+      schema: 3,
+      kho:  (map && map.kho)  || getPolicies('kho'),
+      ship: (map && map.ship) || getPolicies('ship'),
+    });
+  }
+  /* Nhiệm vụ nào thuộc khối quy chế nào */
+  const GROUP_OF_TASK = { 'kho-ship': 'kho', 'kho-truc': 'kho', 'ship-chieu': 'ship', 'ship-far': 'ship' };
+
+  /* Quy chế áp dụng cho MỘT NGÀY trong MỘT KHỐI. Nhiều quy chế cùng phủ → lấy cái BẮT ĐẦU MUỘN NHẤT. */
+  function policyForDate(date, group) {
     const d = String(date || '').slice(0, 10);
     if (!d) return null;
-    const hits = getPolicies().filter(p => (!p.from || d >= p.from) && (!p.to || d <= p.to));
+    const hits = getPolicies(group).filter(p => (!p.from || d >= p.from) && (!p.to || d <= p.to));
     if (!hits.length) return null;                       /* ngày trống → 0đ + cảnh báo (không tự đoán) */
     return hits.sort((a, b) => ((a.from || '') < (b.from || '') ? -1 : 1)).pop();
   }
-  function rulesForDate(date) { const p = policyForDate(date); return p ? p.rules : null; }
-  /* Mức ĐANG hiệu lực hôm nay — chỉ dùng làm gợi ý mặc định trên UI */
-  function getRules() { return rulesForDate(_today()) || clone(DEFAULT_RULES); }
-  /* Gộp danh mục "đơn xa" của MỌI quy chế → dropdown luôn chọn được;
+  function rulesForDate(date, group) { const p = policyForDate(date, group); return p ? p.rules : null; }
+  const policyForEntry = e => policyForDate(e && e.date, GROUP_OF_TASK[e && e.task]);
+  /* Mức ĐANG hiệu lực hôm nay (gộp 2 khối) — chỉ dùng làm gợi ý mặc định trên UI */
+  function getRules() {
+    return Object.assign({}, clone(DEFAULT_RULES),
+      rulesForDate(_today(), 'kho') || {}, rulesForDate(_today(), 'ship') || {});
+  }
+  /* Trực kho: mức /buổi theo quy chế KHO của ngày đó (null = ngày chưa có quy chế) */
+  function khoTrucRateOn(date) {
+    const r = rulesForDate(date, 'kho');
+    return r ? (+r.khoTruc || 0) : null;
+  }
+  /* Gộp danh mục "đơn xa" của MỌI quy chế SHIP → dropdown luôn chọn được;
      số tiền vẫn tính theo quy chế của NGÀY (id không có trong quy chế đó → 0đ). */
   function allFarList() {
     const seen = new Map();
-    getPolicies().forEach(p => (p.rules.shipFar || []).forEach(f => { if (f && f.id) seen.set(f.id, f); }));
+    getPolicies('ship').forEach(p => (p.rules.shipFar || []).forEach(f => { if (f && f.id) seen.set(f.id, f); }));
     return Array.from(seen.values());
   }
 
@@ -78,16 +119,19 @@
   /* ===== NHIỆM VỤ ===== */
   const TASKS = {
     'kho-ship':   { dept: 'Kho', label: 'Hỗ trợ ship', icon: '🛵', needsOrder: true },
-    'kho-truc':   { dept: 'Kho', label: 'Trực kho', icon: '🏭' },
+    /* manual:false → KHÔNG cho nhập tay nữa. Tiền trực kho sinh 100% từ tab "🏭 Lịch trực kho"
+       (nguồn duy nhất) → không thể cộng trùng. */
+    'kho-truc':   { dept: 'Kho', label: 'Trực kho', icon: '🏭', manual: false },
     'ship-chieu': { dept: 'Ship', label: 'Hỗ trợ ship chiều', icon: '🌤️' },
     'ship-far':   { dept: 'Ship', label: 'Đơn xa', icon: '📍', needsFar: true },
   };
-  const tasksForDept = dept => Object.keys(TASKS).filter(k => TASKS[k].dept === dept);
+  const manualTasks = () => Object.keys(TASKS).filter(k => TASKS[k].manual !== false);
+  const tasksForDept = dept => manualTasks().filter(k => TASKS[k].dept === dept);
 
   /* ===== TÍNH TIỀN 1 dòng — theo QUY CHẾ phủ NGÀY của dòng đó =====
      Bỏ trống `rules` → tự tra theo entry.date. Không quy chế nào phủ → 0đ. */
   function computeAmount(entry, rules) {
-    if (rules === undefined) rules = rulesForDate(entry && entry.date);
+    if (rules === undefined) rules = rulesForDate(entry && entry.date, GROUP_OF_TASK[entry && entry.task]);
     if (!rules) return 0;
     switch (entry.task) {
       case 'kho-ship': {
@@ -109,13 +153,22 @@
      LUÔN tính lại theo quy chế phủ NGÀY của từng dòng (quy chế = nguồn sự thật duy nhất).
      Số `amount` lưu trong sổ chỉ là bản cache để hiển thị nhanh/offline. */
   function helperFor(staffId, month) {
-    const entries = getLog()
+    /* (1) Sổ ghi tay (hỗ trợ ship, ship chiều, đơn xa) */
+    const manual = getLog()
       .filter(e => e.staffId === staffId && String(e.date || '').slice(0, 7) === month)
+      .filter(e => TASKS[e.task] && TASKS[e.task].manual !== false)   /* bỏ 'kho-truc' cũ nếu còn sót */
       .map(e => {
-        const pol = policyForDate(e.date);
+        const pol = policyForEntry(e);
         return { ...e, amount: pol ? computeAmount(e, pol.rules) : 0, policyName: pol ? pol.name : null, noPolicy: !pol };
-      })
-      .sort((a, b) => (a.date < b.date ? -1 : 1));
+      });
+    /* (2) Trực kho — sinh từ LỊCH TRỰC (nguồn duy nhất, không nhập tay) */
+    const duty = (window.KHODUTY && window.KHODUTY.bonusEntries)
+      ? window.KHODUTY.bonusEntries(staffId, month).map(e => {
+          const pol = policyForEntry(e);
+          return { ...e, amount: pol ? computeAmount(e, pol.rules) : 0, policyName: pol ? pol.name : null, noPolicy: !pol };
+        })
+      : [];
+    const entries = manual.concat(duty).sort((a, b) => (a.date < b.date ? -1 : a.date > b.date ? 1 : 0));
     const total = entries.reduce((s, e) => s + (+e.amount || 0), 0);
     const noPolicy = entries.filter(e => e.noPolicy).length;
     return { total, entries, noPolicy };
@@ -129,6 +182,7 @@
     const t = TASKS[e.task] || {};
     if (e.task === 'kho-ship') return `${t.label} · ${esc(e.orderName || e.orderCode || '?')}${e.weight ? ' (' + e.weight + 'kg)' : ''}`;
     if (e.task === 'ship-far') { const f = allFarList().find(x => x.id === e.farId); return `${t.label} · ${esc(f ? f.name : '?')}`; }
+    if (e.task === 'kho-truc') return `${t.label} · ca ${e.buoi === 'chieu' ? 'chiều' : 'sáng'}`;
     return t.label || e.task;
   };
 
@@ -140,11 +194,17 @@
     if (!_bMonth) _bMonth = (document.getElementById('payMonth') || {}).value || (window.todayISO ? window.todayISO().slice(0, 7) : '2026-07');
     const host = document.getElementById('payView');
     if (!host) return;
-    const monthLog = getLog().filter(e => String(e.date || '').slice(0, 7) === _bMonth);
-    /* Tiền LUÔN tính lại theo quy chế phủ NGÀY của từng dòng */
-    const calc = e => { const pol = policyForDate(e.date); return { pol, amt: pol ? computeAmount(e, pol.rules) : 0 }; };
+    /* Sổ ghi tay + ca trực sinh từ LỊCH TRỰC KHO (chỉ đọc, sửa ở tab Lịch trực) */
+    const manualLog = getLog()
+      .filter(e => String(e.date || '').slice(0, 7) === _bMonth)
+      .filter(e => TASKS[e.task] && TASKS[e.task].manual !== false);
+    const dutyLog = (window.KHODUTY && window.KHODUTY.bonusEntriesMonth)
+      ? window.KHODUTY.bonusEntriesMonth(_bMonth) : [];
+    const monthLog = manualLog.concat(dutyLog);
+    /* Tiền LUÔN tính lại theo quy chế (đúng khối Kho/Ship) phủ NGÀY của từng dòng */
+    const calc = e => { const pol = policyForEntry(e); return { pol, amt: pol ? computeAmount(e, pol.rules) : 0 }; };
     const grandTotal = monthLog.reduce((s, e) => s + calc(e).amt, 0);
-    const nNoPolicy = monthLog.filter(e => !policyForDate(e.date)).length;
+    const nNoPolicy = monthLog.filter(e => !policyForEntry(e)).length;
 
     const rowsHtml = monthLog
       .sort((a, b) => (a.date < b.date ? 1 : a.date > b.date ? -1 : 0))
@@ -163,8 +223,10 @@
           <td class="num" style="font-weight:700;color:#15803D;white-space:nowrap">${amtCell}</td>
           <td style="font-size:12px;color:var(--muted)">${esc(e.note || '')}</td>
           <td class="num" style="white-space:nowrap">
-            <button class="btn btn-ghost btn-sm" style="padding:2px 7px" onclick="window.BONUS.openEntry('${e.id}')" title="Sửa">✏️</button>
-            <button class="btn btn-ghost btn-sm" style="padding:2px 7px;color:#B91C1C" onclick="window.BONUS.delEntry('${e.id}')" title="Xoá">🗑</button>
+            ${e.source === 'duty'
+              ? `<button class="btn btn-ghost btn-sm" style="padding:2px 7px" onclick="window.setPayTab && window.setPayTab('duty')" title="Ca trực sinh từ Lịch trực kho — sửa ở tab đó">🏭 Lịch trực</button>`
+              : `<button class="btn btn-ghost btn-sm" style="padding:2px 7px" onclick="window.BONUS.openEntry('${e.id}')" title="Sửa">✏️</button>
+                 <button class="btn btn-ghost btn-sm" style="padding:2px 7px;color:#B91C1C" onclick="window.BONUS.delEntry('${e.id}')" title="Xoá">🗑</button>`}
           </td>
         </tr>`;
       }).join('');
@@ -227,7 +289,7 @@
         <div><label style="font-size:11.5px;font-weight:600;color:var(--muted)">Nhiệm vụ</label>
           <select id="beTask" onchange="window.BONUS._onStaffTask()" style="width:100%;padding:8px;border:1px solid var(--line);border-radius:7px">
             <option value="">— chọn nhiệm vụ —</option>
-            ${Object.keys(TASKS).map(k => `<option value="${k}" data-dept="${TASKS[k].dept}" ${cur.task === k ? 'selected' : ''}>${TASKS[k].icon} ${TASKS[k].dept} · ${TASKS[k].label}</option>`).join('')}
+            ${manualTasks().map(k => `<option value="${k}" data-dept="${TASKS[k].dept}" ${cur.task === k ? 'selected' : ''}>${TASKS[k].icon} ${TASKS[k].dept} · ${TASKS[k].label}</option>`).join('')}
           </select></div>
         <div id="beOrderWrap" style="display:none;grid-template-columns:2fr 1fr;gap:10px">
           <div style="position:relative"><label style="font-size:11.5px;font-weight:600;color:var(--muted)">Tên/mã đơn — gõ để tìm (tự lấy kg), hoặc gõ tay</label>
@@ -305,7 +367,7 @@
     const task = (document.getElementById('beTask') || {}).value || '';
     const date = (document.getElementById('beDate') || {}).value || '';
     const entry = { task, date, weight: (document.getElementById('beWeight') || {}).value, farId: (document.getElementById('beFar') || {}).value };
-    const pol = policyForDate(date);
+    const pol = task ? policyForEntry(entry) : null;
     const amt = pol ? computeAmount(entry, pol.rules) : 0;
     const el = document.getElementById('beAmtVal');
     if (!el) return;
@@ -397,7 +459,7 @@
         <input type="date" class="be-r-date" value="${esc(date)}" style="${inp}">
         <select class="be-r-task" onchange="window.BONUS._rowTask(${idx})" style="${inp}">
           <option value="">— nhiệm vụ —</option>
-          ${Object.keys(TASKS).map(k => `<option value="${k}">${TASKS[k].icon} ${TASKS[k].dept}·${TASKS[k].label}</option>`).join('')}
+          ${manualTasks().map(k => `<option value="${k}">${TASKS[k].icon} ${TASKS[k].dept}·${TASKS[k].label}</option>`).join('')}
         </select>
         <div class="be-r-order" style="display:none;position:relative;flex:1;min-width:150px">
           <input class="be-r-ord" autocomplete="off" placeholder="Gõ mã/tên đơn…" oninput="window.BONUS._acOrderRow(${idx})" onfocus="window.BONUS._acOrderRow(${idx})" onblur="window.BONUS._hideAcEl(this.nextElementSibling)" style="width:100%;${inp}">
@@ -433,7 +495,7 @@
   function _rowCalc(idx) {
     const row = _rowOf(idx); if (!row) return;
     const e = _rowEntry(row);
-    const pol = policyForDate(e.date);
+    const pol = e.task ? policyForEntry(e) : null;
     const amt = pol ? computeAmount(e, pol.rules) : 0;
     const el = row.querySelector('.be-r-amt');
     el.textContent = (e.date && !pol) ? '⚠ chưa có quy chế' : (amt ? '+' + fmt(amt) : '0 (chưa đủ ĐK)');
@@ -500,7 +562,7 @@
   }
 
   /* ===== MODAL: cấu hình mức thưởng ===== */
-  /* ===== QUY CHẾ THƯỞNG — quản lý nhiều giai đoạn ===== */
+  /* ===== QUY CHẾ THƯỞNG — 2 KHỐI ĐỘC LẬP: Kho & Ship ===== */
   function _nextDay(iso) {
     if (!iso) return '';
     const d = new Date(iso + 'T00:00:00');
@@ -519,14 +581,34 @@
       <button onclick="this.closest('.br-far').remove()" style="border:none;background:none;color:#B91C1C;cursor:pointer">✕</button>
     </div>`;
 
-  function _polCard(p, i, open) {
-    const r = p.rules;
+  /* Thân quy chế — mức của KHO khác mức của SHIP */
+  function _rulesEditor(group, r, i) {
+    if (group === 'kho') {
+      return `<div style="background:#F0FDF4;border:1px solid #BBF7D0;border-radius:9px;padding:10px 12px">
+        <div style="font-size:12px;color:var(--muted);margin-bottom:5px">Hỗ trợ ship — theo trọng lượng đơn (từ–đến kg → thưởng/đơn):</div>
+        <div class="qc-tiers">${(r.khoShipTiers || []).map(_tierRow).join('')}</div>
+        <button class="btn btn-ghost btn-sm" onclick="window.BONUS._polAddTier('kho',${i})" style="font-size:11.5px;margin-bottom:8px">➕ Thêm mốc kg</button>
+        <div style="display:flex;align-items:center;gap:8px"><label style="flex:1">Trực kho (/buổi — sáng hoặc chiều)</label>
+          <input type="number" class="qc-truc" value="${r.khoTruc}" style="width:130px;padding:6px;border:1px solid var(--line);border-radius:6px;text-align:right;font-weight:700"></div>
+        <div style="font-size:11px;color:var(--muted);margin-top:5px">Ca trực nhập ở tab <b>🏭 Lịch trực kho</b>, tiền tự tính theo mức này.</div>
+      </div>`;
+    }
+    return `<div style="background:#EFF6FF;border:1px solid #BFDBFE;border-radius:9px;padding:10px 12px">
+      <div style="display:flex;align-items:center;gap:8px;margin-bottom:9px"><label style="flex:1">Ship sáng hỗ trợ ship chiều (/lần)</label>
+        <input type="number" class="qc-chieu" value="${r.shipChieu}" style="width:130px;padding:6px;border:1px solid var(--line);border-radius:6px;text-align:right;font-weight:700"></div>
+      <div style="font-size:12px;color:var(--muted);margin-bottom:5px">Đơn xa — danh mục:</div>
+      <div class="qc-far">${(r.shipFar || []).map(_farRow).join('')}</div>
+      <button class="btn btn-ghost btn-sm" onclick="window.BONUS._polAddFar('ship',${i})" style="font-size:11.5px">➕ Thêm tuyến đơn xa</button>
+    </div>`;
+  }
+
+  function _polCard(p, group, i, open) {
     return `<div class="qc-card" data-id="${p.id}" style="border:1px solid var(--line);border-radius:10px;margin-bottom:10px;background:#fff;overflow:hidden">
-      <div style="display:flex;align-items:center;gap:8px;padding:9px 11px;background:#F9FAFB;border-bottom:1px solid var(--line);cursor:pointer" onclick="window.BONUS._polToggle(${i})">
+      <div style="display:flex;align-items:center;gap:8px;padding:9px 11px;background:#F9FAFB;border-bottom:1px solid var(--line);cursor:pointer" onclick="window.BONUS._polToggle('${group}',${i})">
         <span class="qc-chev" style="color:#15803D;width:12px">${open ? '▾' : '▸'}</span>
-        <b style="flex:1;font-size:13px" class="qc-title">${esc(p.name)}</b>
-        <span class="qc-range" style="font-size:11.5px;color:var(--muted)">${p.from ? p.from.split('-').reverse().join('/') : '−∞'} → ${p.to ? p.to.split('-').reverse().join('/') : 'nay'}</span>
-        <button onclick="event.stopPropagation();window.BONUS._polRemove(${i})" style="border:none;background:none;color:#B91C1C;cursor:pointer;font-size:15px" title="Xoá quy chế">🗑</button>
+        <b style="flex:1;font-size:13px">${esc(p.name)}</b>
+        <span style="font-size:11.5px;color:var(--muted)">${p.from ? p.from.split('-').reverse().join('/') : '−∞'} → ${p.to ? p.to.split('-').reverse().join('/') : 'nay'}</span>
+        <button onclick="event.stopPropagation();window.BONUS._polRemove('${group}',${i})" style="border:none;background:none;color:#B91C1C;cursor:pointer;font-size:15px" title="Xoá quy chế">🗑</button>
       </div>
       <div class="qc-body" style="padding:11px 13px;display:${open ? 'block' : 'none'}">
         <div style="display:grid;grid-template-columns:1.6fr 1fr 1fr;gap:8px;margin-bottom:11px">
@@ -537,135 +619,149 @@
           <div><label style="font-size:11px;color:var(--muted);font-weight:600">Đến hết (trống = nay)</label>
             <input type="date" class="qc-to" value="${p.to}" style="width:100%;padding:6px;border:1px solid var(--line);border-radius:6px;box-sizing:border-box"></div>
         </div>
-        <div style="background:#F0FDF4;border:1px solid #BBF7D0;border-radius:9px;padding:10px 12px;margin-bottom:9px">
-          <div style="font-weight:800;color:#15803D;margin-bottom:7px">📦 KHO</div>
-          <div style="font-size:12px;color:var(--muted);margin-bottom:5px">Hỗ trợ ship — theo trọng lượng đơn (từ–đến kg → thưởng/đơn):</div>
-          <div class="qc-tiers">${(r.khoShipTiers || []).map(_tierRow).join('')}</div>
-          <button class="btn btn-ghost btn-sm" onclick="window.BONUS._polAddTier(${i})" style="font-size:11.5px;margin-bottom:8px">➕ Thêm mốc kg</button>
-          <div style="display:flex;align-items:center;gap:8px"><label style="flex:1">Trực kho (/buổi)</label>
-            <input type="number" class="qc-truc" value="${r.khoTruc}" style="width:130px;padding:6px;border:1px solid var(--line);border-radius:6px;text-align:right;font-weight:700"></div>
-        </div>
-        <div style="background:#EFF6FF;border:1px solid #BFDBFE;border-radius:9px;padding:10px 12px">
-          <div style="font-weight:800;color:#1E40AF;margin-bottom:7px">🛵 SHIP</div>
-          <div style="display:flex;align-items:center;gap:8px;margin-bottom:9px"><label style="flex:1">Ship sáng hỗ trợ ship chiều (/lần)</label>
-            <input type="number" class="qc-chieu" value="${r.shipChieu}" style="width:130px;padding:6px;border:1px solid var(--line);border-radius:6px;text-align:right;font-weight:700"></div>
-          <div style="font-size:12px;color:var(--muted);margin-bottom:5px">Đơn xa — danh mục:</div>
-          <div class="qc-far">${(r.shipFar || []).map(_farRow).join('')}</div>
-          <button class="btn btn-ghost btn-sm" onclick="window.BONUS._polAddFar(${i})" style="font-size:11.5px">➕ Thêm tuyến đơn xa</button>
-        </div>
+        ${_rulesEditor(group, p.rules, i)}
       </div>
     </div>`;
   }
 
-  function openPolicies() {
-    const pols = getPolicies().sort((a, b) => ((a.from || '') < (b.from || '') ? -1 : 1));
+  let _qcGroup = 'kho';
+  function _groupSection(group) {
+    const pols = getPolicies(group).sort((a, b) => ((a.from || '') < (b.from || '') ? -1 : 1));
     const last = pols.length - 1;
+    return `<div id="qcPane-${group}" style="display:${_qcGroup === group ? 'block' : 'none'}">
+      <div id="qcList-${group}">${pols.map((p, i) => _polCard(p, group, i, i === last)).join('')}</div>
+      <button class="btn btn-ghost" onclick="window.BONUS._polAdd('${group}')" style="width:100%;margin-top:4px">➕ Thêm quy chế ${GROUP_LABEL[group]} (chép mức từ quy chế cuối)</button>
+    </div>`;
+  }
+  function openPolicies(group) {
+    _qcGroup = GROUPS.indexOf(group) >= 0 ? group : 'kho';
+    const tabBtn = g => `<button onclick="window.BONUS._qcTab('${g}')" id="qcTab-${g}"
+      style="flex:1;padding:9px;border:1.5px solid ${_qcGroup === g ? '#15803D' : 'var(--line)'};background:${_qcGroup === g ? '#DCFCE7' : '#fff'};color:${_qcGroup === g ? '#15803D' : 'var(--navy)'};border-radius:8px;font-weight:700;cursor:pointer;font-size:13px">${GROUP_LABEL[g]}</button>`;
     window.openModal('⚙ Quy chế thưởng hỗ trợ', `
       <div style="background:#EFF6FF;border:1px solid #BFDBFE;border-radius:9px;padding:10px 12px;font-size:12.5px;color:#1E40AF;line-height:1.65;margin-bottom:12px">
-        💡 Mỗi <b>quy chế</b> có khoảng ngày hiệu lực riêng. Tiền thưởng của một khoản ghi được tra theo
-        <b>quy chế phủ NGÀY của khoản đó</b> — nên sửa mức hôm nay <b>không</b> làm đổi tiền của giai đoạn trước.<br>
-        Để trống <b>“Đến hết”</b> = quy chế đang áp dụng tới hiện tại. Ngày không thuộc quy chế nào → khoản đó tính <b>0đ</b>.
+        💡 Quy chế <b>Kho</b> và <b>Ship</b> hoàn toàn <b>tách biệt</b> — ngày hiệu lực và mức thưởng riêng.
+        Tiền của mỗi khoản tra theo quy chế phủ <b>NGÀY</b> của khoản đó → sửa mức hôm nay <b>không</b> làm đổi tiền giai đoạn trước.<br>
+        Để trống <b>“Đến hết”</b> = đang áp dụng tới hiện tại. Ngày không thuộc quy chế nào → khoản đó tính <b>0đ</b>.
       </div>
-      <div id="qcList">${pols.map((p, i) => _polCard(p, i, i === last)).join('')}</div>
-      <button class="btn btn-ghost" onclick="window.BONUS._polAdd()" style="width:100%;margin-top:4px">➕ Thêm quy chế mới (chép mức từ quy chế cuối)</button>
-      <div id="qcWarn" style="margin-top:10px"></div>
+      <div style="display:flex;gap:8px;margin-bottom:12px">${tabBtn('kho')}${tabBtn('ship')}</div>
+      ${_groupSection('kho')}
+      ${_groupSection('ship')}
     `, {
       width: '660px',
       footer: `<button class="btn btn-ghost" onclick="window.closeModal()">Huỷ</button>
-               <button class="btn btn-primary" onclick="window.BONUS._savePolicies()">💾 Lưu quy chế</button>`,
+               <button class="btn btn-primary" onclick="window.BONUS._savePolicies()">💾 Lưu cả 2 khối</button>`,
     });
   }
-  function _polToggle(i) {
-    const card = document.querySelectorAll('#qcList .qc-card')[i]; if (!card) return;
+  function _qcTab(g) {
+    _qcGroup = g;
+    GROUPS.forEach(x => {
+      const pane = document.getElementById('qcPane-' + x);
+      const btn = document.getElementById('qcTab-' + x);
+      if (pane) pane.style.display = x === g ? 'block' : 'none';
+      if (btn) {
+        btn.style.border = '1.5px solid ' + (x === g ? '#15803D' : 'var(--line)');
+        btn.style.background = x === g ? '#DCFCE7' : '#fff';
+        btn.style.color = x === g ? '#15803D' : 'var(--navy)';
+      }
+    });
+  }
+  const _cards = group => Array.from(document.querySelectorAll('#qcList-' + group + ' .qc-card'));
+  function _polToggle(group, i) {
+    const card = _cards(group)[i]; if (!card) return;
     const body = card.querySelector('.qc-body');
     const open = body.style.display === 'none';
     body.style.display = open ? 'block' : 'none';
     card.querySelector('.qc-chev').textContent = open ? '▾' : '▸';
   }
-  function _polAddTier(i) {
-    const box = document.querySelectorAll('#qcList .qc-card')[i]?.querySelector('.qc-tiers'); if (!box) return;
+  function _polAddTier(group, i) {
+    const box = _cards(group)[i] && _cards(group)[i].querySelector('.qc-tiers'); if (!box) return;
     const d = document.createElement('div'); d.innerHTML = _tierRow(null); box.appendChild(d.firstElementChild);
   }
-  function _polAddFar(i) {
-    const box = document.querySelectorAll('#qcList .qc-card')[i]?.querySelector('.qc-far'); if (!box) return;
+  function _polAddFar(group, i) {
+    const box = _cards(group)[i] && _cards(group)[i].querySelector('.qc-far'); if (!box) return;
     const d = document.createElement('div'); d.innerHTML = _farRow(null); box.appendChild(d.firstElementChild);
   }
-  function _polRemove(i) {
-    const cards = document.querySelectorAll('#qcList .qc-card');
-    if (cards.length <= 1) { window.toast?.('Phải còn ít nhất 1 quy chế', 'warn'); return; }
-    if (!confirm('Xoá quy chế này? Các khoản thưởng rơi vào giai đoạn đó sẽ thành 0đ nếu không quy chế nào phủ.')) return;
-    cards[i].remove();
-    _reindexPolicies();
+  function _repaint(group, arr) {
+    const list = document.getElementById('qcList-' + group);
+    if (list) list.innerHTML = arr.map((p, i) => _polCard(p, group, i, i === arr.length - 1)).join('');
   }
-  /* Vẽ lại chỉ số handler sau khi xoá (onclick nhúng index) */
-  function _reindexPolicies() {
-    const arr = _readPolicies();
-    const list = document.getElementById('qcList'); if (!list) return;
-    list.innerHTML = arr.map((p, i) => _polCard(p, i, i === arr.length - 1)).join('');
+  function _polRemove(group, i) {
+    if (_cards(group).length <= 1) { window.toast?.('Mỗi khối phải còn ít nhất 1 quy chế', 'warn'); return; }
+    if (!confirm('Xoá quy chế này? Các khoản rơi vào giai đoạn đó sẽ thành 0đ nếu không quy chế nào phủ.')) return;
+    const arr = _readPolicies(group);
+    arr.splice(i, 1);
+    _repaint(group, arr);
   }
-  function _polAdd() {
-    const arr = _readPolicies();
+  function _polAdd(group) {
+    const arr = _readPolicies(group);
     const lastP = arr[arr.length - 1];
-    const from = lastP && lastP.to ? _nextDay(lastP.to) : _today();
     arr.push({
       id: _pid(),
       name: 'Quy chế ' + (arr.length + 1),
-      from, to: '',
-      rules: lastP ? clone(lastP.rules) : clone(DEFAULT_RULES),
+      from: (lastP && lastP.to) ? _nextDay(lastP.to) : _today(),
+      to: '',
+      rules: lastP ? clone(lastP.rules) : clone(DEFAULT_OF[group]),
     });
-    const list = document.getElementById('qcList');
-    list.innerHTML = arr.map((p, i) => _polCard(p, i, i === arr.length - 1)).join('');
+    _repaint(group, arr);
   }
-  /* Đọc toàn bộ quy chế đang hiển thị trong modal */
-  function _readPolicies() {
-    return Array.from(document.querySelectorAll('#qcList .qc-card')).map(card => {
-      const tiers = Array.from(card.querySelectorAll('.qc-tiers .br-tier')).map(el => ({
-        min: +el.querySelector('.br-min').value || 0,
-        max: +el.querySelector('.br-max').value || 0,
-        amount: +el.querySelector('.br-amt').value || 0,
-      })).filter(t => t.max > 0 && t.amount > 0);
-      const shipFar = Array.from(card.querySelectorAll('.qc-far .br-far')).map(el => ({
-        id: el.dataset.id,
-        name: el.querySelector('.br-far-name').value.trim(),
-        amount: +el.querySelector('.br-far-amt').value || 0,
-      })).filter(f => f.name);
+  /* Đọc quy chế của 1 khối đang hiển thị trong modal */
+  function _readPolicies(group) {
+    return _cards(group).map(card => {
+      const rules = {};
+      if (group === 'kho') {
+        rules.khoShipTiers = Array.from(card.querySelectorAll('.qc-tiers .br-tier')).map(el => ({
+          min: +el.querySelector('.br-min').value || 0,
+          max: +el.querySelector('.br-max').value || 0,
+          amount: +el.querySelector('.br-amt').value || 0,
+        })).filter(t => t.max > 0 && t.amount > 0);   /* rỗng = không thưởng mốc kg nào (hợp lệ) */
+        rules.khoTruc = +card.querySelector('.qc-truc').value || 0;
+      } else {
+        rules.shipChieu = +card.querySelector('.qc-chieu').value || 0;
+        rules.shipFar = Array.from(card.querySelectorAll('.qc-far .br-far')).map(el => ({
+          id: el.dataset.id,
+          name: el.querySelector('.br-far-name').value.trim(),
+          amount: +el.querySelector('.br-far-amt').value || 0,
+        })).filter(f => f.name);
+      }
       return {
         id: card.dataset.id,
         name: card.querySelector('.qc-name').value.trim() || 'Quy chế',
         from: card.querySelector('.qc-from').value || '',
         to: card.querySelector('.qc-to').value || '',
-        rules: {
-          khoShipTiers: tiers,           /* rỗng = KHÔNG thưởng mốc kg nào (hợp lệ, vd "dưới 20kg không thưởng") */
-          khoTruc: +card.querySelector('.qc-truc').value || 0,
-          shipChieu: +card.querySelector('.qc-chieu').value || 0,
-          shipFar,
-        },
+        rules,
       };
     });
   }
-  function _savePolicies() {
-    const arr = _readPolicies();
-    if (!arr.length) { window.toast?.('Phải có ít nhất 1 quy chế', 'warn'); return; }
-    /* Ngày bắt đầu > ngày kết thúc → chặn */
-    for (const p of arr) {
-      if (p.from && p.to && p.from > p.to) {
-        window.toast?.(`"${p.name}": ngày bắt đầu sau ngày kết thúc`, 'warn'); return;
-      }
-    }
-    /* Cảnh báo chồng lấn / khoảng trống (vẫn cho lưu — chồng lấn thì lấy quy chế bắt đầu muộn hơn) */
-    const sorted = arr.slice().sort((a, b) => ((a.from || '') < (b.from || '') ? -1 : 1));
+  function _validate(group, arr) {
     const warns = [];
+    for (const p of arr) {
+      if (p.from && p.to && p.from > p.to) return { err: `${GROUP_LABEL[group]} · "${p.name}": ngày bắt đầu sau ngày kết thúc` };
+    }
+    const sorted = arr.slice().sort((a, b) => ((a.from || '') < (b.from || '') ? -1 : 1));
     for (let i = 1; i < sorted.length; i++) {
       const prev = sorted[i - 1], cur = sorted[i];
-      if (!prev.to) { warns.push(`“${prev.name}” để trống ngày kết thúc nên chồng lấn “${cur.name}” — ngày trùng sẽ tính theo “${cur.name}”.`); continue; }
-      if (cur.from && prev.to >= cur.from) warns.push(`“${prev.name}” và “${cur.name}” chồng ngày — ngày trùng tính theo “${cur.name}”.`);
-      else if (cur.from && _nextDay(prev.to) < cur.from) warns.push(`Trống từ ${_nextDay(prev.to).split('-').reverse().join('/')} đến ${_nextDay(cur.from).split('-').reverse().join('/')} — khoản ghi trong khoảng này sẽ là 0đ.`);
+      if (!prev.to) { warns.push(`${GROUP_LABEL[group]}: “${prev.name}” không có ngày kết thúc nên chồng “${cur.name}” — ngày trùng tính theo “${cur.name}”.`); continue; }
+      if (cur.from && prev.to >= cur.from) warns.push(`${GROUP_LABEL[group]}: “${prev.name}” và “${cur.name}” chồng ngày — ngày trùng tính theo “${cur.name}”.`);
+      else if (cur.from && _nextDay(prev.to) < cur.from) warns.push(`${GROUP_LABEL[group]}: trống từ ${_nextDay(prev.to).split('-').reverse().join('/')} đến trước ${cur.from.split('-').reverse().join('/')} — khoản ghi trong khoảng này = 0đ.`);
     }
-    savePolicies(arr);
+    return { warns };
+  }
+  function _savePolicies() {
+    const kho = _readPolicies('kho');
+    const ship = _readPolicies('ship');
+    if (!kho.length || !ship.length) { window.toast?.('Mỗi khối phải có ít nhất 1 quy chế', 'warn'); return; }
+    let warns = [];
+    for (const [g, arr] of [['kho', kho], ['ship', ship]]) {
+      const v = _validate(g, arr);
+      if (v.err) { window.toast?.(v.err, 'warn'); return; }
+      warns = warns.concat(v.warns);
+    }
+    saveAllPolicies({ kho, ship });
     window.closeModal?.();
-    window.toast?.(`✓ Đã lưu ${arr.length} quy chế` + (warns.length ? ` · ${warns.length} cảnh báo` : ''), warns.length ? 'warn' : 'success');
+    window.toast?.(`✓ Đã lưu quy chế: Kho ${kho.length} · Ship ${ship.length}` + (warns.length ? ` · ${warns.length} cảnh báo` : ''), warns.length ? 'warn' : 'success');
     if (warns.length) setTimeout(() => window.toast?.('⚠ ' + warns[0], 'warn'), 900);
     renderBonusTab();
+    if (window.KHODUTY && window.KHODUTY.rerender) window.KHODUTY.rerender();
     window.renderPayrollPublic && window.renderPayrollPublic();
   }
 
@@ -673,11 +769,12 @@
 
   window.BONUS = {
     getRules, getLog, saveLog, computeAmount, helperFor, TASKS,
-    /* Quy chế theo giai đoạn (v419) */
-    getPolicies, savePolicies, policyForDate, rulesForDate, allFarList,
+    /* Quy chế theo giai đoạn, TÁCH khối Kho/Ship (v421) */
+    getPolicies, saveAllPolicies, policyForDate, policyForEntry, rulesForDate,
+    khoTrucRateOn, allFarList, GROUPS, GROUP_OF_TASK,
     renderBonusTab, openEntry, delEntry, setBonusMonth,
     openPolicies, openRules: openPolicies,   /* alias tương thích */
-    _polToggle, _polAdd, _polRemove, _polAddTier, _polAddFar, _savePolicies,
+    _qcTab, _polToggle, _polAdd, _polRemove, _polAddTier, _polAddFar, _savePolicies,
     _onStaffTask, _calc, _save,
     _acStaff, _pickStaff, _acOrder, _pickOrder, _hideAc,
     openBatch, _addRow, _rowTask, _rowCalc, _removeRow, _acOrderRow, _pickOrderRow, _hideAcEl, _saveBatch,

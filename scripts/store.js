@@ -242,6 +242,7 @@
     'cust_prefs',      /* Thói quen mua KH — MED */
     'addrDupOk',       /* Cặp KH trùng địa chỉ ĐÃ XÁC NHẬN "không phải trùng" ["KH001|KH060"] — bỏ badge, không cảnh báo lại */
     'bonusRules',      /* Mức thưởng hỗ trợ Kho/Ship (tier kg, trực kho, đơn xa...) — admin cấu hình */
+    'khoDuty',         /* Lịch TRỰC KHO {date:{sang:[],chieu:[],note}} — nguồn DUY NHẤT sinh tiền trực kho */
     'bonusLog',        /* Sổ ghi thưởng hỗ trợ hàng ngày [{date,staffId,task,weight,farId,amount}] — tự vào phiếu lương */
     'pod_photos',      /* Ảnh giao hàng — MED (base64 lớn) */
     'telegramChannels', /* Cấu hình routing (legacy, deprecated) */

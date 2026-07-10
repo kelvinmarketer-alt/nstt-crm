@@ -8,7 +8,9 @@
      − Phạt/Trừ − BHXH − Tạm ứng
 
    Lương theo công = Lcb × Hệ số HĐ ÷ Công chuẩn × Công thực tế
-   Phụ cấp        = Mức phụ cấp tháng ÷ Công chuẩn × Công thực tế
+   Phụ cấp        = Mức phụ cấp tháng × min(1, Công thực tế ÷ Công chuẩn)
+                    → CÓ TRẦN: đủ hoặc dư công (31/30) đều hưởng TRỌN mức tháng;
+                      thiếu công (29/30) mới bị chia theo tỉ lệ.
 
    Công chuẩn (mẫu số) theo bộ phận:
    - Văn phòng (HR, KT, Sale, MKT, Tuyển dụng): 24
@@ -149,9 +151,9 @@
       workActual: wa,
       perDay: ws ? Math.round((+c.allowanceMonthly || 0) / ws) : 0,
       amount: +c.allowance || 0,
-      /* Công thực tế > công chuẩn (vd tháng 31 ngày, Ship làm cả 7 ngày/tuần)
-         → phụ cấp chia theo công sẽ VƯỢT mức tháng. Không phải lỗi, nhưng phải nói rõ. */
-      overCap: (+c.allowance || 0) > (+c.allowanceMonthly || 0),
+      /* Làm DƯ công (vd 31/30) → bị CHẶN TRẦN ở đúng mức tháng, không cộng thêm. */
+      capped: ws > 0 && wa > ws,
+      full:   ws > 0 && wa >= ws,   /* hưởng trọn mức tháng */
     };
   }
 
@@ -358,7 +360,7 @@
           : getDeptConfig(input.dept, seg.contractType).workStandard);
         const segBasic = +seg.basicSalary || 0;
         const segWork = +seg.workActual || 0;
-        const segBase = roundK(segBasic * segRatio / segWS * segWork);
+        const segBase = segWS > 0 ? roundK(segBasic * segRatio / segWS * segWork) : 0;   /* chặn chia 0 → ∞ */
         baseSalary += segBase;
         workActual += segWork;
         segDetail.push({
@@ -379,13 +381,24 @@
       ratio = CONTRACT_RATIO[input.contractType] || 1.00;
       basicSalary = +input.basicSalary || 0;
       workActual = +input.workActual || 0;
-      /* Lương theo công */
-      baseSalary = roundK(basicSalary * ratio / workStandardDefault * workActual);
+      /* Lương theo công — chặn chia 0 (công chuẩn = 0 → 0đ, không ra ∞/NaN) */
+      baseSalary = workStandardDefault > 0
+        ? roundK(basicSalary * ratio / workStandardDefault * workActual)
+        : 0;
     }
     workStandard = workStandardDefault;
 
-    /* Phụ cấp theo TỔNG công (cả mixed lẫn single) */
-    const allowance = roundK(allowanceMonthly / workStandard * workActual);
+    /* Phụ cấp theo TỔNG công — CÓ TRẦN = đúng mức tháng của vị trí.
+       Làm ĐỦ hoặc DƯ công (vd 31/30) → hưởng trọn mức tháng, KHÔNG cộng thêm.
+       Làm THIẾU công (vd 29/30)      → mức tháng ÷ công chuẩn × công thực tế. */
+    const allowRatio = workStandard > 0 ? Math.min(1, workActual / workStandard) : 0;
+    let allowance = roundK(allowanceMonthly * allowRatio);
+    /* Phiếu ĐÃ DUYỆT / ĐÃ TRẢ → GIỮ NGUYÊN số phụ cấp đã chốt.
+       Không được để công thức mới (trần) làm tụt tiền của phiếu đã trả cho NV.
+       Phiếu 'draft'/'submitted' vẫn áp trần mới (chưa duyệt, chưa chi). */
+    if ((input.status === 'approved' || input.status === 'paid') && typeof input.allowance === 'number') {
+      allowance = +input.allowance;
+    }
 
     /* Tổng thưởng = thưởng thủ công + thưởng hỗ trợ Kho/Ship (sổ ghi, tự tính) */
     const helperBonus = +input.helperBonus || 0;
@@ -464,7 +477,9 @@
           ? `Hỗn hợp ${segDetail.length} segment`
           : `${formatVND(basicSalary)} × ${(ratio*100).toFixed(0)}% ÷ ${workStandard} × ${workActual}`,
         baseSalaryDetail,
-        allowanceDetail: `${formatVND(allowanceMonthly)} ÷ ${workStandard} × ${workActual} = ${formatVND(allowance)}`,
+        allowanceDetail: (workStandard > 0 && workActual >= workStandard)
+          ? `Đủ công (${workActual}/${workStandard}) → hưởng trọn mức tháng ${formatVND(allowanceMonthly)}`
+          : `${formatVND(allowanceMonthly)} ÷ ${workStandard} × ${workActual} = ${formatVND(allowance)}`,
       },
     };
   }
