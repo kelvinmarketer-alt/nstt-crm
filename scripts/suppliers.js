@@ -3,6 +3,9 @@
    ========================================================= */
 (function () {
   const escH = v => String(v == null ? '' : v).replace(/[&<>"]/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]));
+  /* Viết hoa chữ đầu mỗi từ — CHỈ để hiển thị, KHÔNG sửa dữ liệu gốc trong DB.
+     "chú TÝ" → "Chú Tý" · "vụ hành tỏi" → "Vụ Hành Tỏi" · "00852 tuấn tú" → "00852 Tuấn Tú". */
+  const tcName = v => String(v == null ? '' : v).trim().toLowerCase().replace(/(^|[\s(\/-])(\S)/g, (m, sp, ch) => sp + ch.toUpperCase());
   function getSup() { return window.STORE.get('suppliers', window.SUPPLIERS || []) || []; }
   function getPur() { return window.STORE.get('purchases', window.PURCHASES || []) || []; }
   /* Loại NCC (sỉ/lẻ/cả hai) — cloud suppliers không có cột → lưu kv 'supplierMeta' */
@@ -82,7 +85,7 @@
           <span class="sup-caret" style="color:#94A3B8;font-size:11px;flex:0 0 12px">▸</span>
           <span style="flex:1;min-width:0">
             <div style="font-weight:700;color:var(--navy);white-space:nowrap;overflow:hidden;text-overflow:ellipsis">
-              ${has(s.name) ? escH(s.name) : '(chưa đặt tên)'}
+              ${has(s.name) ? escH(tcName(s.name)) : '(chưa đặt tên)'}
               ${paused ? '<span class="tag" style="background:#FEE2E2;color:#B91C1C;font-weight:700;margin-left:6px">Ngừng nhập</span>' : ''}
             </div>
             <div style="font-size:11.5px;color:var(--muted);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;margin-top:1px">${prodSummary}</div>
@@ -171,7 +174,7 @@
     return `<div style="font-size:12.5px;color:var(--muted);margin-bottom:11px">Chọn <b style="color:#1E40AF">📦 Sỉ</b> (giao cả lô) hoặc <b style="color:#15803D">🛵 Lẻ</b> (chia sẵn theo khách) cho từng nhà:</div>
       <div id="uaList" style="display:grid;gap:6px;max-height:58vh;overflow:auto">
         ${list.map(s => `<div id="uarow-${s.id}" style="display:flex;align-items:center;gap:8px;padding:8px 10px;border:1px solid var(--line);border-radius:8px">
-          <div style="flex:1;min-width:0"><b>${escH(s.name)}</b><div style="font-size:11px;color:var(--muted)">${escH(s.phone) || '— chưa có SĐT'}</div></div>
+          <div style="flex:1;min-width:0"><b>${escH(tcName(s.name))}</b><div style="font-size:11px;color:var(--muted)">${escH(s.phone) || '— chưa có SĐT'}</div></div>
           <button class="btn btn-ghost btn-sm" style="border:1px solid #BFDBFE;color:#1E40AF;white-space:nowrap" onclick="window.supAssignInPopup('${s.id}','si')">📦 Sỉ</button>
           <button class="btn btn-ghost btn-sm" style="border:1px solid #BBF7D0;color:#15803D;white-space:nowrap" onclick="window.supAssignInPopup('${s.id}','le')">🛵 Lẻ</button>
         </div>`).join('')}
@@ -205,7 +208,7 @@
         <div style="display:flex;align-items:center;gap:12px">
           <div style="width:54px;height:54px;border-radius:11px;background:rgba(255,255,255,.2);display:grid;place-items:center;font-size:22px;font-weight:800">${window.initials(s.name)}</div>
           <div style="min-width:0">
-            <h2 style="margin:0;font-size:18px;line-height:1.25">${s.name}</h2>
+            <h2 style="margin:0;font-size:18px;line-height:1.25">${escH(tcName(s.name))}</h2>
             <div style="opacity:.9;font-size:13px;margin-top:3px">📞 ${s.phone || '— chưa có số'}</div>
           </div>
         </div>
