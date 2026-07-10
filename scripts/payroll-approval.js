@@ -59,6 +59,26 @@
       .some(b => /hoa hong|commission|doanh so/.test(_noAccent(b && b.name)));
   }
 
+  /* === CHI TIẾT PHẠT ĐI MUỘN — mức khai theo "ngày công" hiện luôn cách quy ra tiền === */
+  function lateDetailHTML(la, dayWage) {
+    la = la || { count: 0, detail: [] };
+    if (!la.count) return '';
+    const f = PF.formatVND;
+    const dw = +dayWage || 0;
+    /* tierLabel = ô nhập tự do trong Cấu hình phạt → PHẢI escape, kẻo lưu thẻ HTML vào khung phạt
+       là chạy script trong phiếu lương của kế toán/CFO. */
+    const rows = (la.detail || []).map(d => {
+      const how = d.unit === 'cong'
+        ? ` → <b>${d.days === 0.5 ? '½' : +d.days} ngày công</b> × ${f(dw)}đ/công =`
+        : ' →';
+      return `Ngày ${+d.day}: muộn ${+d.lateMin}p (${_esc(d.tierLabel) || 'tier'})${how} <b>${f(d.amount)} đ</b>`;
+    }).join('<br>');
+    return `<details style="margin-top:6px">
+      <summary style="cursor:pointer;font-size:11.5px;color:#DC2626">📋 Chi tiết ${la.count} lần</summary>
+      <div style="padding:6px 0 0 12px;font-size:11.5px;color:#7F1D1D;line-height:1.7">${rows}</div>
+    </details>`;
+  }
+
   /* === GIẢI THÍCH PHỤ CẤP: vì sao ra đúng con số đó === */
   function allowanceDetailHTML(c) {
     if (!PF.allowanceExplain) return '';
@@ -488,15 +508,9 @@
               <div style="font-size:11px;color:var(--muted);margin-top:2px">${lateAuto.count?lateAuto.count+' lần muộn':'Không có lần nào'}
                 · <a href="javascript:window.openLatePolicySettings && window.openLatePolicySettings()" style="color:#1E40AF">Sửa khung phạt</a></div>
             </div>
-            <span style="font-size:15px;font-weight:800;color:${lateAuto.count?'#DC2626':'var(--muted)'}">${lateAuto.count?'− '+PF.formatVND(lateAuto.total)+' ₫':'— 0 ₫'}</span>
+            <span id="psLateTotal" style="font-size:15px;font-weight:800;color:${lateAuto.count?'#DC2626':'var(--muted)'}">${lateAuto.count?'− '+PF.formatVND(lateAuto.total)+' ₫':'— 0 ₫'}</span>
           </div>
-          ${lateAuto.count ? `
-            <details style="margin-top:6px">
-              <summary style="cursor:pointer;font-size:11.5px;color:#DC2626">📋 Chi tiết ${lateAuto.count} lần</summary>
-              <div style="padding:6px 0 0 12px;font-size:11.5px;color:#7F1D1D;line-height:1.7">
-                ${lateAuto.detail.map(d => `Ngày ${d.day}: muộn ${d.lateMin}p (${d.tierLabel || 'tier'}) → <b>${PF.formatVND(d.amount)} đ</b>`).join('<br>')}
-              </div>
-            </details>` : ''}
+          <div id="psLateDetail">${lateDetailHTML(lateAuto, computed.dayWage)}</div>
         </div>
 
         <!-- ⑤ HOA HỒNG (phiếu lập từ v418 mới có; phiếu cũ giữ nguyên, không hiện) -->
@@ -695,6 +709,15 @@
       document.getElementById('psBonusTotal').textContent = '+ ' + PF.formatVND(c.totalBonus) + ' ₫';
       document.getElementById('psPenaltyTotal').textContent = '− ' + PF.formatVND(c.totalPenalty) + ' ₫';
       document.getElementById('psTotal').textContent = PF.formatVND(c.total) + ' ₫';
+
+      /* Phạt muộn: mức khai theo "ngày công" đổi theo LCB/công → vẽ lại khối này */
+      const lateTotEl = document.getElementById('psLateTotal');
+      if (lateTotEl) {
+        lateTotEl.textContent = la.count ? '− ' + PF.formatVND(la.total) + ' ₫' : '— 0 ₫';
+        lateTotEl.style.color = la.count ? '#DC2626' : 'var(--muted)';
+      }
+      const lateDetEl = document.getElementById('psLateDetail');
+      if (lateDetEl) lateDetEl.innerHTML = lateDetailHTML(la, c.dayWage);
 
       /* Khoản phạt theo NGÀY CÔNG → cập nhật lại số tiền khi LCB/công thay đổi */
       (c.penalties || []).forEach((pp, i) => {

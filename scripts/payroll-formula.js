@@ -262,45 +262,69 @@
     mode: 'tier',
     graceMinutes: 10,
     tiers: [
-      { thresholdMinutes: 10,  amount:  20000, label: '> 10 phút' },
-      { thresholdMinutes: 30,  amount:  50000, label: '> 30 phút' },
-      { thresholdMinutes: 60,  amount: 100000, label: '> 1 tiếng' },
-      { thresholdMinutes: 180, amount: 300000, label: '> 3 tiếng (nửa buổi)' },
+      { thresholdMinutes: 10,  unit: 'money', amount:  20000, label: '> 10 phút' },
+      { thresholdMinutes: 30,  unit: 'money', amount:  50000, label: '> 30 phút' },
+      { thresholdMinutes: 60,  unit: 'money', amount: 100000, label: '> 1 tiếng' },
+      { thresholdMinutes: 180, unit: 'cong',  days: 0.5, amount: 0, label: '> 3 tiếng — trừ ½ ngày công' },
     ],
     perMinuteRate: 5000, /* dùng nếu mode='perMinute' */
   };
 
+  /* Tier có 2 đơn vị:
+       unit='money' → phạt CỐ ĐỊNH `amount` đồng
+       unit='cong'  → phạt = `days` ngày công × lương 1 ngày công của chính NV đó
+     Tier CŨ (trước v424) không có `unit` ⇒ coi như 'money' (giữ nguyên tiền). */
+  function _normTier(t) {
+    t = t || {};
+    const unit = t.unit === 'cong' ? 'cong' : 'money';
+    return {
+      thresholdMinutes: +t.thresholdMinutes || 0,
+      label: t.label || '',
+      unit,
+      amount: unit === 'money' ? (+t.amount || 0) : 0,
+      days: unit === 'cong' ? (+t.days || 0) : 0,
+    };
+  }
+
   function getLatePolicy() {
     if (!window.STORE) return LATE_POLICY_DEFAULT;
     const saved = window.STORE.get('latePolicy', null);
-    return saved && saved.tiers ? saved : LATE_POLICY_DEFAULT;
+    if (!saved || !saved.tiers) return LATE_POLICY_DEFAULT;
+    return Object.assign({}, saved, { tiers: (saved.tiers || []).map(_normTier) });
   }
 
-  /* 1 lần muộn X phút → trả về {amount, tier} */
-  function applyLatePolicy(lateMin, policy) {
+  const _congLabel = d => (d === 0.5 ? '½ ngày công' : d === 1 ? '1 ngày công' : d + ' ngày công');
+
+  /* 1 lần muộn X phút → trả về {amount, tier}. dayWage = lương 1 ngày công (cho tier unit='cong'). */
+  function applyLatePolicy(lateMin, policy, dayWage) {
     policy = policy || getLatePolicy();
     lateMin = +lateMin || 0;
+    dayWage = +dayWage || 0;
     const grace = +policy.graceMinutes || 0;
-    if (lateMin <= grace) return { amount: 0, tier: null };
+    if (lateMin <= grace) return { amount: 0, tier: null, unit: 'money', days: 0 };
 
     if (policy.mode === 'perMinute') {
       const rate = +policy.perMinuteRate || 5000;
       const amount = Math.round((lateMin - grace) * rate);
-      return { amount, tier: { label: `${lateMin - grace}p × ${rate.toLocaleString('vi-VN')}đ/p` } };
+      return { amount, tier: { label: `${lateMin - grace}p × ${rate.toLocaleString('vi-VN')}đ/p` }, unit: 'money', days: 0 };
     }
 
     /* Tier mode — chọn tier có threshold cao nhất mà NV vượt qua */
-    const tiers = [...(policy.tiers || [])].sort((a, b) => (b.thresholdMinutes || 0) - (a.thresholdMinutes || 0));
+    const tiers = (policy.tiers || []).map(_normTier).sort((a, b) => b.thresholdMinutes - a.thresholdMinutes);
     for (const t of tiers) {
-      if (lateMin >= (+t.thresholdMinutes || 0)) {
-        return { amount: +t.amount || 0, tier: t };
+      if (lateMin >= t.thresholdMinutes) {
+        if (t.unit === 'cong') {
+          return { amount: roundK(dayWage * t.days), tier: t, unit: 'cong', days: t.days };
+        }
+        return { amount: t.amount, tier: t, unit: 'money', days: 0 };
       }
     }
-    return { amount: 0, tier: null };
+    return { amount: 0, tier: null, unit: 'money', days: 0 };
   }
 
-  /* Compute tổng phạt muộn của 1 NV trong 1 tháng từ chấm công */
-  function computeLateAutoForMonth(staffId, month, policy) {
+  /* Compute tổng phạt muộn của 1 NV trong 1 tháng từ chấm công.
+     dayWage cần cho tier tính theo ngày công — computePayslip luôn truyền vào. */
+  function computeLateAutoForMonth(staffId, month, policy, dayWage) {
     policy = policy || getLatePolicy();
     if (!window.STORE) return { count: 0, total: 0, detail: [] };
 
@@ -311,19 +335,24 @@
     const allMeta = window.STORE.get('timesheetMeta', {}) || {};
     const meta = allMeta[staffId + '_' + month] || {};
 
-    let total = 0;
+    let total = 0, totalDays = 0;
     const detail = [];
     sheet.days.forEach((status, idx) => {
       if (status !== 'L') return;
       const dayN = idx + 1;
       const lateMin = (meta[dayN] && meta[dayN].lateMin) || 0;
-      const r = applyLatePolicy(lateMin, policy);
-      if (r.amount > 0) {
+      const r = applyLatePolicy(lateMin, policy, dayWage);
+      if (r.amount > 0 || r.days > 0) {
         total += r.amount;
-        detail.push({ day: dayN, lateMin, amount: r.amount, tierLabel: r.tier?.label || '' });
+        totalDays += r.days;
+        detail.push({
+          day: dayN, lateMin, amount: r.amount,
+          unit: r.unit, days: r.days,
+          tierLabel: (r.tier && r.tier.label) || (r.unit === 'cong' ? _congLabel(r.days) : ''),
+        });
       }
     });
-    return { count: detail.length, total, detail };
+    return { count: detail.length, total, totalDays, detail };
   }
 
   /* === Tính 1 dòng lương đầy đủ === */
@@ -442,7 +471,8 @@
     if (_frozen && input.lateAuto && typeof input.lateAuto.total === 'number') {
       lateAuto = input.lateAuto;
     } else if (input.staffId && input.month) {
-      lateAuto = computeLateAutoForMonth(input.staffId, input.month);
+      /* dayWage: cần cho mức phạt khai theo "½ / 1 ngày công" */
+      lateAuto = computeLateAutoForMonth(input.staffId, input.month, null, dayWage);
     }
 
     /* THỰC LĨNH = Lương công + Phụ cấp + Thưởng + Hoa hồng

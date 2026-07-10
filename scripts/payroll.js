@@ -241,51 +241,98 @@
     for (let i = 0; i < startCol; i++) cells.push(0);
     for (let d = 1; d <= st.last; d++) cells.push(d);
     while (cells.length % 7) cells.push(0);
+    const todayD = window.todayDate();
     const dow = ['T2', 'T3', 'T4', 'T5', 'T6', 'T7', 'CN'];
-    let grid = `<div style="display:grid;grid-template-columns:repeat(7,1fr);gap:5px;max-width:520px">`;
-    grid += dow.map((n, i) => `<div style="text-align:center;font-weight:700;font-size:11.5px;color:${i === 5 ? '#B45309' : i === 6 ? '#DC2626' : 'var(--muted)'};padding:3px 0">${n}</div>`).join('');
+    let grid = `<div style="display:grid;grid-template-columns:repeat(7,minmax(0,1fr));gap:4px">`;
+    grid += dow.map((n, i) => `<div style="text-align:center;font-weight:700;font-size:11px;color:${i === 5 ? '#B45309' : i === 6 ? '#DC2626' : 'var(--muted)'};padding:2px 0 4px">${n}</div>`).join('');
     cells.forEach(d => {
       if (!d) { grid += `<div></div>`; return; }
       const wd = new Date(y, m - 1, d).getDay();
       const isSat = wd === 6, isSun = wd === 0;
+      const isToday = y === todayD.getFullYear() && m - 1 === todayD.getMonth() && d === todayD.getDate();
       const bg = isSun ? '#FEE2E2' : isSat ? '#FEF3C7' : '#fff';
-      const bd = isSun ? '#FCA5A5' : isSat ? '#FDE68A' : '#E6ECE4';
+      const bd = isToday ? '#15803D' : isSun ? '#FCA5A5' : isSat ? '#FDE68A' : '#EDF1EC';
       const col = isSun ? '#DC2626' : isSat ? '#B45309' : 'var(--navy)';
       const fac = isSun ? '0' : isSat ? '½' : '1';
-      grid += `<div style="background:${bg};border:1px solid ${bd};border-radius:8px;padding:6px 3px;text-align:center;min-height:44px">
-        <div style="font-weight:700;font-size:14px;color:${col}">${d}</div>
-        <div style="font-size:9px;color:${col};opacity:.75">${fac} công</div>
+      grid += `<div title="Ngày ${d}/${m} — ${fac} công" style="background:${bg};border:1.5px solid ${bd};border-radius:9px;min-height:52px;display:grid;place-items:center;line-height:1.05">
+        <div style="text-align:center">
+          <div style="font-weight:700;font-size:15px;color:${col}">${d}</div>
+          <div style="font-size:8.5px;font-weight:700;color:${col};opacity:.72;margin-top:1px">${fac} công</div>
+        </div>
       </div>`;
     });
     grid += `</div>`;
-    /* Dải 12 tháng của năm — cờ tháng 5+5 */
+
+    /* Dải 12 tháng — 6 cột × 2 hàng, khớp bố cục Lịch trực kho */
     const yr = Array.from({ length: 12 }, (_, i) => {
       const ms = _monthStats(y, i + 1); const cur = (i + 1) === m;
-      return `<button onclick="window.setPayMonth('${y}-${String(i + 1).padStart(2, '0')}')" title="${ms.reduced ? '⚠ 5 T7 + 5 CN → công giảm' : ''} NC chuẩn ${_ncFmt(ms.nc)}"
-        style="border:1.5px solid ${cur ? '#15803D' : ms.reduced ? '#F59E0B' : '#E6ECE4'};background:${cur ? '#DCFCE7' : ms.reduced ? '#FFFBEB' : '#fff'};border-radius:8px;padding:6px 4px;cursor:pointer;text-align:center">
-        <div style="font-weight:700;font-size:12px;color:${cur ? '#15803D' : 'var(--navy)'}">Th${i + 1}</div>
-        <div style="font-size:10px;color:var(--muted)">${_ncFmt(ms.nc)} công</div>
-        ${ms.reduced ? '<div style="font-size:9px;color:#B45309;font-weight:700">⚠ 5+5</div>' : ''}
+      return `<button onclick="window.setPayMonth('${y}-${String(i + 1).padStart(2, '0')}')" title="${ms.reduced ? '⚠ 5 T7 + 5 CN → công giảm · ' : ''}NC chuẩn ${_ncFmt(ms.nc)}"
+        style="border:1.5px solid ${cur ? '#15803D' : ms.reduced ? '#F59E0B' : '#EDF1EC'};background:${cur ? '#DCFCE7' : ms.reduced ? '#FFFBEB' : '#fff'};border-radius:7px;padding:5px 2px;cursor:pointer;text-align:center;line-height:1.2">
+        <div style="font-weight:700;font-size:11.5px;color:${cur ? '#15803D' : 'var(--navy)'}">Th${i + 1}${ms.reduced ? ' <span style="color:#B45309">⚠</span>' : ''}</div>
+        <div style="font-size:9.5px;color:var(--muted)">${_ncFmt(ms.nc)}</div>
       </button>`;
     }).join('');
 
+    /* Bảng NC chuẩn cả năm — lấp cột phải, bấm dòng để nhảy tháng */
+    const yrRows = Array.from({ length: 12 }, (_, i) => {
+      const ms = _monthStats(y, i + 1); const cur = (i + 1) === m;
+      return `<tr onclick="window.setPayMonth('${y}-${String(i + 1).padStart(2, '0')}')" style="cursor:pointer;background:${cur ? '#F0FDF4' : ms.reduced ? '#FFFBEB' : 'transparent'}">
+        <td style="padding:5px 8px;font-weight:${cur ? '700' : '600'};color:${cur ? '#15803D' : 'var(--navy)'}">Tháng ${i + 1}${ms.reduced ? ' <span title="5 T7 + 5 CN → công giảm" style="color:#B45309">⚠</span>' : ''}</td>
+        <td class="num" style="padding:5px 8px;color:var(--muted)">${ms.last}</td>
+        <td class="num" style="padding:5px 8px;color:#B45309">${ms.sat}</td>
+        <td class="num" style="padding:5px 8px;color:#DC2626">${ms.sun}</td>
+        <td class="num" style="padding:5px 8px;font-weight:700;color:${ms.reduced ? '#B45309' : '#15803D'}">${_ncFmt(ms.nc)}</td>
+      </tr>`;
+    }).join('');
+
+    const kpi = (label, val, sub, col) => `<div style="flex:1;min-width:96px;background:#fff;border:1px solid var(--line);border-radius:10px;padding:9px 12px">
+        <div style="font-size:10.5px;color:var(--muted);text-transform:uppercase;font-weight:600;letter-spacing:.2px">${label}</div>
+        <div style="font-size:21px;font-weight:800;color:${col || 'var(--navy)'};line-height:1.25">${val}</div>
+        <div style="font-size:10.5px;color:var(--muted)">${sub}</div>
+      </div>`;
+
     document.getElementById('payView').innerHTML = `
-      <div style="display:flex;gap:14px;flex-wrap:wrap;align-items:flex-start">
-        <div style="flex:1;min-width:300px">
-          <div style="display:flex;gap:10px;flex-wrap:wrap;margin-bottom:12px">
-            <div class="kpi" style="flex:1;min-width:120px"><div class="kpi-label">NC chuẩn tháng ${m}/${y}</div><div class="kpi-value">${_ncFmt(st.nc)}</div><div class="kpi-trend">công mặc định 1 NV làm đủ</div><div class="kpi-icon">🗓️</div></div>
-            <div class="kpi" style="flex:1;min-width:90px"><div class="kpi-label" style="color:#B45309">Thứ 7</div><div class="kpi-value" style="color:#B45309">${st.sat}</div><div class="kpi-trend">½ công/ngày</div></div>
-            <div class="kpi" style="flex:1;min-width:90px"><div class="kpi-label" style="color:#DC2626">Chủ nhật</div><div class="kpi-value" style="color:#DC2626">${st.sun}</div><div class="kpi-trend">nghỉ · 0 công</div></div>
+      <div style="display:flex;gap:16px;flex-wrap:wrap;align-items:flex-start">
+
+        <div style="flex:3 1 430px;min-width:0">
+          <div style="display:flex;gap:8px;flex-wrap:wrap;margin-bottom:10px">
+            ${kpi(`NC chuẩn ${m}/${y}`, _ncFmt(st.nc), 'công 1 NV làm đủ', st.reduced ? '#B45309' : '#15803D')}
+            ${kpi('Thứ 7', st.sat, '½ công/ngày', '#B45309')}
+            ${kpi('Chủ nhật', st.sun, 'nghỉ · 0 công', '#DC2626')}
           </div>
+
           ${st.reduced
-            ? `<div style="background:#FFFBEB;border:1px solid #FDE68A;border-radius:9px;padding:11px 14px;margin-bottom:12px;font-size:12.5px;color:#92400E"><b>⚠ Tháng ${m}/${y} có 5 Thứ 7 + 5 Chủ nhật</b> → NC chuẩn chỉ còn <b>${_ncFmt(st.nc)} công</b> (thường ~${_ncFmt(refNc)}). Công mặc định của NV tháng này bị GIẢM — app đã tự tính đúng khi ra lương.</div>`
-            : `<div style="background:#F0FDF4;border:1px solid #BBF7D0;border-radius:9px;padding:11px 14px;margin-bottom:12px;font-size:12.5px;color:#15803D">✓ Tháng ${m}/${y} bình thường (${st.sat} T7 + ${st.sun} CN) → NC chuẩn <b>${_ncFmt(st.nc)} công</b>.</div>`}
+            ? `<div style="background:#FFFBEB;border:1px solid #FDE68A;border-radius:8px;padding:8px 11px;margin-bottom:9px;font-size:12px;color:#92400E">⚠ <b>Tháng ${m}/${y} có 5 Thứ 7 + 5 Chủ nhật</b> → NC chuẩn chỉ còn <b>${_ncFmt(st.nc)} công</b> (thường ~${_ncFmt(refNc)}). Công mặc định của NV tháng này <b>GIẢM</b> — app đã tự tính đúng khi ra lương.</div>`
+            : `<div style="background:#F0FDF4;border:1px solid #BBF7D0;border-radius:8px;padding:8px 11px;margin-bottom:9px;font-size:12px;color:#15803D">✓ Tháng ${m}/${y} bình thường (${st.sat} T7 + ${st.sun} CN) → NC chuẩn <b>${_ncFmt(st.nc)} công</b>.</div>`}
+
+          <div style="display:flex;align-items:center;gap:10px;flex-wrap:wrap;font-size:11.5px;color:var(--muted);margin-bottom:8px">
+            <span><span style="display:inline-block;width:8px;height:8px;border-radius:2px;background:#fff;border:1px solid #CBD5C4;vertical-align:middle"></span> T2–T6 = <b>1 công</b></span>
+            <span><span style="display:inline-block;width:8px;height:8px;border-radius:2px;background:#FEF3C7;border:1px solid #FDE68A;vertical-align:middle"></span> <b style="color:#B45309">T7</b> = ½ công</span>
+            <span><span style="display:inline-block;width:8px;height:8px;border-radius:2px;background:#FEE2E2;border:1px solid #FCA5A5;vertical-align:middle"></span> <b style="color:#DC2626">CN</b> = nghỉ (0)</span>
+          </div>
+
           ${grid}
-          <div style="font-size:11px;color:var(--muted);margin-top:10px">Quy ước công: <b>T2–T6</b> = 1 công · <b style="color:#B45309">T7</b> = ½ công · <b style="color:#DC2626">CN</b> = nghỉ (0). Tháng nào rơi <b>5 T7 + 5 CN</b> thì tổng công mặc định thấp hơn.</div>
+
+          <div style="font-size:11px;color:var(--muted);margin-top:8px">Tháng nào rơi <b>5 T7 + 5 CN</b> thì NC chuẩn thấp hơn → lương theo công của NV tính trên mẫu số nhỏ hơn.</div>
         </div>
-        <div style="flex:1;min-width:280px">
-          <div style="font-weight:700;color:var(--navy);font-size:13px;margin-bottom:8px">📆 Cả năm ${y} <span style="font-weight:400;color:var(--muted);font-size:11.5px">— tháng viền cam ⚠ = 5+5, công giảm</span></div>
-          <div style="display:grid;grid-template-columns:repeat(4,1fr);gap:6px">${yr}</div>
+
+        <div style="flex:2 1 290px;min-width:270px">
+          <div style="font-size:12.5px;font-weight:700;color:var(--navy);margin-bottom:7px">🗓️ Cả năm ${y} <span style="font-weight:400;color:var(--muted);font-size:11px">— ⚠ = 5+5, công giảm</span></div>
+          <div style="display:grid;grid-template-columns:repeat(6,minmax(0,1fr));gap:5px;margin-bottom:12px">${yr}</div>
+
+          <div style="font-size:12.5px;font-weight:700;color:var(--navy);margin-bottom:7px">📊 Ngày công chuẩn từng tháng</div>
+          <div style="border:1px solid var(--line);border-radius:10px;overflow:hidden;background:#fff">
+            <table class="mini-table" style="width:100%;border-collapse:separate;border-spacing:0">
+              <thead><tr style="background:#F9FAFB">
+                <th style="text-align:left;padding:7px 8px">Tháng</th>
+                <th class="num" style="padding:7px 8px" title="Số ngày trong tháng">Ngày</th>
+                <th class="num" style="padding:7px 8px">T7</th>
+                <th class="num" style="padding:7px 8px">CN</th>
+                <th class="num" style="padding:7px 8px">NC chuẩn</th>
+              </tr></thead>
+              <tbody>${yrRows}</tbody>
+            </table>
+          </div>
         </div>
       </div>`;
   }
@@ -388,15 +435,30 @@
     const PF = window.PayrollFormula;
     const cur = PF.getLatePolicy();
 
+    const _lpEsc = v => String(v == null ? '' : v).replace(/[&<>"]/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]));
     function tierRow(t, i) {
-      return `<div class="lp-tier" data-idx="${i}" style="display:grid;grid-template-columns:90px 1fr 140px 32px;gap:8px;padding:8px 0;border-bottom:1px dashed var(--line);align-items:center">
+      const isCong = t.unit === 'cong';
+      return `<div class="lp-tier" data-idx="${i}" style="display:grid;grid-template-columns:88px 1fr 118px 128px 30px;gap:7px;padding:8px 0;border-bottom:1px dashed var(--line);align-items:center">
         <div style="display:flex;gap:4px;align-items:center">
           <span style="font-size:11px;color:var(--muted)">≥</span>
-          <input class="lp-tier-min" type="number" min="0" max="480" value="${t.thresholdMinutes}" style="width:64px;text-align:right;padding:5px 7px;font-size:12.5px;border:1px solid var(--line);border-radius:5px">
+          <input class="lp-tier-min" type="number" min="0" max="480" value="${t.thresholdMinutes}" style="width:60px;text-align:right;padding:5px 7px;font-size:12.5px;border:1px solid var(--line);border-radius:5px">
           <span style="font-size:11px;color:var(--muted)">p</span>
         </div>
-        <input class="lp-tier-label" type="text" value="${(t.label||'').replace(/"/g,'&quot;')}" placeholder="VD: > 10 phút" style="padding:5px 8px;font-size:12.5px;border:1px solid var(--line);border-radius:5px">
-        <input class="lp-tier-amount" type="text" inputmode="numeric" value="${(+t.amount||0).toLocaleString('vi-VN')}" data-raw="${+t.amount||0}" placeholder="0" style="padding:5px 8px;text-align:right;font-size:12.5px;font-weight:700;color:#DC2626;border:1px solid var(--line);border-radius:5px">
+        <input class="lp-tier-label" type="text" value="${_lpEsc(t.label)}" placeholder="VD: > 10 phút" style="padding:5px 8px;font-size:12.5px;border:1px solid var(--line);border-radius:5px;min-width:0">
+        <select class="lp-tier-unit" onchange="window._lpSwitchUnit(this)" style="padding:5px 6px;font-size:12px;border:1px solid var(--line);border-radius:5px;background:#fff">
+          <option value="money" ${isCong?'':'selected'}>₫ Tiền cố định</option>
+          <option value="cong"  ${isCong?'selected':''}>📆 Ngày công</option>
+        </select>
+        <div style="position:relative">
+          <input class="lp-tier-amount" type="text" inputmode="numeric" value="${(+t.amount||0).toLocaleString('vi-VN')}" data-raw="${+t.amount||0}" placeholder="0"
+            style="${isCong?'display:none;':''}width:100%;box-sizing:border-box;padding:5px 22px 5px 8px;text-align:right;font-size:12.5px;font-weight:700;color:#DC2626;border:1px solid var(--line);border-radius:5px">
+          <select class="lp-tier-days" style="${isCong?'':'display:none;'}width:100%;box-sizing:border-box;padding:5px 6px;font-size:12.5px;font-weight:700;color:#DC2626;border:1px solid var(--line);border-radius:5px;background:#fff">
+            <option value="0.5" ${(+t.days||0)===0.5?'selected':''}>trừ ½ ngày công</option>
+            <option value="1"   ${(+t.days||0)===1  ?'selected':''}>trừ 1 ngày công</option>
+            <option value="1.5" ${(+t.days||0)===1.5?'selected':''}>trừ 1½ ngày công</option>
+            <option value="2"   ${(+t.days||0)===2  ?'selected':''}>trừ 2 ngày công</option>
+          </select>
+        </div>
         <button onclick="window._lpRemoveTier(${i})" style="background:transparent;border:none;color:#DC2626;cursor:pointer;font-size:16px">×</button>
       </div>`;
     }
@@ -429,8 +491,10 @@
         <div id="lpTierList" style="background:#FAFBFC;border:1px solid var(--line);border-radius:8px;padding:8px 12px;margin-bottom:14px">
           ${(cur.tiers || []).map((t, i) => tierRow(t, i)).join('')}
         </div>
-        <div style="font-size:11.5px;color:var(--muted);background:#F0FDF4;border-left:3px solid #15803D;padding:8px 12px;border-radius:6px;margin-bottom:14px;line-height:1.6">
-          💡 <b>VD áp dụng:</b> NV đi muộn 35 phút (grace 10p) → áp tier có ngưỡng cao nhất mà 35 ≥ ngưỡng → tier <b>"> 30 phút"</b> → phạt <b>50.000 ₫</b>
+        <div style="font-size:11.5px;color:var(--muted);background:#F0FDF4;border-left:3px solid #15803D;padding:8px 12px;border-radius:6px;margin-bottom:14px;line-height:1.7">
+          💡 <b>VD áp dụng:</b> NV đi muộn 35 phút (grace 10p) → áp tier có ngưỡng cao nhất mà 35 ≥ ngưỡng → tier <b>"> 30 phút"</b> → phạt <b>50.000 ₫</b><br>
+          📆 <b>Đơn vị "Ngày công":</b> tiền phạt = <code>lương 1 ngày công của chính NV đó × số ngày</code> — mỗi người một mức, tự tính lại khi đổi lương cơ bản.
+          VD muộn 200 phút, tier <b>≥180p → trừ ½ ngày công</b>, NV lương 8.000.000 / 25 công = 320.000/ngày → phạt <b>160.000 ₫</b>.
         </div>
       </div>
 
@@ -445,11 +509,16 @@
       const mode = document.getElementById('lpMode')?.value || 'tier';
       const graceMinutes = parseInt(document.getElementById('lpGrace')?.value, 10) || 0;
       const parseRaw = (el) => parseInt((el?.value ?? '').toString().replace(/[^\d-]/g, ''), 10) || 0;
-      const tiers = Array.from(document.querySelectorAll('.lp-tier')).map(el => ({
-        thresholdMinutes: parseInt(el.querySelector('.lp-tier-min')?.value, 10) || 0,
-        label: el.querySelector('.lp-tier-label')?.value || '',
-        amount: parseRaw(el.querySelector('.lp-tier-amount')),
-      })).filter(t => t.thresholdMinutes > 0).sort((a, b) => a.thresholdMinutes - b.thresholdMinutes);
+      const tiers = Array.from(document.querySelectorAll('.lp-tier')).map(el => {
+        const unit = el.querySelector('.lp-tier-unit')?.value === 'cong' ? 'cong' : 'money';
+        return {
+          thresholdMinutes: parseInt(el.querySelector('.lp-tier-min')?.value, 10) || 0,
+          label: el.querySelector('.lp-tier-label')?.value || '',
+          unit,
+          amount: unit === 'money' ? parseRaw(el.querySelector('.lp-tier-amount')) : 0,
+          days: unit === 'cong' ? (parseFloat(el.querySelector('.lp-tier-days')?.value) || 0) : 0,
+        };
+      }).filter(t => t.thresholdMinutes > 0).sort((a, b) => a.thresholdMinutes - b.thresholdMinutes);
       const perMinuteRate = parseRaw(document.getElementById('lpRate'));
       const policy = { mode, graceMinutes, tiers, perMinuteRate };
       window.STORE.set('latePolicy', policy);
@@ -482,18 +551,29 @@
     };
     wireMoney(document.body);
 
-    /* Helpers */
+    /* Helpers — data-idx phải TĂNG DẦN, không đếm lại số dòng:
+       xoá mức giữa rồi thêm mới sẽ cấp lại 1 data-idx đang tồn tại → nút ✕ xoá nhầm dòng. */
+    let _lpSeq = (cur.tiers || []).length;
     window._lpAddTier = function () {
       const list = document.getElementById('lpTierList');
-      const idx = list.querySelectorAll('.lp-tier').length;
       const tmp = document.createElement('div');
-      tmp.innerHTML = tierRow({ thresholdMinutes: 60, label: 'Mới', amount: 100000 }, idx);
+      tmp.innerHTML = tierRow({ thresholdMinutes: 60, label: 'Mới', unit: 'money', amount: 100000 }, _lpSeq++);
       list.appendChild(tmp.firstElementChild);
       wireMoney(list);
     };
     window._lpRemoveTier = function (idx) {
       const el = document.querySelector('.lp-tier[data-idx="' + idx + '"]');
       el?.remove();
+    };
+    /* Đổi đơn vị 1 mức: ₫ tiền cố định ⇄ 📆 ngày công */
+    window._lpSwitchUnit = function (sel) {
+      const row = sel.closest('.lp-tier');
+      if (!row) return;
+      const isCong = sel.value === 'cong';
+      const amt = row.querySelector('.lp-tier-amount');
+      const days = row.querySelector('.lp-tier-days');
+      if (amt) amt.style.display = isCong ? 'none' : '';
+      if (days) days.style.display = isCong ? '' : 'none';
     };
   };
 
@@ -925,11 +1005,6 @@
       if (ps && ps.status === 'draft' && window.hydrateDraftPayslip) window.hydrateDraftPayslip(ps);
       const hasPhieu = !!(ps && typeof ps.total === 'number');
 
-      /* Phạt muộn auto từ chấm công + latePolicy */
-      const lateAuto = PF
-        ? PF.computeLateAutoForMonth(s.id, month)
-        : { count: 0, total: 0, detail: [] };
-
       /* Thưởng hỗ trợ Kho/Ship — TỰ tính từ sổ ghi (bonusLog), cộng thẳng vào cột Thưởng */
       /* Thưởng hỗ trợ = tính theo QUY CHẾ phủ ngày từng khoản. Nhưng phiếu ĐÃ nộp/duyệt/trả
          thì GIỮ số đã chốt trên phiếu (sửa quy chế sau này không làm đổi lương đã duyệt). */
@@ -964,6 +1039,11 @@
         }
       }
       const c = _psIn ? PF.computePayslip(_psIn) : null;
+
+      /* Phạt muộn — LẤY TỪ KẾT QUẢ TÍNH, không tính lại:
+         phiếu đã duyệt/đã trả giữ số phạt đã chốt, và tier "trừ ½ ngày công" cần lương ngày
+         của chính NV (chỉ computePayslip mới biết). Tính riêng ở đây → cột Phạt lệch phiếu lương. */
+      const lateAuto = (c && c.lateAuto) ? c.lateAuto : { count: 0, total: 0, detail: [] };
 
       const workActual = c ? (+c.workActual || 0) : paid;
       /* Mẫu số hiển thị PHẢI lấy từ chính kết quả tính (theo contractType của PHIẾU),
