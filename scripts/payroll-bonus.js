@@ -90,7 +90,10 @@
     if (!d) return null;
     const hits = getPolicies(group).filter(p => (!p.from || d >= p.from) && (!p.to || d <= p.to));
     if (!hits.length) return null;                       /* ngày trống → 0đ + cảnh báo (không tự đoán) */
-    return hits.sort((a, b) => ((a.from || '') < (b.from || '') ? -1 : 1)).pop();
+    /* Comparator PHẢI trả 0 khi bằng nhau. Trước đây trả 1 → 2 quy chế CÙNG ngày bắt đầu cho
+       kết quả phụ thuộc thứ tự sort (không xác định). Nay sort ỔN ĐỊNH (ES2019): trùng `from`
+       thì quy chế khai SAU trong danh sách thắng — đúng trực giác "sửa sau đè trước". */
+    return hits.sort((a, b) => String(a.from || '').localeCompare(String(b.from || ''))).pop();
   }
   function rulesForDate(date, group) { const p = policyForDate(date, group); return p ? p.rules : null; }
   const policyForEntry = e => policyForDate(e && e.date, GROUP_OF_TASK[e && e.task]);
@@ -563,11 +566,13 @@
 
   /* ===== MODAL: cấu hình mức thưởng ===== */
   /* ===== QUY CHẾ THƯỞNG — 2 KHỐI ĐỘC LẬP: Kho & Ship ===== */
+  /* Ngày kế tiếp — TÍNH THEO UTC. Trước đây parse local (iso+'T00:00:00') rồi xuất toISOString (UTC):
+     ở VN (UTC+7) việc +1 ngày bị trừ lại đúng 7h → hàm trả về CHÍNH ngày đó, khiến "Thêm quy chế"
+     đặt ngày bắt đầu TRÙNG ngày kết thúc quy chế trước (chồng lấn) và cảnh báo khoảng trống sai. */
   function _nextDay(iso) {
-    if (!iso) return '';
-    const d = new Date(iso + 'T00:00:00');
-    d.setDate(d.getDate() + 1);
-    return d.toISOString().slice(0, 10);
+    const m = String(iso || '').match(/^(\d{4})-(\d{2})-(\d{2})$/);
+    if (!m) return '';
+    return new Date(Date.UTC(+m[1], +m[2] - 1, +m[3] + 1)).toISOString().slice(0, 10);
   }
   const _tierRow = t => `<div class="br-tier" style="display:grid;grid-template-columns:1fr 1fr 1.2fr 30px;gap:6px;align-items:center;margin-bottom:5px">
       <input type="number" class="br-min" value="${t ? t.min : ''}" placeholder="từ kg" style="padding:6px;border:1px solid var(--line);border-radius:6px;text-align:right">

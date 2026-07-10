@@ -148,8 +148,40 @@
       bhxhEmp: c.bhxhEmp,
       bhxhCom: c.bhxhCom,
       bhxh:    c.bhxhEmp,                                       /* alias cho code/báo cáo cũ */
+      /* Đóng băng phạt đi muộn: sửa khung phạt / chấm công tháng cũ KHÔNG được đổi phiếu đã chốt */
+      lateAuto: c.lateAuto || { count: 0, total: 0, detail: [] },
+      lateTotal: (c.lateAuto && c.lateAuto.total) || 0,
     };
   }
+
+  /* Công thực tế của 1 NV trong 1 tháng — DÙNG CHUNG công thức với bảng lương (payroll.js).
+     Nếu payroll.js chưa nạp (trang khác) thì fallback công chuẩn. */
+  function workActualOf(staff, mth) {
+    if (window.payrollWorkActual) return window.payrollWorkActual(staff, mth);
+    return window.workStandardFor
+      ? window.workStandardFor(staff.dept, staff.contractType, mth, staff.role)
+      : PF.getDeptConfig(staff.dept, staff.contractType).workStandard;
+  }
+
+  /* Nạp cấu hình BHXH + hoa hồng vào 1 phiếu NHÁP chưa khai (dùng chung cho drawer & bảng lương,
+     để 2 nơi không hiển thị lệch nhau). Trả về chính object đã sửa. */
+  function hydrateDraftPayslip(ps, cfg) {
+    if (!ps || ps.status !== 'draft') return ps;
+    cfg = cfg || (PF.getStaffPayCfg ? PF.getStaffPayCfg(ps.staffId) : null);
+    if (!cfg) return ps;
+    if (ps.bhxhOn == null && !(+ps.bhxh > 0)) {
+      ps.bhxhOn = cfg.bhxhOn;
+      ps.bhxhBase = cfg.bhxhBase || _bhxhDefaultBase();
+    }
+    if (ps.commMode == null) {
+      const dup = _hasCommissionBonus(ps);
+      ps.commMode = dup ? 'none' : cfg.commMode;
+      ps.commissionPct = dup ? 0 : cfg.commPct;
+      ps.commScope = cfg.commScope;
+    }
+    return ps;
+  }
+  window.hydrateDraftPayslip = hydrateDraftPayslip;
 
   /* === Tìm phiếu theo NV + tháng === */
   function findPayslip(staffId, month) {
@@ -165,23 +197,9 @@
     if (existing) {
       /* Phiếu NHÁP (chưa chốt) → nạp cấu hình BHXH/hoa hồng mới nhất của NV.
          Phiếu ĐÃ NỘP / DUYỆT / TRẢ → GIỮ NGUYÊN, KHÔNG tự tính lại (bảo toàn số đã chốt). */
-      if (existing.status === 'draft') {
-        /* BHXH: CHỈ nạp cấu hình khi phiếu chưa ghi số BHXH nào. Nếu phiếu cũ đã có bhxh > 0
-           mà NV chưa bật BHXH trong hồ sơ, gán bhxhOn=false sẽ THỔI BAY số đó
-           → giữ nguyên dạng legacy, để kế toán tự quyết. */
-        if (existing.bhxhOn == null && !(+existing.bhxh > 0)) {
-          existing.bhxhOn = cfg.bhxhOn;
-          existing.bhxhBase = cfg.bhxhBase || _bhxhDefaultBase();
-        }
-        /* Hoa hồng: phiếu ĐÃ có dòng thưởng tên "hoa hồng / doanh số" → KHÔNG bật hoa hồng tự động,
-           nếu không sẽ CỘNG TRÙNG với dòng thưởng đó (vd phiếu nháp "Hoa hồng tuyển dụng 290k"). */
-        if (existing.commMode == null) {
-          const _dup = _hasCommissionBonus(existing);
-          existing.commMode = _dup ? 'none' : cfg.commMode;
-          existing.commissionPct = _dup ? 0 : cfg.commPct;
-          existing.commScope = cfg.commScope;
-        }
-      }
+      /* Phiếu NHÁP → nạp cấu hình BHXH/hoa hồng mới nhất (giữ số cũ nếu đã có, tránh cộng trùng
+         hoa hồng khi phiếu đã có dòng thưởng "hoa hồng"). Phiếu đã chốt: KHÔNG đụng. */
+      hydrateDraftPayslip(existing, cfg);
       return existing;
     }
     return {
@@ -193,7 +211,9 @@
       role: staff.role || '',
       contractType: staff.contractType || 'official',
       basicSalary: staff.salary || 0,
-      workActual: 0,
+      /* Công thực tế lấy thẳng từ BẢNG CHẤM CÔNG (trước đây hardcode 0 → mở phiếu ra thấy 0 công,
+         lệch hẳn với bảng lương; lỡ bấm Lưu là NV về ~0đ). */
+      workActual: workActualOf(staff, month),
       workStandardOverride: null,
       allowanceOverride: null,
       bonuses: [],
@@ -1135,13 +1155,16 @@
       totalAmount += c.total;
     });
 
-    /* 2) Auto-tạo phiếu cho NV chưa có — dùng default từ staff + công đầy đủ */
-    const sheets = window.STORE.get('timesheet', []) || [];
+    /* 2) Auto-tạo phiếu cho NV chưa có.
+       PHẢI dùng ĐÚNG các nguồn số mà bảng lương + phiếu lương đang dùng, nếu không phiếu
+       gửi hàng loạt sẽ sai tiền rồi bị ĐÓNG BĂNG luôn ở trạng thái 'submitted':
+         · công thực tế  → window.payrollWorkActual (X/L/P đủ ca, H nửa ca, VP T7=0.5, CN=0)
+           (trước đây đếm thô X|P → mất ngày đi muộn 'L', mất nửa ngày 'H', tính T7 = 1 công)
+         · thưởng hỗ trợ → BONUS.helperFor (lịch trực kho + sổ ghi)  (trước đây BỎ QUA → mất tiền)
+         · BHXH + hoa hồng → PF.getStaffPayCfg   (trước đây đọc s.hasBHXH — trường KHÔNG tồn tại
+           — và hardcode 578.000đ; hoa hồng bị bỏ trắng) */
     toCreate.forEach(s => {
-      const sheet = sheets.find(t => t.staffId === s.id && t.month === month);
-      const workActual = sheet
-        ? sheet.days.filter(d => d === 'X' || d === 'P').length
-        : (window.workStandardFor ? window.workStandardFor(s.dept, s.contractType, month, s.role) : PF.getDeptConfig(s.dept, s.contractType).workStandard);
+      const cfg = PF.getStaffPayCfg ? PF.getStaffPayCfg(s.id) : { bhxhOn:false, bhxhBase:0, commMode:'none', commPct:0, commScope:'ownedCusts' };
       const draft = {
         id: 'PR-' + month + '-' + s.id,
         month,
@@ -1151,12 +1174,19 @@
         role: s.role || '',
         contractType: s.contractType || 'official',
         basicSalary: s.salary || 0,
-        workActual,
+        workActual: workActualOf(s, month),
         workStandardOverride: null,
         allowanceOverride: null,
         bonuses: [],
         penalties: [],
-        bhxh: s.hasBHXH ? 578000 : 0,
+        helperBonus: window.BONUS ? (window.BONUS.helperFor(s.id, month).total || 0) : 0,
+        bhxhOn: cfg.bhxhOn,
+        bhxhBase: cfg.bhxhBase || _bhxhDefaultBase(),
+        bhxh: 0,
+        commMode: cfg.commMode,
+        commissionPct: cfg.commPct,
+        commScope: cfg.commScope,
+        commissionAmount: 0,
         advance: 0,
         notes: '(Tự tạo bởi HR khi gửi hàng loạt)',
         createdAt: now,
@@ -1168,9 +1198,7 @@
         paidAt: null,
       };
       const c = PF.computePayslip(draft);
-      draft.baseSalary = c.baseSalary;
-      draft.allowance = c.allowance;
-      draft.total = c.total;
+      Object.assign(draft, computedSnapshot(c));
       totalAmount += c.total;
       list.push(draft);
     });

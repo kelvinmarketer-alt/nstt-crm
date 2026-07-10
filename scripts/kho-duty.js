@@ -279,6 +279,7 @@
 
   /* ===== MODAL: xếp trực 1 ngày ===== */
   function openDay(date) {
+    migrateLegacy();          /* nếu chưa migrate mà lưu đè ngày này → mất ca trực cũ */
     const d = dayOf(date);
     const active = khoStaff();
     /* Người ĐÃ được xếp trực nhưng nay đã nghỉ / chuyển phòng vẫn phải hiện (đang tick),

@@ -69,9 +69,9 @@
     /* "Khung phạt muộn" chiếm trọn 1 hàng → 2 nút CFO sau đó tự ghép cặp 1 hàng */
     .pay-head > button[onclick*="openLatePolicySettings"]{flex:1 1 100%}
     .pay-head .cfo-act{flex:1 1 calc(50% - 10px);min-width:0;white-space:nowrap;justify-content:center}
-    /* tab "Chấm công" / "Bảng lương" full-width chia đều */
-    #payTabs.rpt-tabs{width:100%!important;flex-wrap:nowrap;display:flex}
-    #payTabs .rpt-tab{flex:1 1 0;min-width:0;text-align:center;padding:8px 6px;white-space:nowrap}
+    /* 5 tab (thêm "Lịch trực kho") → cho xuống dòng, không ép 1 hàng kẻo tràn ngang */
+    #payTabs.rpt-tabs{width:100%!important;flex-wrap:wrap;display:flex;justify-content:center}
+    #payTabs .rpt-tab{flex:0 1 auto;min-width:0;text-align:center;padding:7px 10px;font-size:12px;white-space:nowrap}
     /* FIX bảng chấm công: chỉ 2 cột (Tên + Công), full-width, vô hiệu min-width:600 của t-responsive */
     #payView .att-wrap{max-height:none!important;overflow:visible!important}
     #payView table.att-table,#payView table.att-table.t-responsive{width:100%!important;min-width:0!important}

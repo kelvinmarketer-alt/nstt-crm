@@ -133,29 +133,50 @@
     return d === 'Kho' || d === 'Ship' || /kho|ship|giao|vận hành|van hanh/i.test(d) || /giao hàng|giao hang|shipper|tài xế|tai xe/.test(r);
   }
   function shiftFactorForStaff(s, dayN) { return _fullWeekStaff(s) ? 1.0 : shiftFactorOfDay(dayN); }
-  function defaultDaysFor(s) {
-    if (!_fullWeekStaff(s)) return defaultDays();
-    const [y, m] = month.split('-').map(Number); const last = new Date(y, m, 0).getDate();
-    return Array.from({ length: last }, () => 'X');   /* Kho/Ship mặc định làm cả tháng (kể cả T7/CN) */
+
+  /* ===== Helper chấm công THAM SỐ HOÁ THEO THÁNG =====
+     Trước đây defaultDaysFor/paidDaysFor bám biến `month` của tab đang mở → không dùng lại được
+     cho tháng khác (vd nút "Gửi tất cả CFO duyệt", hoặc lúc tạo phiếu mới). Nay tách ra để
+     MỌI nơi tính công thực tế bằng CÙNG một công thức. */
+  function _defaultDaysForMonth(s, mth) {
+    const [y, m] = String(mth).split('-').map(Number);
+    const last = new Date(y, m, 0).getDate();
+    if (_fullWeekStaff(s)) return Array.from({ length: last }, () => 'X');   /* Kho/Ship làm cả tuần */
+    return Array.from({ length: last }, (_, i) => (new Date(y, m - 1, i + 1).getDay() === 0 ? '_' : 'X'));
   }
-  /* Ngày để HIỂN THỊ + TÍNH cho 1 NV. Kho/Ship làm CẢ TUẦN → ô '_' (kiểu "CN nghỉ" của VP)
-     coi là CÓ MẶT (X). Vắng thật vẫn là V. → thứ 7 + chủ nhật đều tính công. */
-  function daysForStaff(s, rawDays) {
-    const arr = rawDays || defaultDaysFor(s);
+  function _daysForStaffMonth(s, mth, rawDays) {
+    const arr = rawDays || _defaultDaysForMonth(s, mth);
     return _fullWeekStaff(s) ? arr.map(v => (v === '_' ? 'X' : v)) : arr;
   }
-  /* Công tính lương THEO NV: Kho/Ship mọi ngày = 1 công; VP T7 = 0.5, CN = 0 */
-  function paidDaysFor(s, days) {
+  /* Công tính lương: Kho/Ship mọi ngày = 1 công · VP: T2-T6 = 1, T7 = 0.5, CN = 0.
+     X/L/P = đủ ca · H = nửa ca · V = vắng (0). */
+  function _paidDaysWeighted(s, mth, days) {
+    const [y, m] = String(mth).split('-').map(Number);
     const full = _fullWeekStaff(s);
     let n = 0;
     (days || []).forEach((d, i) => {
-      const sf = full ? 1.0 : shiftFactorOfDay(i + 1);
+      const dow = new Date(y, m - 1, i + 1).getDay();
+      const sf = full ? 1.0 : (dow === 0 ? 0 : dow === 6 ? 0.5 : 1);
       if (sf === 0) return;
       if (d === 'X' || d === 'L' || d === 'P') n += sf;
       else if (d === 'H') n += sf * 0.5;
     });
     return n;
   }
+  /* API DÙNG CHUNG: công thực tế của 1 NV trong 1 tháng (đọc thẳng bảng chấm công).
+     payroll-approval.js dùng hàm này khi TẠO phiếu / GỬI HÀNG LOẠT để không lệch với bảng lương. */
+  window.payrollWorkActual = function (staff, mth) {
+    if (!staff || !mth) return 0;
+    const sh = (window.STORE.get('timesheet', []) || []).find(t => t.staffId === staff.id && t.month === mth);
+    return _paidDaysWeighted(staff, mth, _daysForStaffMonth(staff, mth, sh ? sh.days : null));
+  };
+
+  function defaultDaysFor(s) { return _defaultDaysForMonth(s, month); }
+  /* Ngày để HIỂN THỊ + TÍNH cho 1 NV. Kho/Ship làm CẢ TUẦN → ô '_' (kiểu "CN nghỉ" của VP)
+     coi là CÓ MẶT (X). Vắng thật vẫn là V. → thứ 7 + chủ nhật đều tính công. */
+  function daysForStaff(s, rawDays) { return _daysForStaffMonth(s, month, rawDays); }
+  /* Công tính lương THEO NV — uỷ quyền cho _paidDaysWeighted để KHÔNG có 2 công thức song song */
+  function paidDaysFor(s, days) { return _paidDaysWeighted(s, month, days); }
   /* NC chuẩn = Σ shiftFactor của các ngày trong tháng (T7 = 0.5, CN = 0)
      → ví dụ tháng 31 ngày: 22 ngày T2-T6 × 1 + 4 ngày T7 × 0.5 + 4 CN × 0 = 24 NC */
   function workdaysInMonth() {
@@ -899,6 +920,9 @@
       const luongCo = Math.round(luongNgay * paid);
 
       const ps = psByStaff[s.id];
+      /* Phiếu NHÁP lập trước v418 chưa khai bhxhOn/commMode: drawer sẽ tự nạp cấu hình NV khi mở.
+         Bảng lương phải nạp Y HỆT, nếu không bảng và phiếu hiện 2 số BHXH/hoa hồng khác nhau. */
+      if (ps && ps.status === 'draft' && window.hydrateDraftPayslip) window.hydrateDraftPayslip(ps);
       const hasPhieu = !!(ps && typeof ps.total === 'number');
 
       /* Phạt muộn auto từ chấm công + latePolicy */
@@ -942,6 +966,9 @@
       const c = _psIn ? PF.computePayslip(_psIn) : null;
 
       const workActual = c ? (+c.workActual || 0) : paid;
+      /* Mẫu số hiển thị PHẢI lấy từ chính kết quả tính (theo contractType của PHIẾU),
+         không lấy s.contractType của hồ sơ NV — nếu không "Công 26/29" mà lương lại chia cho 30. */
+      const wdShow = c ? (+c.workStandard || wd) : wd;
       const baseSalary = c ? c.baseSalary : luongCo;
       const allowance  = c ? c.allowance : 0;
       const comm       = (c && c.commission) || { amount: 0, pct: 0, mode: 'none', revenue: 0 };
@@ -975,7 +1002,7 @@
           <div><b>${s.name}</b><div style="color:var(--muted);font-size:11px">${s.role} · ${s.dept || ''}</div></div>
         </div></td>
         <td class="num"><b>${window.fmt(s.salary || 0)}</b></td>
-        <td class="num"><b style="color:#0369A1">${workActual % 1 === 0 ? workActual : workActual.toFixed(2)}</b><div style="font-size:10px;color:var(--muted)">/${wd % 1 === 0 ? wd : wd.toFixed(1)}</div></td>
+        <td class="num"><b style="color:#0369A1">${workActual % 1 === 0 ? workActual : workActual.toFixed(2)}</b><div style="font-size:10px;color:var(--muted)">/${wdShow % 1 === 0 ? wdShow : wdShow.toFixed(1)}</div></td>
         <td class="num"><b>${window.fmt(baseSalary)}</b></td>
         <td class="num" style="color:#0F766E" title="Phụ cấp ${PF ? (PF.ALLOWANCE_LABEL[c && c.allowanceKey] || '') : ''} — chia theo công thực tế">${allowance ? '<b>+' + window.fmt(allowance) + '</b>' : '<span style="color:var(--muted)">—</span>'}</td>
         <td class="num" style="color:#B45309" title="${comm.mode === 'auto' ? comm.pct + '% × doanh thu ' + window.fmt(comm.revenue) + 'đ' : comm.mode === 'manual' ? 'Nhập tay ở phiếu lương' : 'NV này không có hoa hồng'}">${comm.amount ? '<b>+' + window.fmt(comm.amount) + '</b>' + (comm.mode === 'auto' ? '<div style="font-size:10px;color:var(--muted);font-weight:400">' + comm.pct + '%</div>' : '') : '<span style="color:var(--muted)">—</span>'}</td>

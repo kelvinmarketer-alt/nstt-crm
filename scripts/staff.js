@@ -341,18 +341,18 @@
       <div class="section-h" style="margin-top:14px">💵 Hoa hồng</div>
       <div class="form-row">
         <div><label>Cách tính</label>
-          <select id="sCommMode" onchange="window._sCommToggle(this.value)">
+          <select id="sPayCommMode" onchange="window._sCommToggle(this.value)">
             <option value="none"   ${sel(c.commMode,'none')}>— Không có hoa hồng —</option>
             <option value="auto"   ${sel(c.commMode,'auto')}>📈 Tự tính: % × doanh thu</option>
             <option value="manual" ${sel(c.commMode,'manual')}>✍️ Gõ tay số tiền ở phiếu lương</option>
           </select></div>
-        <div id="sCommPctWrap" style="display:${c.commMode === 'auto' ? '' : 'none'}">
+        <div id="sPayCommPctWrap" style="display:${c.commMode === 'auto' ? '' : 'none'}">
           <label>% hoa hồng</label>
-          <input id="sCommPct" type="number" step="0.1" min="0" max="100" value="${c.commPct}" placeholder="VD: 1.5"></div>
+          <input id="sPayCommPct" type="number" step="0.1" min="0" max="100" value="${c.commPct}" placeholder="VD: 1.5"></div>
       </div>
-      <div class="form-row wide" id="sCommScopeWrap" style="display:${c.commMode === 'auto' ? '' : 'none'}">
+      <div class="form-row wide" id="sPayCommScopeWrap" style="display:${c.commMode === 'auto' ? '' : 'none'}">
         <label>Tính trên doanh thu</label>
-        <select id="sCommScope">
+        <select id="sPayCommScope">
           <option value="ownedCusts" ${sel(c.commScope,'ownedCusts')}>Đơn của KH nhân viên này phụ trách</option>
           <option value="ownOrders"  ${sel(c.commScope,'ownOrders')}>Đơn nhân viên này tự tạo</option>
           <option value="allOrders"  ${sel(c.commScope,'allOrders')}>TẤT CẢ đơn (Giám đốc / Trưởng phòng)</option>
@@ -376,8 +376,8 @@
   };
   window._sCommToggle = function (mode) {
     const isAuto = mode === 'auto';
-    const p = document.getElementById('sCommPctWrap');
-    const s = document.getElementById('sCommScopeWrap');
+    const p = document.getElementById('sPayCommPctWrap');
+    const s = document.getElementById('sPayCommScopeWrap');
     if (p) p.style.display = isAuto ? '' : 'none';
     if (s) s.style.display = isAuto ? '' : 'none';
   };
@@ -512,9 +512,9 @@
       window.PayrollFormula.setStaffPayCfg(id, {
         bhxhOn,
         bhxhBase: bhxhOn ? (parseFloat(window.formVal('#sBhxhBase')) || 0) : 0,
-        commMode: window.formVal('#sCommMode') || 'none',
-        commPct:  parseFloat(window.formVal('#sCommPct')) || 0,
-        commScope: window.formVal('#sCommScope') || 'ownedCusts',
+        commMode: window.formVal('#sPayCommMode') || 'none',
+        commPct:  parseFloat(window.formVal('#sPayCommPct')) || 0,
+        commScope: window.formVal('#sPayCommScope') || 'ownedCusts',
       });
     }
     window.closeModal();

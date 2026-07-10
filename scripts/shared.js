@@ -5,7 +5,7 @@
 
 /* Phiên bản app hiển thị (đối chiếu với CACHE_VERSION trong sw.js) — để user tự XÁC NHẬN
    đang chạy bản mới hay còn kẹt JS cũ (hiện ở góc sidebar + log console). */
-window.APP_VERSION = 'v421';
+window.APP_VERSION = 'v422';
 console.log('%c[NSTT] App ' + window.APP_VERSION, 'color:#339B21;font-weight:bold');
 
 /* Gom NGUỒN khách về 3 nhóm chuẩn: 'mkt' / 'sales' / 'sep-gioi-thieu'.
@@ -372,9 +372,13 @@ window.officeWorkStandard = function (monthStr) {
   return n;
 };
 window.workStandardFor = function (dept, contractType, monthStr, role) {
-  const d = String(dept || ''); const r = String(role || '').toLowerCase();
-  if (d === 'Ship' || /giao hàng|giao hang|shipper|tài xế|tai xe/.test(r)) return 30;
-  if (d === 'Kho' || /(^|\s)kho(\s|$)/.test(d.toLowerCase()) || /kho/.test(r)) {
+  const d = String(dept || ''); const dl = d.toLowerCase(); const r = String(role || '').toLowerCase();
+  /* Nhận cả TÊN PHÒNG BAN CŨ ("Giao hàng", "Vận hành") — phiếu lương cũ còn lưu tên này.
+     Trước đây chỉ khớp dept === 'Ship' nên "Giao hàng" rơi xuống công chuẩn VĂN PHÒNG (24-25)
+     trong khi phụ cấp vẫn tính theo Ship → 2 chỗ lệch nhau. */
+  const shipRe = /giao hàng|giao hang|shipper|tài xế|tai xe|vận hành|van hanh/;
+  if (dl === 'ship' || shipRe.test(dl) || shipRe.test(r)) return 30;
+  if (dl === 'kho' || /(^|\s)kho(\s|$)/.test(dl) || /kho/.test(r)) {
     return (contractType === 'probation' || contractType === 'parttime') ? 30 : 29;
   }
   return window.officeWorkStandard(monthStr);   /* khối văn phòng → theo lịch tháng */

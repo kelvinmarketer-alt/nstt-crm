@@ -393,12 +393,18 @@
        Làm THIẾU công (vd 29/30)      → mức tháng ÷ công chuẩn × công thực tế. */
     const allowRatio = workStandard > 0 ? Math.min(1, workActual / workStandard) : 0;
     let allowance = roundK(allowanceMonthly * allowRatio);
-    /* Phiếu ĐÃ DUYỆT / ĐÃ TRẢ → GIỮ NGUYÊN số phụ cấp đã chốt.
-       Không được để công thức mới (trần) làm tụt tiền của phiếu đã trả cho NV.
-       Phiếu 'draft'/'submitted' vẫn áp trần mới (chưa duyệt, chưa chi). */
-    if ((input.status === 'approved' || input.status === 'paid') && typeof input.allowance === 'number') {
-      allowance = +input.allowance;
-    }
+
+    /* ============ ĐÓNG BĂNG TIỀN CỦA PHIẾU ĐÃ DUYỆT / ĐÃ TRẢ ============
+       Phiếu 'approved'/'paid' = tiền ĐÃ chốt (và có thể đã chi cho NV). Mọi thứ tính LIVE
+       (phạt đi muộn theo latePolicy hiện tại, hoa hồng theo đơn hàng hiện tại, % BHXH ở Cài đặt,
+        công thức phụ cấp mới…) đều KHÔNG được phép làm đổi số của các phiếu đó.
+       → Nếu phiếu có lưu sẵn con số nào thì dùng lại đúng con số ấy.
+       Phiếu 'draft'/'submitted' (chưa duyệt, chưa chi) vẫn tính lại bình thường. */
+    const _frozen = (input.status === 'approved' || input.status === 'paid');
+    const _keep = (stored, computed) => (_frozen && typeof stored === 'number') ? +stored : computed;
+
+    allowance  = _keep(input.allowance, allowance);
+    baseSalary = _keep(input.baseSalary, baseSalary);
 
     /* Tổng thưởng = thưởng thủ công + thưởng hỗ trợ Kho/Ship (sổ ghi, tự tính) */
     const helperBonus = +input.helperBonus || 0;
@@ -416,27 +422,35 @@
     });
     const totalPenalty = penalties.reduce((s, p) => s + (+p.amount || 0), 0);
 
-    /* Hoa hồng — auto (% × doanh thu) hoặc gõ tay, tuỳ vị trí */
-    const commission = computeCommission(input);
+    /* Hoa hồng — auto (% × doanh thu) hoặc gõ tay, tuỳ vị trí.
+       Phiếu đã chốt: giữ số tiền hoa hồng đã lưu (đơn hàng tháng đó sửa sau không làm đổi lương). */
+    const _comm = computeCommission(input);
+    const commission = Object.assign({}, _comm, { amount: _keep(input.commissionAmount, _comm.amount) });
 
-    /* BHXH — NV 10,5% (TRỪ vào lương) · DN 21,5% (công ty chi, KHÔNG trừ NV) */
+    /* BHXH — NV 10,5% (TRỪ vào lương) · DN 21,5% (công ty chi, KHÔNG trừ NV).
+       Phiếu đã chốt: giữ số đã lưu (đổi % ở Cài đặt không làm đổi lương đã duyệt). */
     const bh = computeBhxh(input);
-    const bhxhEmp = bh.emp;
-    const bhxhCom = bh.com;
+    const bhxhEmp = _keep(input.bhxhEmp, bh.emp);
+    const bhxhCom = _keep(input.bhxhCom, bh.com);
     const bhxh = bhxhEmp;                 /* alias giữ tương thích code/phiếu cũ */
     const advance = +input.advance || 0;
 
-    /* === Phạt đi muộn (auto từ chấm công + latePolicy) === */
+    /* === Phạt đi muộn (auto từ chấm công + latePolicy hiện tại) ===
+       Phiếu đã chốt: giữ số phạt đã lưu — sửa khung phạt muộn hoặc sửa chấm công tháng cũ
+       KHÔNG được làm đổi thực lĩnh của phiếu đã duyệt/đã trả. */
     let lateAuto = { count: 0, total: 0, detail: [] };
-    if (input.staffId && input.month) {
+    if (_frozen && input.lateAuto && typeof input.lateAuto.total === 'number') {
+      lateAuto = input.lateAuto;
+    } else if (input.staffId && input.month) {
       lateAuto = computeLateAutoForMonth(input.staffId, input.month);
     }
 
     /* THỰC LĨNH = Lương công + Phụ cấp + Thưởng + Hoa hồng
                    − Phạt − Phạt muộn − BHXH(NV) − Tạm ứng
        (BHXH doanh nghiệp KHÔNG trừ — là chi phí công ty, chỉ hiển thị để theo dõi) */
-    const total = baseSalary + allowance + totalBonus + commission.amount
-                - totalPenalty - bhxhEmp - advance - lateAuto.total;
+    const total = _keep(input.total,
+      baseSalary + allowance + totalBonus + commission.amount
+      - totalPenalty - bhxhEmp - advance - lateAuto.total);
 
     /* Breakdown display — mixed mode liệt kê từng segment */
     let baseSalaryDetail;

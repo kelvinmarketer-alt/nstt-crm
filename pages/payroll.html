@@ -17,9 +17,9 @@
   @media (max-width:560px){
     .head-actions{flex-wrap:wrap}
     .head-actions .cfo-act{flex:1 1 calc(50% - 4px);min-width:0}
-    /* Tab "Chấm công" / "Bảng lương" → full-width chia đều */
-    .rpt-tabs{width:100%!important;flex-wrap:nowrap}
-    .rpt-tab{flex:1 1 0;min-width:0;text-align:center;padding:8px 6px;white-space:nowrap}
+    /* 5 tab (thêm "Lịch trực kho") → KHÔNG ép 1 hàng nữa, cho xuống dòng kẻo tràn ngang */
+    .rpt-tabs{width:100%!important;flex-wrap:wrap;justify-content:center}
+    .rpt-tab{flex:0 1 auto;min-width:0;text-align:center;padding:7px 10px;font-size:12px;white-space:nowrap}
     /* FIX bảng chấm công: chỉ còn 2 cột (Tên + Công) → bảng full-width gọn, bỏ sticky/scrollbox/min-width thừa */
     .att-wrap{max-height:none!important;overflow:visible!important}
     table.att-table, table.att-table.t-responsive{width:100%!important;min-width:0!important}
