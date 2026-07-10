@@ -71,18 +71,27 @@
       const prods = s.products || [];
       const paused = supplyStatusOf(s.id) === 'paused';
       const search = (s.name + ' ' + (s.phone || '')).toLowerCase().replace(/"/g, '');
+      const prodSummary = prods.length
+        ? prods.map(p => escH(p.name)).join(' · ')
+        : '<span style="opacity:.65;font-style:italic">chưa gán sản phẩm</span>';
       const prodLine = prods.length
         ? prods.map(p => `<span style="display:inline-block;background:#fff;border:1px solid var(--line);border-radius:6px;padding:1px 8px;margin:2px 4px 0 0;font-size:12px">${escH(p.name)}${p.price ? `<span style="color:var(--muted)"> · ${window.fmtShort(p.price)}</span>` : ''}</span>`).join('')
         : '<span style="color:var(--muted);font-size:12px;font-style:italic">Chưa gán sản phẩm — bấm “Chi tiết & Sửa” để chọn</span>';
       return `<details class="sup-acc" data-search="${escH(search)}" style="border-bottom:1px solid #EFF2EE">
-        <summary style="display:flex;align-items:center;gap:12px;padding:10px 14px;cursor:pointer;list-style:none">
+        <summary style="display:flex;align-items:center;gap:12px;padding:9px 14px;cursor:pointer;list-style:none">
           <span class="sup-caret" style="color:#94A3B8;font-size:11px;flex:0 0 12px">▸</span>
-          <span style="flex:1;min-width:0;font-weight:700;color:var(--navy);white-space:nowrap;overflow:hidden;text-overflow:ellipsis">
-            ${has(s.name) ? escH(s.name) : '(chưa đặt tên)'}
-            ${paused ? '<span class="tag" style="background:#FEE2E2;color:#B91C1C;font-weight:700;margin-left:6px">Ngừng nhập</span>' : ''}
+          <span style="flex:1;min-width:0">
+            <div style="font-weight:700;color:var(--navy);white-space:nowrap;overflow:hidden;text-overflow:ellipsis">
+              ${has(s.name) ? escH(s.name) : '(chưa đặt tên)'}
+              ${paused ? '<span class="tag" style="background:#FEE2E2;color:#B91C1C;font-weight:700;margin-left:6px">Ngừng nhập</span>' : ''}
+            </div>
+            <div style="font-size:11.5px;color:var(--muted);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;margin-top:1px">${prodSummary}</div>
           </span>
-          <span style="flex:0 0 140px;font-variant-numeric:tabular-nums;color:var(--muted);font-size:12.5px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${has(s.phone) ? escH(s.phone) : dash}</span>
-          <span style="flex:0 0 160px;text-align:right;font-variant-numeric:tabular-nums;white-space:nowrap;font-weight:${s.debt > 0 ? '700' : '400'};color:${s.debt > 0 ? '#DC2626' : 'var(--muted)'}">${money(s.debt)}</span>
+          <span style="flex:0 0 58px;text-align:center">
+            <span style="display:inline-block;min-width:22px;padding:1px 7px;background:${prods.length ? '#EFF6FF' : '#F1F5F9'};color:${prods.length ? '#1E40AF' : '#94A3B8'};border-radius:20px;font-weight:700;font-size:12px;font-variant-numeric:tabular-nums">${prods.length}</span>
+          </span>
+          <span style="flex:0 0 128px;font-variant-numeric:tabular-nums;color:var(--muted);font-size:12.5px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${has(s.phone) ? escH(s.phone) : dash}</span>
+          <span style="flex:0 0 150px;text-align:right;font-variant-numeric:tabular-nums;white-space:nowrap;font-weight:${s.debt > 0 ? '700' : '400'};color:${s.debt > 0 ? '#DC2626' : 'var(--muted)'}">${money(s.debt)}</span>
         </summary>
         <div style="padding:2px 14px 13px 38px;background:#FAFBFA">
           <div style="font-size:10.5px;color:var(--muted);text-transform:uppercase;font-weight:700;letter-spacing:.3px;margin-bottom:4px">Sản phẩm cung cấp (${prods.length})</div>
@@ -112,9 +121,10 @@
         </div>
         <div style="display:flex;align-items:center;gap:12px;padding:7px 14px;background:#FAFBFA;border-bottom:1px solid var(--line);font-size:10.5px;color:var(--muted);text-transform:uppercase;font-weight:700;letter-spacing:.3px">
           <span style="flex:0 0 12px"></span>
-          <span style="flex:1;min-width:0">Tên nhà cung cấp</span>
-          <span style="flex:0 0 140px">SĐT liên hệ</span>
-          <span style="flex:0 0 160px;text-align:right">Công nợ phải trả</span>
+          <span style="flex:1;min-width:0">Tên nhà cung cấp <span style="text-transform:none;font-weight:400;opacity:.75">· sản phẩm cung cấp</span></span>
+          <span style="flex:0 0 58px;text-align:center" title="Số lượng sản phẩm cung cấp">SL SP</span>
+          <span style="flex:0 0 128px">SĐT liên hệ</span>
+          <span style="flex:0 0 150px;text-align:right">Công nợ phải trả</span>
         </div>
         <div id="supBody-${group}" style="max-height:none">
           ${arr.length ? arr.map(accRow).join('') : ''}
