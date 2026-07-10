@@ -15,7 +15,8 @@
   /* ===== QUY TẮC (mức thưởng) — TÁCH RIÊNG 2 KHỐI: KHO và SHIP ===== */
   const DEFAULT_KHO = {
     khoShipTiers: [{ min: 31, max: 99, amount: 30000 }],   /* Kho hỗ trợ ship: đơn 31-99kg → 30k */
-    khoTruc: 50000,        /* Trực kho / BUỔI (sáng hoặc chiều) */
+    khoTrucSang:   50000,   /* Trực kho — CA SÁNG  (mỗi buổi trực = 1 lần thưởng) */
+    khoTrucChieu: 100000,   /* Trực kho — CA CHIỀU */
   };
   const DEFAULT_SHIP = {
     shipChieu: 50000,      /* Ship sáng hỗ trợ ship chiều / lần */
@@ -43,12 +44,20 @@
      · Tiền của 1 khoản LUÔN tra theo quy chế phủ NGÀY của khoản đó
        → sửa mức hôm nay KHÔNG làm đổi tiền của các ngày thuộc quy chế cũ. */
   function _normPolicy(p, group) {
+    const src = p.rules || {};
+    const rules = Object.assign(clone(DEFAULT_OF[group]), src);
+    /* Quy chế CŨ chỉ có 1 mức `khoTruc` chung cho cả 2 buổi → áp cho cả sáng lẫn chiều,
+       KHÔNG để mức mặc định mới (chiều 100k) tự đè lên tiền đã tính của giai đoạn cũ. */
+    if (group === 'kho' && src.khoTruc != null && src.khoTrucSang == null && src.khoTrucChieu == null) {
+      rules.khoTrucSang = +src.khoTruc || 0;
+      rules.khoTrucChieu = +src.khoTruc || 0;
+    }
     return {
       id: p.id || _pid(),
       name: p.name || 'Quy chế',
       from: p.from || '',
       to: p.to || '',
-      rules: Object.assign(clone(DEFAULT_OF[group]), p.rules || {}),
+      rules,
     };
   }
   function getPolicies(group) {
@@ -102,10 +111,11 @@
     return Object.assign({}, clone(DEFAULT_RULES),
       rulesForDate(_today(), 'kho') || {}, rulesForDate(_today(), 'ship') || {});
   }
-  /* Trực kho: mức /buổi theo quy chế KHO của ngày đó (null = ngày chưa có quy chế) */
-  function khoTrucRateOn(date) {
+  /* Trực kho: mức của MỘT BUỔI theo quy chế KHO của ngày đó (null = ngày chưa có quy chế) */
+  function khoTrucRateOn(date, buoi) {
     const r = rulesForDate(date, 'kho');
-    return r ? (+r.khoTruc || 0) : null;
+    if (!r) return null;
+    return +(buoi === 'chieu' ? r.khoTrucChieu : r.khoTrucSang) || 0;
   }
   /* Gộp danh mục "đơn xa" của MỌI quy chế SHIP → dropdown luôn chọn được;
      số tiền vẫn tính theo quy chế của NGÀY (id không có trong quy chế đó → 0đ). */
@@ -142,7 +152,8 @@
         const tier = (rules.khoShipTiers || []).find(t => w >= (+t.min || 0) && w <= (+t.max || 0));
         return tier ? (+tier.amount || 0) : 0;
       }
-      case 'kho-truc':   return +rules.khoTruc || 0;
+      case 'kho-truc':   /* mức theo BUỔI: sáng ≠ chiều */
+        return +(entry.buoi === 'chieu' ? rules.khoTrucChieu : rules.khoTrucSang) || 0;
       case 'ship-chieu': return +rules.shipChieu || 0;
       case 'ship-far': {
         const f = (rules.shipFar || []).find(x => x.id === entry.farId);
@@ -593,9 +604,13 @@
         <div style="font-size:12px;color:var(--muted);margin-bottom:5px">Hỗ trợ ship — theo trọng lượng đơn (từ–đến kg → thưởng/đơn):</div>
         <div class="qc-tiers">${(r.khoShipTiers || []).map(_tierRow).join('')}</div>
         <button class="btn btn-ghost btn-sm" onclick="window.BONUS._polAddTier('kho',${i})" style="font-size:11.5px;margin-bottom:8px">➕ Thêm mốc kg</button>
-        <div style="display:flex;align-items:center;gap:8px"><label style="flex:1">Trực kho (/buổi — sáng hoặc chiều)</label>
-          <input type="number" class="qc-truc" value="${r.khoTruc}" style="width:130px;padding:6px;border:1px solid var(--line);border-radius:6px;text-align:right;font-weight:700"></div>
-        <div style="font-size:11px;color:var(--muted);margin-top:5px">Ca trực nhập ở tab <b>🏭 Lịch trực kho</b>, tiền tự tính theo mức này.</div>
+        <div style="display:grid;grid-template-columns:1fr 130px;gap:8px;align-items:center">
+          <label>🌅 Trực kho — <b>ca sáng</b> (/buổi)</label>
+          <input type="number" class="qc-truc-sang" value="${r.khoTrucSang}" style="width:100%;padding:6px;border:1px solid var(--line);border-radius:6px;text-align:right;font-weight:700;box-sizing:border-box">
+          <label>🌇 Trực kho — <b>ca chiều</b> (/buổi)</label>
+          <input type="number" class="qc-truc-chieu" value="${r.khoTrucChieu}" style="width:100%;padding:6px;border:1px solid var(--line);border-radius:6px;text-align:right;font-weight:700;box-sizing:border-box">
+        </div>
+        <div style="font-size:11px;color:var(--muted);margin-top:5px">Ca trực nhập ở tab <b>🏭 Lịch trực kho</b>, tiền tự tính theo mức này. Trực cả 2 buổi = nhận cả 2 mức.</div>
       </div>`;
     }
     return `<div style="background:#EFF6FF;border:1px solid #BFDBFE;border-radius:9px;padding:10px 12px">
@@ -719,7 +734,8 @@
           max: +el.querySelector('.br-max').value || 0,
           amount: +el.querySelector('.br-amt').value || 0,
         })).filter(t => t.max > 0 && t.amount > 0);   /* rỗng = không thưởng mốc kg nào (hợp lệ) */
-        rules.khoTruc = +card.querySelector('.qc-truc').value || 0;
+        rules.khoTrucSang  = +card.querySelector('.qc-truc-sang').value || 0;
+        rules.khoTrucChieu = +card.querySelector('.qc-truc-chieu').value || 0;
       } else {
         rules.shipChieu = +card.querySelector('.qc-chieu').value || 0;
         rules.shipFar = Array.from(card.querySelectorAll('.qc-far .br-far')).map(el => ({
