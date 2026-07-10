@@ -84,6 +84,12 @@
   }
   /* Ghi cả 2 khối (khối không truyền thì giữ nguyên bản đang có) */
   function saveAllPolicies(map) {
+    /* Form dựng lại CẢ khối {kho, ship} từ DOM; khối không sửa lấy từ getPolicies() = cache.
+       Cache chưa về từ cloud → lưu 1 khối sẽ reset khối kia về MẶC ĐỊNH (đổi tiền thưởng cả team). */
+    if (S().kvReady && !S().kvReady('bonusRules')) {
+      window.toast?.('⏳ Đang tải quy chế từ máy chủ — thử lưu lại sau 1–2 giây', 'warn');
+      return false;
+    }
     S().set('bonusRules', {
       schema: 3,
       kho:  (map && map.kho)  || getPolicies('kho'),
@@ -127,7 +133,17 @@
 
   /* ===== SỔ GHI ===== */
   function getLog() { const a = S().get('bonusLog', []); return Array.isArray(a) ? a : []; }
-  function saveLog(a) { S().set('bonusLog', a); }
+  /* ⚠ Sổ ghi thưởng chạy thẳng vào phiếu lương → KHÔNG ghi cả sổ bằng STORE.set.
+     rmwKv áp đúng dòng vừa thêm/sửa/xoá lên bản cloud mới nhất. mutate phải IDEMPOTENT. */
+  function _logMut(mutate) {
+    const norm = a => (Array.isArray(a) ? a : []);
+    if (S().rmwKv) S().rmwKv('bonusLog', a => mutate(norm(a)) || norm(a), []);
+    else { const a = norm(getLog()); S().set('bonusLog', mutate(a) || a); }
+  }
+  const _logUpsert = (arr, rec) => { const i = arr.findIndex(e => e && e.id === rec.id); if (i >= 0) arr[i] = Object.assign({}, arr[i], rec); else arr.unshift(rec); };
+  function saveEntryRec(rec)  { _logMut(arr => { _logUpsert(arr, rec); return arr; }); }
+  function saveEntryRecs(recs){ _logMut(arr => { recs.forEach(r => _logUpsert(arr, r)); return arr; }); }
+  function removeEntry(id)    { _logMut(arr => arr.filter(e => e && e.id !== id)); }
 
   /* ===== NHIỆM VỤ ===== */
   const TASKS = {
@@ -417,10 +433,7 @@
       weight, farId, amount, note: (document.getElementById('beNote') || {}).value || '',
       updatedAt: new Date().toISOString(),
     };
-    const log = getLog();
-    const ix = log.findIndex(e => e.id === rec.id);
-    if (ix >= 0) log[ix] = Object.assign(log[ix], rec); else log.unshift(rec);
-    saveLog(log);
+    saveEntryRec(rec);
     window.closeModal?.();
     window.toast?.(amount ? `✓ Ghi thưởng +${fmt(amount)}đ cho ${rec.staffName}` : '✓ Đã ghi (0đ — chưa đủ điều kiện)', amount ? 'success' : 'warn');
     renderBonusTab();
@@ -428,7 +441,7 @@
   }
   function delEntry(id) {
     if (!confirm('Xoá khoản thưởng này?')) return;
-    saveLog(getLog().filter(e => e.id !== id));
+    removeEntry(id);
     window.toast?.('🗑 Đã xoá', 'danger');
     renderBonusTab();
   }
@@ -567,7 +580,7 @@
       });
     });
     if (!toAdd.length) { window.toast?.('Chưa có dòng hợp lệ — điền Ngày + Nhiệm vụ (khớp phòng NV)', 'warn'); return; }
-    const log = getLog(); toAdd.forEach(r => log.unshift(r)); saveLog(log);
+    saveEntryRecs(toAdd);
     window.closeModal?.();
     const total = toAdd.reduce((s, r) => s + r.amount, 0);
     window.toast?.(`✓ Lưu ${toAdd.length} khoản cho ${st.name} (+${fmt(total)}đ)${skip ? ` · bỏ ${skip} dòng thiếu/lệch phòng` : ''}`, 'success');
@@ -789,7 +802,9 @@
   function setBonusMonth(m) { _bMonth = m; renderBonusTab(); }
 
   window.BONUS = {
-    getRules, getLog, saveLog, computeAmount, helperFor, TASKS,
+    getRules, getLog, computeAmount, helperFor, TASKS,
+    /* saveLog (ghi cả sổ) đã BỎ — 3 hàm dưới áp thay đổi lên BẢN CLOUD MỚI NHẤT */
+    saveEntryRec, saveEntryRecs, removeEntry,
     /* Quy chế theo giai đoạn, TÁCH khối Kho/Ship (v421) */
     getPolicies, saveAllPolicies, policyForDate, policyForEntry, rulesForDate,
     khoTrucRateOn, allFarList, GROUPS, GROUP_OF_TASK,

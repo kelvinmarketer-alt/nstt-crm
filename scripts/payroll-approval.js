@@ -151,7 +151,18 @@
 
   /* === Lưu/lấy phiếu lương từ STORE === */
   function getPayslips()      { return window.STORE.get('payrollExtra', []) || []; }
-  function savePayslips(list) { window.STORE.set('payrollExtra', list); }
+
+  /* ⚠ KHÔNG ghi cả sổ lương bằng STORE.set. Một tab vừa mở (cache chưa về từ cloud) mà bấm Lưu
+     sẽ ghi đè TOÀN BỘ phiếu lương của mọi NV bằng bản cũ. rmwKv áp đúng thay đổi lên bản
+     cloud mới nhất → 5 kế toán sửa 5 phiếu khác nhau không đè nhau. mutate phải IDEMPOTENT. */
+  function _psMut(mutate) {
+    const norm = a => (Array.isArray(a) ? a : []);
+    if (window.STORE.rmwKv) window.STORE.rmwKv('payrollExtra', a => mutate(norm(a)) || norm(a), []);
+    else { const a = norm(getPayslips()); window.STORE.set('payrollExtra', mutate(a) || a); }
+  }
+  const _upsert = (list, ps) => { const i = list.findIndex(x => x && x.id === ps.id); if (i >= 0) list[i] = ps; else list.push(ps); };
+  function savePayslip(ps)        { _psMut(list => { _upsert(list, ps); return list; }); }
+  function savePayslipsMany(arr)  { _psMut(list => { arr.forEach(ps => _upsert(list, ps)); return list; }); }
 
   /* Đóng băng các số ĐÃ TÍNH vào phiếu khi lưu (báo cáo/đối soát đọc trực tiếp,
      không phải tính lại). Dùng CHUNG cho: lưu nháp / nộp / duyệt / nộp hàng loạt. */
@@ -891,10 +902,7 @@
       const d = collect();
       const c = PF.computePayslip(d);
       const final = { ...d, ...computedSnapshot(c) };
-      const list = getPayslips();
-      const i = list.findIndex(x => x.id === final.id);
-      if (i >= 0) list[i] = final; else list.push(final);
-      savePayslips(list);
+      savePayslip(final);
       window.toast?.('✓ Đã lưu phiếu nháp', 'success');
     };
 
@@ -911,10 +919,7 @@
         submittedBy: user.name || user.email || 'NS',
         submittedAt: new Date().toISOString(),
       };
-      const list = getPayslips();
-      const i = list.findIndex(x => x.id === final.id);
-      if (i >= 0) list[i] = final; else list.push(final);
-      savePayslips(list);
+      savePayslip(final);
       window.toast?.('📤 Đã gửi CFO · ' + PF.formatVND(c.total) + ' ₫', 'success');
       closeDrawer();
     };
@@ -932,10 +937,7 @@
         approvedBy: user.name || user.email || 'CFO',
         approvedAt: new Date().toISOString(),
       };
-      const list = getPayslips();
-      const i = list.findIndex(x => x.id === final.id);
-      if (i >= 0) list[i] = final; else list.push(final);
-      savePayslips(list);
+      savePayslip(final);
       window.toast?.('✓ CFO đã duyệt · ' + PF.formatVND(c.total) + ' ₫', 'success');
       closeDrawer();
     };
@@ -951,10 +953,7 @@
         returnReason: reason,
         returnedAt: new Date().toISOString(),
       };
-      const list = getPayslips();
-      const i = list.findIndex(x => x.id === final.id);
-      if (i >= 0) list[i] = final; else list.push(final);
-      savePayslips(list);
+      savePayslip(final);
       window.toast?.('↩ Đã trả phiếu về NS sửa', 'warn');
       closeDrawer();
     };
@@ -963,10 +962,7 @@
       if (!confirm('Đánh dấu đã TRẢ lương cho ' + p.staffName + '?\n\nSẽ tự tạo phiếu chi vào Sổ quỹ.')) return;
       const d = collect();
       const final = { ...d, paid: true, status: 'paid', paidAt: new Date().toISOString() };
-      const list = getPayslips();
-      const i = list.findIndex(x => x.id === final.id);
-      if (i >= 0) list[i] = final; else list.push(final);
-      savePayslips(list);
+      savePayslip(final);
       /* cross-module-hooks.js subscribe 'payrollExtra' sẽ tự tạo cashEntries */
       window.toast?.('✓ Đã trả lương + tạo phiếu chi Sổ quỹ', 'success');
       closeDrawer();
@@ -1093,19 +1089,20 @@
     /* Approve all submitted */
     window._psApproveAllSubmitted = function (m) {
       if (!confirm(`Duyệt TẤT CẢ ${submitted.length} phiếu chờ?\n\nTổng: ${PF.formatVND(totalSubmit)} ₫\n\nHành động này KHÔNG thể hoàn tác.`)) return;
-      const list = getPayslips();
       const user = (window.AUTH && window.AUTH.currentUser()) || {};
       const now = new Date().toISOString();
-      let count = 0;
-      list.forEach(p => {
-        if (p.month === m && p.status === 'submitted') {
-          p.status = 'approved';
-          p.approvedBy = user.name || 'CFO';
-          p.approvedAt = now;
-          count++;
-        }
+      const count = getPayslips().filter(p => p.month === m && p.status === 'submitted').length;
+      /* Idempotent: chạy lần 2 không còn phiếu 'submitted' nào của tháng m → không đổi gì */
+      _psMut(list => {
+        list.forEach(p => {
+          if (p && p.month === m && p.status === 'submitted') {
+            p.status = 'approved';
+            p.approvedBy = user.name || 'CFO';
+            p.approvedAt = now;
+          }
+        });
+        return list;
       });
-      savePayslips(list);
       window.toast?.(`✓ Đã duyệt ${count} phiếu · Tổng ${PF.formatVND(totalSubmit)} ₫`, 'success');
       window.openPayslipBatchReview(m); /* refresh */
     };
@@ -1124,6 +1121,11 @@
     const isHR = isAdmin || hasPerm('payroll.calc') || hasPerm('payroll.submit');
     if (!isHR) {
       window.toast?.('🔒 Bạn không có quyền gửi phiếu lương cho CFO (cần perm payroll.submit/payroll.calc)', 'warn');
+      return;
+    }
+    /* Chưa nạp xong sổ lương/chấm công → phân loại draft/none sẽ SAI và tạo trùng phiếu */
+    if (window.STORE.kvReady && (!window.STORE.kvReady('payrollExtra') || !window.STORE.kvReady('timesheet'))) {
+      window.toast?.('⏳ Đang tải bảng lương từ máy chủ — thử lại sau 1–2 giây', 'warn');
       return;
     }
 
@@ -1165,6 +1167,7 @@
     const user = (window.AUTH && window.AUTH.currentUser()) || {};
     const submitterName = user.name || user.email || 'NS';
     let totalAmount = 0;
+    const created = [];
 
     /* 1) Đổi status draft → submitted (giữ nguyên data) */
     toSubmit.forEach(ps => {
@@ -1223,10 +1226,11 @@
       const c = PF.computePayslip(draft);
       Object.assign(draft, computedSnapshot(c));
       totalAmount += c.total;
-      list.push(draft);
+      created.push(draft);
     });
 
-    savePayslips(list);
+    /* Ghi theo TỪNG phiếu lên bản cloud mới nhất — không ghi đè sổ lương của người khác */
+    savePayslipsMany(toSubmit.concat(created));
     window.toast?.(`📤 Đã gửi ${totalAffect} phiếu cho CFO duyệt · Tổng ${PF.formatVND(totalAmount)} ₫`, 'success');
 
     /* Refresh view nếu đang ở trang Bảng lương */

@@ -98,13 +98,34 @@
     const all = window.STORE.get('timesheetMeta', {});
     return all[sid + '_' + month] || {};
   }
+  /* ⚠ Chấm công KHÔNG được ghi cả khối (STORE.set) — tab vừa mở, cache chưa về từ cloud thì
+     cả mảng `timesheet` / map `timesheetMeta` đang là bản CŨ. Ghi đè = xoá công của mọi NV khác.
+     rmwKv áp ĐÚNG ô vừa sửa lên BẢN CLOUD MỚI NHẤT. mutate phải idempotent (gán theo index). */
   function setMetaCell(sid, dayIdx, data) {
-    const all = window.STORE.get('timesheetMeta', {});
     const key = sid + '_' + month;
-    if (!all[key]) all[key] = {};
-    if (data === null) delete all[key][dayIdx];
-    else all[key][dayIdx] = Object.assign({}, all[key][dayIdx], data);
-    window.STORE.set('timesheetMeta', all);
+    const mut = all => {
+      all = (all && typeof all === 'object' && !Array.isArray(all)) ? all : {};
+      if (!all[key]) all[key] = {};
+      if (data === null) delete all[key][dayIdx];
+      else all[key][dayIdx] = Object.assign({}, all[key][dayIdx], data);
+      return all;
+    };
+    if (window.STORE.rmwKv) window.STORE.rmwKv('timesheetMeta', mut, {});
+    else window.STORE.set('timesheetMeta', mut(window.STORE.get('timesheetMeta', {})));
+  }
+  /* Ghi 1 ô chấm công của 1 NV trong tháng đang xem */
+  function setDayCell(sid, day, status) {
+    const mth = month, dflt = defaultDays();
+    const mut = arr => {
+      arr = Array.isArray(arr) ? arr : [];
+      let sh = arr.find(t => t && t.staffId === sid && t.month === mth);
+      if (!sh) { sh = { staffId: sid, month: mth, days: dflt.slice() }; arr.unshift(sh); }
+      if (!Array.isArray(sh.days)) sh.days = dflt.slice();
+      sh.days[day - 1] = status;
+      return arr;
+    };
+    if (window.STORE.rmwKv) window.STORE.rmwKv('timesheet', mut, []);
+    else window.STORE.set('timesheet', mut(SHEETS().slice()));
   }
   function counts(days, meta) {
     const c = { X: 0, L: 0, H: 0, P: 0, V: 0, off: 0, lateMin: 0 };
@@ -410,6 +431,12 @@
     });
   };
   window._saveAllowanceSettings = function () {
+    /* Form dựng lại CẢ khối cấu hình từ DOM. Chưa nạp xong → các ô đang hiện MẶC ĐỊNH,
+       bấm Lưu là ghi mặc định đè cấu hình thật (đổi phụ cấp + BHXH của mọi phiếu). */
+    if (window.STORE.kvReady && !window.STORE.kvReady('payrollConfig')) {
+      window.toast?.('⏳ Đang tải cấu hình từ máy chủ — thử lưu lại sau 1–2 giây', 'warn');
+      return;
+    }
     const num = id => parseFloat((document.getElementById(id) || {}).value) || 0;
     window.STORE.set('payrollConfig', {
       allowance: {
@@ -506,6 +533,11 @@
     `;
     /* LƯU — đọc GIÁ TRỊ ô hiện tại (đã sửa), bỏ dấu phân cách; KHÔNG dùng data-raw (là giá trị lúc MỞ). */
     window._saveLatePolicy = function () {
+      /* Chưa nạp xong → modal đang hiện KHUNG PHẠT MẶC ĐỊNH, lưu là ghi đè khung thật */
+      if (window.STORE.kvReady && !window.STORE.kvReady('latePolicy')) {
+        window.toast?.('⏳ Đang tải khung phạt từ máy chủ — thử lưu lại sau 1–2 giây', 'warn');
+        return;
+      }
       const mode = document.getElementById('lpMode')?.value || 'tier';
       const graceMinutes = parseInt(document.getElementById('lpGrace')?.value, 10) || 0;
       const parseRaw = (el) => parseInt((el?.value ?? '').toString().replace(/[^\d-]/g, ''), 10) || 0;
@@ -871,11 +903,7 @@
       });
     });
     pop.querySelector('#popSave').addEventListener('click', () => {
-      const sheets = SHEETS().slice();
-      let sheet = sheets.find(t => t.staffId === sid && t.month === month);
-      if (!sheet) { sheet = { staffId: sid, month, days: defaultDays() }; sheets.unshift(sheet); }
-      sheet.days = sheet.days.slice(); sheet.days[day - 1] = picked;
-      window.STORE.set('timesheet', sheets);
+      setDayCell(sid, day, picked);
       /* Late minutes */
       if (picked === 'L') {
         const min = parseInt(pop.querySelector('#popLateMin').value, 10) || 0;
@@ -895,13 +923,10 @@
 
   function cycleCell(sid, day) {
     if (!canEdit()) { window.toast('🔒 Bạn không có quyền chấm công (cần perm payroll.edit)', 'warn'); return; }
-    const sheets = SHEETS().slice();
-    let sh = sheets.find(t => t.staffId === sid && t.month === month);
-    if (!sh) { sh = { staffId: sid, month, days: defaultDays() }; sheets.unshift(sh); }
-    const cur = sh.days[day - 1]; if (cur === '_') return;
-    sh.days = sh.days.slice();
-    sh.days[day - 1] = cur === 'X' ? 'P' : cur === 'P' ? 'V' : 'X';
-    window.STORE.set('timesheet', sheets);
+    const sh = sheetOf(sid);
+    const cur = sh ? sh.days[day - 1] : defaultDays()[day - 1];
+    if (cur === '_') return;
+    setDayCell(sid, day, cur === 'X' ? 'P' : cur === 'P' ? 'V' : 'X');
     render();
   }
 
@@ -1606,27 +1631,41 @@
   };
   window.confirmTimesheet = function () {
     const P = window._tsParsed; if (!P) { window.closeModal(); return; }
-    const existing = window.STORE.get('staffAliases', {}) || {};
-    const aliasMap = { ...existing };
-    const sheets = window.STORE.get('timesheet', window.TIMESHEET || []).slice();
-    const metaMap = window.STORE.get('timesheetMeta', {}) || {};
-    let applied = 0, lateN = 0;
-    P.rows.forEach(r => {
-      if (!r.chosen) return;
-      /* NHỚ tên viết tắt khi HR đổi khác gợi ý, hoặc NV chưa có alias (học tên mới) — KHÔNG đè alias đã đúng */
-      if (r.name && (r.chosen !== r.auto || !existing[r.chosen])) aliasMap[r.chosen] = r.name.trim();
-      _applyTsDays(sheets, r.chosen, r.days, P.last);
-      /* Số PHÚT MUỘN per-day → timesheetMeta (tính phạt đi muộn + hiện ⏰ ở bảng chấm công) */
-      if (r.lateMeta && Object.keys(r.lateMeta).length) {
-        const mk = r.chosen + '_' + month;
-        const mm = metaMap[mk] = metaMap[mk] || {};
-        Object.keys(r.lateMeta).forEach(dN => { mm[dN] = Object.assign({}, mm[dN], { lateMin: r.lateMeta[dN] }); lateN++; });
-      }
-      applied++;
-    });
-    window.STORE.set('staffAliases', aliasMap);
-    window.STORE.set('timesheet', sheets);
-    window.STORE.set('timesheetMeta', metaMap);
+    /* Import ghi đè công CỦA CẢ THÁNG → chưa nạp xong là ghi đè bằng cache cũ */
+    const S = window.STORE;
+    if (S.kvReady && (!S.kvReady('timesheet') || !S.kvReady('timesheetMeta') || !S.kvReady('staffAliases'))) {
+      window.toast('⏳ Đang tải chấm công từ máy chủ — bấm Xác nhận lại sau 1–2 giây', 'warn');
+      return;
+    }
+    const existing = S.get('staffAliases', {}) || {};
+    const rows = P.rows.filter(r => r.chosen);
+    let lateN = 0;
+    rows.forEach(r => { if (r.lateMeta) lateN += Object.keys(r.lateMeta).length; });
+    const applied = rows.length;
+    const mth = month, last = P.last;
+
+    /* Áp TỪNG NV lên bản cloud mới nhất — không ghi đè công của NV/tháng không nằm trong file */
+    const rmw = (key, mut, fb) => (S.rmwKv ? S.rmwKv(key, mut, fb) : S.set(key, mut(S.get(key, fb))));
+    rmw('staffAliases', m => {
+      m = (m && typeof m === 'object' && !Array.isArray(m)) ? m : {};
+      rows.forEach(r => { if (r.name && (r.chosen !== r.auto || !existing[r.chosen])) m[r.chosen] = r.name.trim(); });
+      return m;
+    }, {});
+    rmw('timesheet', arr => {
+      arr = Array.isArray(arr) ? arr : [];
+      rows.forEach(r => _applyTsDays(arr, r.chosen, r.days, last));
+      return arr;
+    }, []);
+    rmw('timesheetMeta', m => {
+      m = (m && typeof m === 'object' && !Array.isArray(m)) ? m : {};
+      rows.forEach(r => {
+        if (!r.lateMeta || !Object.keys(r.lateMeta).length) return;
+        const mk = r.chosen + '_' + mth;
+        const mm = m[mk] = m[mk] || {};
+        Object.keys(r.lateMeta).forEach(dN => { mm[dN] = Object.assign({}, mm[dN], { lateMin: r.lateMeta[dN] }); });
+      });
+      return m;
+    }, {});
     const skipped = P.rows.length - applied;
     window._tsParsed = null;
     window.closeModal();

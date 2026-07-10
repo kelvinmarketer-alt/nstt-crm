@@ -57,10 +57,15 @@
      - Giữ tối đa 14 snapshot gần nhất
      ===================================================== */
   window.AutoBackup = {
+    /* Thiếu key = mất là mất HẲN (khoDuty từng bị xoá sạch mà snapshot không cứu được).
+       Nhóm lương/công/thưởng đều là JSONB nhỏ → thêm vào không làm phình snapshot đáng kể. */
     KEYS_TO_BACKUP: ['customers','orders','products','staff','drivers',
                      'timesheet','adspend','paymentAccounts','cashEntries',
                      'invoices','partners','audit_log','inventory','suppliers',
-                     'purchases','recurring_orders','quotes','contracts','returns'],
+                     'purchases','recurring_orders','quotes','contracts','returns',
+                     /* + tiền & công (v416–v424) */
+                     'timesheetMeta','payrollExtra','payrollConfig','payrollStaffCfg',
+                     'latePolicy','bonusRules','bonusLog','khoDuty','staffAliases'],
 
     create(label) {
       const data = {};

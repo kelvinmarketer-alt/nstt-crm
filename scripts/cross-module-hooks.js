@@ -311,7 +311,15 @@
       });
       if (changed) {
         window.STORE.set('cashEntries', cash);
-        window.STORE.set('payrollExtra', list);
+        /* Chỉ cắm cờ _cashApplied cho đúng phiếu đã sinh phiếu chi — KHÔNG ghi đè cả sổ lương
+           (`list` ở đây có thể là cache cũ của tab vừa mở). Idempotent theo id. */
+        const doneIds = list.filter(p => p && p._cashApplied).map(p => p.id);
+        if (window.STORE.rmwKv) {
+          window.STORE.rmwKv('payrollExtra', arr => {
+            (Array.isArray(arr) ? arr : []).forEach(p => { if (p && doneIds.indexOf(p.id) >= 0) p._cashApplied = true; });
+            return arr;
+          }, []);
+        } else window.STORE.set('payrollExtra', list);
       }
     });
 

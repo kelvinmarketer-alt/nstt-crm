@@ -171,11 +171,18 @@
       commScope: c.commScope || 'ownedCusts',
     };
   }
+  /* Ghi cấu hình lương của MỘT NV. Không ghi cả map bằng STORE.set: admin B ở tab vừa mở
+     (cache chưa về) sửa 1 NV sẽ xoá cấu hình BHXH/hoa hồng của tất cả NV còn lại. */
   function setStaffPayCfg(staffId, patch) {
-    const all = (window.STORE && window.STORE.get('payrollStaffCfg', {})) || {};
-    all[staffId] = Object.assign({}, all[staffId] || {}, patch);
-    window.STORE.set('payrollStaffCfg', all);
-    return all[staffId];
+    const mut = all => {
+      all = (all && typeof all === 'object' && !Array.isArray(all)) ? all : {};
+      all[staffId] = Object.assign({}, all[staffId] || {}, patch);
+      return all;
+    };
+    const S = window.STORE;
+    if (S && S.rmwKv) S.rmwKv('payrollStaffCfg', mut, {});
+    else if (S) S.set('payrollStaffCfg', mut(S.get('payrollStaffCfg', {})));
+    return getStaffPayCfg(staffId);
   }
 
   /* === Doanh thu của 1 NV trong tháng (để tính hoa hồng tự động) ===

@@ -127,19 +127,24 @@
   async function _flushRmw(key) {
     const mutates = _rmwQueue[key] || []; _rmwQueue[key] = [];
     if (!mutates.length || !isSupabaseMode() || !window.SB_DATA || !window.SB_DATA.setKv) return;
+    /* Đánh dấu ĐANG flush: hàng đợi vừa bị dọn rỗng ở trên, nếu không có cờ này thì trong lúc
+       await getKv/setKv một event realtime chen vào sẽ bị áp rồi bị chính setKv dưới đây ghi đè. */
+    _kvFlushing.add(key);
+    try {
     /* GIỮ ĐÚNG HÌNH DẠNG: cloud có thể là MẢNG (priceTiers, debtLedger…) HOẶC OBJECT/MAP
        (mktPrices, custPriceTiers, accountOpenings…). Trước đây ép non-array → [] khiến blob dạng
        object BỊ XOÁ sạch bản cloud khi flush (mất chỉnh của người khác). Nay lấy nguyên bản cloud
        nếu có; fallback bản local (đã đổi optimistic → đúng hình dạng); cuối cùng mới []. */
     let base;
-    try { const cloud = await window.SB_DATA.getKv(key); base = (cloud != null) ? cloud : (_data[key] != null ? _data[key] : []); }
+    try { const cloud = await window.SB_DATA.getKv(key); _kvLoaded.add(key); base = (cloud != null) ? cloud : (_data[key] != null ? _data[key] : []); }
     catch (e) { base = (_data[key] != null ? _data[key] : []); }
     let cur = JSON.parse(JSON.stringify(base));
     mutates.forEach(m => { try { cur = m(cur) || cur; } catch (e) {} });   /* áp lại mọi thay đổi lên bản cloud mới */
     _data[key] = cur;
     try { localStorage.setItem(PREFIX + key, JSON.stringify(cur)); } catch (e) {}
     (_subs[key] || []).forEach(fn => { try { fn(cur); } catch (e) {} });
-    window.SB_DATA.setKv(key, cur).catch(e => console.warn(`[STORE rmwKv flush ${key}]`, e));
+    await window.SB_DATA.setKv(key, cur).catch(e => console.warn(`[STORE rmwKv flush ${key}]`, e));
+    } finally { _kvFlushing.delete(key); }
   }
 
   /* === Baseline ID-set (BỀN qua reload) — để phân biệt record bị XOÁ ở máy khác
@@ -253,6 +258,31 @@
     return window.SUPABASE_CONFIG?.mode === 'supabase' && !!window.SB_DATA;
   }
 
+  /* === RỖNG = [] hoặc {} hoặc null ===
+     Trước đây chỉ mảng rỗng mới bị coi là rỗng; object rỗng `{}` bị nhầm là "cloud CÓ dữ liệu"
+     → nạp về ghi đè local, và set() cũng vô tư đẩy `{}` lên cloud. Đó chính là đường đã XOÁ SẠCH
+     lịch trực kho (kv_store.khoDuty = {}). Nay object rỗng cũng tính là RỖNG ở cả 3 chỗ:
+     nạp từ cloud, đẩy lên cloud, và realtime. */
+  function _isEmptyVal(v) {
+    if (v == null) return true;
+    if (Array.isArray(v)) return v.length === 0;
+    if (typeof v === 'object') return Object.keys(v).length === 0;
+    return false;
+  }
+  /* Các key ĐƯỢC PHÉP rỗng trên cloud (nhật ký/cờ tạm — xoá sạch là thao tác hợp lệ, không phải tiền) */
+  const _KV_MAY_EMPTY = new Set(['audit_log', 'snapshots', 'addrDupOk', 'tgCronSent', 'usage_stats']);
+  /* Key TIỀN + CÔNG: cấm ghi cả khối khi cloud chưa nạp xong (cache cũ ghi đè = mất dữ liệu người khác).
+     Các key khác (vd cust_prefs — bộ nhớ thói quen mua) không chặn để khỏi cản luồng lên đơn. */
+  const _KV_STRICT = new Set([
+    'timesheet', 'timesheetMeta', 'payrollExtra', 'payrollConfig', 'payrollStaffCfg',
+    'latePolicy', 'bonusRules', 'bonusLog', 'khoDuty',
+    'procurementRuns', 'debtLedger', 'accountOpenings', 'staffAuth', 'staffAliases',
+  ]);
+  /* Cloud đã TRẢ LỜI cho key KV này chưa (khác _preloadDone: done kể cả khi getKv ném lỗi) */
+  const _kvLoaded = new Set();
+  /* Đang trong lúc flush rmwKv (getKv → apply → setKv): realtime KHÔNG được chen vào giữa */
+  const _kvFlushing = new Set();
+
   function _load(key, fallback) {
     try {
       const raw = localStorage.getItem(PREFIX + key);
@@ -336,17 +366,30 @@
          9 keys CRITICAL: NV mất chấm công + bảng lương nếu KHÔNG sync. */
       if (KV_KEYS.has(key) && window.SB_DATA?.getKv) {
         _subscribeKvRealtime();   /* bật realtime kv_store (1 lần) khi có key KV đầu tiên được tải */
-        const v = await window.SB_DATA.getKv(key);
-        if (v != null && (!Array.isArray(v) || v.length > 0)) {
+        /* RETRY: mạng chập chờn ở nhịp load đầu. Chỉ khi getKv TRẢ LỜI mới đánh dấu _kvLoaded —
+           nếu đánh dấu cả lúc lỗi thì set() sẽ đẩy cache cũ đè cloud; nếu không bao giờ đánh dấu
+           thì set() bị khoá vĩnh viễn. Nên: thử 3 nhịp, thất bại hết thì để nguyên (nút Lưu báo chờ). */
+        let v = null, ok = false;
+        for (const d of [0, 700, 2000]) {
+          if (d) await new Promise(r => setTimeout(r, d));
+          try { v = await window.SB_DATA.getKv(key); ok = true; break; }
+          catch (e) { console.warn(`[STORE getKv ${key}] thử lại…`, e.message); }
+        }
+        if (!ok) { console.warn(`[STORE getKv ${key}] KHÔNG nạp được — khoá ghi để tránh đè cloud`); return; }
+        _kvLoaded.add(key);       /* cloud ĐÃ trả lời → từ giờ set()/rmwKv được phép đẩy lên */
+        if (!_isEmptyVal(v)) {
           /* Cloud có data → dùng, ghi đè local */
           _data[key] = v;
           try { localStorage.setItem(PREFIX + key, JSON.stringify(v)); } catch (e) {}
           (_subs[key] || []).forEach(fn => fn(v));
           console.log(`[STORE] Synced ${key} ← kv_store (${Array.isArray(v) ? v.length + ' items' : 'object'})`);
         } else {
-          /* Cloud trống → MIGRATION: push local lên cloud nếu local có data */
+          /* Cloud RỖNG (chưa có row, hoặc [] / {}) → KHÔNG được xoá local.
+             Local còn data → tự đẩy lên (self-heal). Trước đây `{}` bị coi là data thật:
+             mỗi lần F5 lại ghi `{}` đè local → mất vĩnh viễn, không cách nào cứu. */
           const localV = _data[key];
-          if (localV && (Array.isArray(localV) ? localV.length > 0 : Object.keys(localV).length > 0)) {
+          if (!_isEmptyVal(localV)) {
+            console.warn(`[STORE] ${key}: cloud RỖNG nhưng local còn data → đẩy lại lên cloud (không xoá local)`);
             window.SB_DATA.setKv(key, localV)
               .then(() => console.log(`[STORE] ⬆ Migrated ${key} → kv_store`))
               .catch(e => console.warn(`[STORE migrate ${key}]`, e));
@@ -448,6 +491,13 @@
         if (!KV_KEYS.has(key)) return;            /* chỉ nhận key app quan tâm */
         if (value == null) return;
         if (_rmwQueue[key] && _rmwQueue[key].length) return;   /* còn edit chưa flush → bỏ qua, tránh nuốt (flush sẽ merge lên cloud) */
+        if (_kvFlushing.has(key)) return;         /* đang getKv→apply→setKv: event này sẽ bị ghi đè ngay sau đó */
+        /* Blob RỖNG từ máy khác + local đang CÓ data → gần như chắc chắn là sự cố ghi đè,
+           không phải ý muốn. Không nuốt data đang hiển thị; lần preload sau sẽ tự đẩy lại lên. */
+        if (_isEmptyVal(value) && !_isEmptyVal(_data[key]) && !_KV_MAY_EMPTY.has(key)) {
+          console.warn(`[STORE] 🔴 realtime ${key}: bỏ qua blob RỖNG từ máy khác (local đang có data)`);
+          return;
+        }
         const nextJson = JSON.stringify(value);
         if (nextJson === JSON.stringify(_data[key])) return;  /* không đổi → bỏ (né echo của chính mình) */
         _data[key] = value;
@@ -768,6 +818,16 @@
     /* Set toàn bộ — DIFF-SYNC: nếu là array và TABLE_MAP có key,
        sẽ so sánh cache cũ với value mới rồi push delta (insert/update/delete) lên Supabase. */
     set(key, value) {
+      /* ⛔ CHẶN GHI ĐÈ BẰNG CACHE CŨ — key KV mà cloud CHƯA trả lời thì `_data[key]` đang là
+         localStorage cũ / giá trị mặc định. Ghi cả khối lúc này sẽ nuốt phần của người khác
+         (đúng cơ chế đã xoá sạch lịch trực kho). Chặn TRƯỚC khi chạm local để không mất luôn
+         bản của chính user. UI nên gọi STORE.kvReady(key) để khoá nút Lưu cho tới khi nạp xong. */
+      if (isSupabaseMode() && _KV_STRICT.has(key) && !_kvLoaded.has(key)) {
+        console.warn(`[STORE kv ${key}] TỪ CHỐI ghi — chưa nạp xong dữ liệu từ máy chủ`);
+        window.toast?.('⏳ Đang tải dữ liệu từ máy chủ — thử lưu lại sau 1–2 giây', 'warn');
+        _preloadFromSupabase(key);
+        return false;
+      }
       /* Baseline để diff = SNAPSHOT cloud gần nhất (nếu có) — KHÔNG dùng cache live,
          vì caller có thể đã mutate cache TẠI CHỖ (cùng reference) → slice() sẽ giống
          hệt value → diff bỏ sót → không push lên cloud (bug mất dữ liệu sau refresh). */
@@ -799,6 +859,13 @@
       }
       /* KV store (timesheet, payrollExtra, audit_log, snapshots, ...) */
       if (isSupabaseMode() && KV_KEYS.has(key) && window.SB_DATA?.setKv && value != null) {
+        /* SÀN AN TOÀN — không đẩy blob RỖNG đè lên cloud.
+           `{}`/`[]` từ một tab vừa mở (cache chưa về) từng xoá sạch cả khối trên cloud.
+           Muốn xoá thật thì dùng rmwKv (áp thao tác xoá lên BẢN CLOUD MỚI NHẤT) hoặc deleteKv. */
+        if (_isEmptyVal(value) && !_KV_MAY_EMPTY.has(key)) {
+          console.warn(`[STORE kv ${key}] TỪ CHỐI đẩy blob rỗng lên cloud (giữ bản cloud hiện tại). Dùng rmwKv nếu muốn xoá từng mục.`);
+          return;
+        }
         window.SB_DATA.setKv(key, value).catch(e => console.warn(`[STORE kv ${key} → SB]`, e));
         return;
       }
@@ -960,13 +1027,21 @@
     /* Read-Modify-Write cho KV blob nhiều người sửa (priceTiers, mktPrices…): mutate(arr)→arr.
        Local đổi NGAY; cloud ghi gộp lên bản MỚI NHẤT (debounce) → không đè phần của NV khác.
        ⚠ mutate phải IDEMPOTENT (áp 2 lần cùng kết quả): set/xoá theo id, đừng dùng random/push-không-guard. */
-    rmwKv(key, mutate) {
-      if (!(key in _data)) _data[key] = _load(key, []);
+    rmwKv(key, mutate, fallback) {
+      if (!(key in _data)) _data[key] = _load(key, fallback !== undefined ? fallback : []);
       try { _data[key] = mutate(_data[key]) || _data[key]; } catch (e) { console.warn('[STORE rmwKv]', e); }
       _save(key);   /* optimistic local + notify subscriber (KHÔNG push cloud ở đây) */
       (_rmwQueue[key] = _rmwQueue[key] || []).push(mutate);
       clearTimeout(_rmwTimer[key]);
       _rmwTimer[key] = setTimeout(() => _flushRmw(key), 1200);
+      /* Preload song song: _flushRmw sẽ getKv trước khi ghi, nên kể cả chưa nạp xong vẫn an toàn */
+      if (isSupabaseMode() && !_kvLoaded.has(key)) _preloadFromSupabase(key);
+    },
+
+    /* Cloud đã trả lời cho key KV này chưa? UI dùng để khoá nút Lưu (chống ghi đè bằng cache cũ).
+       Mode localStorage → luôn true. */
+    kvReady(key) {
+      return !isSupabaseMode() || !KV_KEYS.has(key) || _kvLoaded.has(key);
     },
 
     /* Dữ liệu cloud của key đã tải XONG chưa? (localStorage mode → luôn true).

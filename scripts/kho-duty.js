@@ -32,7 +32,19 @@
   }
   function getRoster() { migrateLegacy(); return getRosterRaw(); }
   /* dayOf đọc RAW — migrate đã chạy ở entry-point (bonusEntries / renderDutyTab / openDay) */
-  function saveRoster(r) { S().set('khoDuty', r); }
+
+  /* ⚠ KHÔNG BAO GIỜ ghi cả khối lịch bằng STORE.set.
+     Tab vừa mở chưa kịp nạp cloud → getRosterRaw() trả {} → set('khoDuty', {}) XOÁ SẠCH lịch của
+     cả công ty (đã xảy ra 10/07/2026). rmwKv áp ĐÚNG thao tác của user lên BẢN CLOUD MỚI NHẤT,
+     nên chỉ ngày được sửa mới đổi, các ngày khác giữ nguyên. mutate phải IDEMPOTENT. */
+  function _mutRoster(mutate) {
+    const norm = r => (r && typeof r === 'object' && !Array.isArray(r)) ? r : {};
+    if (S().rmwKv) S().rmwKv('khoDuty', r => mutate(norm(r)) || norm(r), {});
+    else { const r = norm(getRosterRaw()); mutate(r); S().set('khoDuty', r); }   /* fallback bản cũ */
+  }
+  function setDay(date, day) {   /* day = {sang,chieu,note} | null để xoá */
+    _mutRoster(r => { if (!day) delete r[date]; else r[date] = day; return r; });
+  }
   function dayOf(date) {
     const d = getRosterRaw()[date] || {};
     return {
@@ -50,22 +62,28 @@
   let _migDone = false;
   function migrateLegacy() {
     if (_migDone || !window.STORE) return;
+    /* ⛔ ĐỢI CLOUD. migrateLegacy chạy tự động mỗi lần render bảng lương (qua bonusEntries).
+       Nếu chạy khi khoDuty/bonusLog chưa nạp xong, nó sẽ dựng lịch từ con số 0 rồi cắm cờ MIG_KEY
+       → ghi đè lịch thật và không bao giờ migrate lại. Chưa nạp xong thì để lần render sau. */
+    if (S().kvReady && (!S().kvReady('khoDuty') || !S().kvReady('bonusLog'))) return;
     const r = getRosterRaw();
     if (r[MIG_KEY]) { _migDone = true; return; }          /* đã migrate ở máy khác → thôi */
     const log = S().get('bonusLog', []) || [];
     const legacy = log.filter(e => e && e.task === 'kho-truc' && e.staffId && DATE_RE.test(String(e.date || '')));
     if (!legacy.length) return;                            /* CHƯA latch: dữ liệu cloud có thể về muộn */
-    let added = 0;
-    legacy.forEach(e => {
-      const d = r[e.date] || (r[e.date] = { sang: [], chieu: [], note: '' });
-      const b = e.buoi === 'chieu' ? 'chieu' : 'sang';
-      if (!Array.isArray(d[b])) d[b] = [];
-      if (d[b].indexOf(e.staffId) < 0) { d[b].push(e.staffId); added++; }
-    });
-    r[MIG_KEY] = true;                                     /* cờ: đừng hồi sinh người đã bị gỡ khỏi lịch */
     _migDone = true;
-    saveRoster(r);
-    console.log(`[NSTT] ✓ Chuyển ${added}/${legacy.length} ca trực kho cũ (bonusLog) → Lịch trực kho`);
+    /* Áp lên BẢN CLOUD MỚI NHẤT, idempotent (indexOf trước khi push) → chạy 2 lần vẫn ra 1 kết quả */
+    _mutRoster(roster => {
+      legacy.forEach(e => {
+        const d = roster[e.date] || (roster[e.date] = { sang: [], chieu: [], note: '' });
+        const b = e.buoi === 'chieu' ? 'chieu' : 'sang';
+        if (!Array.isArray(d[b])) d[b] = [];
+        if (d[b].indexOf(e.staffId) < 0) d[b].push(e.staffId);
+      });
+      roster[MIG_KEY] = true;                              /* cờ: đừng hồi sinh người đã bị gỡ khỏi lịch */
+      return roster;
+    });
+    console.log(`[NSTT] ✓ Chuyển ${legacy.length} ca trực kho cũ (bonusLog) → Lịch trực kho`);
   }
 
   /* ===== Nhân sự Kho ===== */
@@ -310,6 +328,11 @@
 
   /* ===== MODAL: xếp trực 1 ngày ===== */
   function openDay(date) {
+    /* Chưa nạp xong lịch từ máy chủ → các ô tick sẽ hiện SAI (rỗng), user lưu là ghi đè nhầm. */
+    if (S().kvReady && !S().kvReady('khoDuty')) {
+      window.toast?.('⏳ Đang tải lịch trực từ máy chủ — mở lại sau 1–2 giây', 'warn');
+      return;
+    }
     migrateLegacy();          /* nếu chưa migrate mà lưu đè ngày này → mất ca trực cũ */
     const d = dayOf(date);
     const rSang = rateOn(date, 'sang');
@@ -407,10 +430,7 @@
       window.toast?.(`Có ${people} người trực (> ${MAX_PER_DAY}) — bắt buộc ghi chú lý do`, 'warn');
       return;
     }
-    const r = getRoster();
-    if (!n) delete r[date];
-    else r[date] = { sang, chieu, note: note.trim() };
-    saveRoster(r);
+    setDay(date, n ? { sang, chieu, note: note.trim() } : null);
     window.closeModal?.();
     const money = hasPolicy(date) ? (sang.length * (rateOn(date, 'sang') || 0) + chieu.length * (rateOn(date, 'chieu') || 0)) : null;
     window.toast?.(!n ? '✓ Đã xoá lịch trực ngày ' + date.split('-').reverse().join('/')
@@ -420,7 +440,7 @@
   }
   function _clear(date) {
     if (!confirm('Xoá toàn bộ lịch trực ngày này?')) return;
-    const r = getRoster(); delete r[date]; saveRoster(r);
+    setDay(date, null);
     window.closeModal?.();
     window.toast?.('✓ Đã xoá lịch trực', 'success');
     rerender();
@@ -433,7 +453,8 @@
   }
 
   window.KHODUTY = {
-    getRoster, saveRoster, dayOf, khoStaff, peopleCount, migrateLegacy,
+    /* saveRoster (ghi cả khối lịch) đã BỎ — dùng setDay, nó áp lên bản cloud mới nhất */
+    getRoster, setDay, dayOf, khoStaff, peopleCount, migrateLegacy,
     bonusEntries, bonusEntriesMonth, monthStats, dutyDaysIn, rateOn, dayAmount, hasPolicy,
     renderDutyTab, openDay, rerender,
     setMonth: m => { _month = m; },
