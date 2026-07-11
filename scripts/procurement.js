@@ -362,9 +362,9 @@
 
   /* Trả CẢ PHIÊN đã chốt về bước gán NCC để kiểm/sửa (lỡ tay chốt).
      Đơn về "đang gom"; gỡ các phiếu nhập nháp (chưa nhận) mà phiên tự tạo. Phiếu ĐÃ NHẬN giữ nguyên. */
-  window.pcReopenRun = function (runId) {
+  window.pcReopenRun = function (runId, skipConfirm) {
     const runs = getRuns(); const run = runs.find(r => r.id === runId); if (!run) return;
-    if (!confirm(`Trả phiên ${run.id} về bước gán NCC để sửa?\n• Đơn về trạng thái "đang gom".\n• Các phiếu nhập nháp phiên tự tạo (CHƯA nhận) sẽ được gỡ, chốt lại sẽ tạo mới.\n• Phiếu đã "✓ Đã nhận" vẫn giữ nguyên.`)) return;
+    if (!skipConfirm && !confirm(`Trả phiên ${run.id} về bước gán NCC để sửa?\n• Đơn về trạng thái "đang gom".\n• Các phiếu nhập nháp phiên tự tạo (CHƯA nhận) sẽ được gỡ, chốt lại sẽ tạo mới.\n• Phiếu đã "✓ Đã nhận" vẫn giữ nguyên.`)) return;
     run.status = 'draft'; saveRuns(runs);
     const orders = getOrders();
     (run.orderCodes || []).forEach(code => { const o = orders.find(x => x.code === code); if (o && o.whStatus === 'confirmed') o.whStatus = 'gathering'; });
@@ -1469,11 +1469,24 @@ ${o.shortages && o.shortages.length ? `<div style="margin-top:10px;font-size:11.
   /* ===== Init ===== */
   function init() {
     if (window.renderAppShell) window.renderAppShell('procurement', 'Gom hàng → NCC');
-    try { S().get('purchases'); } catch (e) {}   /* warm-load: chốt gom sẽ tự tạo phiếu thu mua ngoài */
+    try { S().get('purchases'); } catch (e) {}   /* warm-load: chốt gom sẽ tự tạo phiếu nhập */
     renderAll();
     /* refresh khi STORE đổi (realtime) */
     S().subscribe?.('orders', () => { renderGather(); renderRelease(); });
     S().subscribe?.('procurementRuns', () => { renderRuns(); renderRelease(); });
+    /* ?reopen=<runId> từ nút "↩ Về phiên gom" bên Phiếu nhập → trả phiên về bước gán NCC
+       (retry chờ procurementRuns nạp xong từ cloud) */
+    try {
+      const rid = new URLSearchParams(location.search).get('reopen');
+      if (rid) {
+        let tries = 0;
+        const tryReopen = () => {
+          if (getRuns().some(r => r.id === rid)) window.pcReopenRun(rid, true);
+          else if (tries++ < 20) setTimeout(tryReopen, 300);
+        };
+        setTimeout(tryReopen, 300);
+      }
+    } catch (e) {}
   }
   if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', init);
   else init();

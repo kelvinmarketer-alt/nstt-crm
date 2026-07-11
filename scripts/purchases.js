@@ -111,51 +111,78 @@
     const p = getPur().find(x => x.id === id);
     if (!p) return;
     const s = findSup(p.supplierId);
-    const dc = document.getElementById('drawerContent');
-    dc.innerHTML = `
-      <div style="background:linear-gradient(135deg,#16A34A 0%,#1B5E20 100%);color:#fff;padding:20px;position:relative">
-        <button onclick="closeDrawer()" style="position:absolute;top:14px;right:14px;background:rgba(255,255,255,0.15);border:none;color:#fff;width:30px;height:30px;border-radius:6px;cursor:pointer">✕</button>
-        <h2 style="margin:0;font-size:20px">${p.id}</h2>
-        <div style="opacity:0.85;font-size:13px;margin-top:4px">${s?.name || p.supplierId} · ${p.date}</div>
+    const isExt = p.supplierId === EXT_SUP_ID || (findSup(p.supplierId) || {}).system;
+    const due = (p.total || 0) - (p.paid || 0);
+    const _a = v => String(v == null ? '' : v).replace(/"/g, '&quot;');
+    const body = `
+      <div style="display:flex;gap:8px;flex-wrap:wrap;align-items:center;margin-bottom:12px">
+        <span class="st-pill st-${p.status}">${p.status==='ordered'?'⏳ Đã đặt - chờ nhận':p.status==='received'?'✓ Đã nhận hàng':'✕ Hủy'}</span>
+        <span style="font-size:12.5px;color:var(--muted)">${s?.name || p.supplierId} · ${p.date}${p.gomRunId ? ' · từ phiên <b>'+p.gomRunId+'</b>' : ''}</span>
       </div>
-      <div style="padding:18px 20px">
-        <div style="background:#FAFBFC;padding:12px;border-radius:8px;margin-bottom:14px">
-          <div style="display:flex;justify-content:space-between;font-size:12.5px;color:var(--muted);margin-bottom:4px">Trạng thái</div>
-          <div><span class="st-pill st-${p.status}">${p.status==='ordered'?'⏳ Đã đặt - chờ nhận':p.status==='received'?'✓ Đã nhận hàng':'✕ Hủy'}</span></div>
-        </div>
+      ${p.status==='ordered' ? `<div style="background:#FFFBEB;border:1px solid #FDE68A;color:#92400E;border-radius:8px;padding:8px 11px;font-size:12px;margin-bottom:12px">✍️ Điền <b>giá thật từng mã</b> (ô vàng) → <b>💾 Lưu giá</b> hoặc <b>✓ Đã nhận</b> → ${isExt?'chi tiền mặt (sổ quỹ)':'ghi <b>công nợ NCC</b>'} + giá vốn${p.noStock?'':' + cộng kho'}.</div>` : ''}
+      <h3 style="margin:0 0 8px;font-size:12px;color:var(--muted);text-transform:uppercase;letter-spacing:0.5px">📦 Mặt hàng nhập</h3>
+      <table style="width:100%;border-collapse:collapse;font-size:13px;margin-bottom:12px">
+        <thead><tr style="background:#FAFBFC"><th style="text-align:left;padding:6px 8px;font-size:11px">SP</th><th style="text-align:right;padding:6px 8px;font-size:11px">SL</th><th style="text-align:right;padding:6px 8px;font-size:11px">Đơn giá</th><th style="text-align:right;padding:6px 8px;font-size:11px">Thành tiền</th></tr></thead>
+        <tbody id="pnEditItems">
+          ${(p.items||[]).map((it,i) => {
+            const priceCell = p.status === 'ordered'
+              ? `<input class="pn-eprice" type="number" min="0" step="1000" value="${it.price||''}" data-i="${i}" data-qty="${it.qty}" placeholder="giá" oninput="window.pnRecalcDrawer()" style="width:98px;text-align:right;border:1px solid #F59E0B;border-radius:5px;padding:5px 7px;font-size:12.5px;background:#FFFBEB">`
+              : window.fmt(it.price);
+            return `<tr style="border-top:1px solid #F1F5F9"><td style="padding:6px 8px"><b>${it.name}</b><div style="font-size:10.5px;color:var(--muted)">${it.productId||''} · ${it.qty} ${it.unit||'kg'}</div></td><td style="text-align:right;padding:6px 8px">${it.qty}</td><td style="text-align:right;padding:6px 8px">${priceCell}</td><td class="pn-etot" data-i="${i}" style="text-align:right;padding:6px 8px;font-weight:600">${window.fmt(it.total)}</td></tr>`;
+          }).join('')}
+          <tr style="background:#FAFBFC;font-weight:700"><td colspan="3" style="padding:8px;text-align:right">TỔNG</td><td id="pnEditTotal" style="text-align:right;padding:8px">${window.fmt(p.total)} ₫</td></tr>
+        </tbody>
+      </table>
 
-        <h3 style="margin:0 0 8px;font-size:12px;color:var(--muted);text-transform:uppercase;letter-spacing:0.5px">📦 Mặt hàng nhập ${window.helpTip('Khi phiếu chuyển sang "Đã nhận", các SP này sẽ tự cộng vào kho. Giá nhập sẽ cập nhật vào priceHistory của SP.')}</h3>
-        <table style="width:100%;border-collapse:collapse;font-size:13px;margin-bottom:14px">
-          <thead><tr style="background:#FAFBFC"><th style="text-align:left;padding:6px 8px;font-size:11px">SP</th><th style="text-align:right;padding:6px 8px;font-size:11px">SL</th><th style="text-align:right;padding:6px 8px;font-size:11px">Đơn giá</th><th style="text-align:right;padding:6px 8px;font-size:11px">Thành tiền</th></tr></thead>
-          <tbody id="pnEditItems">
-            ${(p.items||[]).map((it,i) => {
-              const priceCell = p.status === 'ordered'
-                ? `<input class="pn-eprice" type="number" min="0" step="1000" value="${it.price||''}" data-i="${i}" data-qty="${it.qty}" placeholder="giá" oninput="window.pnRecalcDrawer()" style="width:98px;text-align:right;border:1px solid #F59E0B;border-radius:5px;padding:5px 7px;font-size:12.5px;background:#FFFBEB">`
-                : window.fmt(it.price);
-              return `<tr style="border-top:1px solid #F1F5F9"><td style="padding:6px 8px"><b>${it.name}</b><div style="font-size:10.5px;color:var(--muted)">${it.productId||''} · ${it.qty} ${it.unit||'kg'}</div></td><td style="text-align:right;padding:6px 8px">${it.qty}</td><td style="text-align:right;padding:6px 8px">${priceCell}</td><td class="pn-etot" data-i="${i}" style="text-align:right;padding:6px 8px;font-weight:600">${window.fmt(it.total)}</td></tr>`;
-            }).join('')}
-            <tr style="background:#FAFBFC;font-weight:700"><td colspan="3" style="padding:8px;text-align:right">TỔNG</td><td id="pnEditTotal" style="text-align:right;padding:8px">${window.fmt(p.total)} ₫</td></tr>
-          </tbody>
-        </table>
-
-        <div style="background:${(p.total-p.paid)>0?'#FEE2E2':'#F0FDF4'};padding:10px 12px;border-radius:8px;margin-bottom:12px">
-          <div style="font-size:11.5px;color:var(--muted)">Đã trả / Tổng / Còn nợ</div>
-          <div style="font-size:14px;font-weight:700;margin-top:2px">${window.fmt(p.paid||0)} / ${window.fmt(p.total)} / <span style="color:${(p.total-p.paid)>0?'#DC2626':'var(--ok)'}">${window.fmt(Math.max(0,p.total-(p.paid||0)))} ₫</span></div>
-        </div>
-
-        <div><b>Ghi chú:</b> ${p.note || '—'}</div>
-
-        <button class="btn btn-navy" style="width:100%;margin-top:14px" onclick="window.printPur('${p.id}')">🖨 In phiếu nhập (PDF/HTML)</button>
-        ${p.status==='ordered' ? `<button class="btn btn-navy" style="width:100%;margin-top:8px" onclick="window.pnSaveItemPrices('${p.id}')">💾 Lưu giá vừa điền</button>` : ''}
-        <div style="display:flex;gap:8px;margin-top:8px">
-          ${p.status==='ordered' ? `<button class="btn btn-primary" style="flex:1" onclick="window.pnSaveItemPrices('${p.id}',true);window.markReceived('${p.id}');closeDrawer()">✓ Đã nhận hàng</button>` : ''}
-          ${(p.total-(p.paid||0))>0 && p.status==='received' ? `<button class="btn btn-ghost" style="flex:1;color:var(--ok)" onclick="window.payPur('${p.id}');closeDrawer()">💰 Ghi thanh toán</button>` : ''}
-          ${p.status!=='cancelled' ? `<button class="btn btn-ghost" style="color:var(--danger)" onclick="window.cancelPur('${p.id}')">✕ Hủy phiếu</button>` : ''}
-        </div>
+      <div style="display:flex;gap:12px;flex-wrap:wrap;align-items:flex-end;margin-bottom:12px">
+        <label style="flex:1;min-width:180px;font-size:12px;color:var(--muted)">🧾 Số hóa đơn NCC (đầu vào)
+          <input id="pnInvNo" value="${_a(p.invoiceNo)}" placeholder="số HĐ / ký hiệu (nếu có)" ${p.status==='cancelled'?'disabled':''} style="width:100%;margin-top:3px;border:1px solid var(--line);border-radius:5px;padding:6px 8px;font-size:12.5px">
+        </label>
+        ${(!isExt && p.status==='ordered') ? `<label style="display:flex;align-items:center;gap:7px;font-size:12px;color:var(--muted);cursor:pointer;padding-bottom:7px"><input type="checkbox" id="pnStockCb" ${p.noStock?'':'checked'}> Cộng vào tồn kho khi nhận</label>` : ''}
       </div>
-    `;
-    document.getElementById('drawer').classList.add('open');
-    document.getElementById('drawerBg').classList.add('open');
+
+      <div style="background:${due>0?'#FEE2E2':'#F0FDF4'};padding:10px 12px;border-radius:8px;margin-bottom:10px">
+        <div style="font-size:11.5px;color:var(--muted)">Đã trả / Tổng / Còn nợ</div>
+        <div style="font-size:14px;font-weight:700;margin-top:2px">${window.fmt(p.paid||0)} / ${window.fmt(p.total)} / <span style="color:${due>0?'#DC2626':'var(--ok)'}">${window.fmt(Math.max(0,due))} ₫</span></div>
+      </div>
+      <div style="font-size:12.5px"><b>Ghi chú:</b> ${p.note || '—'}</div>`;
+    const footer = `
+      ${(p.gomRunId && p.status==='ordered') ? `<button class="btn btn-ghost" style="color:#B45309" onclick="window.pnBackToGom('${p.id}')" title="Trả cả phiên gom về bước gán NCC để sửa">↩ Về phiên gom</button>` : ''}
+      <button class="btn btn-ghost" onclick="window.printPur('${p.id}')">🖨 In</button>
+      ${p.status==='ordered' ? `<button class="btn btn-navy" onclick="window.pnSaveItemPrices('${p.id}')">💾 Lưu giá</button>` : ''}
+      ${p.status==='ordered' ? `<button class="btn btn-primary" onclick="window.pnReceiveFromModal('${p.id}')">✓ Đã nhận</button>` : ''}
+      ${p.status==='received' ? `<button class="btn btn-ghost" onclick="window.pnSaveInvoice('${p.id}')" title="Lưu số hoá đơn NCC (hoá đơn thường về sau khi nhận hàng)">💾 Lưu HĐ</button>` : ''}
+      ${(due>0 && p.status==='received') ? `<button class="btn btn-ghost" style="color:var(--ok)" onclick="window.payPur('${p.id}');window.closeModal()">💰 Thanh toán</button>` : ''}
+      ${p.status!=='cancelled' ? `<button class="btn btn-ghost" style="color:var(--danger)" onclick="window.cancelPur('${p.id}')">✕ Hủy phiếu</button>` : ''}`;
+    window.openModal(`📦 ${p.id}`, body, { footer, width: '660px' });
+  };
+
+  /* Đọc số HĐ NCC + cờ cộng kho từ popup vào phiếu */
+  function _pnReadDrawerMeta(p) {
+    const inv = document.getElementById('pnInvNo'); if (inv) p.invoiceNo = inv.value.trim();
+    const cb = document.getElementById('pnStockCb'); if (cb) p.noStock = !cb.checked;
+  }
+  /* ✓ Đã nhận từ popup: lưu giá + số HĐ + cờ kho TRƯỚC rồi mới nhận (để total/kho/HĐ đúng) */
+  window.pnReceiveFromModal = function (id) {
+    window.pnSaveItemPrices(id, true);
+    window.markReceived(id);
+    window.closeModal && window.closeModal();
+  };
+  /* Lưu riêng số hoá đơn NCC (phiếu đã nhận — hoá đơn thường về sau) */
+  window.pnSaveInvoice = function (id) {
+    const list = getPur(); const p = list.find(x => x.id === id); if (!p) return;
+    const inp = document.getElementById('pnInvNo'); if (inp) p.invoiceNo = inp.value.trim();
+    window.STORE.set('purchases', list);
+    window.toast && window.toast('✓ Đã lưu số hoá đơn', 'success');
+  };
+  /* ↩ Về phiên gom để sửa (từ phiếu tự tạo) — điều hướng sang trang Gom hàng + trả phiên về bước gán NCC */
+  window.pnBackToGom = function (id) {
+    const p = getPur().find(x => x.id === id); if (!p || !p.gomRunId) return;
+    if (!confirm(`Về phiên gom ${p.gomRunId} để sửa?\nPhiếu nháp này (chưa nhận) sẽ được gỡ khi trả phiên về — chốt lại sẽ tạo phiếu mới.`)) return;
+    window.closeModal && window.closeModal();
+    const top = window.top || window;
+    try { top.location.href = 'procurement.html?reopen=' + encodeURIComponent(p.gomRunId); }
+    catch (e) { location.href = 'procurement.html?reopen=' + encodeURIComponent(p.gomRunId); }
   };
 
   window.closeDrawer = function () {
@@ -183,6 +210,7 @@
       p.items[i].total = Math.round((+p.items[i].qty || 0) * price);
     });
     p.total = (p.items || []).reduce((s, i) => s + (+i.total || 0), 0);
+    _pnReadDrawerMeta(p);   /* số HĐ NCC + cờ cộng kho */
     window.STORE.set('purchases', list);
     if (!silent) { window.toast && window.toast('✓ Đã lưu giá — bấm "✓ Đã nhận" khi hàng về', 'success'); window.openPurDrawer(id); }
   };
@@ -194,7 +222,7 @@
     const willStock = !list[i].noStock;
     const confMsg = isExt
       ? 'Xác nhận đã nhận hàng thu mua ngoài?\n→ Ghi CHI TIỀN MẶT vào sổ quỹ kế toán + cập nhật giá vốn' + (willStock ? ' + cộng kho.' : ' (không cộng kho).')
-      : 'Xác nhận đã nhận hàng?' + (willStock ? ' Kho sẽ tự động cộng các SP trong phiếu.' : ' (Phiếu này KHÔNG cộng tồn kho.)');
+      : 'Xác nhận đã nhận hàng?\n→ Ghi CÔNG NỢ phải trả NCC + cập nhật giá vốn' + (willStock ? ' + cộng kho.' : ' (không cộng kho).');
     if (!confirm(confMsg)) return;
     list[i].status = 'received';
     list[i]._invApplied = false; /* trigger inventory.js subscribe (bị bỏ qua nếu noStock) */
@@ -210,15 +238,12 @@
         desc: 'Thu mua ngoài ' + list[i].id + ' · ' + (list[i].items || []).length + ' mã',
       });
       window.STORE.set('cashEntries', cash);
-    } else if (sup && sup.paymentTerm !== 'COD') {
-      /* Cộng công nợ NCC nếu chưa COD */
+    } else if (sup) {
+      /* Mua hàng NCC → LUÔN ghi công nợ phải trả (chỉ thu mua ngoài mới chi tiền mặt ngay) */
       window.STORE.update('suppliers', sup.id, {
         debt: (sup.debt || 0) + list[i].total,
         totalSpend: (sup.totalSpend || 0) + list[i].total,
       });
-    } else if (sup) {
-      list[i].paid = list[i].total;
-      window.STORE.update('suppliers', sup.id, { totalSpend: (sup.totalSpend || 0) + list[i].total });
     }
     /* Cập nhật priceHistory cho từng SP */
     const prods = getProds();
@@ -278,7 +303,7 @@
     window.STORE.set('purchases', list);
     if (window.audit) window.audit.log('purchase.cancel', `Hủy ${id}`);
     window.toast('Đã hủy phiếu', 'danger');
-    window.closeDrawer();
+    (window.closeModal || window.closeDrawer || function(){})();   /* phiếu giờ là popup (openModal) */
   };
 
   window.payPur = function (id) {
@@ -348,6 +373,8 @@
       <div style="display:flex;justify-content:flex-end;gap:14px;margin-top:12px;padding-top:10px;border-top:1px solid var(--line);font-size:13px">
         <div>Tổng: <b id="pn_total">0</b> ₫</div>
       </div>
+      <label style="font-size:12px;color:var(--muted);margin-top:10px;display:block">🧾 Số hóa đơn NCC (đầu vào) ${window.helpTip ? window.helpTip('Số hoá đơn đầu vào NCC xuất (nếu có) — để đối chiếu kế toán/thuế.') : ''}</label>
+      <input id="pn_invoice" placeholder="số HĐ / ký hiệu (nếu có)" style="width:100%;border:1px solid var(--line);border-radius:6px;padding:7px;font-size:13px">
       <label style="font-size:12px;color:var(--muted);margin-top:10px;display:block">Ghi chú</label>
       <textarea id="pn_note" rows="2" style="width:100%;border:1px solid var(--line);border-radius:6px;padding:7px;font-size:13px"></textarea>
     `, {
@@ -472,6 +499,7 @@
       items,
       noStock: stockCb ? !stockCb.checked : false,   /* không cộng tồn kho (mua giao thẳng) */
       note: document.getElementById('pn_note').value,
+      invoiceNo: (document.getElementById('pn_invoice') || {}).value || '',
     };
     const list = getPur();
     list.push(obj);
