@@ -645,7 +645,7 @@
           <div class="hd" style="background:linear-gradient(135deg,#B45309,#D97706)">🛒 Danh sách thu mua ngoài <span style="opacity:.85;font-weight:400;font-size:11px">${extData.lines.length} mã · ${fmtQty(extKg)}kg</span>
             <div style="flex:1"></div>
             <button class="btn btn-ghost btn-sm" style="background:rgba(255,255,255,.2);color:#fff;border:none" onclick="window.pcCopyExtImage('${run.id}')">📸 Copy ảnh phiếu</button>
-            <button class="btn btn-ghost btn-sm" style="background:rgba(255,255,255,.2);color:#fff;border:none" onclick="window.pcExtToPurchase('${run.id}')">📥 Phiếu về</button>
+            <button class="btn btn-ghost btn-sm" style="background:rgba(255,255,255,.2);color:#fff;border:none" title="Mở Phiếu nhập → 🛒 Thu mua ngoài, điền sẵn các mã để nhập GIÁ THẬT → vào sổ quỹ + giá vốn" onclick="window.pcExtToPurchase('${run.id}')">📥 Phiếu về</button>
           </div>
           <div style="padding:8px 12px">
           ${extData.lines.map(it => `<div style="font-size:12px;padding:3px 0;border-bottom:1px dashed #EEF2F0">
@@ -1120,14 +1120,27 @@
       window.toast && window.toast('Máy không copy được ảnh → đã copy CHỮ thay thế', 'warn');
     }
   };
-  /* 📥 "Phiếu về": mở Phiếu nhập → 🛒 Thu mua ngoài, điền sẵn các mã (kho nhập GIÁ THẬT → vào sổ + giá vốn) */
+  /* 📥 "Phiếu về": mở Phiếu nhập → 🛒 Thu mua ngoài, điền sẵn các mã (kho nhập GIÁ THẬT → vào sổ quỹ + giá vốn) */
   window.pcExtToPurchase = function (runId) {
     const run = getRuns().find(r => r.id === runId); if (!run) return;
     const { lines } = extReqData(run);
     if (!lines.length) { window.toast && window.toast('Không có mã thu mua ngoài', 'info'); return; }
     const items = lines.map(l => ({ name: l.name, qty: l.qty, price: '' }));
-    try { sessionStorage.setItem('pn_prefill_items', JSON.stringify(items)); } catch (e) {}
-    location.href = 'purchases.html?createForSup=EXT-MARKET';
+    const top = window.top || window;
+    /* Gom hàng thường chạy TRONG IFRAME (tab "Gom hàng" của trang NCC). Điều khiển TRANG CHA:
+       chuyển tab Phiếu nhập + mở modal thu mua ngoài điền sẵn → KHÔNG mở lồng trong iframe. */
+    if (top !== window && typeof top.openPurModal === 'function') {
+      try {
+        if (typeof top.supTab === 'function') top.supTab('pur');
+        top.openPurModal('EXT-MARKET', items);
+        return;
+      } catch (e) { /* lỗi → rơi xuống điều hướng */ }
+    }
+    /* Chạy độc lập: đặt prefill trên cửa sổ trên cùng rồi điều hướng sang trang Phiếu nhập */
+    try { top.sessionStorage.setItem('pn_prefill_items', JSON.stringify(items)); }
+    catch (e) { try { sessionStorage.setItem('pn_prefill_items', JSON.stringify(items)); } catch (e2) {} }
+    try { top.location.href = 'purchases.html?createForSup=EXT-MARKET'; }
+    catch (e) { location.href = 'purchases.html?createForSup=EXT-MARKET'; }
   };
   window.pcPrintExtReq = function (runId) {
     const run = getRuns().find(r => r.id === runId); if (!run) return;
