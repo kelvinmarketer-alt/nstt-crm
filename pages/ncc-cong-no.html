@@ -1,18 +1,40 @@
 <!doctype html>
 <html lang="vi">
 <head>
-<meta charset="utf-8">
-<meta name="viewport" content="width=device-width,initial-scale=1">
+<meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
 <title>Công nợ NCC · Nông Sản Tuấn Tú</title>
-<link rel="stylesheet" href="../styles/tokens.css">
-<link rel="stylesheet" href="../styles/app.css">
+<link rel="stylesheet" href="../styles/tokens.css"><link rel="stylesheet" href="../styles/app.css">
 <style>
-  .ncd-tbl{width:100%;border-collapse:collapse;font-size:13px}
-  .ncd-tbl th{text-align:left;padding:10px 12px;background:#FAFBFC;font-size:11.5px;color:var(--muted);text-transform:uppercase;font-weight:700;border-bottom:1px solid var(--line);white-space:nowrap}
-  .ncd-tbl td{padding:10px 12px;border-bottom:1px solid #F1F5F9}
-  .ncd-tbl tbody tr:hover{background:#FAFBFC}
-  .num{text-align:right}
-  @media (max-width:560px){ .hide-xs{display:none} }
+  .cn-wrap{overflow:auto;border:1px solid var(--line);border-radius:10px;background:#fff;max-height:70vh}
+  table.cn-tbl{border-collapse:separate;border-spacing:0;font-size:12px;min-width:100%}
+  table.cn-tbl th, table.cn-tbl td{padding:6px 9px;white-space:nowrap;border-bottom:1px solid #EEF2F0}
+  table.cn-tbl thead th{position:sticky;top:0;background:#F0FDF4;color:#15803D;font-weight:700;z-index:2;border-bottom:2px solid #15803D}
+  table.cn-tbl td.par, table.cn-tbl th.par{position:sticky;left:0;background:#fff;z-index:1;text-align:left;font-weight:600;border-right:1px solid var(--line);max-width:230px;overflow:hidden;text-overflow:ellipsis}
+  table.cn-tbl thead th.par{background:#E7F6E7;z-index:3}
+  table.cn-tbl td.num{text-align:right;font-variant-numeric:tabular-nums}
+  table.cn-tbl td.z{color:#CBD5E1}
+  table.cn-tbl tr:hover td{background:#F8FAF8}
+  table.cn-tbl tr:hover td.par{background:#F3FAF3}
+  table.cn-tbl tfoot td{position:sticky;bottom:0;background:#1B5E20;color:#fff;font-weight:700;border-top:2px solid #15803D}
+  table.cn-tbl tfoot td.par{background:#1B5E20;color:#fff}
+  .cn-paid{color:#16A34A;font-weight:700}.cn-owe{color:#B45309;font-weight:700}
+  .cn-swipe-hint{display:none}
+  @media (max-width:560px){
+    .cn-wrap{max-width:100%;max-height:64vh;-webkit-overflow-scrolling:touch;border-radius:8px}
+    table.cn-tbl{font-size:11px}
+    table.cn-tbl th, table.cn-tbl td{padding:5px 6px}
+    table.cn-tbl td.par, table.cn-tbl th.par{max-width:120px;font-size:11px}
+    .cn-swipe-hint{display:block;font-size:11px;color:var(--muted);margin:0 0 6px}
+    .cn-head-sub{display:none}
+    .cn-ctrl .cn-date{flex:1 1 calc(50% - 10px);min-width:0}
+    .cn-ctrl .cn-date input{width:100%;box-sizing:border-box}
+    .cn-btn-render{flex:1 1 46%;min-width:0;white-space:nowrap}
+    .cn-unit{flex:1 1 50%;min-width:0}.cn-unit select{width:100%;box-sizing:border-box}
+    .cn-presets{flex:1 1 100%;flex-wrap:nowrap;gap:5px}
+    .cn-presets .btn{flex:1 1 0;min-width:0;white-space:nowrap;padding-left:4px;padding-right:4px}
+    .cn-btn-export{display:none}
+    .cn-search{flex:1 1 100%;min-width:0;width:100%;box-sizing:border-box}
+  }
 </style>
 </head>
 <body>
@@ -26,25 +48,45 @@
   </header>
 
   <main class="main">
-    <div style="margin-bottom:12px">
-      <h1 style="margin:0;font-size:22px;color:var(--navy);font-weight:800">🏭 Công nợ phải trả — Nhà cung cấp</h1>
-      <div style="font-size:13px;color:var(--muted);margin-top:2px">Tiền còn nợ từng NCC (phiếu nhập điều khoản NỢ đã nhận, chưa thanh toán)</div>
+    <div class="cn-head" style="display:flex;align-items:center;gap:12px;margin-bottom:14px;flex-wrap:wrap">
+      <div>
+        <h1 style="margin:0;font-size:22px;color:var(--navy);font-weight:800">🏭 Công nợ phải trả — Nhà cung cấp</h1>
+        <div class="cn-head-sub" style="font-size:13px;color:var(--muted);margin-top:2px">Ma trận NCC × ngày — tự sinh từ phiếu nhập đã nhận. Theo dõi <b>đã trả / chưa trả</b> để quyết toán NCC theo tháng.</div>
+      </div>
     </div>
 
-    <div id="ncdSummary" style="display:grid;grid-template-columns:repeat(auto-fit,minmax(200px,1fr));gap:10px;margin-bottom:14px"></div>
-
-    <div style="display:flex;gap:10px;margin-bottom:10px;flex-wrap:wrap">
-      <input id="ncdSearch" type="search" placeholder="🔎 Tìm NCC theo tên / SĐT…" oninput="window.ncdRender()" style="flex:1;min-width:220px;border:1px solid var(--line);border-radius:7px;padding:8px 11px;font-size:13px">
-      <select id="ncdType" onchange="window.ncdRender()" style="border:1px solid var(--line);border-radius:7px;padding:8px 11px;font-size:13px">
-        <option value="">Tất cả loại</option>
-        <option value="si">📦 Sỉ</option>
-        <option value="le">🛵 Lẻ</option>
-      </select>
+    <div class="chart-card" style="margin-bottom:14px">
+      <div class="cn-ctrl" style="display:flex;gap:12px;align-items:flex-end;flex-wrap:wrap">
+        <div class="cn-date"><label style="font-size:12px;color:var(--muted);display:block;margin-bottom:4px">Từ ngày</label>
+          <input type="date" id="ncdFrom" style="padding:7px 10px;border:1px solid var(--line);border-radius:7px"></div>
+        <div class="cn-date"><label style="font-size:12px;color:var(--muted);display:block;margin-bottom:4px">Đến ngày</label>
+          <input type="date" id="ncdTo" style="padding:7px 10px;border:1px solid var(--line);border-radius:7px"></div>
+        <button class="btn btn-primary cn-btn-render" onclick="window.ncdRender()">🔄 Xem báo cáo</button>
+        <div class="cn-presets" style="display:flex;gap:5px;flex-wrap:wrap">
+          <button class="btn btn-ghost btn-sm" onclick="window.ncdPreset('k1')" title="Ngày 1–15 tháng này">Kỳ 1</button>
+          <button class="btn btn-ghost btn-sm" onclick="window.ncdPreset('k2')" title="Ngày 16–cuối tháng này">Kỳ 2</button>
+          <button class="btn btn-ghost btn-sm" onclick="window.ncdPreset('month')" title="Cả tháng này">Tháng này</button>
+          <button class="btn btn-ghost btn-sm" onclick="window.ncdPreset('prev')" title="Tháng trước">Tháng trước</button>
+        </div>
+        <div style="flex:1"></div>
+        <div class="cn-unit"><label style="font-size:12px;color:var(--muted);display:block;margin-bottom:4px">Đơn vị</label>
+          <select id="ncdUnit" onchange="window.ncdRender()" style="padding:7px 10px;border:1px solid var(--line);border-radius:7px">
+            <option value="1000">Nghìn đồng</option>
+            <option value="1">Đồng (đầy đủ)</option>
+          </select></div>
+        <button class="btn btn-ghost cn-btn-export" onclick="window.ncdExport()" title="Xuất Excel quyết toán NCC">📥 Xuất Excel</button>
+      </div>
+      <div id="ncdSummary" style="margin-top:10px;font-size:12.5px;color:var(--muted)"></div>
     </div>
 
-    <div style="background:#fff;border:1px solid var(--line);border-radius:10px;overflow:hidden">
-      <div style="overflow-x:auto"><div id="ncdTable"></div></div>
+    <div style="display:flex;gap:8px;margin-bottom:10px;align-items:center;flex-wrap:wrap">
+      <input id="ncdSearch" type="search" placeholder="🔎 Tìm nhà cung cấp…" oninput="window.ncdSearch(this.value)"
+        class="cn-search" style="padding:6px 10px;border:1px solid var(--line);border-radius:7px;font-size:12.5px;min-width:220px">
     </div>
+
+    <div class="cn-swipe-hint">↔ Vuốt ngang bảng để xem hết các cột ngày &amp; tổng. Cột NCC luôn ghim bên trái.</div>
+    <div class="cn-wrap"><table class="cn-tbl" id="ncdTable"><tbody><tr><td style="padding:30px;text-align:center;color:var(--muted)">Chọn khoảng ngày rồi bấm "Xem báo cáo".</td></tr></tbody></table></div>
+    <div style="font-size:11.5px;color:var(--muted);margin-top:8px">💡 Mỗi ô = tổng tiền các <b>phiếu nhập đã nhận</b> của NCC đó trong ngày. <b>Đã trả</b> lấy từ phiếu chi trong kỳ · <b>Chưa trả</b> = tổng nhập − đã trả · <b>Công nợ HT</b> = tổng nợ phải trả còn lại của NCC. Bấm <b>tên NCC</b> để ghi thanh toán. (Thu mua ngoài trả tiền mặt ngay → không hiện ở đây.)</div>
   </main>
 </div>
 
@@ -56,6 +98,7 @@
 <script src="../scripts/auth.js"></script>
 <script>if(window.AUTH) window.AUTH.requireAuth();</script>
 <script src="../scripts/help-tips.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
 <script src="../data/suppliers.js"></script>
 <script src="../data/purchases.js"></script>
 <script src="../scripts/ncc-cong-no.js"></script>
