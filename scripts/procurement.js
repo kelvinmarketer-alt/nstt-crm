@@ -360,6 +360,23 @@
     renderAll();
   };
 
+  /* Trả CẢ PHIÊN đã chốt về bước gán NCC để kiểm/sửa (lỡ tay chốt).
+     Đơn về "đang gom"; gỡ các phiếu nhập nháp (chưa nhận) mà phiên tự tạo. Phiếu ĐÃ NHẬN giữ nguyên. */
+  window.pcReopenRun = function (runId) {
+    const runs = getRuns(); const run = runs.find(r => r.id === runId); if (!run) return;
+    if (!confirm(`Trả phiên ${run.id} về bước gán NCC để sửa?\n• Đơn về trạng thái "đang gom".\n• Các phiếu nhập nháp phiên tự tạo (CHƯA nhận) sẽ được gỡ, chốt lại sẽ tạo mới.\n• Phiếu đã "✓ Đã nhận" vẫn giữ nguyên.`)) return;
+    run.status = 'draft'; saveRuns(runs);
+    const orders = getOrders();
+    (run.orderCodes || []).forEach(code => { const o = orders.find(x => x.code === code); if (o && o.whStatus === 'confirmed') o.whStatus = 'gathering'; });
+    S().set('orders', orders);
+    const pur = S().get('purchases', []) || [];
+    pur.filter(p => p.gomRunId === runId && p.status === 'ordered').forEach(p => S().remove('purchases', p.id));
+    window._pcActiveRun = null;
+    renderRuns(); renderRunHistory(); renderRelease();
+    window.toast?.(`↩ Đã trả phiên ${run.id} về bước gán NCC — kiểm/sửa rồi chốt lại`, 'info');
+    window.pcOpenRun(runId);
+  };
+
   function renderRunHistory() {
     const host = document.getElementById('pcRunHistory');
     if (!host) return;
@@ -382,6 +399,7 @@
         <span class="tag" style="background:${st[1]}1f;color:${st[1]};font-weight:700;font-size:10.5px">${st[0]}</span>
         <span style="font-size:11.5px;color:var(--muted)">${r.orderCodes.length} đơn · ${r.lines.length} mã · ${fmtQty(totalKg)} kg${when ? ' · ' + when : ''}</span>
         <div style="flex:1"></div>
+        ${r.status === 'applied' ? `<button class="btn btn-ghost btn-sm" style="color:#B45309" onclick="event.stopPropagation();window.pcReopenRun('${r.id}')" title="Lỡ chốt? Trả cả phiên về bước gán NCC để sửa">↩ Trả về sửa</button>` : ''}
         <button class="btn btn-ghost btn-sm" onclick="event.stopPropagation();window.pcOpenRun('${r.id}')">👁 Xem lại</button>
         ${_runDelBtn(r.id)}
       </div>`;
@@ -437,7 +455,7 @@
     run.lines.forEach(l => (l.allocations || []).forEach(a => {
       if (!a.supplierId || !(+a.qty)) return;
       const b = bySup[a.supplierId] = bySup[a.supplierId] || { id: a.supplierId, name: a.supplierName || a.supplierId, items: [], kg: 0, cost: 0 };
-      b.items.push({ key: l.key, name: l.name, unit: l.unit, qty: +a.qty || 0, unitCost: +a.unitCost || 0, breakdown: l.breakdown });
+      b.items.push({ key: l.key, productId: l.productId, name: l.name, unit: l.unit, qty: +a.qty || 0, unitCost: +a.unitCost || 0, breakdown: l.breakdown });
       b.kg += +a.qty || 0; b.cost += (+a.qty || 0) * (+a.unitCost || 0);
     }));
     return bySup;
@@ -662,10 +680,11 @@
 
     if (_isDoneRun(run)) {
       /* Phiên đã chốt (xem lại từ Lịch sử) — không cho chốt lại, chỉ xem + in phiếu NCC */
-      body += `<div style="position:sticky;bottom:0;background:#fff;padding-top:10px;border-top:1px solid var(--line)">
+      body += `<div style="position:sticky;bottom:0;background:#fff;padding-top:10px;border-top:1px solid var(--line);display:flex;flex-direction:column;gap:8px">
         <div style="background:#F0FDF4;border:1px solid #BBF7D0;border-radius:8px;padding:10px 12px;font-size:12px;color:#15803D">
-          ✓ <b>Phiên đã chốt &amp; phân bổ</b>${run.confirmedAt ? ' lúc ' + new Date(run.confirmedAt).toLocaleString('vi-VN') : ''}. Xem lại phân bổ + copy cú pháp gọi hàng ở trên. Xuất kho → giao shipper ở <b>bước ③</b>.
+          ✓ <b>Phiên đã chốt &amp; phân bổ</b>${run.confirmedAt ? ' lúc ' + new Date(run.confirmedAt).toLocaleString('vi-VN') : ''}. Đã tự tạo <b>phiếu nhập cho từng NCC + thu mua ngoài</b> ở <b>Tài chính → Phiếu nhập</b> (điền giá thật → ✓ Đã nhận). Xuất kho → giao shipper ở <b>bước ③</b>.
         </div>
+        ${run.status === 'applied' ? `<button class="btn btn-ghost" style="color:#B45309;border:1px solid #FDE68A" onclick="window.pcReopenRun('${run.id}')">↩ Lỡ chốt? Trả phiên về bước gán NCC để sửa</button>` : ''}
       </div>
     </div>`;
     } else {
@@ -796,6 +815,7 @@
     a.supplierId = s ? s.id : ''; a.supplierName = s ? s.name : '';
     /* lấy giá nhập của NCC cho mã này (nếu có khai) */
     if (s) { const p = (s.products || []).find(pp => (l.productId && pp.id === l.productId) || norm(pp.name) === norm(l.name)); if (p) a.unitCost = +p.price || a.unitCost || 0; }
+    if (s) rememberSup(l.productId, s.id);   /* ghi nhớ → suppliersForProduct thấy mã đã có NCC (hết badge "thu mua ngoài" + không tạo phiếu trùng) */
     saveRuns(runs); renderRuns(); window.pcOpenRun(runId);
   };
   /* Chip 1-chạm: gán NCC (theo id) cho ô phân bổ ĐẦU của mã. Giá lấy theo khai của NCC. */
@@ -1001,7 +1021,7 @@
     run.status = 'applied';                       /* CHỐT & phân bổ xong → vào Lịch sử đã gom */
     run.confirmedAt = new Date().toISOString();
     saveRun(run);
-    _pcAutoExtPurchase(run);                       /* mã thu mua ngoài → tự tạo phiếu ở Tài chính → Phiếu nhập */
+    _pcAutoPurchases(run);                         /* mã NCC + thu mua ngoài → tự tạo phiếu ở Tài chính → Phiếu nhập */
 
     /* Báo Sale: gom theo đơn → 1 tin Telegram (kênh 'alert') */
     const shortCodes = Object.keys(shortByOrder);
@@ -1067,51 +1087,72 @@
     });
     return { lines: items, supName, type };
   }
+  /* Mã "thu mua ngoài" = KHÔNG NCC nào bán (catalog) VÀ chưa được gán NCC thật nào (allocation).
+     (Nếu gán tay NCC qua "＋ NCC khác" thì thôi tính mua ngoài — tránh tạo TRÙNG phiếu.) */
+  const _isExtLine = (l) => suppliersForProduct(l.productId, l.name).length === 0
+    && !(l.allocations || []).some(a => a.supplierId && a.supplierId !== 'EXT-MARKET' && +a.qty > 0);
   /* ===== THU MUA NGOÀI: các mã KHÔNG NCC nào cung cấp → bộ phận thu mua đi chợ/ngoài ===== */
   function extReqData(run) {
     const lines = (run.lines || [])
-      .filter(l => suppliersForProduct(l.productId, l.name).length === 0)
+      .filter(_isExtLine)
       .map(l => ({
         name: l.name, unit: l.unit, qty: +(+l.totalQty || 0).toFixed(2),
         custs: (l.breakdown || []).map(b => ({ code: b.code, custName: b.custName, qty: +(+b.qty || 0).toFixed(2) })),
       }));
     return { lines };
   }
-  /* ===== TỰ tạo/cập nhật phiếu THU MUA NGOÀI khi CHỐT phiên gom =====
-     1 phiếu/phiên (id = TMN-<runId>), gộp các mã chưa NCC nào cung cấp, giá để trống.
-     Idempotent: chốt lại → cập nhật (giữ giá đã điền), phiếu đã "nhận" thì không đụng. */
-  function _pcAutoExtPurchase(run, _retry) {
+  /* ===== TỰ tạo/cập nhật PHIẾU NHẬP khi CHỐT phiên gom =====
+     - 1 phiếu / NCC (id PN-<runId>-<supId>), giá điền sẵn theo giá NCC khai (sửa được) → nhận thì sinh CÔNG NỢ NCC.
+     - 1 phiếu THU MUA NGOÀI (id TMN-<runId>) cho mã chưa NCC nào cung cấp, giá để trống → nhận thì chi tiền mặt.
+     Idempotent: chốt lại → cập nhật (GIỮ giá kho đã điền); phiếu đã "nhận" → không đụng;
+     NCC/mã rời khỏi phiên → gỡ phiếu nháp (chưa nhận) không còn cần. */
+  function _pcAutoPurchases(run, _retry) {
     if (!run || !S()) return;
-    /* purchases có thể CHƯA nạp từ cloud trên trang gom → nạp rồi thử lại 1 lần (baseline đúng
-       để idempotency/giữ giá chuẩn, tránh insert trùng id). Diff của set() vốn không xoá dữ liệu. */
     if (S().isPreloaded && !S().isPreloaded('purchases') && !_retry) {
-      S().get('purchases'); setTimeout(() => _pcAutoExtPurchase(run, true), 1500); return;
+      S().get('purchases'); setTimeout(() => _pcAutoPurchases(run, true), 1500); return;
     }
-    const extLines = (run.lines || []).filter(l => suppliersForProduct(l.productId, l.name).length === 0);
     const list = S().get('purchases', []) || [];
-    const pid = 'TMN-' + run.id;
-    const idx = list.findIndex(p => p.id === pid);
-    if (!extLines.length) {   /* phiên không còn mã mua ngoài → gỡ phiếu nháp cũ (chưa nhận) */
-      if (idx >= 0 && list[idx].status === 'ordered') S().remove('purchases', pid);   /* remove() xoá được trên cloud; set() không xoá theo omission */
-      return;
-    }
-    if (idx >= 0 && list[idx].status !== 'ordered') return;   /* đã nhận rồi → giữ nguyên */
-    const prevItems = (idx >= 0 ? list[idx].items : []) || [];
-    const items = extLines.map(l => {
-      const prev = prevItems.find(it => (l.productId && it.productId === l.productId) || norm(it.name) === norm(l.name));
-      const price = prev ? (+prev.price || 0) : 0;
-      const qty = +(+l.totalQty || 0).toFixed(2);
-      return { productId: l.productId || null, name: l.name, unit: l.unit, qty, price, total: Math.round(qty * price) };
+    const today = (window.todayVN ? window.todayVN() : new Date().toLocaleDateString('vi-VN'));
+    const desired = {};   /* pid → { supplierId, items:[{productId,name,unit,qty,price,total}] } */
+    /* 1 phiếu / NCC (giá khai sẵn) */
+    const bySup = summarizeBySupplier(run);
+    Object.values(bySup).forEach(b => {
+      const items = b.items.filter(it => +it.qty > 0).map(it => {
+        const qty = +(+it.qty).toFixed(2), price = +it.unitCost || 0;
+        return { productId: it.productId || null, name: it.name, unit: it.unit, qty, price, total: Math.round(qty * price) };
+      });
+      if (items.length) desired['PN-' + run.id + '-' + b.id] = { supplierId: b.id, items };
     });
-    const obj = {
-      id: pid, supplierId: 'EXT-MARKET',
-      date: (window.todayVN ? window.todayVN() : new Date().toLocaleDateString('vi-VN')),
-      status: 'ordered', total: items.reduce((s, i) => s + (+i.total || 0), 0), paid: 0,
-      items, noStock: true, gomRunId: run.id,
-      note: 'Tự tạo từ phiên gom ' + run.id + ' — điền giá thật từng mã rồi bấm ✓ Đã nhận',
-    };
-    if (idx >= 0) list[idx] = { ...list[idx], ...obj }; else list.push(obj);
-    S().set('purchases', list);
+    /* 1 phiếu THU MUA NGOÀI (mã chưa gán NCC nào — dùng _isExtLine để KHÔNG trùng phiếu NCC) */
+    const extLines = (run.lines || []).filter(_isExtLine);
+    if (extLines.length) desired['TMN-' + run.id] = { supplierId: 'EXT-MARKET', items: extLines.map(l => {
+      const qty = +(+l.totalQty || 0).toFixed(2);
+      return { productId: l.productId || null, name: l.name, unit: l.unit, qty, price: 0, total: 0 };
+    }) };
+
+    let changed = false;
+    Object.keys(desired).forEach(pid => {
+      const d = desired[pid];
+      const idx = list.findIndex(p => p.id === pid);
+      if (idx >= 0 && list[idx].status !== 'ordered') return;   /* đã nhận → giữ nguyên */
+      const prevItems = (idx >= 0 ? list[idx].items : []) || [];
+      const items = d.items.map(it => {
+        const prev = prevItems.find(x => (it.productId && x.productId === it.productId) || norm(x.name) === norm(it.name));
+        const price = (prev && +prev.price > 0) ? +prev.price : (+it.price || 0);   /* GIỮ giá kho đã điền */
+        return { ...it, price, total: Math.round((+it.qty || 0) * price) };
+      });
+      const obj = {
+        id: pid, supplierId: d.supplierId, date: today, status: 'ordered',
+        total: items.reduce((s, i) => s + (+i.total || 0), 0), paid: 0,
+        items, noStock: true, gomRunId: run.id,
+        note: 'Tự tạo từ phiên gom ' + run.id + ' — kiểm/điền giá thật rồi bấm ✓ Đã nhận',
+      };
+      if (idx >= 0) list[idx] = { ...list[idx], ...obj }; else list.push(obj);
+      changed = true;
+    });
+    if (changed) S().set('purchases', list);
+    /* NCC/thu-mua-ngoài rời khỏi phiên → gỡ phiếu nháp (chưa nhận) không còn cần */
+    list.filter(p => p.gomRunId === run.id && p.status === 'ordered' && !desired[p.id]).forEach(p => S().remove('purchases', p.id));
   }
   window.pcCopyExtReq = function (runId) {
     const run = getRuns().find(r => r.id === runId); if (!run) return;

@@ -472,6 +472,10 @@
     const idx = list.findIndex(x => x.id === id);
     list[idx].debt = 0;
     window.STORE.set('suppliers', list);
+    /* Đồng bộ: phiếu nhập NET đã nhận của NCC → ĐÃ TRẢ (khớp công nợ ↔ phiếu) */
+    const pur = window.STORE.get('purchases', []) || []; let purCh = false;
+    pur.forEach(p => { if (p.supplierId === id && p.status === 'received' && (+p.total || 0) - (+p.paid || 0) > 0.5) { p.paid = p.total; purCh = true; } });
+    if (purCh) window.STORE.set('purchases', pur);
     /* Ghi phiếu chi */
     const cash = window.STORE.get('cashEntries', []) || [];
     const _pcMax = cash.reduce((m, e) => {

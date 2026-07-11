@@ -75,6 +75,10 @@
     const amt = +s.debt || 0;
     s.debt = 0;
     S().set('suppliers', list);
+    /* Đồng bộ: đánh dấu các phiếu nhập NET đã nhận của NCC này = ĐÃ TRẢ (khớp công nợ ↔ phiếu) */
+    const pur = getPur(); let purChanged = false;
+    pur.forEach(p => { if (p.supplierId === id && p.status === 'received' && (+p.total || 0) - (+p.paid || 0) > 0.5) { p.paid = p.total; purChanged = true; } });
+    if (purChanged) S().set('purchases', pur);
     const cash = S().get('cashEntries', []) || [];
     const pcMax = cash.reduce((m, e) => { const n = parseInt(String(e.no || '').replace(/^PC/, ''), 10); return isNaN(n) ? m : Math.max(m, n); }, 0);
     cash.unshift({
