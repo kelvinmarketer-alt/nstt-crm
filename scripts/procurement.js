@@ -1213,23 +1213,23 @@ tbody tr:nth-child(even){background:#F4FAF2}tfoot td{background:#E8F5E9;font-wei
   window.pcCopySupReq = function (runId, supKey) {
     const run = getRuns().find(r => r.id === runId); if (!run) return;
     readConfirmInputs(run);
-    const { lines, supName, type } = supReqData(run, supKey);
+    const { lines, type } = supReqData(run, supKey);
     const isLe = type === 'le' || type === 'both';
-    const totalKg = lines.reduce((s, l) => s + l.qty, 0);
-    /* CÚ PHÁP "cả hai": mỗi SP ghi TỔNG (để NCC cân) + danh sách TÚI theo khách bên dưới
-       (NCC lẻ đóng sẵn mỗi túi 1 khách). NCC sỉ: chỉ tổng (đóng 1 lô). */
-    const body = lines.map(l => {
-      const head = `🔸 ${l.name}: ${isLe ? 'TỔNG ' : ''}${fmtQty(l.qty)}${l.unit}`;
-      if (!isLe) return head;
-      const bags = _mergeCusts(l.custs).map(b => `   • ${b.name} - ${fmtQty(b.qty)}${l.unit}`).join('\n');
-      return bags ? head + '\n' + bags : head;
-    }).join('\n');
-    const txt = `📋 ĐẶT HÀNG — ${run.id}\n🏭 NCC: ${supName} (${isLe ? 'Lẻ — đóng túi theo khách' : 'Sỉ — gộp tổng'})\n📅 ${new Date().toLocaleDateString('vi-VN')}\n────────────\n`
-      + body
-      + `\n────────────\n📦 Tổng đơn: ${fmtQty(totalKg)} kg`
-      + (isLe ? `\n👉 NCC LẺ đóng gói SẴN theo từng khách (mỗi • = 1 túi).` : `\n👉 NCC SỈ đóng 1 lô theo tổng.`)
-      + ` Báo sớm mã thiếu giúp mình. Cảm ơn!\n— Nông Sản Tuấn Tú`;
-    copyText(txt, 'tin đặt NCC (Zalo)');
+    /* Cú pháp GỌN như sheet: LẺ gom THEO KHÁCH (mỗi khách 1 túi, liệt kê SP+SL);
+       SỈ chỉ liệt kê SP + tổng SL (kho tự chia). 1 tin/nhà, không header rườm rà. */
+    let txt;
+    if (isLe) {
+      const byCust = new Map();
+      lines.forEach(l => _mergeCusts(l.custs).forEach(b => {
+        if (!byCust.has(b.name)) byCust.set(b.name, []);
+        byCust.get(b.name).push(`${l.name} ${fmtQty(b.qty)}${l.unit}`);
+      }));
+      txt = [...byCust.entries()].map(([cust, items]) => `${cust}\n${items.join('\n')}`).join('\n\n');
+    } else {
+      txt = lines.map(l => `${l.name} ${fmtQty(l.qty)}${l.unit}`).join('\n');
+    }
+    if (!txt) { window.toast && window.toast('Chưa có mã cho NCC này', 'info'); return; }
+    copyText(txt + `\n\n— Nông Sản Tuấn Tú`, 'cú pháp gọi hàng');
   };
 
   /* ============ ③ XUẤT KHO → SHIP ============ */

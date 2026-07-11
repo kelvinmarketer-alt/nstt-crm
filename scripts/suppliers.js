@@ -224,12 +224,21 @@
           <div style="font-size:21px;font-weight:800;color:${s.debt > 0 ? '#DC2626' : 'var(--ok)'};margin-top:2px">${s.debt > 0 ? window.fmt(s.debt) + ' ₫' : '— Hết nợ'}</div>
         </div>
 
-        <h3 style="margin:0 0 8px;font-size:12px;color:var(--muted);text-transform:uppercase;letter-spacing:.5px">🥬 Sản phẩm cung cấp (${prods.length})</h3>
+        <h3 style="margin:0 0 8px;font-size:12px;color:var(--muted);text-transform:uppercase;letter-spacing:.5px">🥬 Sản phẩm cung cấp (${prods.length}) <span style="text-transform:none;font-weight:400;color:#94A3B8">— sửa tên/giá tại chỗ · ✕ để xoá</span></h3>
+        <datalist id="supProdDL_${s.id}">${_catalogProds().map(p => `<option value="${escH(p.name)}">`).join('')}</datalist>
         <div style="border:1px solid var(--line);border-radius:9px;overflow:hidden">
-          ${prods.length ? prods.map(p => `<div style="display:flex;align-items:center;gap:10px;padding:9px 12px;border-bottom:1px solid #F1F5F9;font-size:12.5px">
-            <span style="flex:1"><b>${p.name}</b></span>
-            <span style="color:${p.price ? 'var(--navy)' : 'var(--muted)'};font-weight:${p.price ? '700' : '400'};white-space:nowrap">${p.price ? window.fmt(p.price) + ' ₫' : '— chưa có giá'}</span>
-          </div>`).join('') : '<div style="padding:16px;text-align:center;color:var(--muted);font-size:12px">Chưa gán sản phẩm — bấm “✏️ Sửa NCC” để chọn</div>'}
+          ${prods.map((p, i) => `<div style="display:flex;align-items:center;gap:6px;padding:6px 8px;border-bottom:1px solid #F1F5F9">
+            <input value="${escH(p.name)}" onchange="window.supEditProdName('${s.id}',${i},this.value)" title="Sửa tên SP" style="flex:1;min-width:0;border:1px solid transparent;border-radius:5px;padding:6px 8px;font-size:12.5px;font-weight:600;background:#F6FAF6">
+            <input type="number" min="0" step="1000" value="${p.price || ''}" placeholder="giá" onchange="window.supEditProdPrice('${s.id}',${i},this.value)" title="Giá nhập (₫)" style="width:88px;text-align:right;border:1px solid var(--line);border-radius:5px;padding:6px 8px;font-size:12px">
+            <button onclick="window.supDelProd('${s.id}',${i})" title="Xoá SP này" style="border:none;background:none;color:#B91C1C;cursor:pointer;font-size:15px;padding:0 4px">✕</button>
+          </div>`).join('') || '<div style="padding:12px;text-align:center;color:var(--muted);font-size:12px">Chưa có SP — thêm ở dòng dưới</div>'}
+          <div style="display:flex;align-items:center;gap:6px;padding:8px;background:#F0FDF4">
+            <input id="supAddName_${s.id}" list="supProdDL_${s.id}" placeholder="➕ Thêm SP (gõ tên)…" autocomplete="off"
+              onkeydown="if(event.key==='Enter'){event.preventDefault();window.supAddProd('${s.id}')}"
+              style="flex:1;min-width:0;border:1px solid #86EFAC;border-radius:5px;padding:7px 8px;font-size:12.5px;background:#fff">
+            <input id="supAddPrice_${s.id}" type="number" min="0" step="1000" placeholder="giá" style="width:88px;text-align:right;border:1px solid #86EFAC;border-radius:5px;padding:7px 8px;font-size:12px;background:#fff">
+            <button onclick="window.supAddProd('${s.id}')" style="border:none;background:#15803D;color:#fff;border-radius:6px;padding:7px 13px;font-size:12.5px;font-weight:700;cursor:pointer;white-space:nowrap">＋ Thêm</button>
+          </div>
         </div>
 
         <details style="margin-top:14px">
@@ -247,6 +256,52 @@
       </div>`;
     document.getElementById('drawer').classList.add('open');
     document.getElementById('drawerBg').classList.add('open');
+  };
+
+  /* ===== Thêm/Sửa/Xoá SP ngay trong popup NCC (lưu vào suppliers.products → sync cloud) ===== */
+  const _pn = v => String(v == null ? '' : v).toLowerCase().normalize('NFD').replace(/[̀-ͯ]/g, '').replace(/đ/g, 'd').replace(/\s+/g, ' ').trim();
+  const _catalogProds = () => window.STORE.get('products', window.PRODUCTS || []) || [];
+  function _saveSupProds(id, prods, rerender) {
+    const list = getSup(); const s = list.find(x => x.id === id); if (!s) return;
+    s.products = prods;
+    window.STORE.set('suppliers', list);
+    render();
+    if (rerender) window.openSupDrawer(id);
+  }
+  window.supDelProd = function (id, idx) {
+    const s = getSup().find(x => x.id === id); if (!s) return;
+    const prods = (s.products || []).slice(); if (idx < 0 || idx >= prods.length) return;
+    prods.splice(idx, 1);
+    _saveSupProds(id, prods, true);
+  };
+  window.supEditProdName = function (id, idx, val) {
+    const s = getSup().find(x => x.id === id); if (!s || !(s.products || [])[idx]) return;
+    val = String(val || '').trim(); if (!val) { window.openSupDrawer(id); return; }   /* rỗng → khôi phục */
+    const cat = _catalogProds().find(p => _pn(p.name) === _pn(val));
+    const prods = s.products.slice();
+    prods[idx] = { ...prods[idx], name: cat ? cat.name : val, id: cat ? cat.id : (prods[idx].id || '') };
+    _saveSupProds(id, prods, false);
+  };
+  window.supEditProdPrice = function (id, idx, val) {
+    const s = getSup().find(x => x.id === id); if (!s || !(s.products || [])[idx]) return;
+    const prods = s.products.slice();
+    prods[idx] = { ...prods[idx], price: val === '' ? 0 : (+val || 0) };
+    _saveSupProds(id, prods, false);
+  };
+  window.supAddProd = function (id) {
+    const s = getSup().find(x => x.id === id); if (!s) return;
+    const nameEl = document.getElementById('supAddName_' + id);
+    const priceEl = document.getElementById('supAddPrice_' + id);
+    const name = nameEl ? String(nameEl.value || '').trim() : '';
+    if (!name) { nameEl && nameEl.focus(); window.toast && window.toast('Nhập tên sản phẩm', 'warn'); return; }
+    const price = (priceEl && priceEl.value !== '') ? (+priceEl.value || 0) : 0;
+    const cat = _catalogProds().find(p => _pn(p.name) === _pn(name));
+    const prods = (s.products || []).slice();
+    if (prods.some(p => (cat && p.id && p.id === cat.id) || _pn(p.name) === _pn(name))) {
+      window.toast && window.toast('SP đã có trong danh sách', 'info'); return;
+    }
+    prods.push({ id: cat ? cat.id : '', name: cat ? cat.name : name, price });
+    _saveSupProds(id, prods, true);
   };
 
   window.closeDrawer = function () {
