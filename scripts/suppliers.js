@@ -467,6 +467,7 @@
     const s = getSup().find(x => x.id === id);
     if (!s || !s.debt) return;
     if (!confirm(`Ghi thanh toán ${window.fmt(s.debt)} ₫ cho ${s.name}?`)) return;
+    const amt = +s.debt || 0;   /* CHỐT số tiền TRƯỚC khi zero (s và list[idx] cùng reference → nếu không phiếu chi = 0₫) */
     const list = getSup();
     const idx = list.findIndex(x => x.id === id);
     list[idx].debt = 0;
@@ -479,7 +480,7 @@
     }, 0);
     cash.unshift({
       no: 'PC' + String(_pcMax + 1).padStart(4,'0'),
-      date: window.todayVN(), type: 'out', amount: s.debt,
+      date: window.todayVN(), type: 'out', amount: amt,
       account: 'Tiền mặt', party: s.name,
       desc: 'Thanh toán công nợ NCC ' + s.id,
     });

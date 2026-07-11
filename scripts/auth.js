@@ -306,6 +306,7 @@
     'accounting.html': 'accounting.view',
     'debt.html':       'debt.view',
     'cong-no-tong-hop.html': 'debt.view',
+    'ncc-cong-no.html': 'debt.view',
     'invoices.html':   'invoices.view',
     'adspend.html':    'adspend.view',
     'staff.html':      'staff.view',

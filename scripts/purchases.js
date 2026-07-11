@@ -127,9 +127,14 @@
         <h3 style="margin:0 0 8px;font-size:12px;color:var(--muted);text-transform:uppercase;letter-spacing:0.5px">📦 Mặt hàng nhập ${window.helpTip('Khi phiếu chuyển sang "Đã nhận", các SP này sẽ tự cộng vào kho. Giá nhập sẽ cập nhật vào priceHistory của SP.')}</h3>
         <table style="width:100%;border-collapse:collapse;font-size:13px;margin-bottom:14px">
           <thead><tr style="background:#FAFBFC"><th style="text-align:left;padding:6px 8px;font-size:11px">SP</th><th style="text-align:right;padding:6px 8px;font-size:11px">SL</th><th style="text-align:right;padding:6px 8px;font-size:11px">Đơn giá</th><th style="text-align:right;padding:6px 8px;font-size:11px">Thành tiền</th></tr></thead>
-          <tbody>
-            ${(p.items||[]).map(it => `<tr style="border-top:1px solid #F1F5F9"><td style="padding:6px 8px"><b>${it.name}</b><div style="font-size:10.5px;color:var(--muted)">${it.productId||''}</div></td><td style="text-align:right;padding:6px 8px">${it.qty}</td><td style="text-align:right;padding:6px 8px">${window.fmt(it.price)}</td><td style="text-align:right;padding:6px 8px;font-weight:600">${window.fmt(it.total)}</td></tr>`).join('')}
-            <tr style="background:#FAFBFC;font-weight:700"><td colspan="3" style="padding:8px;text-align:right">TỔNG</td><td style="text-align:right;padding:8px">${window.fmt(p.total)} ₫</td></tr>
+          <tbody id="pnEditItems">
+            ${(p.items||[]).map((it,i) => {
+              const priceCell = p.status === 'ordered'
+                ? `<input class="pn-eprice" type="number" min="0" step="1000" value="${it.price||''}" data-i="${i}" data-qty="${it.qty}" placeholder="giá" oninput="window.pnRecalcDrawer()" style="width:98px;text-align:right;border:1px solid #F59E0B;border-radius:5px;padding:5px 7px;font-size:12.5px;background:#FFFBEB">`
+                : window.fmt(it.price);
+              return `<tr style="border-top:1px solid #F1F5F9"><td style="padding:6px 8px"><b>${it.name}</b><div style="font-size:10.5px;color:var(--muted)">${it.productId||''} · ${it.qty} ${it.unit||'kg'}</div></td><td style="text-align:right;padding:6px 8px">${it.qty}</td><td style="text-align:right;padding:6px 8px">${priceCell}</td><td class="pn-etot" data-i="${i}" style="text-align:right;padding:6px 8px;font-weight:600">${window.fmt(it.total)}</td></tr>`;
+            }).join('')}
+            <tr style="background:#FAFBFC;font-weight:700"><td colspan="3" style="padding:8px;text-align:right">TỔNG</td><td id="pnEditTotal" style="text-align:right;padding:8px">${window.fmt(p.total)} ₫</td></tr>
           </tbody>
         </table>
 
@@ -141,8 +146,9 @@
         <div><b>Ghi chú:</b> ${p.note || '—'}</div>
 
         <button class="btn btn-navy" style="width:100%;margin-top:14px" onclick="window.printPur('${p.id}')">🖨 In phiếu nhập (PDF/HTML)</button>
+        ${p.status==='ordered' ? `<button class="btn btn-navy" style="width:100%;margin-top:8px" onclick="window.pnSaveItemPrices('${p.id}')">💾 Lưu giá vừa điền</button>` : ''}
         <div style="display:flex;gap:8px;margin-top:8px">
-          ${p.status==='ordered' ? `<button class="btn btn-primary" style="flex:1" onclick="window.markReceived('${p.id}');closeDrawer()">✓ Đã nhận hàng</button>` : ''}
+          ${p.status==='ordered' ? `<button class="btn btn-primary" style="flex:1" onclick="window.pnSaveItemPrices('${p.id}',true);window.markReceived('${p.id}');closeDrawer()">✓ Đã nhận hàng</button>` : ''}
           ${(p.total-(p.paid||0))>0 && p.status==='received' ? `<button class="btn btn-ghost" style="flex:1;color:var(--ok)" onclick="window.payPur('${p.id}');closeDrawer()">💰 Ghi thanh toán</button>` : ''}
           ${p.status!=='cancelled' ? `<button class="btn btn-ghost" style="color:var(--danger)" onclick="window.cancelPur('${p.id}')">✕ Hủy phiếu</button>` : ''}
         </div>
@@ -157,6 +163,29 @@
     document.getElementById('drawerBg').classList.remove('open');
   };
 
+  /* Tính lại thành tiền + tổng khi kho gõ giá trong drawer (phiếu "Đã đặt") */
+  window.pnRecalcDrawer = function () {
+    let tot = 0;
+    document.querySelectorAll('#pnEditItems .pn-eprice').forEach(inp => {
+      const qty = +inp.dataset.qty || 0, price = +inp.value || 0, i = inp.dataset.i;
+      const line = Math.round(qty * price); tot += line;
+      const cell = document.querySelector(`#pnEditItems .pn-etot[data-i="${i}"]`);
+      if (cell) cell.textContent = window.fmt(line);
+    });
+    const tt = document.getElementById('pnEditTotal'); if (tt) tt.textContent = window.fmt(tot) + ' ₫';
+  };
+  /* Lưu giá vừa điền vào phiếu (chỉ khi 'ordered'). silent=true → không toast/re-render (dùng khi bấm Đã nhận). */
+  window.pnSaveItemPrices = function (id, silent) {
+    const list = getPur(); const p = list.find(x => x.id === id); if (!p || p.status !== 'ordered') return;
+    document.querySelectorAll('#pnEditItems .pn-eprice').forEach(inp => {
+      const i = +inp.dataset.i; if (!p.items[i]) return;
+      const price = +inp.value || 0; p.items[i].price = price;
+      p.items[i].total = Math.round((+p.items[i].qty || 0) * price);
+    });
+    p.total = (p.items || []).reduce((s, i) => s + (+i.total || 0), 0);
+    window.STORE.set('purchases', list);
+    if (!silent) { window.toast && window.toast('✓ Đã lưu giá — bấm "✓ Đã nhận" khi hàng về', 'success'); window.openPurDrawer(id); }
+  };
   window.markReceived = function (id) {
     const list = getPur();
     const i = list.findIndex(x => x.id === id);

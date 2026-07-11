@@ -645,7 +645,6 @@
           <div class="hd" style="background:linear-gradient(135deg,#B45309,#D97706)">🛒 Danh sách thu mua ngoài <span style="opacity:.85;font-weight:400;font-size:11px">${extData.lines.length} mã · ${fmtQty(extKg)}kg</span>
             <div style="flex:1"></div>
             <button class="btn btn-ghost btn-sm" style="background:rgba(255,255,255,.2);color:#fff;border:none" onclick="window.pcCopyExtImage('${run.id}')">📸 Copy ảnh phiếu</button>
-            <button class="btn btn-ghost btn-sm" style="background:rgba(255,255,255,.2);color:#fff;border:none" title="Mở Phiếu nhập → 🛒 Thu mua ngoài, điền sẵn các mã để nhập GIÁ THẬT → vào sổ quỹ + giá vốn" onclick="window.pcExtToPurchase('${run.id}')">📥 Phiếu về</button>
           </div>
           <div style="padding:8px 12px">
           ${extData.lines.map(it => `<div style="font-size:12px;padding:3px 0;border-bottom:1px dashed #EEF2F0">
@@ -653,7 +652,7 @@
             ${it.custs.length ? `<div style="font-size:10.5px;color:var(--muted);margin-top:1px">Cho: ${it.custs.map(b => esc(b.custName || b.code) + ' ' + fmtQty(b.qty) + it.unit).join(' · ')}</div>` : ''}
           </div>`).join('')}
           </div>
-          <div style="padding:0 12px 10px;font-size:11px;color:#92400E">💡 Cuối ngày: thu mua nhập phiếu kèm <b>giá thật</b> ở <b>Phiếu nhập → 🛒 Thu mua ngoài</b> (đọc ảnh AI được) → tự vào sổ quỹ kế toán + cập nhật giá vốn.</div>
+          <div style="padding:0 12px 10px;font-size:11px;color:#92400E">💡 Bấm <b>✅ Chốt phiên</b> → các mã này <b>TỰ tạo phiếu</b> ở <b>Tài chính → Phiếu nhập</b> (theo từng phiên/ngày). Kho vào đó <b>bấm phiếu → điền giá thật từng mã → ✓ Đã nhận</b> → vào sổ quỹ + giá vốn.</div>
         </div>`;
     }
 
@@ -1002,6 +1001,7 @@
     run.status = 'applied';                       /* CHỐT & phân bổ xong → vào Lịch sử đã gom */
     run.confirmedAt = new Date().toISOString();
     saveRun(run);
+    _pcAutoExtPurchase(run);                       /* mã thu mua ngoài → tự tạo phiếu ở Tài chính → Phiếu nhập */
 
     /* Báo Sale: gom theo đơn → 1 tin Telegram (kênh 'alert') */
     const shortCodes = Object.keys(shortByOrder);
@@ -1076,6 +1076,42 @@
         custs: (l.breakdown || []).map(b => ({ code: b.code, custName: b.custName, qty: +(+b.qty || 0).toFixed(2) })),
       }));
     return { lines };
+  }
+  /* ===== TỰ tạo/cập nhật phiếu THU MUA NGOÀI khi CHỐT phiên gom =====
+     1 phiếu/phiên (id = TMN-<runId>), gộp các mã chưa NCC nào cung cấp, giá để trống.
+     Idempotent: chốt lại → cập nhật (giữ giá đã điền), phiếu đã "nhận" thì không đụng. */
+  function _pcAutoExtPurchase(run, _retry) {
+    if (!run || !S()) return;
+    /* purchases có thể CHƯA nạp từ cloud trên trang gom → nạp rồi thử lại 1 lần (baseline đúng
+       để idempotency/giữ giá chuẩn, tránh insert trùng id). Diff của set() vốn không xoá dữ liệu. */
+    if (S().isPreloaded && !S().isPreloaded('purchases') && !_retry) {
+      S().get('purchases'); setTimeout(() => _pcAutoExtPurchase(run, true), 1500); return;
+    }
+    const extLines = (run.lines || []).filter(l => suppliersForProduct(l.productId, l.name).length === 0);
+    const list = S().get('purchases', []) || [];
+    const pid = 'TMN-' + run.id;
+    const idx = list.findIndex(p => p.id === pid);
+    if (!extLines.length) {   /* phiên không còn mã mua ngoài → gỡ phiếu nháp cũ (chưa nhận) */
+      if (idx >= 0 && list[idx].status === 'ordered') S().remove('purchases', pid);   /* remove() xoá được trên cloud; set() không xoá theo omission */
+      return;
+    }
+    if (idx >= 0 && list[idx].status !== 'ordered') return;   /* đã nhận rồi → giữ nguyên */
+    const prevItems = (idx >= 0 ? list[idx].items : []) || [];
+    const items = extLines.map(l => {
+      const prev = prevItems.find(it => (l.productId && it.productId === l.productId) || norm(it.name) === norm(l.name));
+      const price = prev ? (+prev.price || 0) : 0;
+      const qty = +(+l.totalQty || 0).toFixed(2);
+      return { productId: l.productId || null, name: l.name, unit: l.unit, qty, price, total: Math.round(qty * price) };
+    });
+    const obj = {
+      id: pid, supplierId: 'EXT-MARKET',
+      date: (window.todayVN ? window.todayVN() : new Date().toLocaleDateString('vi-VN')),
+      status: 'ordered', total: items.reduce((s, i) => s + (+i.total || 0), 0), paid: 0,
+      items, noStock: true, gomRunId: run.id,
+      note: 'Tự tạo từ phiên gom ' + run.id + ' — điền giá thật từng mã rồi bấm ✓ Đã nhận',
+    };
+    if (idx >= 0) list[idx] = { ...list[idx], ...obj }; else list.push(obj);
+    S().set('purchases', list);
   }
   window.pcCopyExtReq = function (runId) {
     const run = getRuns().find(r => r.id === runId); if (!run) return;
@@ -1392,6 +1428,7 @@ ${o.shortages && o.shortages.length ? `<div style="margin-top:10px;font-size:11.
   /* ===== Init ===== */
   function init() {
     if (window.renderAppShell) window.renderAppShell('procurement', 'Gom hàng → NCC');
+    try { S().get('purchases'); } catch (e) {}   /* warm-load: chốt gom sẽ tự tạo phiếu thu mua ngoài */
     renderAll();
     /* refresh khi STORE đổi (realtime) */
     S().subscribe?.('orders', () => { renderGather(); renderRelease(); });
