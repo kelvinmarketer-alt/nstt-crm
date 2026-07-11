@@ -82,6 +82,9 @@
     <div style="display:flex;gap:8px;margin-bottom:10px;align-items:center;flex-wrap:wrap">
       <input id="ncdSearch" type="search" placeholder="🔎 Tìm nhà cung cấp…" oninput="window.ncdSearch(this.value)"
         class="cn-search" style="padding:6px 10px;border:1px solid var(--line);border-radius:7px;font-size:12.5px;min-width:220px">
+      <div style="flex:1"></div>
+      <button class="btn btn-ghost btn-sm" onclick="window.ncdReconcile()" title="Up bảng kê NCC (Excel) → so lệch với app">📋 Đối soát file</button>
+      <button class="btn btn-ghost btn-sm" onclick="window.ncdImport()" title="Up Excel → tạo phiếu nhập hàng loạt">📥 Nhập phiếu Excel</button>
     </div>
 
     <div class="cn-swipe-hint">↔ Vuốt ngang bảng để xem hết các cột ngày &amp; tổng. Cột NCC luôn ghim bên trái.</div>

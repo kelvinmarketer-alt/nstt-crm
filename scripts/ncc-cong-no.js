@@ -76,12 +76,12 @@
       <th class="num" style="background:#FEE2E2">CÔNG NỢ HT</th>
     </tr></thead>`;
     const body = `<tbody>${data.list.map(r => `<tr>
-      <td class="par" title="Bấm để ghi thanh toán công nợ NCC"><a href="javascript:void(0)" onclick="window.ncdPay('${r.key}')" style="color:var(--navy);font-weight:700;text-decoration:none;border-bottom:1px dotted var(--navy)">${escH(r.name)}</a></td>
+      <td class="par" title="Bấm để xem bản đối chiếu công nợ — in / copy gửi NCC"><a href="javascript:void(0)" onclick="window.ncdStatement('${r.key}')" style="color:var(--navy);font-weight:700;text-decoration:none;border-bottom:1px dotted var(--navy)">${escH(r.name)}</a></td>
       ${data.days.map(d => { const v = r.daily[d] || 0; return `<td class="num ${v ? '' : 'z'}">${v ? fmtU(v) : '·'}</td>`; }).join('')}
       <td class="num"><b>${fmtU(r.total)}</b></td>
       <td class="num cn-paid">${r.paid ? fmtU(r.paid) : '·'}</td>
       <td class="num cn-owe">${r.remain ? fmtU(r.remain) : '·'}</td>
-      <td class="num" style="font-weight:800;color:#DC2626">${r.debtNow ? fmtU(r.debtNow) : '·'}</td>
+      <td class="num" style="font-weight:800;color:#DC2626">${r.debtNow ? `<a href="javascript:void(0)" onclick="window.ncdPay('${r.key}')" title="Bấm để ghi thanh toán công nợ NCC" style="color:#DC2626;text-decoration:none;border-bottom:1px dotted #DC2626">${fmtU(r.debtNow)}</a>` : '·'}</td>
     </tr>`).join('')}</tbody>`;
     const foot = `<tfoot><tr>
       <td class="par">TỔNG CỘNG</td>
@@ -154,8 +154,155 @@
     window.ncdRender();
   };
 
+  /* ========== F1: ĐỐI CHIẾU CÔNG NỢ NCC (in / copy gửi NCC) ========== */
+  const _invMap = () => (S().get('purchaseInvoices', {}) || {});
+  const _inPeriod = (dmy, fromISO, toISO) => { const iso = dmyToISO(dmy); return iso && iso >= fromISO && iso <= toISO; };
+  window.ncdStatement = function (id) {
+    if (!_last) { window.toast && window.toast('Bấm "Xem báo cáo" trước', 'warn'); return; }
+    const r = _last.list.find(x => x.key === id); if (!r) { window.toast && window.toast('Không thấy NCC', 'warn'); return; }
+    const { fromISO, toISO } = _last;
+    const s = getSup().find(x => x.id === id) || { name: r.name };
+    const ci = S().get('companyInfo', {}) || {};
+    const comp = { name: ci.name || 'CÔNG TY TNHH NÔNG SẢN TUẤN TÚ HÀ NỘI', address: ci.address || '36/147A Tân Mai, Hoàng Mai, Hà Nội', phone: ci.hotline || '0836 676 086' };
+    const inv = _invMap();
+    const phieu = getPur().filter(p => p.supplierId === id && p.status === 'received' && _inPeriod(p.date, fromISO, toISO))
+      .sort((a, b) => (dmyToISO(a.date) < dmyToISO(b.date) ? -1 : 1));
+    const f = v => (Math.round(+v || 0)).toLocaleString('vi-VN');
+    let tN = 0, tT = 0;
+    const rowsHtml = phieu.map((p, i) => { const nh = +p.total || 0, tr = +p.paid || 0; tN += nh; tT += tr;
+      return `<tr><td class="c">${i + 1}</td><td class="c">${escH(p.date)}</td><td>${escH(p.id)}</td><td>${escH(inv[p.id] || '')}</td><td class="r">${f(nh)}</td><td class="r">${f(tr)}</td><td class="r">${f(nh - tr)}</td></tr>`; }).join('');
+    const conNo = r.debtNow || (tN - tT);
+    const txt = `ĐỐI CHIẾU CÔNG NỢ NHÀ CUNG CẤP\n${s.name}\nKỳ: ${ddmm(fromISO)} → ${ddmm(toISO)}\n──────────\n`
+      + (phieu.length ? phieu.map((p, i) => `${i + 1}. ${p.date} · ${p.id}: nhập ${f(p.total)} · đã trả ${f(p.paid || 0)} · còn ${f((+p.total || 0) - (+p.paid || 0))}`).join('\n') : '(không có phiếu trong kỳ)')
+      + `\n──────────\nTổng nhập: ${f(tN)}đ · Đã trả: ${f(tT)}đ · CÒN NỢ: ${f(conNo)}đ\n— ${comp.name}`;
+    const html = `<!doctype html><html lang="vi"><head><meta charset="utf-8"><title>Đối chiếu công nợ - ${escH(s.name)}</title><style>
+      *{box-sizing:border-box}body{font-family:'Segoe UI',Arial,sans-serif;margin:0;padding:18px;color:#1a1a1a}.pg{max-width:820px;margin:0 auto}
+      .hd{border-bottom:2px solid #1B5E20;padding-bottom:8px;margin-bottom:6px}.hd b{font-size:15px;color:#1B5E20}
+      h1{color:#1B5E20;text-align:center;font-size:20px;margin:12px 0 2px}.sub{text-align:center;font-size:13px;margin-bottom:10px}
+      table{width:100%;border-collapse:collapse;font-size:12.5px}th,td{border:1px solid #555;padding:4px 7px}thead th{background:#EAF5EA}
+      td.c{text-align:center}td.r{text-align:right;font-variant-numeric:tabular-nums}.grand td{background:#FFF7C2;color:#B91C1C;font-weight:800}
+      .toolbar{position:sticky;top:0;background:#fff;padding:8px 0 12px;display:flex;gap:8px;justify-content:center}
+      .toolbar button{padding:8px 16px;border:none;border-radius:7px;font-weight:700;cursor:pointer}.b1{background:#1B5E20;color:#fff}.b2{background:#E8A33D;color:#fff}
+      @media print{.toolbar{display:none}body{padding:0}}</style></head><body>
+      <div class="toolbar"><button class="b1" onclick="window.print()">🖨 In</button><button class="b2" onclick="cp()">📋 Copy nội dung</button></div>
+      <div class="pg"><div class="hd"><b>${escH(comp.name)}</b><br>${escH(comp.address)} · ĐT: ${escH(comp.phone)}</div>
+        <h1>ĐỐI CHIẾU CÔNG NỢ NHÀ CUNG CẤP</h1><div class="sub"><b>${escH(s.name)}</b> · Kỳ: <b>${ddmm(fromISO)} → ${ddmm(toISO)}</b></div>
+        <table><thead><tr><th>STT</th><th>Ngày</th><th>Số phiếu</th><th>Số HĐ</th><th>Tiền nhập</th><th>Đã trả</th><th>Còn nợ</th></tr></thead>
+          <tbody>${rowsHtml || '<tr><td colspan="7" class="c">Không có phiếu trong kỳ</td></tr>'}</tbody>
+          <tfoot><tr class="grand"><td colspan="4" class="r">TỔNG NHẬP KỲ</td><td class="r">${f(tN)}</td><td class="r">${f(tT)}</td><td class="r">${f(tN - tT)}</td></tr>
+            <tr class="grand"><td colspan="6" class="r">CÔNG NỢ PHẢI TRẢ HIỆN TẠI</td><td class="r">${f(conNo)}</td></tr></tfoot></table>
+        <p style="font-size:12px;margin-top:10px">Kính đề nghị Quý nhà cung cấp đối chiếu &amp; xác nhận công nợ kỳ trên. Trân trọng cảm ơn!</p></div>
+      <script>function cp(){navigator.clipboard.writeText(${JSON.stringify(txt).replace(/<\//g, '<\\/')}).then(function(){alert('Đã copy nội dung đối chiếu')}).catch(function(){})}<\/script></body></html>`;
+    const w = window.open('', '_blank'); if (!w) { window.toast && window.toast('Trình duyệt chặn popup — cho phép để in đối chiếu', 'warn'); return; }
+    w.document.write(html); w.document.close();
+  };
+
+  /* ========== F2: ĐỐI SOÁT file NCC ↔ app (so tổng nhập theo ngày) ========== */
+  window.ncdReconcile = function () {
+    window.openModal('📋 Đối soát file NCC ↔ app', `
+      <div style="background:#EFF6FF;color:#1E40AF;padding:9px 12px;border-radius:8px;font-size:12px;margin-bottom:12px">Up file bảng kê NCC (Excel) có <b>Ngày</b> + <b>Số tiền</b>. App so <b>tổng nhập theo ngày</b> (theo bộ lọc/kỳ hiện tại) với file → chỉ ra ngày khớp / lệch. Muốn soát 1 NCC: gõ tên NCC vào ô tìm trước rồi mở lại.</div>
+      <input type="file" id="ncdRecFile" accept=".xlsx,.xls" onchange="window._ncdRecRead(this.files[0])" style="width:100%;border:1px dashed var(--line);border-radius:8px;padding:14px;background:#FAFAFB">
+      <div id="ncdRecOut" style="margin-top:10px"></div>`,
+      { width: '640px', footer: `<button class="btn btn-ghost" onclick="window.closeModal()">Đóng</button>` });
+  };
+  window._ncdRecRead = function (file) {
+    if (!file || !window.XLSX) { window.toast && window.toast('Chưa tải thư viện Excel', 'warn'); return; }
+    const fr = new FileReader();
+    fr.onload = ev => {
+      let rows = [];
+      try { const wb = window.XLSX.read(ev.target.result, { type: 'array' }); rows = window.XLSX.utils.sheet_to_json(wb.Sheets[wb.SheetNames[0]], { header: 1 }); }
+      catch (e) { document.getElementById('ncdRecOut').innerHTML = '<div style="color:#B91C1C">Không đọc được file.</div>'; return; }
+      const yr = String((_last && _last.fromISO || '2026').slice(0, 4));
+      const fileDay = {};
+      rows.forEach(r => {
+        if (!Array.isArray(r)) return; let iso = '', amt = 0;
+        r.forEach(cell => {
+          const s = String(cell == null ? '' : cell).trim();
+          const md = s.match(/^(\d{1,2})\/(\d{1,2})(?:\/(\d{2,4}))?/);
+          if (md && !iso) { const y = md[3] ? (md[3].length === 2 ? '20' + md[3] : md[3]) : yr; iso = `${y}-${pad(+md[2])}-${pad(+md[1])}`; }
+          const n = parseFloat(s.replace(/[.\s₫]/g, '').replace(',', '.'));
+          if (!isNaN(n) && n > amt) amt = n;
+        });
+        if (iso && amt) fileDay[iso] = (fileDay[iso] || 0) + amt;
+      });
+      const appDay = {}; if (_last) _last.days.forEach(d => { appDay[d] = _last.list.reduce((s, r) => s + (r.daily[d] || 0), 0); });
+      const allDays = [...new Set([...Object.keys(appDay), ...Object.keys(fileDay)])].filter(d => (appDay[d] || fileDay[d])).sort();
+      const f = v => (Math.round(+v || 0)).toLocaleString('vi-VN'); let nLech = 0;
+      const body = allDays.map(d => { const a = appDay[d] || 0, ff = fileDay[d] || 0, diff = a - ff; if (Math.abs(diff) > 1) nLech++;
+        return `<tr style="background:${Math.abs(diff) > 1 ? '#FEF2F2' : '#fff'}"><td style="padding:5px 9px">${ddmm(d)}</td><td style="padding:5px 9px;text-align:right">${a ? f(a) : '·'}</td><td style="padding:5px 9px;text-align:right">${ff ? f(ff) : '·'}</td><td style="padding:5px 9px;text-align:right;color:${Math.abs(diff) > 1 ? '#B91C1C' : '#16A34A'};font-weight:700">${diff ? f(diff) : '✓'}</td></tr>`; }).join('');
+      document.getElementById('ncdRecOut').innerHTML = `<div style="font-size:12.5px;margin-bottom:6px">${nLech ? `⚠ <b style="color:#B91C1C">${nLech} ngày LỆCH</b>` : '✓ Khớp toàn bộ'} · app = theo bộ lọc hiện tại</div>
+        <div style="max-height:44vh;overflow:auto;border:1px solid var(--line);border-radius:8px"><table style="width:100%;border-collapse:collapse;font-size:12.5px"><thead><tr style="background:#F0FDF4"><th style="text-align:left;padding:6px 9px">Ngày</th><th style="text-align:right;padding:6px 9px">App</th><th style="text-align:right;padding:6px 9px">File NCC</th><th style="text-align:right;padding:6px 9px">Lệch</th></tr></thead><tbody>${body || '<tr><td colspan="4" style="padding:14px;text-align:center;color:var(--muted)">Không đọc được ngày/tiền trong file</td></tr>'}</tbody></table></div>`;
+    };
+    fr.readAsArrayBuffer(file);
+  };
+
+  /* ========== F3: NHẬP PHIẾU NHẬP từ Excel (tạo phiếu nháp hàng loạt) ========== */
+  let _impGroups = [];
+  window.ncdImport = function () {
+    _impGroups = [];
+    window.openModal('📥 Nhập phiếu nhập từ Excel', `
+      <div style="background:#FFFBEB;color:#92400E;padding:9px 12px;border-radius:8px;font-size:12px;margin-bottom:12px">File Excel mỗi dòng 1 mặt hàng, có cột: <b>NCC · Ngày · Tên SP · SL · Đơn giá</b> (dòng đầu là tiêu đề). App gộp theo <b>NCC + ngày</b> → tạo <b>phiếu nhập nháp (Đã đặt)</b> để kho kiểm rồi bấm ✓ Đã nhận. Xem trước rồi mới tạo.</div>
+      <input type="file" id="ncdImpFile" accept=".xlsx,.xls" onchange="window._ncdImpRead(this.files[0])" style="width:100%;border:1px dashed var(--line);border-radius:8px;padding:14px;background:#FAFAFB">
+      <div id="ncdImpOut" style="margin-top:10px"></div>`,
+      { width: '720px', footer: `<button class="btn btn-ghost" onclick="window.closeModal()">Đóng</button><button class="btn btn-primary" id="ncdImpBtn" onclick="window._ncdImpCommit()" disabled>Tạo phiếu nháp</button>` });
+  };
+  window._ncdImpRead = function (file) {
+    if (!file || !window.XLSX) { window.toast && window.toast('Chưa tải thư viện Excel', 'warn'); return; }
+    const fr = new FileReader();
+    fr.onload = ev => {
+      let rows = [];
+      try { const wb = window.XLSX.read(ev.target.result, { type: 'array' }); rows = window.XLSX.utils.sheet_to_json(wb.Sheets[wb.SheetNames[0]], { header: 1 }); }
+      catch (e) { document.getElementById('ncdImpOut').innerHTML = '<div style="color:#B91C1C">Không đọc được file.</div>'; return; }
+      const head = (rows[0] || []).map(h => _nk(h));
+      const col = kw => head.findIndex(h => kw.some(k => h.includes(k)));
+      const cN = col(['ncc', 'nha cung cap']), cD = col(['ngay', 'date']), cS = col(['ten', 'san pham', 'mat hang', 'sp']), cQ = col(['sl', 'so luong', 'khoi luong', 'qty']), cP = col(['gia', 'don gia', 'price']);
+      if (cN < 0 || cS < 0 || cQ < 0) { document.getElementById('ncdImpOut').innerHTML = '<div style="color:#B91C1C">Thiếu cột NCC / Tên SP / SL. Kiểm tra dòng tiêu đề.</div>'; return; }
+      const sups = getSup(); const supByName = {}; sups.forEach(s => supByName[_nk(s.name)] = s);
+      const prods = S().get('products', []) || []; const prodByName = {}; prods.forEach(p => prodByName[_nk(p.name)] = p);
+      const yr = new Date().getFullYear(); const groups = {};
+      rows.slice(1).forEach(r => {
+        if (!Array.isArray(r)) return;
+        const nccName = String(r[cN] || '').trim(); const spName = String(r[cS] || '').trim();
+        const qty = parseFloat(String(r[cQ] || '').replace(',', '.')) || 0; const price = cP >= 0 ? (parseFloat(String(r[cP] || '').replace(/[.\s₫]/g, '')) || 0) : 0;
+        if (!nccName || !spName || !(qty > 0)) return;
+        const dRaw = cD >= 0 ? String(r[cD] || '').trim() : ''; const md = dRaw.match(/(\d{1,2})\/(\d{1,2})(?:\/(\d{2,4}))?/);
+        const date = md ? `${pad(+md[1])}/${pad(+md[2])}/${md[3] ? (md[3].length === 2 ? '20' + md[3] : md[3]) : yr}` : (window.todayVN ? window.todayVN() : '');
+        const sup = supByName[_nk(nccName)]; const prod = prodByName[_nk(spName)];
+        const key = (sup ? sup.id : '#' + _nk(nccName)) + '|' + date;
+        const g = groups[key] || (groups[key] = { supId: sup ? sup.id : '', supName: sup ? sup.name : nccName, matched: !!sup, date, items: [] });
+        g.items.push({ productId: prod ? prod.id : null, name: prod ? prod.name : spName, unit: prod ? (prod.unit || 'kg') : 'kg', qty, price, total: Math.round(qty * price) });
+      });
+      _impGroups = Object.values(groups);
+      const f = v => (+v || 0).toLocaleString('vi-VN'); const out = document.getElementById('ncdImpOut');
+      if (!_impGroups.length) { out.innerHTML = '<div style="color:#B91C1C">Không đọc được dòng hợp lệ nào.</div>'; return; }
+      const nUn = _impGroups.filter(g => !g.matched).length;
+      out.innerHTML = `<div style="font-size:12.5px;margin-bottom:6px">Sẽ tạo <b>${_impGroups.filter(g => g.matched).length} phiếu nháp</b>${nUn ? ` · ⚠ bỏ <b style="color:#B45309">${nUn} phiếu NCC chưa khớp danh bạ</b> (thêm NCC trước rồi nhập lại)` : ''}</div>
+        <div style="max-height:42vh;overflow:auto;border:1px solid var(--line);border-radius:8px"><table style="width:100%;border-collapse:collapse;font-size:12px"><thead><tr style="background:#F0FDF4"><th style="text-align:left;padding:6px 9px">NCC</th><th style="padding:6px 9px">Ngày</th><th style="text-align:right;padding:6px 9px">Số mã</th><th style="text-align:right;padding:6px 9px">Tổng tiền</th></tr></thead><tbody>${_impGroups.map(g => `<tr style="${g.matched ? '' : 'background:#FEF3C7'}"><td style="padding:5px 9px">${escH(g.supName)}${g.matched ? '' : ' ⚠ chưa khớp'}</td><td style="padding:5px 9px;text-align:center">${escH(g.date)}</td><td style="padding:5px 9px;text-align:right">${g.items.length}</td><td style="padding:5px 9px;text-align:right">${f(g.items.reduce((s, i) => s + i.total, 0))}₫</td></tr>`).join('')}</tbody></table></div>`;
+      const btn = document.getElementById('ncdImpBtn'); if (btn) btn.disabled = !_impGroups.some(g => g.matched);
+    };
+    fr.readAsArrayBuffer(file);
+  };
+  window._ncdImpCommit = function () {
+    const ok = _impGroups.filter(g => g.supId);
+    if (!ok.length) return;
+    const list = getPur(); const stamp = Date.now().toString(36); let n = 0;
+    ok.forEach((g, gi) => {
+      const items = g.items;
+      list.push({ id: 'PNX-' + stamp + '-' + (gi + 1), supplierId: g.supId, date: g.date, status: 'ordered',
+        total: items.reduce((s, i) => s + (+i.total || 0), 0), paid: 0, items, noStock: true,
+        note: 'Nhập từ Excel · kiểm giá rồi ✓ Đã nhận' });
+      n++;
+    });
+    const skipped = _impGroups.length - ok.length;
+    window.STORE.set('purchases', list);
+    if (window.audit) window.audit.log('purchase.import', `Nhập Excel ${n} phiếu nháp NCC`);
+    window.toast && window.toast(`✓ Đã tạo ${n} phiếu nháp` + (skipped ? ` · bỏ ${skipped} phiếu NCC chưa khớp` : '') + ' — vào Phiếu nhập kiểm giá + ✓ Đã nhận', 'success');
+    _impGroups = []; window.closeModal && window.closeModal();
+  };
+
   /* Init */
   if (window.renderAppShell) window.renderAppShell('ncc-debt', 'Công nợ NCC');
+  S().get('products');   /* warm-load: khớp SP khi nhập Excel */
   if (window.STORE) {
     S().get('purchases'); S().get('suppliers'); S().get('cashEntries');   /* warm-load */
     S().subscribe('suppliers', window.ncdRender);
