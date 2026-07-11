@@ -36,7 +36,6 @@
         <div class="t2" data-fin="debt" onclick="window.finTab('debt')">📉 Công nợ</div>
         <div class="t2" data-fin="invoices" onclick="window.finTab('invoices')">🧾 Hóa đơn</div>
         <div class="t2" data-fin="pur" onclick="window.finTab('pur')">📦 Phiếu nhập</div>
-        <div class="t2" data-fin="nccdebt" onclick="window.finTab('nccdebt')">🏭 Công nợ NCC</div>
       </div>
     </div>
     <div class="fin-body">
@@ -55,7 +54,7 @@
 <script>
   if (window.renderAppShell) window.renderAppShell('finance', 'Tài chính');
   /* Phiếu nhập (kế toán) = tab 'pur' → nhúng purchases.html. extraQS: truyền createForSup từ "Phiếu về" của Gom hàng. */
-  var FIN_FILE = { accounting: 'accounting', debt: 'debt', invoices: 'invoices', pur: 'purchases', nccdebt: 'ncc-cong-no' };
+  var FIN_FILE = { accounting: 'accounting', debt: 'debt', invoices: 'invoices', pur: 'purchases' };
   window.finTab = function (which, extraQS) {
     document.querySelectorAll('.t2').forEach(t => t.classList.toggle('active', t.dataset.fin === which));
     var src = (FIN_FILE[which] || which) + '.html?embed=1';
@@ -66,7 +65,7 @@
   (function () {
     var p = new URLSearchParams(location.search);
     var t = p.get('tab') || 'accounting';
-    if (!['accounting', 'debt', 'invoices', 'pur', 'nccdebt'].includes(t)) t = 'accounting';
+    if (!['accounting', 'debt', 'invoices', 'pur'].includes(t)) t = 'accounting';
     var cfs = p.get('createForSup');
     window.finTab(t, cfs ? ('createForSup=' + encodeURIComponent(cfs)) : '');
   })();

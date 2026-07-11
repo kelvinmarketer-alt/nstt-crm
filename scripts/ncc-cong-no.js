@@ -155,7 +155,7 @@
   };
 
   /* Init */
-  if (window.renderAppShell) window.renderAppShell('finance', 'Công nợ NCC');
+  if (window.renderAppShell) window.renderAppShell('ncc-debt', 'Công nợ NCC');
   if (window.STORE) {
     S().get('purchases'); S().get('suppliers'); S().get('cashEntries');   /* warm-load */
     S().subscribe('suppliers', window.ncdRender);
