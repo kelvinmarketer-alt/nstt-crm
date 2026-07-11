@@ -47,11 +47,11 @@
     const has = (...kw) => kw.some(k => r.includes(k));
     /* CFO / Giám đốc tài chính / Kế toán trưởng → tài chính (KIỂM TRA TRƯỚC 'giám đốc' chung) */
     if (has('cfo', 'kế toán trưởng') || (has('giám đốc') && has('tài chính')) || (has('tài chính') && !has('giám đốc') && !has('ceo')))
-      return ['dashboard.view', 'accounting.view', 'accounting.edit', 'debt.view', 'debt.collect', 'invoices.view', 'invoices.create', 'adspend.view', 'adspend.edit', 'suppliers.view', 'products.view', 'orders.view', 'reports.view', 'reports.profit', 'reports.daily', 'reports.export', 'payroll.viewSelf', 'payroll.viewAll'];
+      return ['dashboard.view', 'accounting.view', 'accounting.edit', 'debt.view', 'debt.collect', 'invoices.view', 'invoices.create', 'adspend.view', 'adspend.edit', 'suppliers.view', 'purchases.view', 'purchases.create', 'products.view', 'orders.view', 'reports.view', 'reports.profit', 'reports.daily', 'reports.export', 'payroll.viewSelf', 'payroll.viewAll'];
     /* Sếp / CEO / Tổng giám đốc / Giám đốc điều hành → toàn quyền */
     if (has('sếp', 'ceo', 'chủ doanh', 'giám đốc', 'tổng giám', 'admin', 'ban giám đốc')) return ['all'];
     if (has('kế toán'))
-      return ['dashboard.view', 'customers.view', 'accounting.view', 'accounting.edit', 'debt.view', 'debt.collect', 'invoices.view', 'invoices.create', 'adspend.view', 'products.view', 'orders.view', 'reports.view', 'reports.daily', 'payroll.viewSelf'];
+      return ['dashboard.view', 'customers.view', 'accounting.view', 'accounting.edit', 'debt.view', 'debt.collect', 'invoices.view', 'invoices.create', 'adspend.view', 'purchases.view', 'purchases.create', 'products.view', 'orders.view', 'reports.view', 'reports.daily', 'payroll.viewSelf'];
     if (has('nhân sự', 'tuyển dụng', 'hr', 'hcns', 'hành chính'))
       return ['dashboard.view', 'customers.view', 'staff.view', 'staff.edit', 'payroll.viewSelf', 'payroll.viewAll', 'payroll.edit', 'payroll.upload', 'payroll.calc', 'payroll.submit', 'reports.view'];
     if (has('marketing', 'mkt', 'digital', 'ads', 'content', 'truyền thông'))
@@ -316,6 +316,7 @@
     /* Modules mới */
     'inventory.html':  'inventory.view',
     'suppliers.html':  'suppliers.view',
+    'procurement.html': 'suppliers.view',
     'purchases.html':  'purchases.view',
     'quotes.html':     'quotes.view',
     'recurring.html':  'recurring.view',

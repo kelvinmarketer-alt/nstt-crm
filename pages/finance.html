@@ -35,6 +35,7 @@
         <div class="t2 active" data-fin="accounting" onclick="window.finTab('accounting')">💰 Kế toán</div>
         <div class="t2" data-fin="debt" onclick="window.finTab('debt')">📉 Công nợ</div>
         <div class="t2" data-fin="invoices" onclick="window.finTab('invoices')">🧾 Hóa đơn</div>
+        <div class="t2" data-fin="pur" onclick="window.finTab('pur')">📦 Phiếu nhập</div>
       </div>
     </div>
     <div class="fin-body">
@@ -52,14 +53,21 @@
 <script>if(window.AUTH) window.AUTH.requireAuth();</script>
 <script>
   if (window.renderAppShell) window.renderAppShell('finance', 'Tài chính');
-  window.finTab = function (which) {
+  /* Phiếu nhập (kế toán) = tab 'pur' → nhúng purchases.html. extraQS: truyền createForSup từ "Phiếu về" của Gom hàng. */
+  var FIN_FILE = { accounting: 'accounting', debt: 'debt', invoices: 'invoices', pur: 'purchases' };
+  window.finTab = function (which, extraQS) {
     document.querySelectorAll('.t2').forEach(t => t.classList.toggle('active', t.dataset.fin === which));
-    document.getElementById('finFrame').src = which + '.html?embed=1';
+    var src = (FIN_FILE[which] || which) + '.html?embed=1';
+    if (extraQS) src += '&' + extraQS;
+    document.getElementById('finFrame').src = src;
   };
-  /* tab mặc định (đọc ?tab= nếu có) */
+  /* tab mặc định (đọc ?tab= nếu có) + truyền createForSup sang Phiếu nhập */
   (function () {
-    var t = new URLSearchParams(location.search).get('tab') || 'accounting';
-    window.finTab(['accounting', 'debt', 'invoices'].includes(t) ? t : 'accounting');
+    var p = new URLSearchParams(location.search);
+    var t = p.get('tab') || 'accounting';
+    if (!['accounting', 'debt', 'invoices', 'pur'].includes(t)) t = 'accounting';
+    var cfs = p.get('createForSup');
+    window.finTab(t, cfs ? ('createForSup=' + encodeURIComponent(cfs)) : '');
   })();
 </script>
 </body>

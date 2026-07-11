@@ -1126,21 +1126,14 @@
     const { lines } = extReqData(run);
     if (!lines.length) { window.toast && window.toast('Không có mã thu mua ngoài', 'info'); return; }
     const items = lines.map(l => ({ name: l.name, qty: l.qty, price: '' }));
+    /* Phiếu nhập là tab trong Tài chính (việc kế toán) → mở Tài chính, tab Phiếu nhập,
+       modal thu mua ngoài điền sẵn. sessionStorage giữ qua điều hướng + iframe purchases
+       cùng origin đọc được. */
     const top = window.top || window;
-    /* Gom hàng thường chạy TRONG IFRAME (tab "Gom hàng" của trang NCC). Điều khiển TRANG CHA:
-       chuyển tab Phiếu nhập + mở modal thu mua ngoài điền sẵn → KHÔNG mở lồng trong iframe. */
-    if (top !== window && typeof top.openPurModal === 'function') {
-      try {
-        if (typeof top.supTab === 'function') top.supTab('pur');
-        top.openPurModal('EXT-MARKET', items);
-        return;
-      } catch (e) { /* lỗi → rơi xuống điều hướng */ }
-    }
-    /* Chạy độc lập: đặt prefill trên cửa sổ trên cùng rồi điều hướng sang trang Phiếu nhập */
     try { top.sessionStorage.setItem('pn_prefill_items', JSON.stringify(items)); }
     catch (e) { try { sessionStorage.setItem('pn_prefill_items', JSON.stringify(items)); } catch (e2) {} }
-    try { top.location.href = 'purchases.html?createForSup=EXT-MARKET'; }
-    catch (e) { location.href = 'purchases.html?createForSup=EXT-MARKET'; }
+    try { top.location.href = 'finance.html?tab=pur&createForSup=EXT-MARKET'; }
+    catch (e) { location.href = 'finance.html?tab=pur&createForSup=EXT-MARKET'; }
   };
   window.pcPrintExtReq = function (runId) {
     const run = getRuns().find(r => r.id === runId); if (!run) return;

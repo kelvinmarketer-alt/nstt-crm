@@ -149,17 +149,11 @@
 
   <main class="main">
     <div style="margin-bottom:12px">
-      <h1 style="margin:0;font-size:22px;color:var(--navy);font-weight:800">🏭 Nhà cung cấp &amp; Phiếu nhập <span id="hbTitle"></span></h1>
-      <div style="font-size:13px;color:var(--muted);margin-top:2px">Danh bạ NCC đầu vào · đơn nhập hàng · công nợ phải trả</div>
+      <h1 style="margin:0;font-size:22px;color:var(--navy);font-weight:800">🏭 Nhà cung cấp <span id="hbTitle"></span></h1>
+      <div style="font-size:13px;color:var(--muted);margin-top:2px">Danh bạ NCC đầu vào · sản phẩm cung cấp · công nợ phải trả</div>
     </div>
 
-    <div class="tabs2">
-      <div class="t2 active" data-t2="ncc" onclick="window.supTab('ncc')"><span class="t2ic">🏭</span><span class="t2lbl">Nhà cung cấp</span> <span id="t2nccCount" class="t2cnt"></span></div>
-      <div class="t2" data-t2="gom" onclick="window.supTab('gom')"><span class="t2ic">🧺</span><span class="t2lbl">Gom hàng</span></div>
-      <div class="t2" data-t2="pur" onclick="window.supTab('pur')"><span class="t2ic">📦</span><span class="t2lbl">Phiếu nhập</span> <span id="t2purCount" class="t2cnt"></span></div>
-    </div>
-
-    <!-- ===== TAB NHÀ CUNG CẤP ===== -->
+    <!-- ===== NHÀ CUNG CẤP (module riêng — Gom hàng & Phiếu nhập đã tách sang menu khác) ===== -->
     <div id="paneNcc">
       <div class="sup-ncc-actions" style="display:flex;justify-content:flex-end;gap:8px;margin-bottom:12px;flex-wrap:wrap">
         <button class="btn btn-ghost sup-btn-csv" onclick="window.exportSupCsv()">⬇ Xuất CSV</button>
@@ -172,46 +166,6 @@
       <div id="supList"></div>
     </div>
 
-    <!-- ===== TAB PHIẾU NHẬP ===== -->
-    <div id="panePur" style="display:none">
-      <div class="pur-banner" style="background:#EFF6FF;color:#1E40AF;padding:9px 12px;border-radius:8px;font-size:12.5px;margin-bottom:12px">
-        💡 Quy trình: có đơn KH → bấm <b>Gom hàng → NCC</b> để gom, hoặc tạo phiếu nhập tay tại đây. Khi hàng về bấm <b>"✓ Nhận"</b> để cộng kho + ghi công nợ NCC. <b>Hạn chế tồn kho</b> — chỉ nhập đủ đơn.
-      </div>
-      <div class="pur-actions-row" style="display:flex;justify-content:flex-end;gap:8px;margin-bottom:12px;flex-wrap:wrap">
-        <button class="btn btn-ghost pur-btn-csv" onclick="window.exportPurCsv()">⬇ Xuất CSV</button>
-        <button class="btn btn-primary pur-btn-create" onclick="window.openPurModal()">+ Tạo phiếu nhập</button>
-      </div>
-      <div style="display:grid;grid-template-columns:repeat(4,1fr);gap:10px;margin-bottom:14px" id="purKpis"></div>
-      <div class="pur-filter-row" style="display:flex;gap:10px;margin-bottom:10px;flex-wrap:wrap">
-        <button class="btn btn-primary pur-btn-create-m" onclick="window.openPurModal()">+ Tạo phiếu nhập</button>
-        <input id="purQ" placeholder="🔍 Tìm mã phiếu, NCC..." style="flex:1;min-width:240px;border:1px solid var(--line);border-radius:7px;padding:7px 11px;font-size:13px">
-        <select id="purSt" style="border:1px solid var(--line);border-radius:7px;padding:7px 11px;font-size:13px">
-          <option value="">Tất cả trạng thái</option>
-          <option value="ordered">⏳ Đã đặt</option>
-          <option value="received">✓ Đã nhận</option>
-          <option value="cancelled">✕ Hủy</option>
-        </select>
-        <select id="purSup" style="border:1px solid var(--line);border-radius:7px;padding:7px 11px;font-size:13px"><option value="">Tất cả NCC</option></select>
-      </div>
-      <div style="background:#fff;border:1px solid var(--line);border-radius:10px;overflow:hidden">
-        <div style="overflow-x:auto">
-          <table class="pn-table">
-            <thead><tr>
-              <th class="hide-xs" style="width:32px"><div id="purSelectAll" class="checkbox" onclick="this.classList.toggle('on')" title="Chọn tất cả"></div></th>
-              <th>Mã phiếu</th><th>NCC</th><th>Ngày nhập</th><th class="hide-xs">Mặt hàng</th>
-              <th class="num">Tổng tiền</th><th class="num hide-xs">Đã trả</th><th class="num hide-xs">Còn nợ</th>
-              <th>Trạng thái</th><th class="hide-xs">Hành động</th>
-            </tr></thead>
-            <tbody id="purBody"></tbody>
-          </table>
-        </div>
-      </div>
-    </div>
-
-    <!-- ===== TAB GOM HÀNG → NCC (nhúng module Gom hàng) ===== -->
-    <div id="paneGom" style="display:none;height:calc(100vh - 200px);min-height:520px">
-      <iframe id="gomFrame" title="Gom hàng → NCC" style="width:100%;height:100%;border:1px solid var(--line);border-radius:10px;display:block"></iframe>
-    </div>
 
   </main>
 </div>
@@ -247,38 +201,5 @@
 <script src="../scripts/data-linkage.js"></script>
 <script src="../scripts/system-core.js"></script>
 <script src="../scripts/ai-chat.js"></script>
-<script>
-  /* Chuyển tab NCC ↔ Phiếu nhập */
-  window.supTab = function (which) {
-    document.querySelectorAll('.t2').forEach(t => t.classList.toggle('active', t.dataset.t2 === which));
-    document.getElementById('paneNcc').style.display = which === 'ncc' ? '' : 'none';
-    document.getElementById('panePur').style.display = which === 'pur' ? '' : 'none';
-    const pg = document.getElementById('paneGom');
-    if (pg) {
-      pg.style.display = which === 'gom' ? '' : 'none';
-      if (which === 'gom') { const f = document.getElementById('gomFrame'); if (f && !f.src) f.src = 'procurement.html?embed=1'; }
-    }
-  };
-  /* Cập nhật số đếm trên tab */
-  function _supTabCounts() {
-    try {
-      const nc = (window.STORE.get('suppliers', []) || []).length;
-      const pu = (window.STORE.get('purchases', []) || []).filter(p => p.status !== 'cancelled').length;
-      const a = document.getElementById('t2nccCount'); if (a) a.textContent = nc || '';
-      const b = document.getElementById('t2purCount'); if (b) b.textContent = pu || '';
-    } catch (e) {}
-  }
-  if (window.STORE) {
-    _supTabCounts();
-    window.STORE.subscribe('suppliers', _supTabCounts);
-    window.STORE.subscribe('purchases', _supTabCounts);
-  }
-  /* Mở tab Phiếu nhập + form tạo phiếu cho 1 NCC (gọi từ drawer NCC) */
-  window.openPurForSup = function (supId) {
-    window.supTab('pur');
-    if (typeof closeDrawer === 'function') closeDrawer();
-    setTimeout(() => window.openPurModal && window.openPurModal(supId), 60);
-  };
-</script>
 </body>
 </html>
