@@ -392,14 +392,9 @@
         <option value="replace_next">📅 Bù hàng HÔM SAU (báo NCC + kho nhập dư)</option>
       </select>
       <div id="rt_refundWrap">
-        <div style="display:flex;gap:8px">
-          <div style="flex:1"><label style="${_lbl}">Số tiền trừ hoá đơn (₫)</label><input id="rt_refund" type="number" placeholder="tự tính theo SL × giá" style="${_inp}"></div>
-          <div style="flex:1"><label style="${_lbl}">Hình thức</label>
-            <select id="rt_mode" style="${_inp}">
-              <option value="debt">Giảm công nợ KH (B2B — khuyên dùng)</option>
-              <option value="cash">Chi tiền mặt (tạo phiếu chi)</option>
-            </select></div>
-        </div>
+        <label style="${_lbl}">Số tiền trừ vào công nợ KH (₫) ${window.helpTip ? window.helpTip('Đơn B2B đều tính công nợ → trả hàng = TRỪ vào công nợ khách (gỡ SP khỏi hoá đơn). Không dùng tiền mặt.') : ''}</label>
+        <input id="rt_refund" type="number" placeholder="tự tính theo SL × giá bán" style="${_inp}">
+        <input type="hidden" id="rt_mode" value="debt">
       </div>
       <div id="rt_replaceNote" style="display:none;background:#EFF6FF;color:#1E40AF;padding:8px 11px;border-radius:7px;font-size:11.5px;margin-bottom:8px"></div>
       <label style="${_lbl}">Hàng trả về xử lý thế nào?</label>
