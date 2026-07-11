@@ -227,20 +227,22 @@
     return ro;
   }
 
-  window.processReturn = function(id) {
+  window.processReturn = async function(id) {
     const list = getR();
     const i = list.findIndex(x => x.id === id);
     if (i < 0) return;
     const r = list[i];
+    if (r.status !== 'pending') return;   /* chống double-click (status đặt đồng bộ trước await) */
     const res = r.resolution || 'refund';
     const resLbl = res === 'refund'
       ? `TRỪ hoá đơn ${window.fmt(r.refundTotal)}₫ (${r.refundMode === 'cash' ? 'tiền mặt' : 'giảm nợ'})`
       : res === 'replace_next' ? 'Bù hàng HÔM SAU (tạo đơn giao bù + báo NCC)' : 'Bù hàng NGAY hôm nay (tạo đơn giao bù)';
     const summary = [
       r.item ? `Mặt hàng: ${r.item.name} ${r.qtyReturn||0}${r.item.unit||'kg'}` : '',
-      `Hàng trả: ${r.disposition==='restock' ? 'NHẬP LẠI KHO' : 'BỎ (hao hụt)'}`,
+      `Hàng trả: ${r.disposition==='restock' ? 'NHẬP LẠI KHO (còn dùng được)' : 'BỎ (hao hụt)'}`,
       'Cách xử lý: ' + resLbl,
-      r.fault==='supplier' && r.supplierId ? `Đòi lại NCC: ${r.supplierName}` : ''
+      (res==='refund' && r.item) ? `Gỡ "${r.item.name}" khỏi hoá đơn ${r.orderCode}` : '',
+      (r.fault==='supplier' && r.supplierId) ? `Trả NCC ${r.supplierName} → TRỪ công nợ ${window.fmt((+r.supClaimAmount)||(+r.refundTotal)||0)}₫` : ''
     ].filter(Boolean).join('\n');
     if (!confirm(`Xử lý đơn trả ${r.id}?\n\n${summary}`)) return;
 
@@ -262,8 +264,32 @@
 
     /* 2) Giải quyết theo CÁCH XỬ LÝ */
     if (res === 'refund') {
-      /* Không lấy nữa → trừ vào hoá đơn (giảm nợ / chi tiền mặt) */
-      r.status = 'refunded';
+      r.status = 'refunded';   /* đặt SỚM (đồng bộ, trước await) để guard chống double-click chặn được */
+      /* B) Gỡ/giảm SP đã trả khỏi ĐƠN (hoá đơn) KH → giảm freight. Đơn "Công nợ" thì nợ KH TỰ
+         giảm (nợ = Σ freight − Σ trả). bRemoved = đã gỡ được khỏi đơn hay chưa. */
+      let bRemoved = false;
+      if (r.item && r.item.id && r.qtyReturn > 0) {
+        const ord = getOrd(); const o = ord.find(x => x.code === r.orderCode);
+        if (o) {
+          if (!(Array.isArray(o.items) && o.items.length) && window.SB_DATA && window.SB_DATA.getOrderItems) {
+            try { const its = await window.SB_DATA.getOrderItems(r.orderCode); if (Array.isArray(its)) o.items = its; } catch (e) {}
+          }
+          if (Array.isArray(o.items) && o.items.length) {
+            const it = o.items.find(x => x.id === r.item.id) || o.items.find(x => (x.name || '').trim().toLowerCase() === (r.item.name || '').trim().toLowerCase());
+            if (it) {
+              const newQty = +((+it.qty || 0) - r.qtyReturn).toFixed(3);
+              if (newQty <= 0.001) o.items = o.items.filter(x => x !== it);
+              else { it.qty = newQty; it.total = Math.round(newQty * (+it.price || 0)); }
+              o.freight = (o.items || []).reduce((s, x) => s + (+x.total || 0), 0);
+              window.STORE.set('orders', ord);
+              bRemoved = true;
+              msgs.push(`gỡ ${r.item.name} khỏi hoá đơn ${r.orderCode}`);
+            }
+          } else { msgs.push('đơn chưa tải mặt hàng — chưa gỡ khỏi hoá đơn'); }
+        }
+      }
+      /* Hoàn tiền: TIỀN MẶT → luôn chi (đơn thường đã trả tiền). GIẢM NỢ → CHỈ ghi sổ khi CHƯA gỡ
+         được khỏi đơn (đã gỡ thì freight giảm → nợ tự giảm; ghi thêm sổ = TRỪ 2 LẦN). */
       if (r.refundTotal > 0) {
         if (r.refundMode === 'cash') {
           window.STORE.add('cashEntries', {
@@ -276,22 +302,16 @@
           const accs = window.STORE.get('paymentAccounts', []) || [];
           const acc = accs.find(a => (a.name || '').toLowerCase().includes('tiền mặt'));
           if (acc) window.STORE.update('paymentAccounts', acc.id, { balance: (+acc.balance || 0) - r.refundTotal });
-          msgs.push('tạo phiếu chi');
-        } else {
+          msgs.push('tạo phiếu chi hoàn tiền');
+        } else if (!bRemoved) {
           const custs = window.STORE.get('customers', []) || [];
           const c = custs.find(x => x.id === r.custId) || custs.find(x => x.name === r.custName);
-          if (c) {
-            window.STORE.update('customers', c.id, {
-              debt: Math.max(0, (+c.debt || 0) - r.refundTotal),
-              debtOverdue: Math.max(0, (+c.debtOverdue || 0) - r.refundTotal),
-            });
-            /* Ghi SỔ CÔNG NỢ: giảm nợ do trả hàng */
-            window.addDebtLedger && window.addDebtLedger({
-              custId: c.id, type: 'payment', amount: r.refundTotal, ref: r.id, date: r.date,
-              desc: 'Giảm nợ trả hàng ' + r.orderCode + (r.item ? ' · ' + r.item.name : ''),
-            });
-            msgs.push(`giảm công nợ ${r.custName}`);
-          } else { msgs.push('không tìm thấy KH để giảm nợ'); }
+          if (c && window.addDebtLedger) {
+            window.addDebtLedger({ custId: c.id, type: 'payment', amount: r.refundTotal, ref: r.id, date: r.date, desc: 'Giảm nợ trả hàng ' + r.orderCode + (r.item ? ' · ' + r.item.name : '') });
+            msgs.push(`giảm công nợ ${r.custName} (sổ)`);
+          } else { msgs.push('chưa gỡ được khỏi đơn — kiểm tra công nợ KH thủ công'); }
+        } else {
+          msgs.push('công nợ KH tự giảm theo hoá đơn');
         }
       }
     } else {
@@ -309,14 +329,21 @@
 
     /* 3) Lỗi NCC → tạo khoản đòi lại NCC */
     if (r.fault === 'supplier' && r.supplierId) {
+      const claimAmt = +r.supClaimAmount || +r.refundTotal || 0;   /* ưu tiên giá NHẬP; fallback giá bán */
       const claims = window.STORE.get('supplierClaims', []) || [];
       claims.unshift({
         id:'CL'+Date.now().toString(36), supplierId:r.supplierId, supplierName:r.supplierName,
         orderCode:r.orderCode, returnId:r.id, item:r.item?r.item.name:'', qty:r.qtyReturn||0,
-        amount:r.refundTotal, reason:r.reason, date:r.date, status:'open'
+        amount:claimAmt, reason:r.reason, date:r.date, status:'open'
       });
       window.STORE.set('supplierClaims', claims);
-      msgs.push(`tạo khoản đòi NCC ${r.supplierName}`);
+      /* A) Trừ tiền nhập → GIẢM công nợ phải trả NCC (hàng xấu trả về NCC) */
+      if (claimAmt > 0) {
+        const sups = window.STORE.get('suppliers', []) || [];
+        const s = sups.find(x => x.id === r.supplierId);
+        if (s) { window.STORE.update('suppliers', s.id, { debt: Math.max(0, (+s.debt || 0) - claimAmt) }); msgs.push(`trừ công nợ NCC ${r.supplierName} ${window.fmt(claimAmt)}₫`); }
+      }
+      msgs.push(`ghi khoản đòi NCC ${r.supplierName}`);
     }
 
     window.STORE.set('returns', list);
@@ -389,6 +416,8 @@
       <div id="rt_supWrap" style="display:none">
         <label style="${_lbl}">NCC chịu trách nhiệm</label>
         <select id="rt_sup" style="${_inp}"><option value="">— Chọn NCC —</option>${sups.map(s => `<option value="${s.id}">${s.name}</option>`).join('')}</select>
+        <label style="${_lbl}">Trừ tiền nhập NCC (₫) ${window.helpTip ? window.helpTip('Trả hàng xấu về NCC → TRỪ vào công nợ phải trả NCC. Mặc định = SL trả × giá nhập gần nhất.') : ''}</label>
+        <input id="rt_supAmount" type="number" placeholder="tự tính SL × giá nhập gần nhất" style="${_inp}">
       </div>
       <label style="${_lbl}">Ghi chú</label>
       <textarea id="rt_note" rows="2" style="width:100%;border:1px solid var(--line);border-radius:6px;padding:7px;font-size:13px"></textarea>
@@ -426,14 +455,23 @@
   };
   window._rtOnFault = function() {
     document.getElementById('rt_supWrap').style.display = document.getElementById('rt_fault').value === 'supplier' ? '' : 'none';
+    window._rtCalcRefund();
   };
-  /* Tự tính số tiền trừ = SL trả × đơn giá mặt hàng */
+  /* Giá nhập gần nhất của SP (priceHistory.buy) */
+  function _rtLastBuy(pid) {
+    const prods = window.STORE.get('products', []) || [];
+    const p = prods.find(x => x.id === pid); const h = (p && p.priceHistory) || [];
+    const last = h[h.length - 1]; return last ? (+last.buy || 0) : 0;
+  }
+  /* Tự tính: số tiền trừ hoá đơn KH = SL × giá bán; trừ tiền nhập NCC = SL × giá nhập */
   window._rtCalcRefund = function() {
     const sel = window._rtResolveItem();
     const price = sel ? sel.price : 0;
     const qty = parseFloat(document.getElementById('rt_qty').value) || 0;
     const rf = document.getElementById('rt_refund');
     if (rf && price && qty) rf.value = Math.round(price * qty);
+    const sa = document.getElementById('rt_supAmount');
+    if (sa && sel && qty) { const buy = _rtLastBuy(sel.item.id); if (buy) sa.value = Math.round(buy * qty); }
   };
   /* Đổi cách xử lý → ẩn/hiện ô trừ tiền vs hướng dẫn bù hàng */
   window._rtOnResolution = function() {
@@ -475,6 +513,7 @@
       refundMode: document.getElementById('rt_mode').value,
       supplierId: supSel ? supSel.value : '',
       supplierName: (supSel && supSel.value) ? supSel.options[supSel.selectedIndex].text : '',
+      supClaimAmount: parseInt((document.getElementById('rt_supAmount') || {}).value) || 0,
       refundTotal: parseInt(document.getElementById('rt_refund').value) || 0,
       note: document.getElementById('rt_note').value,
       status: 'pending',
