@@ -229,6 +229,7 @@
     'recurringDrivers',/* Shipper mặc định mẫu đơn định kỳ {roId:{id,name}} — bảng recurring_orders không có cột driver */
     'procurementRuns', /* Phiên gom hàng → đặt NCC (Kho) — CRITICAL */
     'whProcure',       /* Module KHO: NCC mặc định/SP · hệ số quy đổi kg · giờ chốt đơn · SP mua ngoài */
+    'purchaseInvoices',/* Số hoá đơn ĐẦU VÀO của NCC theo phiếu {phiếuId: số HĐ} — cloud purchases KHÔNG có cột này */
     'supplierClaims',  /* Khoản đòi lại NCC khi hàng NCC giao hỏng (Trả hàng) */
     'supplierMeta',    /* Loại NCC (sỉ/lẻ/cả hai) — cloud suppliers không có cột này */
     'custPriceTiers',  /* Nhóm giá gán cho từng KH {custId:tierId} — cloud customers không có cột price_tier */

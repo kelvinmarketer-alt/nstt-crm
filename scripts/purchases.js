@@ -16,6 +16,32 @@
   function getProds() { return window.STORE.get('products', window.PRODUCTS || []) || []; }
   function findSup(id) { return id === EXT_SUP_ID ? EXT_SUP : getSup().find(s => s.id === id); }
 
+  /* ===== Trường KHÔNG có cột trên cloud purchases (bị strip khi sync) → tự chứa ===== */
+  /* Số hoá đơn NCC (đầu vào) — lưu KV đồng bộ được, theo mã phiếu */
+  const _pnInv = () => (window.STORE.get('purchaseInvoices', {}) || {});
+  function _pnSetInv(id, val) {
+    val = String(val || '').trim();
+    if (window.STORE.rmwKv) window.STORE.rmwKv('purchaseInvoices', c => { c = (c && typeof c === 'object') ? c : {}; if (val) c[id] = val; else delete c[id]; return c; }, {});
+    else { const m = _pnInv(); if (val) m[id] = val; else delete m[id]; window.STORE.set('purchaseInvoices', m); }
+  }
+  const _pnInvOf = p => (p && (p.invoiceNo || _pnInv()[p.id])) || '';
+  /* Phiên gom của phiếu tự tạo — SUY từ mã (PN-<runId>-<supId> / TMN-<runId>), khỏi cần cột gom_run_id */
+  function _pnGomRun(p) {
+    if (!p) return '';
+    if (p.gomRunId) return p.gomRunId;
+    const id = p.id || '';
+    if (/^TMN-GOM-/.test(id)) return id.slice(4);
+    const m = id.match(/^PN-(GOM-[^-]+)-/);
+    return m ? m[1] : '';
+  }
+  /* Không cộng kho? phiếu GOM + THU MUA NGOÀI = giao thẳng → không cộng tồn (suy từ mã, khỏi cột no_stock) */
+  function _pnNoStock(p) {
+    if (!p) return false;
+    if (p.supplierId === EXT_SUP_ID || (findSup(p.supplierId) || {}).system) return true;
+    if (/^(PN|TMN)-GOM-/.test(p.id || '')) return true;
+    return p.noStock === true;   /* phiếu tay: giá trị phiên (mất sau reload → về mặc định cộng kho) */
+  }
+
   /* Sinh số phiếu quỹ không trùng PK 'no': lấy max seq hiện có theo prefix rồi +1,
      kiểm tra tồn tại (tránh trùng nếu dữ liệu thưa/nhảy số). */
   function _nextCashNo(cash, prefix) {
@@ -113,13 +139,14 @@
     const s = findSup(p.supplierId);
     const isExt = p.supplierId === EXT_SUP_ID || (findSup(p.supplierId) || {}).system;
     const due = (p.total || 0) - (p.paid || 0);
+    const gomRun = _pnGomRun(p), noStock = _pnNoStock(p);
     const _a = v => String(v == null ? '' : v).replace(/"/g, '&quot;');
     const body = `
       <div style="display:flex;gap:8px;flex-wrap:wrap;align-items:center;margin-bottom:12px">
         <span class="st-pill st-${p.status}">${p.status==='ordered'?'⏳ Đã đặt - chờ nhận':p.status==='received'?'✓ Đã nhận hàng':'✕ Hủy'}</span>
-        <span style="font-size:12.5px;color:var(--muted)">${s?.name || p.supplierId} · ${p.date}${p.gomRunId ? ' · từ phiên <b>'+p.gomRunId+'</b>' : ''}</span>
+        <span style="font-size:12.5px;color:var(--muted)">${s?.name || p.supplierId} · ${p.date}${gomRun ? ' · từ phiên <b>'+gomRun+'</b>' : ''}</span>
       </div>
-      ${p.status==='ordered' ? `<div style="background:#FFFBEB;border:1px solid #FDE68A;color:#92400E;border-radius:8px;padding:8px 11px;font-size:12px;margin-bottom:12px">✍️ Điền <b>giá thật từng mã</b> (ô vàng) → <b>💾 Lưu giá</b> hoặc <b>✓ Đã nhận</b> → ${isExt?'chi tiền mặt (sổ quỹ)':'ghi <b>công nợ NCC</b>'} + giá vốn${p.noStock?'':' + cộng kho'}.</div>` : ''}
+      ${p.status==='ordered' ? `<div style="background:#FFFBEB;border:1px solid #FDE68A;color:#92400E;border-radius:8px;padding:8px 11px;font-size:12px;margin-bottom:12px">✍️ Điền <b>giá thật từng mã</b> (ô vàng) → <b>💾 Lưu giá</b> hoặc <b>✓ Đã nhận</b> → ${isExt?'chi tiền mặt (sổ quỹ)':'ghi <b>công nợ NCC</b>'} + giá vốn${noStock?'':' + cộng kho'}.</div>` : ''}
       <h3 style="margin:0 0 8px;font-size:12px;color:var(--muted);text-transform:uppercase;letter-spacing:0.5px">📦 Mặt hàng nhập</h3>
       <table style="width:100%;border-collapse:collapse;font-size:13px;margin-bottom:12px">
         <thead><tr style="background:#FAFBFC"><th style="text-align:left;padding:6px 8px;font-size:11px">SP</th><th style="text-align:right;padding:6px 8px;font-size:11px">SL</th><th style="text-align:right;padding:6px 8px;font-size:11px">Đơn giá</th><th style="text-align:right;padding:6px 8px;font-size:11px">Thành tiền</th></tr></thead>
@@ -136,9 +163,9 @@
 
       <div style="display:flex;gap:12px;flex-wrap:wrap;align-items:flex-end;margin-bottom:12px">
         <label style="flex:1;min-width:180px;font-size:12px;color:var(--muted)">🧾 Số hóa đơn NCC (đầu vào)
-          <input id="pnInvNo" value="${_a(p.invoiceNo)}" placeholder="số HĐ / ký hiệu (nếu có)" ${p.status==='cancelled'?'disabled':''} style="width:100%;margin-top:3px;border:1px solid var(--line);border-radius:5px;padding:6px 8px;font-size:12.5px">
+          <input id="pnInvNo" value="${_a(_pnInvOf(p))}" placeholder="số HĐ / ký hiệu (nếu có)" ${p.status==='cancelled'?'disabled':''} style="width:100%;margin-top:3px;border:1px solid var(--line);border-radius:5px;padding:6px 8px;font-size:12.5px">
         </label>
-        ${(!isExt && p.status==='ordered') ? `<label style="display:flex;align-items:center;gap:7px;font-size:12px;color:var(--muted);cursor:pointer;padding-bottom:7px"><input type="checkbox" id="pnStockCb" ${p.noStock?'':'checked'}> Cộng vào tồn kho khi nhận</label>` : ''}
+        ${(!isExt && !gomRun && p.status==='ordered') ? `<label style="display:flex;align-items:center;gap:7px;font-size:12px;color:var(--muted);cursor:pointer;padding-bottom:7px"><input type="checkbox" id="pnStockCb" ${noStock?'':'checked'}> Cộng vào tồn kho khi nhận</label>` : ''}
       </div>
 
       <div style="background:${due>0?'#FEE2E2':'#F0FDF4'};padding:10px 12px;border-radius:8px;margin-bottom:10px">
@@ -147,7 +174,7 @@
       </div>
       <div style="font-size:12.5px"><b>Ghi chú:</b> ${p.note || '—'}</div>`;
     const footer = `
-      ${(p.gomRunId && p.status==='ordered') ? `<button class="btn btn-ghost" style="color:#B45309" onclick="window.pnBackToGom('${p.id}')" title="Trả cả phiên gom về bước gán NCC để sửa">↩ Về phiên gom</button>` : ''}
+      ${(gomRun && p.status==='ordered') ? `<button class="btn btn-ghost" style="color:#B45309" onclick="window.pnBackToGom('${p.id}')" title="Trả cả phiên gom về bước gán NCC để sửa">↩ Về phiên gom</button>` : ''}
       <button class="btn btn-ghost" onclick="window.printPur('${p.id}')">🖨 In</button>
       ${p.status==='ordered' ? `<button class="btn btn-navy" onclick="window.pnSaveItemPrices('${p.id}')">💾 Lưu giá</button>` : ''}
       ${p.status==='ordered' ? `<button class="btn btn-primary" onclick="window.pnReceiveFromModal('${p.id}')">✓ Đã nhận</button>` : ''}
@@ -159,7 +186,7 @@
 
   /* Đọc số HĐ NCC + cờ cộng kho từ popup vào phiếu */
   function _pnReadDrawerMeta(p) {
-    const inv = document.getElementById('pnInvNo'); if (inv) p.invoiceNo = inv.value.trim();
+    const inv = document.getElementById('pnInvNo'); if (inv) { p.invoiceNo = inv.value.trim(); _pnSetInv(p.id, p.invoiceNo); }
     const cb = document.getElementById('pnStockCb'); if (cb) p.noStock = !cb.checked;
   }
   /* ✓ Đã nhận từ popup: lưu giá + số HĐ + cờ kho TRƯỚC rồi mới nhận (để total/kho/HĐ đúng) */
@@ -171,18 +198,18 @@
   /* Lưu riêng số hoá đơn NCC (phiếu đã nhận — hoá đơn thường về sau) */
   window.pnSaveInvoice = function (id) {
     const list = getPur(); const p = list.find(x => x.id === id); if (!p) return;
-    const inp = document.getElementById('pnInvNo'); if (inp) p.invoiceNo = inp.value.trim();
+    const inp = document.getElementById('pnInvNo'); if (inp) { p.invoiceNo = inp.value.trim(); _pnSetInv(id, p.invoiceNo); }
     window.STORE.set('purchases', list);
     window.toast && window.toast('✓ Đã lưu số hoá đơn', 'success');
   };
   /* ↩ Về phiên gom để sửa (từ phiếu tự tạo) — điều hướng sang trang Gom hàng + trả phiên về bước gán NCC */
   window.pnBackToGom = function (id) {
-    const p = getPur().find(x => x.id === id); if (!p || !p.gomRunId) return;
-    if (!confirm(`Về phiên gom ${p.gomRunId} để sửa?\nPhiếu nháp này (chưa nhận) sẽ được gỡ khi trả phiên về — chốt lại sẽ tạo phiếu mới.`)) return;
+    const p = getPur().find(x => x.id === id); const run = _pnGomRun(p); if (!p || !run) return;
+    if (!confirm(`Về phiên gom ${run} để sửa?\nPhiếu nháp này (chưa nhận) sẽ được gỡ khi trả phiên về — chốt lại sẽ tạo phiếu mới.`)) return;
     window.closeModal && window.closeModal();
     const top = window.top || window;
-    try { top.location.href = 'procurement.html?reopen=' + encodeURIComponent(p.gomRunId); }
-    catch (e) { location.href = 'procurement.html?reopen=' + encodeURIComponent(p.gomRunId); }
+    try { top.location.href = 'procurement.html?reopen=' + encodeURIComponent(run); }
+    catch (e) { location.href = 'procurement.html?reopen=' + encodeURIComponent(run); }
   };
 
   window.closeDrawer = function () {
@@ -219,7 +246,7 @@
     const i = list.findIndex(x => x.id === id);
     if (i < 0 || list[i].status !== 'ordered') return;
     const isExt = list[i].supplierId === EXT_SUP_ID || (findSup(list[i].supplierId) || {}).system;
-    const willStock = !list[i].noStock;
+    const willStock = !_pnNoStock(list[i]);
     const confMsg = isExt
       ? 'Xác nhận đã nhận hàng thu mua ngoài?\n→ Ghi CHI TIỀN MẶT vào sổ quỹ kế toán + cập nhật giá vốn' + (willStock ? ' + cộng kho.' : ' (không cộng kho).')
       : 'Xác nhận đã nhận hàng?\n→ Ghi CÔNG NỢ phải trả NCC + cập nhật giá vốn' + (willStock ? ' + cộng kho.' : ' (không cộng kho).');
@@ -504,6 +531,7 @@
     const list = getPur();
     list.push(obj);
     window.STORE.set('purchases', list);
+    if (obj.invoiceNo) _pnSetInv(obj.id, obj.invoiceNo);   /* số HĐ NCC → KV (cloud purchases không có cột) */
     if (window.audit) window.audit.log('purchase.create', `${obj.id} cho ${findSup(obj.supplierId)?.name || obj.supplierId} (${window.fmt(obj.total)} ₫)`);
     window.toast('✓ Đã tạo phiếu nhập (chưa nhận hàng — vào danh sách bấm "✓ Nhận" khi hàng về)', 'success');
     window.closeModal();

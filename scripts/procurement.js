@@ -370,7 +370,7 @@
     (run.orderCodes || []).forEach(code => { const o = orders.find(x => x.code === code); if (o && o.whStatus === 'confirmed') o.whStatus = 'gathering'; });
     S().set('orders', orders);
     const pur = S().get('purchases', []) || [];
-    pur.filter(p => p.gomRunId === runId && p.status === 'ordered').forEach(p => S().remove('purchases', p.id));
+    pur.filter(p => _isGomPhieuOf(p, runId) && p.status === 'ordered').forEach(p => S().remove('purchases', p.id));
     window._pcActiveRun = null;
     renderRuns(); renderRunHistory(); renderRelease();
     window.toast?.(`↩ Đã trả phiên ${run.id} về bước gán NCC — kiểm/sửa rồi chốt lại`, 'info');
@@ -1151,8 +1151,14 @@
       changed = true;
     });
     if (changed) S().set('purchases', list);
-    /* NCC/thu-mua-ngoài rời khỏi phiên → gỡ phiếu nháp (chưa nhận) không còn cần */
-    list.filter(p => p.gomRunId === run.id && p.status === 'ordered' && !desired[p.id]).forEach(p => S().remove('purchases', p.id));
+    /* NCC/thu-mua-ngoài rời khỏi phiên → gỡ phiếu nháp (chưa nhận) không còn cần.
+       Khớp theo MÃ phiếu (gom_run_id bị strip trên cloud) để reload vẫn gỡ đúng. */
+    list.filter(p => _isGomPhieuOf(p, run.id) && p.status === 'ordered' && !desired[p.id]).forEach(p => S().remove('purchases', p.id));
+  }
+  /* Phiếu tự tạo của 1 phiên gom — nhận biết qua mã (PN-<runId>-<supId> / TMN-<runId>) */
+  function _isGomPhieuOf(p, runId) {
+    if (!p) return false;
+    return p.gomRunId === runId || p.id === 'TMN-' + runId || String(p.id || '').startsWith('PN-' + runId + '-');
   }
   window.pcCopyExtReq = function (runId) {
     const run = getRuns().find(r => r.id === runId); if (!run) return;
