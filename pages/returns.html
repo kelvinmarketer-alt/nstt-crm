@@ -151,35 +151,90 @@
           : `<span style="font-weight:700;color:#DC2626">${window.fmt(r.refundTotal)} ₫</span><div style="font-size:9px;color:var(--muted);font-weight:400">${r.refundMode==='cash'?'chi tiền mặt':'trừ công nợ'}</div>`
       }</td>
       <td class="hide-xs" style="padding:10px"><span style="background:${stClr[r.status]}1f;color:${stClr[r.status]};padding:2px 8px;border-radius:99px;font-size:11px;font-weight:700">${stLab[r.status]}</span></td>
-      <td class="hide-xs" style="padding:10px">${r.status==='pending' ? `<button class="btn btn-ghost btn-sm" onclick="window.processReturn('${r.id}')">✓ Xử lý</button>` : ''}</td>
+      <td class="hide-xs" style="padding:10px">${r.status==='pending' ? (r.fromShip ? `<button class="btn btn-ghost btn-sm" onclick="window.approveShipReturn('${r.id}')" title="Phiếu từ shipper — duyệt để trừ hoá đơn KH + nợ NCC">✓ Duyệt</button>` : `<button class="btn btn-ghost btn-sm" onclick="window.processReturn('${r.id}')">✓ Xử lý</button>`) : ''}</td>
     </tr>`).join('');
   }
 
-  /* 🚩 Đơn shipper báo trả (từ Bảng giao hàng) — chờ kho ghi phiếu trả chi tiết */
+  const _esc0 = s => String(s == null ? '' : s).replace(/</g, '&lt;');
+  /* 🚩 Phiếu trả từ shipper (Bảng giao hàng) — chờ kế toán DUYỆT */
   function renderShipReports() {
     const host = document.getElementById('shipReportHost'); if (!host) return;
-    const flagged = getOrd().filter(o => o && o.returnPending);
-    if (!flagged.length) { host.innerHTML = ''; return; }
+    const pend = getR().filter(r => r && r.fromShip && r.status === 'pending');
+    if (!pend.length) { host.innerHTML = ''; return; }
     host.innerHTML = `<div style="background:#FFFBEB;border:1.5px solid #FCD34D;border-radius:10px;padding:12px 14px;margin:14px 0 4px">
-      <div style="font-size:13px;font-weight:800;color:#B45309;margin-bottom:8px">🚩 Shipper báo trả — chờ ghi phiếu (${flagged.length})</div>
+      <div style="font-size:13px;font-weight:800;color:#B45309;margin-bottom:8px">🚩 Phiếu trả từ shipper — chờ kế toán duyệt (${pend.length})</div>
       <div style="display:flex;flex-direction:column;gap:8px">
-      ${flagged.slice().reverse().map(o => `<div style="display:flex;align-items:center;gap:10px;flex-wrap:wrap;background:#fff;border:1px solid #FDE68A;border-radius:8px;padding:9px 11px">
+      ${pend.slice().reverse().map(r => {
+        const its = (Array.isArray(r.items) && r.items.length)
+          ? r.items.map(x => `${_esc0(x.name)} ${x.qty}${x.unit || ''}`).join(', ')
+          : (r.item ? `${_esc0(r.item.name)} ${r.qtyReturn || 0}${r.item.unit || ''}` : '(toàn bộ đơn)');
+        return `<div style="display:flex;align-items:center;gap:10px;flex-wrap:wrap;background:#fff;border:1px solid #FDE68A;border-radius:8px;padding:9px 11px">
         <div style="flex:1;min-width:180px">
-          <div style="font-size:13.5px;font-weight:700;color:var(--navy)">#${o.code} · ${String(o.custName||'').replace(/</g,'&lt;')}</div>
-          <div style="font-size:11.5px;color:var(--muted)">${o.returnNote ? '📝 '+String(o.returnNote).replace(/</g,'&lt;')+' · ' : ''}Ship: ${o.returnReportedBy||'—'}${o.returnReportedAt ? ' · '+new Date(o.returnReportedAt).toLocaleString('vi-VN') : ''}</div>
+          <div style="font-size:13.5px;font-weight:700;color:var(--navy)">#${_esc0(r.orderCode)} · ${_esc0(r.custName)}</div>
+          <div style="font-size:11.5px;color:var(--muted)">↩️ ${its} · ${r.disposition === 'restock' ? '🏬 hàng đẹp' : '🗑 hàng xấu'}${r.note ? ' · 📝 ' + _esc0(r.note) : ''} · ${window.fmt(r.refundTotal || 0)}₫</div>
         </div>
-        <button class="btn btn-primary btn-sm" onclick="window.location.href='returns.html?ret='+encodeURIComponent('${o.code}')">📝 Ghi phiếu trả</button>
-        <button class="btn btn-ghost btn-sm" onclick="window.dismissShipReport('${o.code}')" title="Shipper báo nhầm — bỏ cờ">✕</button>
-      </div>`).join('')}
+        <button class="btn btn-primary btn-sm" onclick="window.approveShipReturn('${r.id}')">✓ Duyệt & xử lý</button>
+      </div>`;
+      }).join('')}
       </div>
-      <div style="font-size:11px;color:var(--muted);margin-top:8px">Kho bấm <b>Ghi phiếu trả</b> → chọn mặt hàng + hàng <b>xấu</b> (trả NCC) hay <b>đẹp</b> (nhập tồn) → lưu. Kế toán bấm <b>✓ Xử lý</b> để chốt tiền (giảm công nợ KH / trừ nợ NCC).</div>
+      <div style="font-size:11px;color:var(--muted);margin-top:8px">Kế toán bấm <b>Duyệt & xử lý</b> → xác nhận hàng đẹp/xấu + (nếu lỗi NCC) chọn nhà cung cấp → hệ thống gỡ mặt hàng khỏi hoá đơn KH (<b>công nợ KH tự giảm</b>) + <b>trừ công nợ NCC</b>.</div>
     </div>`;
   }
-  window.dismissShipReport = function (code) {
-    if (!confirm('Bỏ cờ báo trả đơn ' + code + '?\n(Dùng khi shipper báo nhầm — đơn vẫn "Đã giao", công nợ giữ nguyên.)')) return;
-    window.STORE.update('orders', code, { returnPending: false });
-    renderShipReports();
-    window.toast && window.toast('Đã bỏ cờ báo trả ' + code, 'info');
+  /* Kế toán duyệt phiếu trả của shipper */
+  window.approveShipReturn = function (id) {
+    const r = getR().find(x => x.id === id); if (!r) { window.toast && window.toast('Không thấy phiếu', 'warn'); return; }
+    const sups = window.STORE.get('suppliers', []) || [];
+    const its = (Array.isArray(r.items) && r.items.length) ? r.items : (r.item ? [{ name: r.item.name, unit: r.item.unit, qty: r.qtyReturn, total: r.refundTotal }] : []);
+    const itemHtml = its.map(x => `<li>${_esc0(x.name)} — <b>${x.qty}${x.unit || ''}</b>${x.total ? ` · ${window.fmt(x.total)}₫` : ''}</li>`).join('') || '<li>(toàn bộ đơn)</li>';
+    const supOpts = `<option value="">— chọn nhà cung cấp —</option>` + sups.map(s => `<option value="${s.id}">${_esc0(s.name)}</option>`).join('');
+    window.openModal('✓ Duyệt phiếu trả — #' + _esc0(r.orderCode), `
+      <div style="font-size:12.5px;color:var(--muted);margin-bottom:6px">Khách: <b>${_esc0(r.custName)}</b> · shipper báo</div>
+      <ul style="margin:0 0 12px 18px;font-size:13px;line-height:1.6">${itemHtml}</ul>
+      <div style="margin-bottom:10px"><label style="font-size:12px;color:var(--muted);display:block;margin-bottom:5px">Xử lý hàng</label>
+        <label style="margin-right:16px;font-size:13px"><input type="radio" name="apDisp" value="restock" ${r.disposition === 'restock' ? 'checked' : ''}> 🏬 Nhập lại kho</label>
+        <label style="font-size:13px"><input type="radio" name="apDisp" value="discard" ${r.disposition !== 'restock' ? 'checked' : ''}> 🗑 Bỏ hao hụt</label>
+      </div>
+      <div style="margin-bottom:10px"><label style="font-size:12px;color:var(--muted);display:block;margin-bottom:4px">Lỗi do</label>
+        <select id="apFault" onchange="document.getElementById('apSupWrap').style.display=this.value==='supplier'?'block':'none'" style="width:100%;box-sizing:border-box;padding:8px;border:1px solid var(--line);border-radius:7px;font-size:13px">
+          <option value="customer" ${r.fault === 'customer' ? 'selected' : ''}>👤 Khách / không đòi ai</option>
+          <option value="supplier" ${r.fault === 'supplier' ? 'selected' : ''}>🏭 Nhà cung cấp (trừ nợ NCC)</option>
+          <option value="shipping" ${r.fault === 'shipping' ? 'selected' : ''}>🚚 Vận chuyển</option>
+        </select>
+      </div>
+      <div id="apSupWrap" style="display:${r.fault === 'supplier' ? 'block' : 'none'};margin-bottom:10px">
+        <label style="font-size:12px;color:var(--muted);display:block;margin-bottom:4px">Nhà cung cấp + số tiền trừ nợ</label>
+        <select id="apSup" style="width:100%;box-sizing:border-box;padding:8px;border:1px solid var(--line);border-radius:7px;font-size:13px;margin-bottom:6px">${supOpts}</select>
+        <input id="apAmt" type="number" value="${+r.refundTotal || 0}" style="width:100%;box-sizing:border-box;padding:8px;border:1px solid var(--line);border-radius:7px;font-size:13px" placeholder="Số tiền đòi NCC (đ)">
+      </div>
+      <div style="font-size:11.5px;color:var(--muted)">Duyệt → gỡ mặt hàng khỏi hoá đơn KH (<b>công nợ KH tự giảm</b>) + (nếu lỗi NCC) <b>trừ công nợ NCC</b>. Không hoàn tiền mặt.</div>
+    `, {
+      width: '470px',
+      footer: `<button class="btn btn-ghost" onclick="window.rejectShipReturn('${r.id}')">✕ Từ chối</button>
+               <button class="btn btn-primary" onclick="window._apCommit('${r.id}')">✓ Duyệt &amp; xử lý</button>`
+    });
+  };
+  window._apCommit = function (id) {
+    const list = getR(); const r = list.find(x => x.id === id); if (!r) return;
+    r.disposition = (document.querySelector('input[name="apDisp"]:checked') || {}).value || 'discard';
+    r.fault = (document.getElementById('apFault') || {}).value || 'customer';
+    r.refundMode = 'debt';
+    if (r.fault === 'supplier') {
+      const sid = (document.getElementById('apSup') || {}).value || '';
+      r.supplierId = sid;
+      r.supplierName = sid ? ((window.STORE.get('suppliers', []) || []).find(s => s.id === sid) || {}).name || '' : '';
+      r.supClaimAmount = parseInt((document.getElementById('apAmt') || {}).value) || 0;
+    } else { r.supplierId = ''; r.supplierName = ''; r.supClaimAmount = 0; }
+    window.STORE.set('returns', list);
+    window.closeModal && window.closeModal();
+    window.processReturn(id, true);   /* đã xác nhận qua popup → khỏi confirm lần nữa */
+  };
+  window.rejectShipReturn = function (id) {
+    if (!confirm('Từ chối phiếu trả này? (đơn giữ nguyên, không trừ gì)')) return;
+    const list = getR(); const r = list.find(x => x.id === id);
+    if (r) { r.status = 'rejected'; window.STORE.set('returns', list); }
+    window.closeModal && window.closeModal();
+    renderRet(); renderShipReports();
+    window.toast && window.toast('Đã từ chối phiếu trả', 'info');
   };
 
   function renderPodGallery() {
@@ -256,39 +311,47 @@
     return ro;
   }
 
-  window.processReturn = async function(id) {
+  window.processReturn = async function(id, skipConfirm) {
     const list = getR();
     const i = list.findIndex(x => x.id === id);
     if (i < 0) return;
     const r = list[i];
     if (r.status !== 'pending') return;   /* chống double-click (status đặt đồng bộ trước await) */
+    /* Mặt hàng trả: ưu tiên items[] (phiếu shipper nhiều mã), fallback item đơn lẻ (phiếu tay cũ) */
+    const rItems = (Array.isArray(r.items) && r.items.length)
+      ? r.items
+      : (r.item ? [{ id: r.item.id, name: r.item.name, unit: r.item.unit, qty: +r.qtyReturn || 0, price: +r.item.price || 0 }] : []);
     const res = r.resolution || 'refund';
     const resLbl = res === 'refund'
       ? `TRỪ hoá đơn ${window.fmt(r.refundTotal)}₫ (${r.refundMode === 'cash' ? 'tiền mặt' : 'giảm nợ'})`
       : res === 'replace_next' ? 'Bù hàng HÔM SAU (tạo đơn giao bù + báo NCC)' : 'Bù hàng NGAY hôm nay (tạo đơn giao bù)';
+    const itemsLbl = rItems.length ? rItems.map(x => `${x.name} ${x.qty}${x.unit||'kg'}`).join(', ') : '(toàn bộ đơn)';
     const summary = [
-      r.item ? `Mặt hàng: ${r.item.name} ${r.qtyReturn||0}${r.item.unit||'kg'}` : '',
+      `Mặt hàng: ${itemsLbl}`,
       `Hàng trả: ${r.disposition==='restock' ? 'NHẬP LẠI KHO (còn dùng được)' : 'BỎ (hao hụt)'}`,
       'Cách xử lý: ' + resLbl,
-      (res==='refund' && r.item) ? `Gỡ "${r.item.name}" khỏi hoá đơn ${r.orderCode}` : '',
+      (res==='refund' && rItems.length) ? `Gỡ khỏi hoá đơn ${r.orderCode}` : '',
       (r.fault==='supplier' && r.supplierId) ? `Trả NCC ${r.supplierName} → TRỪ công nợ ${window.fmt((+r.supClaimAmount)||(+r.refundTotal)||0)}₫` : ''
     ].filter(Boolean).join('\n');
-    if (!confirm(`Xử lý đơn trả ${r.id}?\n\n${summary}`)) return;
+    if (!skipConfirm && !confirm(`Xử lý đơn trả ${r.id}?\n\n${summary}`)) return;
 
     const msgs = [];
 
-    /* 1) Nhập lại kho nếu hàng còn dùng được */
-    if (r.disposition === 'restock' && r.item && r.item.id && r.qtyReturn > 0) {
+    /* 1) Nhập lại kho nếu hàng còn dùng được (đẹp) — lặp mọi mặt hàng trả */
+    if (r.disposition === 'restock' && rItems.length) {
       const inv = window.STORE.get('inventory', []) || [];
-      let item = inv.find(x => x.productId === r.item.id);
-      if (!item) {
-        item = { id:'INV'+Math.floor(performance.now()).toString(36), productId:r.item.id, stock:0, minStock:10, maxStock:100, avgDaily:5, lastIn:'', lastOut:'', location:'Kho A1' };
-        inv.push(item);
-      }
-      item.stock = Math.max(0, (item.stock||0) + r.qtyReturn);
-      item.lastIn = r.date;
+      rItems.forEach((ri, k) => {
+        if (!ri.id || !(ri.qty > 0)) return;
+        let item = inv.find(x => x.productId === ri.id);
+        if (!item) {
+          item = { id:'INV'+Math.floor(performance.now()).toString(36)+k, productId:ri.id, stock:0, minStock:10, maxStock:100, avgDaily:5, lastIn:'', lastOut:'', location:'Kho A1' };
+          inv.push(item);
+        }
+        item.stock = Math.max(0, (item.stock||0) + ri.qty);
+        item.lastIn = r.date;
+        msgs.push(`+${ri.qty}${ri.unit||'kg'} ${ri.name} vào kho`);
+      });
       window.STORE.set('inventory', inv);
-      msgs.push(`+${r.qtyReturn}${r.item.unit||'kg'} vào kho`);
     }
 
     /* 2) Giải quyết theo CÁCH XỬ LÝ */
@@ -296,31 +359,37 @@
       r.status = 'refunded';   /* đặt SỚM (đồng bộ, trước await) để guard chống double-click chặn được */
       /* B) Gỡ/giảm SP đã trả khỏi ĐƠN (hoá đơn) KH → giảm freight. Đơn "Công nợ" thì nợ KH TỰ
          giảm (nợ = Σ freight − Σ trả). bRemoved = đã gỡ được khỏi đơn hay chưa. */
-      let bRemoved = false;
-      if (r.item && r.item.id && r.qtyReturn > 0) {
+      let removedAny = false;                              /* đã gỡ được ≥1 mặt hàng khỏi đơn (freight tự giảm) */
+      let unremovedVal = rItems.length ? 0 : (+r.refundTotal || 0);  /* giá trị phần KHÔNG gỡ được → ghi sổ riêng (phiếu toàn bộ đơn = ghi sổ hết) */
+      let orderObj = null;
+      const valOf = ri => (+ri.total || Math.round((+ri.qty || 0) * (+ri.price || 0)));
+      if (rItems.length) {
         const ord = getOrd(); const o = ord.find(x => x.code === r.orderCode);
+        orderObj = o || null;
         if (o) {
           if (!(Array.isArray(o.items) && o.items.length) && window.SB_DATA && window.SB_DATA.getOrderItems) {
             try { const its = await window.SB_DATA.getOrderItems(r.orderCode); if (Array.isArray(its)) o.items = its; } catch (e) {}
           }
           if (Array.isArray(o.items) && o.items.length) {
-            const it = o.items.find(x => x.id === r.item.id) || o.items.find(x => (x.name || '').trim().toLowerCase() === (r.item.name || '').trim().toLowerCase());
-            if (it) {
-              const newQty = +((+it.qty || 0) - r.qtyReturn).toFixed(3);
-              if (newQty <= 0.001) o.items = o.items.filter(x => x !== it);
-              else { it.qty = newQty; it.total = Math.round(newQty * (+it.price || 0)); }
-              o.freight = (o.items || []).reduce((s, x) => s + (+x.total || 0), 0);
-              window.STORE.set('orders', ord);
-              bRemoved = true;
-              msgs.push(`gỡ ${r.item.name} khỏi hoá đơn ${r.orderCode}`);
-            }
-          } else { msgs.push('đơn chưa tải mặt hàng — chưa gỡ khỏi hoá đơn'); }
-        }
+            rItems.forEach(ri => {
+              if (!(ri.qty > 0)) return;
+              const it = o.items.find(x => x.id === ri.id) || o.items.find(x => (x.name || '').trim().toLowerCase() === (ri.name || '').trim().toLowerCase());
+              if (it) {
+                const newQty = +((+it.qty || 0) - ri.qty).toFixed(3);
+                if (newQty <= 0.001) o.items = o.items.filter(x => x !== it);
+                else { it.qty = newQty; it.total = Math.round(newQty * (+it.price || 0)); }
+                removedAny = true;
+                msgs.push(`gỡ ${ri.name} khỏi hoá đơn`);
+              } else { unremovedVal += valOf(ri); }   /* không khớp dòng nào → ghi sổ giảm nợ phần này */
+            });
+            if (removedAny) { o.freight = (o.items || []).reduce((s, x) => s + (+x.total || 0), 0); window.STORE.set('orders', ord); }
+          } else { unremovedVal = +r.refundTotal || 0; msgs.push('đơn chưa tải mặt hàng — ghi giảm nợ qua sổ'); }
+        } else { unremovedVal = +r.refundTotal || 0; }   /* không thấy đơn → ghi sổ toàn bộ */
       }
-      /* Hoàn tiền: TIỀN MẶT → luôn chi (đơn thường đã trả tiền). GIẢM NỢ → CHỈ ghi sổ khi CHƯA gỡ
-         được khỏi đơn (đã gỡ thì freight giảm → nợ tự giảm; ghi thêm sổ = TRỪ 2 LẦN). */
-      if (r.refundTotal > 0) {
-        if (r.refundMode === 'cash') {
+      /* Hoàn tiền. TIỀN MẶT → chi đủ refundTotal. GIẢM NỢ → phần đã gỡ khỏi đơn thì freight tự giảm nợ;
+         CHỈ ghi sổ phần CHƯA gỡ được (unremovedVal) để không trừ 2 lần, và chỉ khi đơn là CÔNG NỢ. */
+      if (r.refundMode === 'cash') {
+        if (r.refundTotal > 0) {
           window.STORE.add('cashEntries', {
             no: 'PCTH-' + Math.floor(performance.now()).toString(36).toUpperCase(),
             date: r.date, type: 'out', party: r.custName,
@@ -332,14 +401,18 @@
           const acc = accs.find(a => (a.name || '').toLowerCase().includes('tiền mặt'));
           if (acc) window.STORE.update('paymentAccounts', acc.id, { balance: (+acc.balance || 0) - r.refundTotal });
           msgs.push('tạo phiếu chi hoàn tiền');
-        } else if (!bRemoved) {
+        }
+      } else {
+        /* Đơn công nợ? (payBy chứa "nợ"). Không thấy đơn → mặc định công nợ (app này bán công nợ). */
+        const isCredit = orderObj ? /nợ|cong no|credit/i.test(orderObj.payBy || orderObj.pay_by || '') : true;
+        if (unremovedVal > 0 && isCredit) {
           const custs = window.STORE.get('customers', []) || [];
           const c = custs.find(x => x.id === r.custId) || custs.find(x => x.name === r.custName);
           if (c && window.addDebtLedger) {
-            window.addDebtLedger({ custId: c.id, type: 'payment', amount: r.refundTotal, ref: r.id, date: r.date, desc: 'Giảm nợ trả hàng ' + r.orderCode + (r.item ? ' · ' + r.item.name : '') });
-            msgs.push(`giảm công nợ ${r.custName} (sổ)`);
+            window.addDebtLedger({ custId: c.id, type: 'payment', amount: unremovedVal, ref: r.id, date: r.date, desc: 'Giảm nợ trả hàng ' + r.orderCode + (r.item ? ' · ' + r.item.name : '') });
+            msgs.push(`giảm công nợ ${r.custName} (sổ) ${window.fmt(unremovedVal)}₫`);
           } else { msgs.push('chưa gỡ được khỏi đơn — kiểm tra công nợ KH thủ công'); }
-        } else {
+        } else if (removedAny) {
           msgs.push('công nợ KH tự giảm theo hoá đơn');
         }
       }
@@ -545,17 +618,15 @@
       items: [],
     });
     window.STORE.set('returns', list);
-    /* Đơn do shipper báo trả (Bảng giao hàng) → đã ghi phiếu, bỏ cờ chờ xử lý */
-    if (o && o.returnPending) window.STORE.update('orders', code, { returnPending: false });
     window.audit && window.audit.log('return.create', `${sel.value}`);
     window.toast('✓ Đã ghi nhận đơn trả','success');
     window.closeModal();
   };
 
   window.STORE.subscribe('returns', renderRet);
+  window.STORE.subscribe('returns', renderShipReports);
   window.STORE.subscribe('pod_photos', renderPodGallery);
-  window.STORE.subscribe('orders', renderShipReports);
-  window.STORE.subscribe('__preloaded__', k => { if (k === 'orders') renderShipReports(); });
+  window.STORE.subscribe('__preloaded__', k => { if (k === 'returns') { renderRet(); renderShipReports(); } });
   renderRet();
   renderShipReports();
   populatePODSelect();

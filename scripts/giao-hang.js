@@ -142,21 +142,78 @@
     render();
   };
 
-  /* ===== SHIP: Báo trả (THÔ) → Đã giao + cờ chờ kho/KT xử lý ===== */
-  window.ghBaoTra = function (code) {
+  /* ===== SHIP: Báo trả → popup chọn mặt hàng + SL (toàn bộ/1 phần) → phiếu chờ kế toán duyệt ===== */
+  window.ghBaoTra = async function (code) {
     const o = ordByCode(code); if (!o) return;
-    const raw = prompt(`↩️ Ship báo TRẢ HÀNG đơn ${code}\nGhi chú (mặt hàng nào / lý do — tuỳ chọn):`, '');
-    if (raw === null) return;   /* bấm Huỷ/Escape → KHÔNG đánh dấu, KHÔNG báo trả */
-    const note = raw.trim();
-    S().update('orders', code, {
-      status: 'delivered', deliveredAt: nowISO(),
-      returnPending: true,
-      returnReportedBy: (window.CURRENT_USER && window.CURRENT_USER.name) || 'shipper',
-      returnReportedAt: nowISO(),
-      returnNote: note
+    let items = Array.isArray(o.items) ? o.items.slice() : [];
+    if (!items.length && window.SB_DATA && window.SB_DATA.getOrderItems) {
+      try { const its = await window.SB_DATA.getOrderItems(code); if (Array.isArray(its)) items = its; } catch (e) {}
+    }
+    window._ghTra = { code, items, custName: o.custName || '', cust: o.cust || '', freight: +o.freight || 0 };
+    const rows = items.length ? items.map((it, i) => {
+      const unit = esc(it.unit || 'kg');
+      return `<div class="ght-row">
+        <div class="ght-info"><b>${esc(it.name || it.id)}</b><div class="ght-sub">đã giao ${fmt(it.qty || 0)} ${unit}${it.price ? ` · ${fmt(it.price)}₫/${unit}` : ''}</div></div>
+        <input type="number" class="ght-q" data-i="${i}" min="0" max="${it.qty || 0}" step="0.1" value="0" placeholder="0">
+        <span class="ght-unit">${unit}</span>
+      </div>`;
+    }).join('') : `<div style="color:#B45309;font-size:12.5px;padding:8px 0">Đơn chưa tải chi tiết mặt hàng — sẽ tạo phiếu trả <b>toàn bộ đơn</b> để kế toán kiểm lại.</div>`;
+    window.openModal('↩️ Báo trả hàng — #' + esc(code), `
+      <div style="font-size:12.5px;color:var(--muted);margin-bottom:10px">Khách: <b>${esc(o.custName || '')}</b>. Nhập số lượng <b>TRẢ</b> cho từng mặt hàng (để 0 nếu không trả). Trả 1 phần cũng được — vd giao 30, lỗi 1 thì nhập <b>1</b>.</div>
+      <div id="ghTraList">${rows}</div>
+      ${items.length ? `<button class="btn btn-ghost btn-sm" onclick="window._ghTraAll()" style="margin-top:8px">↩️ Trả toàn bộ đơn</button>` : ''}
+      <div style="margin-top:12px"><label style="font-size:12px;color:var(--muted);display:block;margin-bottom:5px">Tình trạng hàng trả</label>
+        <label style="margin-right:16px;font-size:13px"><input type="radio" name="ghtDisp" value="bad" checked> 🗑 Hàng xấu/lỗi (trả NCC)</label>
+        <label style="font-size:13px"><input type="radio" name="ghtDisp" value="good"> 🏬 Hàng đẹp (giữ lại kho)</label>
+      </div>
+      <div style="margin-top:10px"><label style="font-size:12px;color:var(--muted);display:block;margin-bottom:4px">Lý do / ghi chú</label>
+        <input id="ghtReason" placeholder="vd: dập nát, sai loại, thiếu…" style="width:100%;box-sizing:border-box;padding:9px;border:1px solid var(--line);border-radius:8px;font-size:13px"></div>
+    `, {
+      width: '480px',
+      footer: `<button class="btn btn-ghost" onclick="window.closeModal()">Huỷ</button>
+               <button class="btn" style="background:#EA580C;color:#fff;border-color:#EA580C" onclick="window._ghConfirmTra()">↩️ Tạo phiếu trả</button>`
     });
-    window.toast && window.toast('↩️ Đã báo trả ' + code + ' — kho/kế toán sẽ chốt', 'warn');
-    if (window.sendTgMessage) window.sendTgMessage('alert', `↩️ SHIP BÁO TRẢ HÀNG\n📦 ${code} · ${o.custName || ''}${note ? '\n📝 ' + note : ''}\n👉 Kho phân loại + Kế toán chốt ở module Trả hàng.`);
+  };
+  window._ghTraAll = function () {
+    document.querySelectorAll('#ghTraList .ght-q').forEach(inp => { inp.value = inp.getAttribute('max') || 0; });
+  };
+  window._ghConfirmTra = function () {
+    const T = window._ghTra; if (!T) return;
+    const picked = [];
+    document.querySelectorAll('#ghTraList .ght-q').forEach(inp => {
+      const i = +inp.getAttribute('data-i'); const it = T.items[i]; if (!it) return;
+      const q = Math.min(parseFloat(inp.value) || 0, +it.qty || (parseFloat(inp.value) || 0));
+      if (q > 0) picked.push({ id: it.id, name: it.name, unit: it.unit || 'kg', qty: q, price: +it.price || 0, total: Math.round(q * (+it.price || 0)) });
+    });
+    if (T.items.length && !picked.length) { window.toast && window.toast('Nhập số lượng trả cho ít nhất 1 mặt hàng', 'warn'); return; }
+    const reason = ((document.getElementById('ghtReason') || {}).value || '').trim();
+    const bad = ((document.querySelector('input[name="ghtDisp"]:checked') || {}).value || 'bad') === 'bad';
+    const refundTotal = picked.reduce((s, x) => s + x.total, 0) || (T.items.length ? 0 : T.freight);
+    const first = picked[0] || null;
+    const rec = {
+      id: 'RT' + Date.now().toString(36).toUpperCase(),
+      orderCode: T.code, custId: T.cust, custName: T.custName,
+      date: (window.viToday ? window.viToday() : new Date().toLocaleDateString('vi-VN')),
+      items: picked,
+      item: first ? { id: first.id, name: first.name, unit: first.unit, price: first.price } : null,
+      qtyReturn: first ? first.qty : 0,
+      reason: reason || (bad ? 'Hàng xấu/lỗi' : 'Khách trả'),
+      caseType: 'onsite', resolution: 'refund',
+      disposition: bad ? 'discard' : 'restock',
+      fault: bad ? 'supplier' : 'customer',
+      refundMode: 'debt', supplierId: '', supplierName: '', supClaimAmount: 0,
+      refundTotal, note: reason, status: 'pending', fromShip: true,
+      handledBy: (window.CURRENT_USER && window.CURRENT_USER.name) || 'shipper', reportedAt: nowISO(),
+    };
+    window.STORE.add('returns', rec);
+    /* Giao đã xong (khách nhận rồi mới trả) → đơn sang Đã giao, phiếu trả sẽ giảm hoá đơn khi kế toán duyệt */
+    S().update('orders', T.code, { status: 'delivered', deliveredAt: nowISO() });
+    window.closeModal && window.closeModal();
+    window.toast && window.toast('↩️ Đã tạo phiếu trả — chờ kế toán duyệt', 'success');
+    if (window.sendTgMessage) {
+      const lines = picked.length ? picked.map(x => `• ${x.name}: ${x.qty}${x.unit}`).join('\n') : '• (toàn bộ đơn)';
+      window.sendTgMessage('alert', `↩️ PHIẾU TRẢ HÀNG (chờ duyệt)\n📦 ${T.code} · ${T.custName}\n${lines}\n${bad ? '🗑 Hàng xấu → đòi NCC' : '🏬 Hàng đẹp → nhập kho'}${reason ? '\n📝 ' + reason : ''}\n👉 Kế toán duyệt ở module Trả hàng.`);
+    }
     render();
   };
 
