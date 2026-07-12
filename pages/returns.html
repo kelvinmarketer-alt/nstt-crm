@@ -117,6 +117,31 @@
   function getR() { return window.STORE.get('returns', window.RETURNS || []) || []; }
   function getOrd() { return window.STORE.get('orders', []) || []; }
   function getPODs() { return window.STORE.get('pod_photos', {}) || {}; }
+  const _rnorm = s => String(s || '').trim().toLowerCase();
+  /* Dò NHÀ CUNG CẤP đã gán cho 1 sản phẩm + GIÁ NHẬP (suppliers[].products[].price). Ưu tiên NCC có giá. */
+  function _supForProduct(pid, pname) {
+    const sups = window.STORE.get('suppliers', []) || [];
+    const cands = [];
+    sups.forEach(s => {
+      if (s.active === false) return;
+      const p = (s.products || []).find(pp => (pid && pp.id === pid) || (pname && _rnorm(pp.name) === _rnorm(pname)));
+      if (p) cands.push({ supplierId: s.id, supplierName: s.name, buyPrice: +p.price || 0 });
+    });
+    if (!cands.length) return null;
+    cands.sort((a, b) => (b.buyPrice > 0) - (a.buyPrice > 0) || (a.buyPrice - b.buyPrice));
+    return cands[0];
+  }
+  /* Giá nhập (buyPrice) từ danh mục Sản phẩm & Giá — fallback khi NCC chưa đặt giá riêng */
+  function _buyPriceOf(pid, pname) {
+    const p = (window.STORE.get('products', []) || []).find(x => x.id === pid || (pname && _rnorm(x.name) === _rnorm(pname)));
+    return p ? (+p.buyPrice || 0) : 0;
+  }
+  /* NCC + giá nhập gợi ý cho 1 mặt hàng trả (dùng ở popup Duyệt) */
+  function _nccInfoFor(it) {
+    const sup = _supForProduct(it.id, it.name);
+    const buyPrice = (sup && sup.buyPrice) || _buyPriceOf(it.id, it.name) || 0;
+    return { supplierId: sup ? sup.supplierId : '', supplierName: sup ? sup.supplierName : '', buyPrice };
+  }
 
   function renderRet() {
     const list = getR();
@@ -178,60 +203,92 @@
   window.approveShipReturn = function (id) {
     const r = getR().find(x => x.id === id); if (!r) { window.toast && window.toast('Không thấy phiếu', 'warn'); return; }
     const sups = window.STORE.get('suppliers', []) || [];
-    const its = (Array.isArray(r.items) && r.items.length) ? r.items : (r.item ? [{ name: r.item.name, unit: r.item.unit, qty: r.qtyReturn, total: r.refundTotal, cond: r.disposition === 'restock' ? 'good' : 'bad', note: r.note }] : []);
+    const its = (Array.isArray(r.items) && r.items.length) ? r.items : (r.item ? [{ id: r.item.id, name: r.item.name, unit: r.item.unit, qty: r.qtyReturn, total: r.refundTotal, cond: r.disposition === 'restock' ? 'good' : 'bad', note: r.note }] : []);
     const custReduce = its.reduce((s, x) => s + (+x.total || 0), 0) || (+r.refundTotal || 0);
-    const badTotal = its.filter(x => (x.cond || 'bad') === 'bad').reduce((s, x) => s + (+x.total || 0), 0);
     const pods = ((window.STORE.get('pod_photos', {}) || {})[r.orderCode]) || [];
+    /* Mỗi mặt hàng XẤU: tự dò NCC đã gán + giá nhập → ô nhập gợi ý theo tên, sửa được */
+    let nccTotal = 0;
+    const badRows = its.map((x, i) => {
+      if ((x.cond || 'bad') !== 'bad') return '';
+      const info = _nccInfoFor(x);
+      const line = Math.round((+x.qty || 0) * (info.buyPrice || 0));
+      nccTotal += line;
+      return `<div style="border:1px solid #FDE68A;background:#FFFBEB;border-radius:7px;padding:8px 10px;margin-bottom:6px">
+        <div style="font-weight:700;font-size:12.5px">🗑 ${_esc0(x.name)} · ${x.qty}${_esc0(x.unit || '')}</div>
+        <div style="display:flex;gap:6px;align-items:center;flex-wrap:wrap;margin-top:5px;font-size:12px">
+          <span style="color:var(--muted)">NCC</span>
+          <input class="ap-sup" data-i="${i}" list="apSupDL" value="${_esc0(info.supplierName)}" placeholder="gõ tên NCC…" style="flex:1;min-width:120px;padding:6px 8px;border:1px solid var(--line);border-radius:6px">
+          <span style="color:var(--muted)">giá nhập</span>
+          <input class="ap-buy" data-i="${i}" data-q="${+x.qty || 0}" type="number" value="${info.buyPrice || ''}" oninput="window._apRecalc()" style="width:86px;padding:6px 8px;border:1px solid var(--line);border-radius:6px;text-align:right" placeholder="0">
+          <span>= <b class="ap-line" data-i="${i}" style="color:#B45309">${window.fmt(line)}</b>đ</span>
+        </div>
+        ${info.supplierName ? '' : '<div style="font-size:10.5px;color:#B45309;margin-top:3px">⚠ SP chưa gán NCC — gõ tên NCC để trừ nợ</div>'}
+      </div>`;
+    }).join('');
     const itemRows = its.map(x => `<tr style="border-top:1px solid #F1F5F9">
         <td style="padding:5px 8px">${_esc0(x.name)}${x.note ? `<div style="font-size:10.5px;color:var(--muted)">📝 ${_esc0(x.note)}</div>` : ''}</td>
         <td style="padding:5px 8px;text-align:right;white-space:nowrap">${x.qty}${x.unit || ''}</td>
         <td style="padding:5px 8px;white-space:nowrap">${(x.cond || 'bad') === 'good' ? '🏬 đẹp→kho' : '🗑 xấu→NCC'}</td>
         <td style="padding:5px 8px;text-align:right;white-space:nowrap">${window.fmt(+x.total || 0)}₫</td>
       </tr>`).join('') || '<tr><td colspan="4" style="padding:6px 8px;color:var(--muted)">(toàn bộ đơn)</td></tr>';
-    const supOpts = `<option value="">— chọn nhà cung cấp —</option>` + sups.map(s => `<option value="${s.id}">${_esc0(s.name)}</option>`).join('');
     window.openModal('✓ Duyệt phiếu trả — #' + _esc0(r.orderCode), `
-      <div style="font-size:12.5px;color:var(--muted);margin-bottom:8px">Khách: <b>${_esc0(r.custName)}</b> · shipper báo · Đơn: <a href="orders.html?open=${encodeURIComponent(r.orderCode)}" style="color:var(--navy);font-weight:700">#${_esc0(r.orderCode)} ↗</a></div>
+      <datalist id="apSupDL">${sups.map(s => `<option value="${_esc0(s.name)}"></option>`).join('')}</datalist>
+      <div style="font-size:12.5px;color:var(--muted);margin-bottom:8px">Khách: <b>${_esc0(r.custName)}</b> · Đơn: <a href="orders.html?open=${encodeURIComponent(r.orderCode)}" style="color:var(--navy);font-weight:700">#${_esc0(r.orderCode)} ↗</a></div>
       <table style="width:100%;border-collapse:collapse;font-size:12.5px;border:1px solid var(--line);border-radius:8px;overflow:hidden;margin-bottom:12px">
         <thead><tr style="background:#F8FAF8;color:var(--muted);font-size:11px;text-transform:uppercase">
-          <th style="padding:6px 8px;text-align:left">Mặt hàng / ghi chú</th><th style="padding:6px 8px;text-align:right">SL trả</th><th style="padding:6px 8px;text-align:left">Xử lý</th><th style="padding:6px 8px;text-align:right">Tiền</th>
+          <th style="padding:6px 8px;text-align:left">Mặt hàng / ghi chú</th><th style="padding:6px 8px;text-align:right">SL trả</th><th style="padding:6px 8px;text-align:left">Xử lý</th><th style="padding:6px 8px;text-align:right">Tiền bán</th>
         </tr></thead><tbody>${itemRows}</tbody>
       </table>
       ${pods.length ? `<div style="margin-bottom:12px"><div style="font-size:11px;color:var(--muted);text-transform:uppercase;margin-bottom:4px">📷 Ảnh giao hàng — đối chứng (${pods.length})</div><div style="display:flex;gap:6px;flex-wrap:wrap">${pods.map(p => `<img src="${p.dataURL}" style="width:64px;height:64px;object-fit:cover;border-radius:6px;border:1px solid var(--line);cursor:pointer" onclick="window.open(this.src)">`).join('')}</div></div>` : ''}
-      <div style="background:#F0FDF4;border:1px solid #BBF7D0;border-radius:8px;padding:10px 12px;margin-bottom:12px;font-size:13px">
-        <div style="display:flex;justify-content:space-between;margin-bottom:4px"><span>➖ Giảm hoá đơn khách (công nợ KH −)</span><b style="color:#B45309">${window.fmt(custReduce)}₫</b></div>
-        <div style="display:flex;justify-content:space-between"><span>🏭 Trả NCC — hàng xấu (công nợ NCC −)</span><b style="color:#B45309">${window.fmt(badTotal)}₫</b></div>
+      ${badRows ? `<div style="font-size:11px;color:var(--muted);text-transform:uppercase;margin-bottom:5px">🏭 Trả NCC hàng xấu — theo GIÁ NHẬP (tự dò NCC đã gán, sửa được)</div>${badRows}` : ''}
+      <div style="background:#F0FDF4;border:1px solid #BBF7D0;border-radius:8px;padding:10px 12px;margin:6px 0 12px;font-size:13px">
+        <div style="display:flex;justify-content:space-between;margin-bottom:4px"><span>➖ Giảm hoá đơn khách (giá BÁN)</span><b style="color:#B45309">${window.fmt(custReduce)}₫</b></div>
+        <div style="display:flex;justify-content:space-between"><span>🏭 Trừ nợ NCC (giá NHẬP)</span><b style="color:#B45309">−<span id="apNccTotal">${window.fmt(nccTotal)}</span>₫</b></div>
       </div>
-      ${badTotal > 0 ? `<div style="margin-bottom:10px">
-        <label style="font-size:12px;color:var(--muted);display:block;margin-bottom:4px">Nhà cung cấp nhận hàng xấu + số tiền trừ nợ <b>(sửa thành GIÁ NHẬP cho chuẩn)</b></label>
-        <select id="apSup" style="width:100%;box-sizing:border-box;padding:8px;border:1px solid var(--line);border-radius:7px;font-size:13px;margin-bottom:6px">${supOpts}</select>
-        <input id="apAmt" type="number" value="${badTotal}" style="width:100%;box-sizing:border-box;padding:8px;border:1px solid var(--line);border-radius:7px;font-size:13px" placeholder="Số tiền trừ nợ NCC (đ)">
-      </div>` : '<div style="font-size:12px;color:var(--muted);margin-bottom:10px">Không có hàng xấu → không trừ nợ NCC. Hàng đẹp sẽ nhập lại kho.</div>'}
-      <div style="font-size:11.5px;color:var(--muted)">Duyệt → gỡ mặt hàng khỏi hoá đơn KH (công nợ KH tự giảm) + nhập kho hàng đẹp + trừ nợ NCC hàng xấu. Tất cả bằng <b>công nợ</b>, không tiền mặt.</div>
+      <div style="font-size:11.5px;color:var(--muted)">Duyệt → gỡ mặt hàng khỏi hoá đơn KH (giảm công nợ KH theo giá bán) + nhập kho hàng đẹp + trừ nợ TỪNG NCC theo giá nhập. Tất cả bằng <b>công nợ</b>.</div>
     `, {
-      width: '540px',
+      width: '560px',
       footer: `<button class="btn btn-ghost" onclick="window.rejectShipReturn('${r.id}')">✕ Từ chối</button>
                <button class="btn btn-primary" onclick="window._apCommit('${r.id}')">✓ Duyệt &amp; xử lý</button>`
     });
   };
+  window._apRecalc = function () {
+    let total = 0;
+    document.querySelectorAll('.ap-buy').forEach(inp => {
+      const q = +inp.getAttribute('data-q') || 0; const line = Math.round(q * (+inp.value || 0)); total += line;
+      const el = document.querySelector('.ap-line[data-i="' + inp.getAttribute('data-i') + '"]'); if (el) el.textContent = window.fmt(line);
+    });
+    const t = document.getElementById('apNccTotal'); if (t) t.textContent = window.fmt(total);
+  };
   window._apCommit = function (id) {
     const list = getR(); const r = list.find(x => x.id === id); if (!r) return;
-    /* items[] (phiếu shipper) HOẶC fallback item đơn lẻ (phiếu tay) — để badTotal đúng cho cả 2 loại */
-    const its = (Array.isArray(r.items) && r.items.length) ? r.items : (r.item ? [{ ...r.item, total: +r.refundTotal || 0, cond: r.disposition === 'restock' ? 'good' : 'bad' }] : []);
-    const badTotal = its.filter(x => (x.cond || 'bad') === 'bad').reduce((s, x) => s + (+x.total || 0), 0);
+    const its = (Array.isArray(r.items) && r.items.length) ? r.items : (r.item ? [{ id: r.item.id, name: r.item.name, unit: r.item.unit, qty: r.qtyReturn, total: +r.refundTotal || 0, cond: r.disposition === 'restock' ? 'good' : 'bad', note: r.note }] : []);
+    const sups = window.STORE.get('suppliers', []) || [];
+    const findSup = nm => sups.find(s => _rnorm(s.name) === _rnorm(nm));
+    /* Gán NCC + giá nhập cho từng SP xấu (từ ô type-ahead) → buyTotal = SL × giá nhập */
+    let anyNcc = false;
+    its.forEach((x, i) => {
+      if ((x.cond || 'bad') !== 'bad') { x.supplierId = ''; x.buyTotal = 0; return; }
+      const supEl = document.querySelector('.ap-sup[data-i="' + i + '"]');
+      const buyEl = document.querySelector('.ap-buy[data-i="' + i + '"]');
+      const nm = supEl ? supEl.value.trim() : '';
+      const sup = nm ? findSup(nm) : null;
+      const buyPrice = buyEl ? (+buyEl.value || 0) : 0;
+      x.supplierId = sup ? sup.id : '';
+      x.supplierName = sup ? sup.name : nm;
+      x.buyPrice = buyPrice;
+      x.buyTotal = Math.round((+x.qty || 0) * buyPrice);
+      if (x.supplierId && x.buyTotal > 0) anyNcc = true;
+    });
+    r.items = its;
+    r.perItemNCC = true;
+    r.fault = anyNcc ? 'supplier' : 'customer';
     r.refundMode = 'debt';
-    if (badTotal > 0) {
-      const sid = (document.getElementById('apSup') || {}).value || '';
-      if (!sid && !confirm('Chưa chọn nhà cung cấp cho hàng xấu → sẽ KHÔNG trừ nợ NCC (chỉ giảm hoá đơn khách). Vẫn duyệt?')) return;
-      r.fault = 'supplier';
-      r.supplierId = sid;
-      r.supplierName = sid ? ((window.STORE.get('suppliers', []) || []).find(s => s.id === sid) || {}).name || '' : '';
-      r.supClaimAmount = parseInt((document.getElementById('apAmt') || {}).value) || 0;
-    } else {
-      r.fault = 'customer'; r.supplierId = ''; r.supplierName = ''; r.supClaimAmount = 0;
-    }
+    const badNoSup = its.filter(x => (x.cond || 'bad') === 'bad' && !(x.supplierId && x.buyTotal > 0));
+    if (badNoSup.length && !confirm(badNoSup.length + ' mặt hàng xấu chưa khớp NCC/giá nhập → phần đó KHÔNG trừ nợ NCC (vẫn giảm hoá đơn khách). Vẫn duyệt?')) return;
     window.STORE.set('returns', list);
     window.closeModal && window.closeModal();
-    window.processReturn(id, true);   /* đã xác nhận qua popup → khỏi confirm lần nữa */
+    window.processReturn(id, true);
   };
   window.rejectShipReturn = function (id) {
     if (!confirm('Từ chối phiếu trả này? (đơn giữ nguyên, không trừ gì)')) return;
@@ -430,9 +487,25 @@
       } else msgs.push('không tạo được đơn bù (thiếu đơn gốc/mặt hàng)');
     }
 
-    /* 3) Lỗi NCC → tạo khoản đòi lại NCC */
-    if (r.fault === 'supplier' && r.supplierId) {
-      const claimAmt = +r.supClaimAmount || badTotalR || +r.refundTotal || 0;   /* kế toán nhập; fallback = tiền hàng XẤU (không gồm hàng đẹp) */
+    /* 3) Hàng xấu → trả NCC theo GIÁ NHẬP, tự động theo NCC gán TỪNG SP (per-item, gộp theo NCC) */
+    if (r.perItemNCC) {
+      const badItems = rItems.filter(x => (x.cond || 'bad') === 'bad' && x.supplierId && (+x.buyTotal > 0));
+      if (badItems.length) {
+        const sups = window.STORE.get('suppliers', []) || [];
+        const claims = window.STORE.get('supplierClaims', []) || [];
+        const bySup = {};
+        badItems.forEach(x => { const g = bySup[x.supplierId] || (bySup[x.supplierId] = { name: x.supplierName || '', amt: 0, items: [] }); g.amt += (+x.buyTotal || 0); g.items.push(x); });
+        Object.keys(bySup).forEach((sid, k) => {
+          const g = bySup[sid]; if (!(g.amt > 0)) return;
+          const s = sups.find(x => x.id === sid);
+          if (s) { window.STORE.update('suppliers', s.id, { debt: Math.max(0, (+s.debt || 0) - g.amt) }); msgs.push(`trừ nợ NCC ${s.name} ${window.fmt(g.amt)}₫ (giá nhập)`); }
+          claims.unshift({ id: 'CL' + Date.now().toString(36) + k, supplierId: sid, supplierName: g.name, orderCode: r.orderCode, returnId: r.id, item: g.items.map(i => i.name).join(', '), qty: g.items.reduce((s2, i) => s2 + (+i.qty || 0), 0), amount: g.amt, reason: r.reason, date: r.date, status: 'open' });
+        });
+        window.STORE.set('supplierClaims', claims);
+      }
+    } else if (r.fault === 'supplier' && r.supplierId) {
+      /* Phiếu tay cũ (chưa qua popup mới) — 1 NCC/phiếu */
+      const claimAmt = +r.supClaimAmount || badTotalR || +r.refundTotal || 0;
       const claims = window.STORE.get('supplierClaims', []) || [];
       claims.unshift({
         id:'CL'+Date.now().toString(36), supplierId:r.supplierId, supplierName:r.supplierName,
@@ -440,7 +513,6 @@
         amount:claimAmt, reason:r.reason, date:r.date, status:'open'
       });
       window.STORE.set('supplierClaims', claims);
-      /* A) Trừ tiền nhập → GIẢM công nợ phải trả NCC (hàng xấu trả về NCC) */
       if (claimAmt > 0) {
         const sups = window.STORE.get('suppliers', []) || [];
         const s = sups.find(x => x.id === r.supplierId);

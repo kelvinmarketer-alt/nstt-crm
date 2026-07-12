@@ -874,16 +874,30 @@
     let html = '';
     if (rs.length) {
       html += `<div class="section-h" style="color:#B45309">↩️ Đã trả hàng (${rs.length})</div>`;
+      const _n = s => String(s || '').trim().toLowerCase();
+      const _ordR = (window.STORE.get('orders', window.ORDERS || []) || []).find(o => o.code === code);
+      const _ordItems = (_ordR && Array.isArray(_ordR.items)) ? _ordR.items : [];
       rs.forEach(r => {
-        const its = (Array.isArray(r.items) && r.items.length) ? r.items : (r.item ? [{ name: r.item.name, qty: r.qtyReturn, unit: r.item.unit, total: r.refundTotal, cond: r.disposition === 'restock' ? 'good' : 'bad', note: r.note }] : []);
+        const its = (Array.isArray(r.items) && r.items.length) ? r.items : (r.item ? [{ id: r.item.id, name: r.item.name, qty: r.qtyReturn, unit: r.item.unit, total: r.refundTotal, cond: r.disposition === 'restock' ? 'good' : 'bad', note: r.note }] : []);
         const custCut = its.reduce((s, x) => s + (+x.total || 0), 0) || (+r.refundTotal || 0);
-        const badCut = (r.fault === 'supplier' && r.supplierId) ? ((+r.supClaimAmount) || its.filter(x => (x.cond || 'bad') === 'bad').reduce((s, x) => s + (+x.total || 0), 0)) : 0;
+        const badCut = r.perItemNCC
+          ? its.filter(x => x.supplierId && +x.buyTotal > 0).reduce((s, x) => s + (+x.buyTotal || 0), 0)
+          : ((r.fault === 'supplier' && r.supplierId) ? ((+r.supClaimAmount) || its.filter(x => (x.cond || 'bad') === 'bad').reduce((s, x) => s + (+x.total || 0), 0)) : 0);
         const stTxt = r.status === 'pending' ? '⏳ chờ kế toán duyệt' : (r.status === 'refunded' ? '✓ đã xử lý' : _e(r.status));
         html += `<div style="border:1px solid #FDE68A;background:#FFFBEB;border-radius:8px;padding:10px 12px;margin:0 0 8px;font-size:12.5px">
           <div style="font-weight:700;color:#B45309;margin-bottom:6px">Phiếu ${_e(r.id)} · ${_e(r.date || '')} · ${stTxt}</div>
-          ${its.map(x => `<details style="margin-bottom:2px"><summary style="cursor:pointer">${_e(x.name)} — <b>${x.qty}${_e(x.unit || '')}</b> · ${(x.cond || 'bad') === 'good' ? '🏬 đẹp→kho' : '🗑 xấu→NCC'} · <b style="color:#B45309">−${window.fmt(+x.total || 0)}đ</b></summary><div style="padding:4px 0 6px 14px;color:var(--muted)">📝 Lý do: ${x.note ? _e(x.note) : '(không ghi chú)'}</div></details>`).join('')}
-          <div style="border-top:1px dashed #FDE68A;margin-top:6px;padding-top:6px;display:flex;justify-content:space-between"><span>➖ Giảm hoá đơn khách (công nợ KH −)</span><b style="color:#B45309">${window.fmt(custCut)}đ</b></div>
-          ${badCut ? `<div style="display:flex;justify-content:space-between;margin-top:2px"><span>🏭 Trừ nợ NCC${r.supplierName ? ' (' + _e(r.supplierName) + ')' : ''}</span><b style="color:#B45309">${window.fmt(badCut)}đ</b></div>` : ''}
+          ${its.map(x => {
+            const ret = +x.qty || 0;
+            const curIt = _ordItems.find(y => (x.id && y.id === x.id) || _n(y.name) === _n(x.name));
+            const cur = curIt ? (+curIt.qty || 0) : 0;
+            const orig = (r.status === 'refunded') ? (cur + ret) : (curIt ? cur : ret);
+            const remain = (r.status === 'refunded') ? cur : Math.max(0, orig - ret);
+            const price = (+x.price) || (curIt ? +curIt.price : 0) || (ret ? Math.round((+x.total || 0) / ret) : 0);
+            const nccPart = (r.perItemNCC && x.supplierId && +x.buyTotal > 0) ? ` · 🏭 trừ NCC <b>${_e(x.supplierName || '')}</b>: ${window.fmt(+x.buyTotal)}đ (giá nhập ${window.fmt(+x.buyPrice || 0)})` : '';
+            return `<details style="margin-bottom:2px"><summary style="cursor:pointer">${_e(x.name)}: <b>${orig}</b> − <b style="color:#B45309">${ret}</b> = <b>${remain}</b>${_e(x.unit || '')} · ${window.fmt(price)}₫ → giảm <b style="color:#B45309">${window.fmt(+x.total || 0)}đ</b> ${(x.cond || 'bad') === 'good' ? '🏬 đẹp' : '🗑 xấu'}</summary><div style="padding:4px 0 6px 14px;color:var(--muted)">📝 Lý do: ${x.note ? _e(x.note) : '(không ghi chú)'}${nccPart}</div></details>`;
+          }).join('')}
+          <div style="border-top:1px dashed #FDE68A;margin-top:6px;padding-top:6px;display:flex;justify-content:space-between"><span>➖ Giảm hoá đơn khách (giá bán)</span><b style="color:#B45309">${window.fmt(custCut)}đ</b></div>
+          ${badCut ? `<div style="display:flex;justify-content:space-between;margin-top:2px"><span>🏭 Trừ nợ NCC (giá nhập)</span><b style="color:#B45309">${window.fmt(badCut)}đ</b></div>` : ''}
         </div>`;
       });
     }

@@ -9,8 +9,8 @@
 (function () {
   const S = () => window.STORE;
   const qs = new URLSearchParams(location.search);
-  const SHIP_MODE = qs.get('mode') === 'ship';
-  const ME = (qs.get('me') || '').trim().toLowerCase();
+  const SHIP_TOKEN = (qs.get('ship') || '').trim();          /* link bảo mật riêng mỗi shipper */
+  const SHIP_MODE = qs.get('mode') === 'ship' || !!SHIP_TOKEN;
 
   const nowISO = () => new Date().toISOString();
   const fmt = n => (window.fmt ? window.fmt(n) : Number(n || 0).toLocaleString('vi-VN'));
@@ -18,7 +18,23 @@
   const shippers = () => (S().get('shippers', window.DRIVERS || []) || []).filter(s => s && s.name);
   const ordByCode = code => ordList().find(o => o.code === code);
   const isTransit = o => o.status === 'transit' || o.status === 'pickup';   /* pickup = đơn cũ đã dispatch trước bản v455 */
-  const mineOnly = o => !ME || String(o.driverName || '').trim().toLowerCase() === ME;
+  /* Shipper đang xem: ưu tiên TOKEN (?ship=), fallback ?me= (link cũ). Token không tra được tên → không lộ đơn ai. */
+  function resolveMe() {
+    if (SHIP_TOKEN) {
+      const list = shippers();
+      const s = list.find(x => x.linkToken === SHIP_TOKEN);
+      if (s) return { name: s.name };
+      if (!list.length) return { name: '', loading: true };
+      return { name: '', invalid: true };
+    }
+    return { name: (qs.get('me') || '').trim() };
+  }
+  const mineOnly = o => {
+    const me = resolveMe();
+    if (me.invalid || me.loading) return false;
+    if (!me.name) return true;                     /* kho xem tất cả */
+    return String(o.driverName || '').trim().toLowerCase() === me.name.trim().toLowerCase();
+  };
 
   function itemsSummary(o) {
     const its = Array.isArray(o.items) ? o.items : [];
@@ -53,13 +69,21 @@
 
   function render() {
     const host = document.getElementById('ghBoard'); if (!host) return;
+    const me = resolveMe();
+    if (SHIP_MODE) { const _hn = document.getElementById('ghShipName'); if (_hn) _hn.textContent = me.name ? ('🛵 ' + me.name) : (me.invalid ? '⚠ Link lỗi' : '🛵 Shipper'); }
+    if (me.invalid) {   /* token sai / shipper đã bị xoá */
+      host.innerHTML = `<div class="gh-empty">⚠ Link không hợp lệ hoặc đã hết hạn.<br><span style="font-size:12px">Liên hệ kho để lấy link mới.</span></div>`;
+      const tE = document.getElementById('ghTabs'); if (tE) tE.innerHTML = '';
+      return;
+    }
+    if (me.loading) { host.innerHTML = `<div class="gh-empty">Đang tải…</div>`; return; }
     const list = ordList().filter(o => isTransit(o) && mineOnly(o))
       .sort((a, b) => String(b.date || '').localeCompare(String(a.date || '')));
     const tabsEl = document.getElementById('ghTabs');
-    if (tabsEl) tabsEl.innerHTML = `<div class="gh-count">🚚 Đang giao: <b>${list.length}</b> đơn${ME ? ' · ' + esc(qs.get('me')) : ''}</div>`;
+    if (tabsEl) tabsEl.innerHTML = `<div class="gh-count">🚚 Đang giao: <b>${list.length}</b> đơn${me.name ? ' · ' + esc(me.name) : ''}</div>`;
     if (!list.length) {
-      host.innerHTML = `<div class="gh-empty">${ME
-        ? `Không có đơn đang giao cho "<b>${esc(qs.get('me'))}</b>".`
+      host.innerHTML = `<div class="gh-empty">${me.name
+        ? `Không có đơn đang giao cho "<b>${esc(me.name)}</b>".`
         : '✓ Không có đơn nào đang giao.<br><span style="font-size:12px">Kho giao shipper ở <b>Gom hàng → ③ Xuất kho</b>, đơn sẽ hiện ở đây.</span>'}</div>`;
       return;
     }
@@ -67,17 +91,18 @@
   }
   window._ghRender = render;
 
-  /* ===== Gán / đổi shipper cho đơn (để link riêng lọc đúng) — KHÔNG đổi trạng thái ===== */
+  /* ===== Gán / đổi shipper cho đơn (nhập tên → gợi ý) — KHÔNG đổi trạng thái ===== */
   window.ghAssignShipper = function (code) {
     const o = ordByCode(code); if (!o) return;
-    const opts = shippers().map(s => `<option value="${esc(s.id)}" ${o.driver === s.id || o.driverName === s.name ? 'selected' : ''}>${esc(s.name)}</option>`).join('');
+    const list = shippers();
+    const dl = list.map(s => `<option value="${esc(s.name)}"></option>`).join('');
+    const hint = list.length ? '' : '<div style="font-size:11.5px;color:#B45309;margin-top:6px">⚠ Chưa có shipper nào — thêm ở trang <a href="shippers.html">Shipper</a> trước.</div>';
     window.openModal('🛵 Gán shipper — ' + esc(code), `
       <div style="font-size:13px;color:#334155;margin-bottom:12px">Đơn <b>#${esc(code)}</b> · ${esc(o.custName || '')}</div>
-      <label style="font-size:12px;color:var(--muted);display:block;margin-bottom:4px">Shipper phụ trách</label>
-      <select id="ghShipSel" style="width:100%;padding:10px;border:1px solid var(--line);border-radius:8px;font-size:14px">
-        <option value="">— chưa gán —</option>${opts}
-      </select>
-      <div style="font-size:11.5px;color:var(--muted);margin-top:8px">Gán để shipper thấy đúng đơn của mình qua link riêng. Không đổi trạng thái đơn.</div>
+      <label style="font-size:12px;color:var(--muted);display:block;margin-bottom:4px">Shipper phụ trách (gõ tên → chọn gợi ý)</label>
+      <input id="ghShipInp" list="ghShipDL" value="${esc(o.driverName || '')}" placeholder="Gõ tên shipper…" autocomplete="off" style="width:100%;box-sizing:border-box;padding:10px;border:1px solid var(--line);border-radius:8px;font-size:14px">
+      <datalist id="ghShipDL">${dl}</datalist>${hint}
+      <div style="font-size:11.5px;color:var(--muted);margin-top:8px">Gán để shipper thấy đúng đơn của mình qua link riêng. Để trống = bỏ gán.</div>
     `, {
       width: '420px',
       footer: `<button class="btn btn-ghost" onclick="window.closeModal()">Huỷ</button>
@@ -86,11 +111,13 @@
   };
   window._ghConfirmShipper = function (code) {
     const o = ordByCode(code); if (!o) return;
-    const sel = document.getElementById('ghShipSel'); const sid = sel ? sel.value : '';
-    const sName = sid ? (shippers().find(s => s.id === sid) || {}).name || '' : '';
-    S().update('orders', code, { driver: sid, driverName: sName });
+    const inp = document.getElementById('ghShipInp');
+    const nm = inp ? inp.value.trim() : '';
+    const norm = s => String(s || '').trim().toLowerCase();
+    const s = nm ? shippers().find(x => norm(x.name) === norm(nm)) : null;
+    S().update('orders', code, { driver: s ? s.id : '', driverName: s ? s.name : nm });
     window.closeModal && window.closeModal();
-    window.toast && window.toast(sName ? ('🛵 Gán ' + sName + ' cho ' + code) : ('Bỏ gán shipper ' + code), 'success');
+    window.toast && window.toast(nm ? ('🛵 Gán ' + (s ? s.name : nm) + ' cho ' + code + (s ? '' : ' (tên tự do)')) : ('Bỏ gán shipper ' + code), 'success');
     render();
   };
 
@@ -193,22 +220,32 @@
     render();
   };
 
-  /* ===== Link giao hàng riêng cho từng shipper (copy gửi Zalo/SMS) ===== */
+  /* ===== Link giao hàng RIÊNG mỗi shipper — dùng TOKEN bảo mật (không đoán/sửa được) ===== */
+  function _mkToken() {
+    const c = 'abcdefghijkmnpqrstuvwxyz23456789'; let t = '';
+    for (let i = 0; i < 12; i++) t += c[Math.floor(Math.random() * c.length)];
+    return 'shp_' + t;
+  }
   window.ghShipLinks = function () {
     const base = location.origin + location.pathname;
-    const mk = name => base + '?mode=ship' + (name ? '&me=' + encodeURIComponent(name) : '');
     const item = (label, url) => `<div style="display:flex;gap:8px;align-items:center;padding:9px 0;border-bottom:1px solid #EEF2F0">
         <div style="flex:1;min-width:0"><b>${label}</b><div style="font-size:11px;color:var(--muted);word-break:break-all;margin-top:1px">${esc(url)}</div></div>
         <button class="btn btn-ghost btn-sm" data-u="${esc(url)}" onclick="window._ghCopy(this.getAttribute('data-u'))" style="flex-shrink:0">📋 Copy</button>
       </div>`;
     const list = shippers();
-    const rows = list.length ? list.map(s => item('🛵 ' + esc(s.name), mk(s.name))).join('')
+    /* Đảm bảo mỗi shipper có 1 token cố định (sinh 1 lần, lưu vào hồ sơ shipper) */
+    const withTok = list.map(s => {
+      let tok = s.linkToken;
+      if (!tok) { tok = _mkToken(); S().update('shippers', s.id, { linkToken: tok }); }
+      return { name: s.name, tok };
+    });
+    const rows = withTok.length ? withTok.map(s => item('🛵 ' + esc(s.name), base + '?ship=' + s.tok)).join('')
       : '<div style="color:var(--muted);padding:8px 0">Chưa có shipper — thêm ở trang Shipper.</div>';
     window.openModal('🔗 Link giao hàng cho shipper', `
-      <div style="font-size:12.5px;color:var(--muted);margin-bottom:10px">Copy link gửi cho từng shipper (Zalo/SMS). Shipper mở link trên điện thoại → chỉ thấy đơn <b>đang giao của mình</b> → bấm <b>✅ Giao xong</b>. Bảo shipper ⭐ lưu (bookmark) để lần sau mở nhanh.</div>
+      <div style="font-size:12.5px;color:var(--muted);margin-bottom:10px">Mỗi shipper 1 link <b>RIÊNG có mã bảo mật</b> — chỉ thấy + xác nhận đơn <b>của mình</b>, KHÔNG đụng được đơn người khác (không sửa tên trên link để xem đơn người khác được). Gửi Zalo/SMS, bảo họ ⭐ lưu.</div>
       ${rows}
-      ${item('📋 Tất cả (không lọc tên)', mk(''))}
-    `, { width: '500px', footer: `<button class="btn btn-primary" onclick="window.closeModal()">Xong</button>` });
+      ${item('🏬 Link kho (xem TẤT CẢ đơn đang giao)', base + '?mode=ship')}
+    `, { width: '520px', footer: `<button class="btn btn-primary" onclick="window.closeModal()">Xong</button>` });
   };
   window._ghCopy = function (t) {
     if (navigator.clipboard && navigator.clipboard.writeText) {
@@ -264,16 +301,17 @@
     if (SHIP_MODE) {
       document.documentElement.classList.add('embed');
       const hEl = document.getElementById('ghShipHead');
-      if (hEl) { hEl.style.display = 'flex'; hEl.querySelector('#ghShipName').textContent = qs.get('me') ? ('🛵 ' + qs.get('me')) : '🛵 Shipper'; }
+      if (hEl) hEl.style.display = 'flex';   /* tên shipper do render() điền (sau khi token resolve) */
     } else if (window.renderAppShell) {
       window.renderAppShell('giao-hang', 'Bảng giao hàng');
     }
     const _ghp = document.getElementById('ghPhoto'); if (_ghp) _ghp.onchange = _ghPhotoPicked;
     render();
     S().subscribe('orders', render);
+    S().subscribe('shippers', render);   /* danh sách shipper / token về → render lại (gán + link) */
     S().subscribe('pod_photos', render);   /* cập nhật số đếm 📷 Ảnh (N) */
     S().subscribe('__preloaded__', k => { if (k === 'orders' || k === 'shippers' || k === 'pod_photos') render(); });
-    setTimeout(() => { S().get('orders', window.ORDERS || []); S().get('pod_photos', {}); }, 300);
+    setTimeout(() => { S().get('orders', window.ORDERS || []); S().get('shippers', window.DRIVERS || []); S().get('pod_photos', {}); }, 300);
   }
   if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', init);
   else init();
