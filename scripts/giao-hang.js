@@ -1,67 +1,46 @@
 /* =========================================================
-   Nông Sản Tuấn Tú Hà Nội — BẢNG GIAO HÀNG (Kho + Shipper)
-   Màn hình bấm nhanh, KHÔNG cần vào chi tiết đơn:
-     Chờ giao ──[🚚 Giao shipper]──▶ Đang giao ──┬─[✅ Giao xong]──▶ Đã giao (công nợ chốt)
-                                                  └─[↩️ Trả]──▶ Đã giao + cờ "ship báo trả"
-   Ship báo trả THÔ → Kho phân loại + Kế toán chốt tiền ở module Trả hàng.
-   ?mode=ship[&me=Tên]  → giao diện rút gọn cho shipper (chỉ tab Đang giao, lọc theo tên).
+   Nông Sản Tuấn Tú Hà Nội — BẢNG GIAO HÀNG (cho Shipper)
+   Kho GIAO SHIPPER ở Gom hàng → ③ Xuất kho (đơn thành "Đang giao").
+   Bảng này CHỈ hiển thị đơn ĐANG GIAO → shipper bấm:
+     [✅ Giao xong] → Đã giao (công nợ khách chốt)
+     [↩️ Trả]       → popup chọn từng mặt hàng + SL + tình trạng (xấu/đẹp) + ghi chú → phiếu chờ kế toán duyệt
+   ?mode=ship[&me=Tên] → giao diện rút gọn cho shipper (lọc theo tên).
    ========================================================= */
 (function () {
   const S = () => window.STORE;
   const qs = new URLSearchParams(location.search);
   const SHIP_MODE = qs.get('mode') === 'ship';
-  const ME = (qs.get('me') || '').trim().toLowerCase();   /* lọc theo tên shipper (ship mode) */
-  let TAB = 'wait';                                        /* 'wait' = Chờ giao · 'transit' = Đang giao */
-  if (SHIP_MODE) TAB = 'transit';
+  const ME = (qs.get('me') || '').trim().toLowerCase();
 
   const nowISO = () => new Date().toISOString();
   const fmt = n => (window.fmt ? window.fmt(n) : Number(n || 0).toLocaleString('vi-VN'));
   const ordList = () => (S().get('orders', window.ORDERS || []) || []);
   const shippers = () => (S().get('shippers', window.DRIVERS || []) || []).filter(s => s && s.name);
   const ordByCode = code => ordList().find(o => o.code === code);
-
-  /* ===== Phân nhóm trạng thái (giữ enum cũ, gộp hiển thị) ===== */
-  const WAIT_ST = ['confirmed', 'pickup', 'new', ''];          /* Chờ giao */
-  const isWait = o => WAIT_ST.includes(o.status || '') && o.status !== 'draft' && o.status !== 'cancelled';
-  const isTransit = o => o.status === 'transit';
-
-  /* Lọc theo shipper (chỉ ở ship mode & có ?me=) */
+  const isTransit = o => o.status === 'transit' || o.status === 'pickup';   /* pickup = đơn cũ đã dispatch trước bản v455 */
   const mineOnly = o => !ME || String(o.driverName || '').trim().toLowerCase() === ME;
 
-  /* ===== Tóm tắt mặt hàng 1 dòng ===== */
   function itemsSummary(o) {
     const its = Array.isArray(o.items) ? o.items : [];
     if (!its.length) return (o.qty ? o.qty + ' kiện' : '—');
     const by = {};
     its.forEach(x => { const u = (x.unit || 'kg').toString().trim().toLowerCase() || 'kg'; by[u] = (by[u] || 0) + (+x.qty || 0); });
-    const parts = Object.keys(by).sort((a, b) => a === 'kg' ? -1 : b === 'kg' ? 1 : a.localeCompare(b, 'vi'))
-      .map(u => `${Number.isInteger(by[u]) ? by[u] : Math.round(by[u] * 100) / 100} ${u}`);
-    return parts.join(' · ') + ` · ${its.length} mã`;
+    return Object.keys(by).sort((a, b) => a === 'kg' ? -1 : b === 'kg' ? 1 : a.localeCompare(b, 'vi'))
+      .map(u => `${Number.isInteger(by[u]) ? by[u] : Math.round(by[u] * 100) / 100} ${u}`).join(' · ') + ` · ${its.length} mã`;
   }
   const esc = s => String(s == null ? '' : s).replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
   const shortAddr = a => { a = String(a || '').trim(); return a.length > 46 ? a.slice(0, 44) + '…' : (a || '—'); };
 
-  /* ===== 1 dòng đơn (list) ===== */
+  /* ===== 1 dòng đơn ĐANG GIAO ===== */
   function cardHtml(o) {
     const cust = esc(o.custName || o.custId || 'Khách');
     const money = o.freight ? ` · <span class="gh-money">${fmt(o.freight)}₫</span>` : '';
-    const flag = o.returnPending ? `<span class="gh-flag">🚩 đã báo trả</span>` : '';
-    const head = `<div class="gh-title"><span class="gh-code">#${esc(o.code)}</span><b class="gh-cust">${cust}</b>${flag}</div>`;
-    if (TAB === 'wait') {
-      return `<div class="gh-row">
-        <div class="gh-main">${head}
-          <div class="gh-meta">📍 ${esc(shortAddr(o.drop))} · 📦 ${esc(itemsSummary(o))}${money}</div>
-        </div>
-        <div class="gh-act">
-          <button class="gh-btn gh-go" onclick="ghGiaoShipper('${esc(o.code)}')">🚚 Giao shipper</button>
-        </div>
-      </div>`;
-    }
-    /* Đang giao */
     const ship = o.driverName ? `<span class="gh-ship">🛵 ${esc(o.driverName)}</span>` : `<span class="gh-ship gh-noship">🛵 chưa gán</span>`;
     return `<div class="gh-row">
-      <div class="gh-main">${head}
-        <div class="gh-meta">📍 ${esc(shortAddr(o.drop))} · 📦 ${esc(itemsSummary(o))}${money} · ${ship}</div>
+      <div class="gh-main">
+        <div class="gh-title"><span class="gh-code">#${esc(o.code)}</span><b class="gh-cust">${cust}</b></div>
+        <div class="gh-meta">📍 ${esc(shortAddr(o.drop))} · 📦 ${esc(itemsSummary(o))}${money} · ${ship}
+          <a href="javascript:void(0)" onclick="ghAssignShipper('${esc(o.code)}')" style="color:#0EA5E9;font-size:11px;margin-left:2px;white-space:nowrap">✎ gán</a></div>
       </div>
       <div class="gh-act">
         <button class="gh-btn gh-done" onclick="ghGiaoXong('${esc(o.code)}')">✅ Giao xong</button>
@@ -70,65 +49,46 @@
     </div>`;
   }
 
-  /* ===== Render toàn bảng ===== */
   function render() {
     const host = document.getElementById('ghBoard'); if (!host) return;
-    const all = ordList();
-    const waitList = all.filter(isWait);
-    const transitList = all.filter(o => isTransit(o) && mineOnly(o));
-    const list = (TAB === 'wait' ? waitList : transitList)
+    const list = ordList().filter(o => isTransit(o) && mineOnly(o))
       .sort((a, b) => String(b.date || '').localeCompare(String(a.date || '')));
-
-    /* Tabs (ẩn tab "Chờ giao" ở ship mode) */
     const tabsEl = document.getElementById('ghTabs');
-    if (tabsEl) {
-      if (SHIP_MODE) { tabsEl.style.display = 'none'; }
-      else {
-        tabsEl.innerHTML =
-          `<button class="gh-tab ${TAB === 'wait' ? 'active' : ''}" onclick="ghTab('wait')">🟡 Chờ giao <b>${waitList.length}</b></button>
-           <button class="gh-tab ${TAB === 'transit' ? 'active' : ''}" onclick="ghTab('transit')">🔵 Đang giao <b>${all.filter(isTransit).length}</b></button>`;
-      }
-    }
-
+    if (tabsEl) tabsEl.innerHTML = `<div class="gh-count">🚚 Đang giao: <b>${list.length}</b> đơn${ME ? ' · ' + esc(qs.get('me')) : ''}</div>`;
     if (!list.length) {
-      host.innerHTML = `<div class="gh-empty">${TAB === 'wait'
-        ? '✓ Không còn đơn nào chờ giao.'
-        : (ME ? `Không có đơn đang giao cho "<b>${esc(qs.get('me'))}</b>".` : '✓ Không có đơn nào đang giao.')}</div>`;
+      host.innerHTML = `<div class="gh-empty">${ME
+        ? `Không có đơn đang giao cho "<b>${esc(qs.get('me'))}</b>".`
+        : '✓ Không có đơn nào đang giao.<br><span style="font-size:12px">Kho giao shipper ở <b>Gom hàng → ③ Xuất kho</b>, đơn sẽ hiện ở đây.</span>'}</div>`;
       return;
     }
     host.innerHTML = list.map(cardHtml).join('');
   }
   window._ghRender = render;
-  window.ghTab = function (t) { TAB = t; render(); };
 
-  /* ===== KHO: Giao cho shipper → Đang giao ===== */
-  window.ghGiaoShipper = function (code) {
+  /* ===== Gán / đổi shipper cho đơn (để link riêng lọc đúng) — KHÔNG đổi trạng thái ===== */
+  window.ghAssignShipper = function (code) {
     const o = ordByCode(code); if (!o) return;
     const opts = shippers().map(s => `<option value="${esc(s.id)}" ${o.driver === s.id || o.driverName === s.name ? 'selected' : ''}>${esc(s.name)}</option>`).join('');
-    window.openModal('🚚 Giao cho shipper — ' + esc(code), `
+    window.openModal('🛵 Gán shipper — ' + esc(code), `
       <div style="font-size:13px;color:#334155;margin-bottom:12px">Đơn <b>#${esc(code)}</b> · ${esc(o.custName || '')}</div>
-      <label style="font-size:12px;color:var(--muted);display:block;margin-bottom:4px">Chọn shipper</label>
+      <label style="font-size:12px;color:var(--muted);display:block;margin-bottom:4px">Shipper phụ trách</label>
       <select id="ghShipSel" style="width:100%;padding:10px;border:1px solid var(--line);border-radius:8px;font-size:14px">
-        <option value="">— chưa gán (giao sau) —</option>${opts}
+        <option value="">— chưa gán —</option>${opts}
       </select>
-      <div style="font-size:11.5px;color:var(--muted);margin-top:8px">Bấm xác nhận → đơn chuyển sang <b>Đang giao</b>, shipper sẽ thấy trên máy của mình.</div>
+      <div style="font-size:11.5px;color:var(--muted);margin-top:8px">Gán để shipper thấy đúng đơn của mình qua link riêng. Không đổi trạng thái đơn.</div>
     `, {
       width: '420px',
       footer: `<button class="btn btn-ghost" onclick="window.closeModal()">Huỷ</button>
-               <button class="btn btn-primary" onclick="window._ghConfirmShipper('${esc(code)}')">🚚 Bắt đầu giao</button>`
+               <button class="btn btn-primary" onclick="window._ghConfirmShipper('${esc(code)}')">Lưu</button>`
     });
   };
   window._ghConfirmShipper = function (code) {
     const o = ordByCode(code); if (!o) return;
-    const sel = document.getElementById('ghShipSel');
-    const sid = sel ? sel.value : '';
+    const sel = document.getElementById('ghShipSel'); const sid = sel ? sel.value : '';
     const sName = sid ? (shippers().find(s => s.id === sid) || {}).name || '' : '';
-    const patch = { status: 'transit', transitAt: nowISO() };
-    if (sid) { patch.driver = sid; patch.driverName = sName; }
-    S().update('orders', code, patch);
+    S().update('orders', code, { driver: sid, driverName: sName });
     window.closeModal && window.closeModal();
-    window.toast && window.toast('🚚 Đang giao ' + code + (sName ? ' · ' + sName : ''), 'success');
-    if (window.sendTgMessage) window.sendTgMessage('alert', `🚚 BẮT ĐẦU GIAO\n📦 ${code} · ${o.custName || ''}${sName ? '\n🛵 ' + sName : ''}`);
+    window.toast && window.toast(sName ? ('🛵 Gán ' + sName + ' cho ' + code) : ('Bỏ gán shipper ' + code), 'success');
     render();
   };
 
@@ -142,7 +102,7 @@
     render();
   };
 
-  /* ===== SHIP: Báo trả → popup chọn mặt hàng + SL (toàn bộ/1 phần) → phiếu chờ kế toán duyệt ===== */
+  /* ===== SHIP: Báo trả → popup chọn từng mặt hàng + SL + tình trạng + ghi chú RIÊNG mỗi SP ===== */
   window.ghBaoTra = async function (code) {
     const o = ordByCode(code); if (!o) return;
     let items = Array.isArray(o.items) ? o.items.slice() : [];
@@ -152,44 +112,59 @@
     window._ghTra = { code, items, custName: o.custName || '', cust: o.cust || '', freight: +o.freight || 0 };
     const rows = items.length ? items.map((it, i) => {
       const unit = esc(it.unit || 'kg');
-      return `<div class="ght-row">
-        <div class="ght-info"><b>${esc(it.name || it.id)}</b><div class="ght-sub">đã giao ${fmt(it.qty || 0)} ${unit}${it.price ? ` · ${fmt(it.price)}₫/${unit}` : ''}</div></div>
-        <input type="number" class="ght-q" data-i="${i}" min="0" max="${it.qty || 0}" step="0.1" value="0" placeholder="0">
-        <span class="ght-unit">${unit}</span>
+      return `<div class="ght-item">
+        <div class="ght-row">
+          <div class="ght-info"><b>${esc(it.name || it.id)}</b><div class="ght-sub">đã giao ${fmt(it.qty || 0)} ${unit}${it.price ? ` · ${fmt(it.price)}₫/${unit}` : ''}</div></div>
+          <input type="number" class="ght-q" data-i="${i}" min="0" max="${it.qty || 0}" step="0.1" value="0" placeholder="0" oninput="window._ghToggleDetail(${i})">
+          <span class="ght-unit">${unit}</span>
+        </div>
+        <div class="ght-detail" id="ghtD${i}" style="display:none">
+          <select class="ght-cond" data-i="${i}">
+            <option value="bad">🗑 Hàng xấu/lỗi (trả NCC)</option>
+            <option value="good">🏬 Hàng đẹp (giữ lại kho)</option>
+          </select>
+          <input class="ght-note" data-i="${i}" placeholder="Ghi chú riêng SP này (vd: dập nát)…">
+        </div>
       </div>`;
     }).join('') : `<div style="color:#B45309;font-size:12.5px;padding:8px 0">Đơn chưa tải chi tiết mặt hàng — sẽ tạo phiếu trả <b>toàn bộ đơn</b> để kế toán kiểm lại.</div>`;
     window.openModal('↩️ Báo trả hàng — #' + esc(code), `
-      <div style="font-size:12.5px;color:var(--muted);margin-bottom:10px">Khách: <b>${esc(o.custName || '')}</b>. Nhập số lượng <b>TRẢ</b> cho từng mặt hàng (để 0 nếu không trả). Trả 1 phần cũng được — vd giao 30, lỗi 1 thì nhập <b>1</b>.</div>
+      <div style="font-size:12.5px;color:var(--muted);margin-bottom:10px">Khách: <b>${esc(o.custName || '')}</b>. Nhập số lượng <b>TRẢ</b> cho mặt hàng nào bị trả (để 0 nếu không trả). Gõ SL &gt; 0 sẽ hiện ô chọn <b>tình trạng + ghi chú riêng</b> cho SP đó.</div>
       <div id="ghTraList">${rows}</div>
       ${items.length ? `<button class="btn btn-ghost btn-sm" onclick="window._ghTraAll()" style="margin-top:8px">↩️ Trả toàn bộ đơn</button>` : ''}
-      <div style="margin-top:12px"><label style="font-size:12px;color:var(--muted);display:block;margin-bottom:5px">Tình trạng hàng trả</label>
-        <label style="margin-right:16px;font-size:13px"><input type="radio" name="ghtDisp" value="bad" checked> 🗑 Hàng xấu/lỗi (trả NCC)</label>
-        <label style="font-size:13px"><input type="radio" name="ghtDisp" value="good"> 🏬 Hàng đẹp (giữ lại kho)</label>
-      </div>
-      <div style="margin-top:10px"><label style="font-size:12px;color:var(--muted);display:block;margin-bottom:4px">Lý do / ghi chú</label>
-        <input id="ghtReason" placeholder="vd: dập nát, sai loại, thiếu…" style="width:100%;box-sizing:border-box;padding:9px;border:1px solid var(--line);border-radius:8px;font-size:13px"></div>
     `, {
-      width: '480px',
+      width: '520px',
       footer: `<button class="btn btn-ghost" onclick="window.closeModal()">Huỷ</button>
                <button class="btn" style="background:#EA580C;color:#fff;border-color:#EA580C" onclick="window._ghConfirmTra()">↩️ Tạo phiếu trả</button>`
     });
   };
+  window._ghToggleDetail = function (i) {
+    const q = parseFloat((document.querySelector(`.ght-q[data-i="${i}"]`) || {}).value) || 0;
+    const d = document.getElementById('ghtD' + i);
+    if (d) d.style.display = q > 0 ? 'flex' : 'none';
+  };
   window._ghTraAll = function () {
-    document.querySelectorAll('#ghTraList .ght-q').forEach(inp => { inp.value = inp.getAttribute('max') || 0; });
+    document.querySelectorAll('#ghTraList .ght-q').forEach(inp => {
+      inp.value = inp.getAttribute('max') || 0;
+      window._ghToggleDetail(+inp.getAttribute('data-i'));
+    });
   };
   window._ghConfirmTra = function () {
     const T = window._ghTra; if (!T) return;
     const picked = [];
     document.querySelectorAll('#ghTraList .ght-q').forEach(inp => {
       const i = +inp.getAttribute('data-i'); const it = T.items[i]; if (!it) return;
-      const q = Math.min(parseFloat(inp.value) || 0, +it.qty || (parseFloat(inp.value) || 0));
-      if (q > 0) picked.push({ id: it.id, name: it.name, unit: it.unit || 'kg', qty: q, price: +it.price || 0, total: Math.round(q * (+it.price || 0)) });
+      const q = Math.min(parseFloat(inp.value) || 0, (+it.qty > 0 ? +it.qty : (parseFloat(inp.value) || 0)));
+      if (q > 0) {
+        const cond = (document.querySelector(`.ght-cond[data-i="${i}"]`) || {}).value || 'bad';
+        const note = ((document.querySelector(`.ght-note[data-i="${i}"]`) || {}).value || '').trim();
+        picked.push({ id: it.id, name: it.name, unit: it.unit || 'kg', qty: q, price: +it.price || 0, total: Math.round(q * (+it.price || 0)), cond, note });
+      }
     });
     if (T.items.length && !picked.length) { window.toast && window.toast('Nhập số lượng trả cho ít nhất 1 mặt hàng', 'warn'); return; }
-    const reason = ((document.getElementById('ghtReason') || {}).value || '').trim();
-    const bad = ((document.querySelector('input[name="ghtDisp"]:checked') || {}).value || 'bad') === 'bad';
+    const anyBad = picked.some(x => x.cond === 'bad') || !picked.length;
     const refundTotal = picked.reduce((s, x) => s + x.total, 0) || (T.items.length ? 0 : T.freight);
     const first = picked[0] || null;
+    const noteAll = picked.map(x => x.note ? `${x.name}: ${x.note}` : '').filter(Boolean).join(' · ');
     const rec = {
       id: 'RT' + Date.now().toString(36).toUpperCase(),
       orderCode: T.code, custId: T.cust, custName: T.custName,
@@ -197,27 +172,26 @@
       items: picked,
       item: first ? { id: first.id, name: first.name, unit: first.unit, price: first.price } : null,
       qtyReturn: first ? first.qty : 0,
-      reason: reason || (bad ? 'Hàng xấu/lỗi' : 'Khách trả'),
+      reason: noteAll || (anyBad ? 'Hàng xấu/lỗi' : 'Khách trả'),
       caseType: 'onsite', resolution: 'refund',
-      disposition: bad ? 'discard' : 'restock',
-      fault: bad ? 'supplier' : 'customer',
+      disposition: picked.length && picked.every(x => x.cond === 'good') ? 'restock' : 'discard',  /* tổng quát; xử lý theo từng SP khi duyệt */
+      fault: anyBad ? 'supplier' : 'customer',
       refundMode: 'debt', supplierId: '', supplierName: '', supClaimAmount: 0,
-      refundTotal, note: reason, status: 'pending', fromShip: true,
+      refundTotal, note: noteAll, status: 'pending', fromShip: true,
       handledBy: (window.CURRENT_USER && window.CURRENT_USER.name) || 'shipper', reportedAt: nowISO(),
     };
     window.STORE.add('returns', rec);
-    /* Giao đã xong (khách nhận rồi mới trả) → đơn sang Đã giao, phiếu trả sẽ giảm hoá đơn khi kế toán duyệt */
     S().update('orders', T.code, { status: 'delivered', deliveredAt: nowISO() });
     window.closeModal && window.closeModal();
     window.toast && window.toast('↩️ Đã tạo phiếu trả — chờ kế toán duyệt', 'success');
     if (window.sendTgMessage) {
-      const lines = picked.length ? picked.map(x => `• ${x.name}: ${x.qty}${x.unit}`).join('\n') : '• (toàn bộ đơn)';
-      window.sendTgMessage('alert', `↩️ PHIẾU TRẢ HÀNG (chờ duyệt)\n📦 ${T.code} · ${T.custName}\n${lines}\n${bad ? '🗑 Hàng xấu → đòi NCC' : '🏬 Hàng đẹp → nhập kho'}${reason ? '\n📝 ' + reason : ''}\n👉 Kế toán duyệt ở module Trả hàng.`);
+      const lines = picked.length ? picked.map(x => `• ${x.name}: ${x.qty}${x.unit} (${x.cond === 'good' ? 'đẹp' : 'xấu'})${x.note ? ' — ' + x.note : ''}`).join('\n') : '• (toàn bộ đơn)';
+      window.sendTgMessage('alert', `↩️ PHIẾU TRẢ HÀNG (chờ duyệt)\n📦 ${T.code} · ${T.custName}\n${lines}\n👉 Kế toán duyệt ở module Trả hàng.`);
     }
     render();
   };
 
-  /* ===== Link giao hàng riêng cho từng shipper (kho copy gửi Zalo/SMS) ===== */
+  /* ===== Link giao hàng riêng cho từng shipper (copy gửi Zalo/SMS) ===== */
   window.ghShipLinks = function () {
     const base = location.origin + location.pathname;
     const mk = name => base + '?mode=ship' + (name ? '&me=' + encodeURIComponent(name) : '');
@@ -226,8 +200,7 @@
         <button class="btn btn-ghost btn-sm" data-u="${esc(url)}" onclick="window._ghCopy(this.getAttribute('data-u'))" style="flex-shrink:0">📋 Copy</button>
       </div>`;
     const list = shippers();
-    const rows = list.length
-      ? list.map(s => item('🛵 ' + esc(s.name), mk(s.name))).join('')
+    const rows = list.length ? list.map(s => item('🛵 ' + esc(s.name), mk(s.name))).join('')
       : '<div style="color:var(--muted);padding:8px 0">Chưa có shipper — thêm ở trang Shipper.</div>';
     window.openModal('🔗 Link giao hàng cho shipper', `
       <div style="font-size:12.5px;color:var(--muted);margin-bottom:10px">Copy link gửi cho từng shipper (Zalo/SMS). Shipper mở link trên điện thoại → chỉ thấy đơn <b>đang giao của mình</b> → bấm <b>✅ Giao xong</b>. Bảo shipper ⭐ lưu (bookmark) để lần sau mở nhanh.</div>
@@ -237,17 +210,14 @@
   };
   window._ghCopy = function (t) {
     if (navigator.clipboard && navigator.clipboard.writeText) {
-      navigator.clipboard.writeText(t).then(
-        () => window.toast && window.toast('📋 Đã copy link', 'success'),
-        () => window.prompt('Copy link (Ctrl+C):', t)
-      );
+      navigator.clipboard.writeText(t).then(() => window.toast && window.toast('📋 Đã copy link', 'success'), () => window.prompt('Copy link (Ctrl+C):', t));
     } else { window.prompt('Copy link (Ctrl+C):', t); }
   };
 
   /* ===== Init ===== */
   function init() {
     if (SHIP_MODE) {
-      document.documentElement.classList.add('embed');   /* ẩn sidebar/topbar → màn hình ship gọn */
+      document.documentElement.classList.add('embed');
       const hEl = document.getElementById('ghShipHead');
       if (hEl) { hEl.style.display = 'flex'; hEl.querySelector('#ghShipName').textContent = qs.get('me') ? ('🛵 ' + qs.get('me')) : '🛵 Shipper'; }
     } else if (window.renderAppShell) {
@@ -256,7 +226,6 @@
     render();
     S().subscribe('orders', render);
     S().subscribe('__preloaded__', k => { if (k === 'orders' || k === 'shippers') render(); });
-    /* mồi tải orders từ cloud */
     setTimeout(() => S().get('orders', window.ORDERS || []), 300);
   }
   if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', init);

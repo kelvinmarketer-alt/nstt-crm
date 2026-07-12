@@ -269,8 +269,16 @@
     if (_page < 1) _page = 1;
     const _from = (_page - 1) * _perPage;
     const _shown = rows.slice(_from, _from + _perPage);
+    /* Map đơn → phiếu trả (để hiện badge "đã bị trả X₫" trên bảng đơn) */
+    const _retMap = (function () {
+      const rs = window.STORE.get('returns', window.RETURNS || []) || [];
+      const m = {};
+      rs.forEach(r => { if (!r || !r.orderCode || r.status === 'rejected') return; const g = m[r.orderCode] || (m[r.orderCode] = { count: 0, total: 0, pending: 0 }); g.count++; g.total += (+r.refundTotal || 0); if (r.status === 'pending') g.pending++; });
+      return m;
+    })();
     document.getElementById('tbody').innerHTML = _shown.map(o => {
       try {
+        const _ret = _retMap[o.code];
         /* Chuẩn hoá status: đơn web cũ dùng 'new' → coi như 'confirmed' (Mới) */
         const statusKey = STATUS[o.status] ? o.status : 'confirmed';
         const st = STATUS[statusKey];
@@ -292,7 +300,7 @@
                 if (ql) return `<div style="margin-top:3px"><span class="tag" title="KT2 đã chốt báo giá" style="background:#DCFCE7;color:#15803D;font-weight:700;font-size:10px">🔒 Giá: ${_escOpt(ql.by || 'Đã chốt')}</span></div>`;
                 if (tl) return `<div style="margin-top:3px"><span class="tag" title="KT1 đã chốt sản lượng — chờ KT2 báo giá" style="background:#FFEDD5;color:#B45309;font-weight:700;font-size:10px">📦 SL: ${_escOpt(tl.by || '')} · chờ giá</span></div>`;
                 return `<div style="margin-top:3px"><span class="tag" title="Chưa chốt sản lượng — KT1 cần khớp SL khách nhận" style="background:#FEE2E2;color:#DC2626;font-weight:600;font-size:10px">⏳ Chờ chốt SL</span></div>`;
-              })()}</td>
+              })()}${_ret ? `<div style="margin-top:3px"><span class="tag" style="background:#FFEDD5;color:#B45309;font-weight:700;font-size:10px" title="Đơn có trả hàng — hoá đơn đã bị giảm so với ban đầu">↩️ Trả ${window.fmtShort ? window.fmtShort(_ret.total) : _ret.total}đ${_ret.pending ? ' · chờ duyệt' : ''}</span></div>` : ''}</td>
           <td class="hide-sm" data-field="date" title="Giờ tạo đơn (chính xác)" style="font-size:12px;color:var(--muted)">${orderWhen(o)}</td>
           <td class="cust-col">
             <div class="name-clamp" data-field="custName" title="Click để sửa tên KH">${o.custName || '—'}</div>
@@ -872,8 +880,15 @@
     const st = STATUS[o.status];
 
     document.getElementById('dCode').textContent = o.code;
+    const _retInfo = (function () {
+      const rs = window.STORE.get('returns', window.RETURNS || []) || [];
+      let total = 0, count = 0, pending = 0; const rItemsAll = [];
+      rs.forEach(r => { if (!r || r.orderCode !== code || r.status === 'rejected') return; count++; total += (+r.refundTotal || 0); if (r.status === 'pending') pending++; (Array.isArray(r.items) ? r.items : []).forEach(x => rItemsAll.push(`${x.name} ${x.qty}${x.unit || ''}`)); });
+      return count ? { total, count, pending, itemsTxt: rItemsAll.join(', ') } : null;
+    })();
     document.getElementById('dMeta').innerHTML = `
       <span class="status-pill st-${o.status}">${st.icon} ${st.label}</span>
+      ${_retInfo ? `<span class="status-pill" style="background:#FFEDD5;color:#B45309" title="Trả: ${(_retInfo.itemsTxt || '').replace(/"/g, '')}">↩️ Trả ${window.fmtShort(_retInfo.total)}₫${_retInfo.pending ? ' · chờ duyệt' : ''}</span>` : ''}
       ${svcList.map(svc => `<span class="svc-tag" style="background:${svc.color}20;color:${svc.color}">${svc.icon} ${svc.label}</span>`).join(' ')}
       ${tm ? `<span class="tm-tag">${tm.icon} ${tm.label}</span>` : ''}
       <span>· 🕒 ${orderWhen(o)}</span>
@@ -2691,6 +2706,7 @@ ${o.note ? `\n📝 Ghi chú: ${o.note}` : ''}
   }
   /* Subscribe + init */
   window.STORE.subscribe('orders', scheduleRender);
+  window.STORE.subscribe('returns', scheduleRender);   /* đơn bị trả → cập nhật badge "↩️ Trả" realtime */
   window.STORE.subscribe('orderQtyLocks', scheduleRender);   /* khoá SL/báo giá đổi máy khác → badge/tab realtime */
   window.STORE.subscribe('orderQuoteLocks', scheduleRender);
   window.STORE.subscribe('shippers', scheduleRender);        /* bộ lọc shipper/NV refresh trong render() */

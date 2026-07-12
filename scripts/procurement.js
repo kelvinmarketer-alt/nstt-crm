@@ -1427,7 +1427,8 @@ ${o.shortages && o.shortages.length ? `<div style="margin-top:10px;font-size:11.
   window.pcDispatch = function (code) {
     const orders = getOrders(); const o = orders.find(x => x.code === code); if (!o) return;
     o.whStatus = 'released';
-    o.status = 'pickup';   /* vào pipeline giao hàng */
+    o.status = 'transit';   /* Giao shipper = đơn sang "Đang giao" (hiện ở Bảng giao hàng cho shipper) */
+    o.transitAt = new Date().toISOString();
     S().set('orders', orders);
     /* CHỈ TẠI ĐÂY (gom xong → giao shipper) mới bắn group + phân đơn shipper.
        Dùng format chung "ĐƠN MỚI CẦN GIAO" (có shipper, chống gửi trùng). */

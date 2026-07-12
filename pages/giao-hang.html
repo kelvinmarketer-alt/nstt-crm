@@ -36,11 +36,16 @@
   .gh-empty{padding:44px 20px;text-align:center;color:var(--muted);font-size:14px}
   html.embed .gh-link-btn{display:none}
   /* Popup báo trả — chọn mặt hàng + SL */
-  .ght-row{display:flex;align-items:center;gap:10px;padding:8px 0;border-bottom:1px solid #EEF2F0}
+  .gh-count{font-size:14px;font-weight:700;color:var(--navy);padding:2px 0 2px}
+  .ght-item{border-bottom:1px solid #EEF2F0}
+  .ght-row{display:flex;align-items:center;gap:10px;padding:8px 0}
   .ght-info{flex:1;min-width:0}
   .ght-sub{font-size:11.5px;color:var(--muted);margin-top:1px}
   .ght-q{width:80px;padding:7px 8px;border:1px solid var(--line);border-radius:7px;font-size:13px;text-align:right}
   .ght-unit{font-size:12px;color:var(--muted);width:32px}
+  .ght-detail{display:flex;gap:8px;align-items:center;padding:0 0 10px 0}
+  .ght-cond{padding:7px 8px;border:1px solid var(--line);border-radius:7px;font-size:12.5px;background:#FFF7ED}
+  .ght-note{flex:1;min-width:0;padding:7px 8px;border:1px solid var(--line);border-radius:7px;font-size:12.5px}
   /* Ship mode + điện thoại: nút xuống dòng full-width, to cho dễ bấm 1 tay */
   html.embed .gh-row{flex-wrap:wrap;padding:14px 16px}
   html.embed .gh-act{width:100%}
@@ -68,7 +73,7 @@
     <div style="display:flex;align-items:center;gap:12px;margin-bottom:6px;flex-wrap:wrap">
       <div>
         <h1 style="margin:0;font-size:22px;color:var(--navy);font-weight:800">🚚 Bảng giao hàng</h1>
-        <div style="font-size:13px;color:var(--muted);margin-top:2px">Kho + shipper bấm nhanh — không cần vào chi tiết đơn. Giao xong là công nợ khách tự chốt.</div>
+        <div style="font-size:13px;color:var(--muted);margin-top:2px">Đơn <b>đang giao</b> — shipper bấm ✅ Giao xong / ↩️ Trả. Kho giao shipper ở <b>Gom hàng → ③ Xuất kho</b>.</div>
       </div>
       <div style="flex:1"></div>
       <button class="btn btn-ghost gh-link-btn" onclick="window.ghShipLinks()" title="Lấy link giao hàng riêng cho từng shipper">🔗 Link cho shipper</button>
@@ -78,8 +83,8 @@
     <div class="gh-board" id="ghBoard"><div class="gh-empty">Đang tải…</div></div>
 
     <div style="font-size:11.5px;color:var(--muted);margin-top:14px;line-height:1.5">
-      💡 <b>Chờ giao</b>: kho bấm <b>Giao shipper</b> (chọn người giao) → đơn sang <b>Đang giao</b>.
-      <b>Đang giao</b>: shipper bấm <b>✅ Giao xong</b> (chốt công nợ) hoặc <b>↩️ Trả</b> (báo thô — kho phân loại + kế toán chốt ở <a href="returns.html">Trả hàng</a>).
+      💡 Đơn hiện ở đây sau khi kho bấm <b>Giao shipper</b> tại <b>Gom hàng → ③ Xuất kho</b>.
+      Shipper bấm <b>✅ Giao xong</b> (chốt công nợ khách) hoặc <b>↩️ Trả</b> → chọn mặt hàng + SL + tình trạng → phiếu chờ kế toán duyệt ở <a href="returns.html">Trả hàng</a>.
     </div>
   </main>
 </div>

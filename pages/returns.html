@@ -132,7 +132,7 @@
     const stClr = {pending:'#92400E', refunded:'#15803D', replaced:'#1E40AF', rejected:'#B91C1C'};
     tb.innerHTML = list.slice().reverse().map(r => `<tr style="border-top:1px solid #F1F5F9">
       <td data-field="title" style="padding:10px"><b>${r.id}</b></td>
-      <td class="hide-xs" style="padding:10px"><a href="orders.html" style="color:var(--navy)">${r.orderCode}</a></td>
+      <td class="hide-xs" style="padding:10px"><a href="orders.html?open=${encodeURIComponent(r.orderCode)}" style="color:var(--navy)" title="Mở chi tiết đơn">${r.orderCode} ↗</a></td>
       <td data-field="cust" style="padding:10px">${r.custName}</td>
       <td class="hide-xs" style="padding:10px">${r.date}</td>
       <td data-field="meta" style="padding:10px;font-size:12px">
@@ -184,46 +184,54 @@
   window.approveShipReturn = function (id) {
     const r = getR().find(x => x.id === id); if (!r) { window.toast && window.toast('Không thấy phiếu', 'warn'); return; }
     const sups = window.STORE.get('suppliers', []) || [];
-    const its = (Array.isArray(r.items) && r.items.length) ? r.items : (r.item ? [{ name: r.item.name, unit: r.item.unit, qty: r.qtyReturn, total: r.refundTotal }] : []);
-    const itemHtml = its.map(x => `<li>${_esc0(x.name)} — <b>${x.qty}${x.unit || ''}</b>${x.total ? ` · ${window.fmt(x.total)}₫` : ''}</li>`).join('') || '<li>(toàn bộ đơn)</li>';
+    const its = (Array.isArray(r.items) && r.items.length) ? r.items : (r.item ? [{ name: r.item.name, unit: r.item.unit, qty: r.qtyReturn, total: r.refundTotal, cond: r.disposition === 'restock' ? 'good' : 'bad', note: r.note }] : []);
+    const custReduce = its.reduce((s, x) => s + (+x.total || 0), 0) || (+r.refundTotal || 0);
+    const badTotal = its.filter(x => (x.cond || 'bad') === 'bad').reduce((s, x) => s + (+x.total || 0), 0);
+    const itemRows = its.map(x => `<tr style="border-top:1px solid #F1F5F9">
+        <td style="padding:5px 8px">${_esc0(x.name)}${x.note ? `<div style="font-size:10.5px;color:var(--muted)">📝 ${_esc0(x.note)}</div>` : ''}</td>
+        <td style="padding:5px 8px;text-align:right;white-space:nowrap">${x.qty}${x.unit || ''}</td>
+        <td style="padding:5px 8px;white-space:nowrap">${(x.cond || 'bad') === 'good' ? '🏬 đẹp→kho' : '🗑 xấu→NCC'}</td>
+        <td style="padding:5px 8px;text-align:right;white-space:nowrap">${window.fmt(+x.total || 0)}₫</td>
+      </tr>`).join('') || '<tr><td colspan="4" style="padding:6px 8px;color:var(--muted)">(toàn bộ đơn)</td></tr>';
     const supOpts = `<option value="">— chọn nhà cung cấp —</option>` + sups.map(s => `<option value="${s.id}">${_esc0(s.name)}</option>`).join('');
     window.openModal('✓ Duyệt phiếu trả — #' + _esc0(r.orderCode), `
-      <div style="font-size:12.5px;color:var(--muted);margin-bottom:6px">Khách: <b>${_esc0(r.custName)}</b> · shipper báo</div>
-      <ul style="margin:0 0 12px 18px;font-size:13px;line-height:1.6">${itemHtml}</ul>
-      <div style="margin-bottom:10px"><label style="font-size:12px;color:var(--muted);display:block;margin-bottom:5px">Xử lý hàng</label>
-        <label style="margin-right:16px;font-size:13px"><input type="radio" name="apDisp" value="restock" ${r.disposition === 'restock' ? 'checked' : ''}> 🏬 Nhập lại kho</label>
-        <label style="font-size:13px"><input type="radio" name="apDisp" value="discard" ${r.disposition !== 'restock' ? 'checked' : ''}> 🗑 Bỏ hao hụt</label>
+      <div style="font-size:12.5px;color:var(--muted);margin-bottom:8px">Khách: <b>${_esc0(r.custName)}</b> · shipper báo · Đơn: <a href="orders.html?open=${encodeURIComponent(r.orderCode)}" style="color:var(--navy);font-weight:700">#${_esc0(r.orderCode)} ↗</a></div>
+      <table style="width:100%;border-collapse:collapse;font-size:12.5px;border:1px solid var(--line);border-radius:8px;overflow:hidden;margin-bottom:12px">
+        <thead><tr style="background:#F8FAF8;color:var(--muted);font-size:11px;text-transform:uppercase">
+          <th style="padding:6px 8px;text-align:left">Mặt hàng / ghi chú</th><th style="padding:6px 8px;text-align:right">SL trả</th><th style="padding:6px 8px;text-align:left">Xử lý</th><th style="padding:6px 8px;text-align:right">Tiền</th>
+        </tr></thead><tbody>${itemRows}</tbody>
+      </table>
+      <div style="background:#F0FDF4;border:1px solid #BBF7D0;border-radius:8px;padding:10px 12px;margin-bottom:12px;font-size:13px">
+        <div style="display:flex;justify-content:space-between;margin-bottom:4px"><span>➖ Giảm hoá đơn khách (công nợ KH −)</span><b style="color:#B45309">${window.fmt(custReduce)}₫</b></div>
+        <div style="display:flex;justify-content:space-between"><span>🏭 Trả NCC — hàng xấu (công nợ NCC −)</span><b style="color:#B45309">${window.fmt(badTotal)}₫</b></div>
       </div>
-      <div style="margin-bottom:10px"><label style="font-size:12px;color:var(--muted);display:block;margin-bottom:4px">Lỗi do</label>
-        <select id="apFault" onchange="document.getElementById('apSupWrap').style.display=this.value==='supplier'?'block':'none'" style="width:100%;box-sizing:border-box;padding:8px;border:1px solid var(--line);border-radius:7px;font-size:13px">
-          <option value="customer" ${r.fault === 'customer' ? 'selected' : ''}>👤 Khách / không đòi ai</option>
-          <option value="supplier" ${r.fault === 'supplier' ? 'selected' : ''}>🏭 Nhà cung cấp (trừ nợ NCC)</option>
-          <option value="shipping" ${r.fault === 'shipping' ? 'selected' : ''}>🚚 Vận chuyển</option>
-        </select>
-      </div>
-      <div id="apSupWrap" style="display:${r.fault === 'supplier' ? 'block' : 'none'};margin-bottom:10px">
-        <label style="font-size:12px;color:var(--muted);display:block;margin-bottom:4px">Nhà cung cấp + số tiền trừ nợ</label>
+      ${badTotal > 0 ? `<div style="margin-bottom:10px">
+        <label style="font-size:12px;color:var(--muted);display:block;margin-bottom:4px">Nhà cung cấp nhận hàng xấu + số tiền trừ nợ <b>(sửa thành GIÁ NHẬP cho chuẩn)</b></label>
         <select id="apSup" style="width:100%;box-sizing:border-box;padding:8px;border:1px solid var(--line);border-radius:7px;font-size:13px;margin-bottom:6px">${supOpts}</select>
-        <input id="apAmt" type="number" value="${+r.refundTotal || 0}" style="width:100%;box-sizing:border-box;padding:8px;border:1px solid var(--line);border-radius:7px;font-size:13px" placeholder="Số tiền đòi NCC (đ)">
-      </div>
-      <div style="font-size:11.5px;color:var(--muted)">Duyệt → gỡ mặt hàng khỏi hoá đơn KH (<b>công nợ KH tự giảm</b>) + (nếu lỗi NCC) <b>trừ công nợ NCC</b>. Không hoàn tiền mặt.</div>
+        <input id="apAmt" type="number" value="${badTotal}" style="width:100%;box-sizing:border-box;padding:8px;border:1px solid var(--line);border-radius:7px;font-size:13px" placeholder="Số tiền trừ nợ NCC (đ)">
+      </div>` : '<div style="font-size:12px;color:var(--muted);margin-bottom:10px">Không có hàng xấu → không trừ nợ NCC. Hàng đẹp sẽ nhập lại kho.</div>'}
+      <div style="font-size:11.5px;color:var(--muted)">Duyệt → gỡ mặt hàng khỏi hoá đơn KH (công nợ KH tự giảm) + nhập kho hàng đẹp + trừ nợ NCC hàng xấu. Tất cả bằng <b>công nợ</b>, không tiền mặt.</div>
     `, {
-      width: '470px',
+      width: '540px',
       footer: `<button class="btn btn-ghost" onclick="window.rejectShipReturn('${r.id}')">✕ Từ chối</button>
                <button class="btn btn-primary" onclick="window._apCommit('${r.id}')">✓ Duyệt &amp; xử lý</button>`
     });
   };
   window._apCommit = function (id) {
     const list = getR(); const r = list.find(x => x.id === id); if (!r) return;
-    r.disposition = (document.querySelector('input[name="apDisp"]:checked') || {}).value || 'discard';
-    r.fault = (document.getElementById('apFault') || {}).value || 'customer';
+    const its = (Array.isArray(r.items) && r.items.length) ? r.items : [];
+    const badTotal = its.filter(x => (x.cond || 'bad') === 'bad').reduce((s, x) => s + (+x.total || 0), 0);
     r.refundMode = 'debt';
-    if (r.fault === 'supplier') {
+    if (badTotal > 0) {
       const sid = (document.getElementById('apSup') || {}).value || '';
+      if (!sid && !confirm('Chưa chọn nhà cung cấp cho hàng xấu → sẽ KHÔNG trừ nợ NCC (chỉ giảm hoá đơn khách). Vẫn duyệt?')) return;
+      r.fault = 'supplier';
       r.supplierId = sid;
       r.supplierName = sid ? ((window.STORE.get('suppliers', []) || []).find(s => s.id === sid) || {}).name || '' : '';
       r.supClaimAmount = parseInt((document.getElementById('apAmt') || {}).value) || 0;
-    } else { r.supplierId = ''; r.supplierName = ''; r.supClaimAmount = 0; }
+    } else {
+      r.fault = 'customer'; r.supplierId = ''; r.supplierName = ''; r.supClaimAmount = 0;
+    }
     window.STORE.set('returns', list);
     window.closeModal && window.closeModal();
     window.processReturn(id, true);   /* đã xác nhận qua popup → khỏi confirm lần nữa */
@@ -321,6 +329,8 @@
     const rItems = (Array.isArray(r.items) && r.items.length)
       ? r.items
       : (r.item ? [{ id: r.item.id, name: r.item.name, unit: r.item.unit, qty: +r.qtyReturn || 0, price: +r.item.price || 0 }] : []);
+    /* Tổng tiền hàng XẤU (trả NCC) — dùng làm mức trừ nợ NCC mặc định/fallback (KHÔNG lấy cả hàng đẹp) */
+    const badTotalR = rItems.filter(x => (x.cond || 'bad') === 'bad').reduce((s, x) => s + (+x.total || 0), 0);
     const res = r.resolution || 'refund';
     const resLbl = res === 'refund'
       ? `TRỪ hoá đơn ${window.fmt(r.refundTotal)}₫ (${r.refundMode === 'cash' ? 'tiền mặt' : 'giảm nợ'})`
@@ -337,11 +347,14 @@
 
     const msgs = [];
 
-    /* 1) Nhập lại kho nếu hàng còn dùng được (đẹp) — lặp mọi mặt hàng trả */
-    if (r.disposition === 'restock' && rItems.length) {
+    /* 1) Nhập lại kho theo TÌNH TRẠNG từng SP: hàng ĐẸP (cond='good') → +kho; hàng XẤU → bỏ (trả NCC).
+       Phiếu tay cũ không có cond → theo r.disposition chung. */
+    if (rItems.length) {
       const inv = window.STORE.get('inventory', []) || [];
+      let anyRestock = false;
       rItems.forEach((ri, k) => {
-        if (!ri.id || !(ri.qty > 0)) return;
+        const isGood = ri.cond ? ri.cond === 'good' : (r.disposition === 'restock');
+        if (!isGood || !ri.id || !(ri.qty > 0)) return;
         let item = inv.find(x => x.productId === ri.id);
         if (!item) {
           item = { id:'INV'+Math.floor(performance.now()).toString(36)+k, productId:ri.id, stock:0, minStock:10, maxStock:100, avgDaily:5, lastIn:'', lastOut:'', location:'Kho A1' };
@@ -349,9 +362,10 @@
         }
         item.stock = Math.max(0, (item.stock||0) + ri.qty);
         item.lastIn = r.date;
+        anyRestock = true;
         msgs.push(`+${ri.qty}${ri.unit||'kg'} ${ri.name} vào kho`);
       });
-      window.STORE.set('inventory', inv);
+      if (anyRestock) window.STORE.set('inventory', inv);
     }
 
     /* 2) Giải quyết theo CÁCH XỬ LÝ */
@@ -431,7 +445,7 @@
 
     /* 3) Lỗi NCC → tạo khoản đòi lại NCC */
     if (r.fault === 'supplier' && r.supplierId) {
-      const claimAmt = +r.supClaimAmount || +r.refundTotal || 0;   /* ưu tiên giá NHẬP; fallback giá bán */
+      const claimAmt = +r.supClaimAmount || badTotalR || +r.refundTotal || 0;   /* kế toán nhập; fallback = tiền hàng XẤU (không gồm hàng đẹp) */
       const claims = window.STORE.get('supplierClaims', []) || [];
       claims.unshift({
         id:'CL'+Date.now().toString(36), supplierId:r.supplierId, supplierName:r.supplierName,
