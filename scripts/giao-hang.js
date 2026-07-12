@@ -228,24 +228,52 @@
   }
   window.ghShipLinks = function () {
     const base = location.origin + location.pathname;
-    const item = (label, url) => `<div style="display:flex;gap:8px;align-items:center;padding:9px 0;border-bottom:1px solid #EEF2F0">
+    const item = (label, url, guestId) => `<div style="display:flex;gap:8px;align-items:center;padding:9px 0;border-bottom:1px solid #EEF2F0">
         <div style="flex:1;min-width:0"><b>${label}</b><div style="font-size:11px;color:var(--muted);word-break:break-all;margin-top:1px">${esc(url)}</div></div>
         <button class="btn btn-ghost btn-sm" data-u="${esc(url)}" onclick="window._ghCopy(this.getAttribute('data-u'))" style="flex-shrink:0">📋 Copy</button>
+        ${guestId ? `<button class="btn btn-ghost btn-sm" onclick="window.ghRemoveGuest('${guestId}')" title="Xoá ship ngoài (link hết hiệu lực)" style="flex-shrink:0;color:#DC2626">🗑</button>` : ''}
       </div>`;
     const list = shippers();
     /* Đảm bảo mỗi shipper có 1 token cố định (sinh 1 lần, lưu vào hồ sơ shipper) */
     const withTok = list.map(s => {
       let tok = s.linkToken;
       if (!tok) { tok = _mkToken(); S().update('shippers', s.id, { linkToken: tok }); }
-      return { name: s.name, tok };
+      return { id: s.id, name: s.name, tok, guest: !!s.guest };
     });
-    const rows = withTok.length ? withTok.map(s => item('🛵 ' + esc(s.name), base + '?ship=' + s.tok)).join('')
-      : '<div style="color:var(--muted);padding:8px 0">Chưa có shipper — thêm ở trang Shipper.</div>';
+    const perm = withTok.filter(s => !s.guest);
+    const guests = withTok.filter(s => s.guest);
+    const permRows = perm.length ? perm.map(s => item('🛵 ' + esc(s.name), base + '?ship=' + s.tok)).join('')
+      : '<div style="color:var(--muted);padding:6px 0;font-size:12px">Chưa có shipper cố định — thêm ở trang <a href="shippers.html">Shipper</a>.</div>';
+    const guestRows = guests.map(s => item('🧑‍🔧 ' + esc(s.name) + ' <span style="font-size:10px;color:#B45309;background:#FEF3C7;padding:0 6px;border-radius:10px;font-weight:700">ngoài</span>', base + '?ship=' + s.tok, s.id)).join('');
     window.openModal('🔗 Link giao hàng cho shipper', `
-      <div style="font-size:12.5px;color:var(--muted);margin-bottom:10px">Mỗi shipper 1 link <b>RIÊNG có mã bảo mật</b> — chỉ thấy + xác nhận đơn <b>của mình</b>, KHÔNG đụng được đơn người khác (không sửa tên trên link để xem đơn người khác được). Gửi Zalo/SMS, bảo họ ⭐ lưu.</div>
-      ${rows}
+      <div style="font-size:12.5px;color:var(--muted);margin-bottom:10px">Mỗi shipper 1 link <b>RIÊNG có mã bảo mật</b> — chỉ thấy + xác nhận đơn <b>của mình</b>, không xem được đơn người khác. Gửi Zalo/SMS, bảo họ ⭐ lưu.</div>
+      <div style="font-size:11px;color:var(--muted);text-transform:uppercase;margin-bottom:2px;font-weight:700">🛵 Shipper cố định</div>
+      ${permRows}
+      <div style="font-size:11px;color:var(--muted);text-transform:uppercase;margin:14px 0 2px;font-weight:700">🧑‍🔧 Ship ngoài (thuê tạm lúc nhiều đơn)</div>
+      ${guestRows}
+      <div style="display:flex;gap:6px;margin:8px 0 3px">
+        <input id="ghGuestName" placeholder="Tên ship ngoài (vd: A Hùng xe ôm - 09xx)" autocomplete="off" style="flex:1;box-sizing:border-box;padding:8px 10px;border:1px solid var(--line);border-radius:7px;font-size:13px">
+        <button class="btn btn-primary btn-sm" onclick="window.ghAddGuestShipper()" style="white-space:nowrap">➕ Tạo link</button>
+      </div>
+      <div style="font-size:11px;color:var(--muted);margin-bottom:10px">Tạo xong link hiện ngay ở trên → copy gửi họ. Rồi vào từng đơn bấm <b>✎ gán</b> chọn tên người này để đơn hiện trên link của họ. Giao xong xoá 🗑 cho gọn.</div>
       ${item('🏬 Link kho (xem TẤT CẢ đơn đang giao)', base + '?mode=ship')}
-    `, { width: '520px', footer: `<button class="btn btn-primary" onclick="window.closeModal()">Xong</button>` });
+    `, { width: '540px', footer: `<button class="btn btn-primary" onclick="window.closeModal()">Xong</button>` });
+  };
+  window.ghAddGuestShipper = function () {
+    const el = document.getElementById('ghGuestName');
+    const name = el ? el.value.trim() : '';
+    if (!name) { window.toast && window.toast('Nhập tên ship ngoài', 'warn'); return; }
+    S().add('shippers', { id: 'SHPG' + Date.now().toString(36).toUpperCase(), name, phone: '', active: true, guest: true, linkToken: _mkToken(), createdAt: nowISO() });
+    window.toast && window.toast('➕ Đã tạo ship ngoài: ' + name, 'success');
+    if (window.closeModal) window.closeModal();
+    setTimeout(() => window.ghShipLinks(), 130);   /* mở lại modal để hiện link mới */
+  };
+  window.ghRemoveGuest = function (id) {
+    if (!confirm('Xoá ship ngoài này? Link của họ sẽ hết hiệu lực.')) return;
+    S().remove('shippers', id);
+    window.toast && window.toast('Đã xoá ship ngoài', 'info');
+    if (window.closeModal) window.closeModal();
+    setTimeout(() => window.ghShipLinks(), 130);
   };
   window._ghCopy = function (t) {
     if (navigator.clipboard && navigator.clipboard.writeText) {
