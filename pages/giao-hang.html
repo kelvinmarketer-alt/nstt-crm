@@ -14,30 +14,36 @@
   .gh-tab b{display:inline-block;margin-left:4px;background:#EEF2F0;color:var(--navy);border-radius:20px;padding:0 8px;font-size:12px}
   .gh-tab.active{border-color:var(--red);color:var(--navy);background:#F0FDF4}
   .gh-tab.active b{background:var(--red);color:#fff}
-  .gh-board{display:grid;grid-template-columns:repeat(auto-fill,minmax(280px,1fr));gap:12px}
-  .gh-card{border:1px solid var(--line);border-radius:12px;background:#fff;padding:13px 14px;box-shadow:0 1px 3px rgba(16,24,40,.05);display:flex;flex-direction:column;gap:6px}
-  .gh-top{display:flex;align-items:center;gap:8px;flex-wrap:wrap}
-  .gh-code{font-size:12px;font-weight:800;color:var(--red);background:#F0FDF4;padding:1px 7px;border-radius:6px}
-  .gh-cust{font-size:15px;font-weight:800;color:var(--navy);flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+  .gh-board{display:flex;flex-direction:column;border:1px solid var(--line);border-radius:12px;overflow:hidden;background:#fff}
+  .gh-row{display:flex;align-items:center;gap:14px;padding:12px 16px;border-bottom:1px solid #EEF2F0}
+  .gh-row:last-child{border-bottom:0}
+  .gh-row:hover{background:#FAFBFA}
+  .gh-main{flex:1;min-width:0}
+  .gh-title{display:flex;align-items:center;gap:8px;flex-wrap:wrap;font-size:14.5px;color:var(--navy)}
+  .gh-code{font-size:11.5px;font-weight:800;color:var(--red);background:#F0FDF4;padding:1px 7px;border-radius:6px}
+  .gh-cust{font-weight:800}
   .gh-flag{font-size:10.5px;font-weight:800;color:#B45309;background:#FEF3C7;padding:1px 7px;border-radius:20px}
-  .gh-line{font-size:12.5px;color:#475467;line-height:1.45}
-  .gh-items{color:#334155}
-  .gh-money{font-weight:800;color:var(--navy);margin-left:4px}
-  .gh-ship{font-size:12.5px;font-weight:700;color:#0EA5E9}
+  .gh-meta{font-size:12.5px;color:#667085;margin-top:3px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+  .gh-money{font-weight:800;color:var(--navy)}
+  .gh-ship{font-weight:700;color:#0EA5E9}
   .gh-noship{color:#B45309}
-  .gh-btn{border:0;border-radius:10px;padding:13px;font-size:15px;font-weight:800;cursor:pointer;color:#fff;width:100%;margin-top:4px}
+  .gh-act{display:flex;gap:8px;flex-shrink:0}
+  .gh-btn{border:0;border-radius:9px;padding:10px 15px;font-size:13.5px;font-weight:800;cursor:pointer;color:#fff;white-space:nowrap}
+  .gh-btn:active{transform:scale(.97)}
   .gh-go{background:#0EA5E9}
-  .gh-actions{display:flex;gap:8px;margin-top:4px}
-  .gh-done{background:#15803D;flex:2}
-  .gh-ret{background:#EA580C;flex:1}
-  .gh-empty{grid-column:1/-1;padding:40px 20px;text-align:center;color:var(--muted);font-size:14px;border:1px dashed var(--line);border-radius:12px;background:#FAFAFB}
-  .gh-btn:active{transform:scale(.98)}
-  /* Ship mode: nút to hơn cho thao tác 1 tay */
-  html.embed .gh-board{grid-template-columns:1fr}
-  html.embed .gh-btn{padding:16px;font-size:16px}
-  html.embed .gh-card{padding:15px}
+  .gh-done{background:#15803D}
+  .gh-ret{background:#EA580C}
+  .gh-empty{padding:44px 20px;text-align:center;color:var(--muted);font-size:14px}
+  html.embed .gh-link-btn{display:none}
+  /* Ship mode + điện thoại: nút xuống dòng full-width, to cho dễ bấm 1 tay */
+  html.embed .gh-row{flex-wrap:wrap;padding:14px 16px}
+  html.embed .gh-act{width:100%}
+  html.embed .gh-btn{flex:1;padding:15px;font-size:15px}
   @media (max-width:560px){
-    .gh-board{grid-template-columns:1fr}
+    .gh-row{flex-wrap:wrap}
+    .gh-act{width:100%}
+    .gh-btn{flex:1;padding:13px}
+    .gh-meta{white-space:normal}
     .gh-tab{font-size:13px;min-width:0}
   }
 </style>
@@ -58,6 +64,8 @@
         <h1 style="margin:0;font-size:22px;color:var(--navy);font-weight:800">🚚 Bảng giao hàng</h1>
         <div style="font-size:13px;color:var(--muted);margin-top:2px">Kho + shipper bấm nhanh — không cần vào chi tiết đơn. Giao xong là công nợ khách tự chốt.</div>
       </div>
+      <div style="flex:1"></div>
+      <button class="btn btn-ghost gh-link-btn" onclick="window.ghShipLinks()" title="Lấy link giao hàng riêng cho từng shipper">🔗 Link cho shipper</button>
     </div>
 
     <div class="gh-tabs" id="ghTabs"></div>

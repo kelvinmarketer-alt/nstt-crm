@@ -41,26 +41,33 @@
   const esc = s => String(s == null ? '' : s).replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
   const shortAddr = a => { a = String(a || '').trim(); return a.length > 46 ? a.slice(0, 44) + '…' : (a || '—'); };
 
-  /* ===== Card 1 đơn ===== */
+  /* ===== 1 dòng đơn (list) ===== */
   function cardHtml(o) {
     const cust = esc(o.custName || o.custId || 'Khách');
-    const money = o.freight ? `<span class="gh-money">${fmt(o.freight)}₫</span>` : '';
-    const ship = o.driverName ? `<span class="gh-ship">🛵 ${esc(o.driverName)}</span>` : `<span class="gh-ship gh-noship">🛵 chưa gán</span>`;
+    const money = o.freight ? ` · <span class="gh-money">${fmt(o.freight)}₫</span>` : '';
     const flag = o.returnPending ? `<span class="gh-flag">🚩 đã báo trả</span>` : '';
-    const top = `<div class="gh-top"><span class="gh-code">#${esc(o.code)}</span><span class="gh-cust">${cust}</span>${flag}</div>`;
-    const info = `<div class="gh-line">📍 ${esc(shortAddr(o.drop))}</div>
-                  <div class="gh-line gh-items">📦 ${esc(itemsSummary(o))} ${money}</div>`;
+    const head = `<div class="gh-title"><span class="gh-code">#${esc(o.code)}</span><b class="gh-cust">${cust}</b>${flag}</div>`;
     if (TAB === 'wait') {
-      return `<div class="gh-card">${top}${info}
-        <button class="gh-btn gh-go" onclick="ghGiaoShipper('${esc(o.code)}')">🚚 GIAO SHIPPER</button>
+      return `<div class="gh-row">
+        <div class="gh-main">${head}
+          <div class="gh-meta">📍 ${esc(shortAddr(o.drop))} · 📦 ${esc(itemsSummary(o))}${money}</div>
+        </div>
+        <div class="gh-act">
+          <button class="gh-btn gh-go" onclick="ghGiaoShipper('${esc(o.code)}')">🚚 Giao shipper</button>
+        </div>
       </div>`;
     }
     /* Đang giao */
-    return `<div class="gh-card">${top}${info}<div class="gh-line">${ship}</div>
-      <div class="gh-actions">
-        <button class="gh-btn gh-done" onclick="ghGiaoXong('${esc(o.code)}')">✅ GIAO XONG</button>
-        <button class="gh-btn gh-ret" onclick="ghBaoTra('${esc(o.code)}')">↩️ TRẢ</button>
-      </div></div>`;
+    const ship = o.driverName ? `<span class="gh-ship">🛵 ${esc(o.driverName)}</span>` : `<span class="gh-ship gh-noship">🛵 chưa gán</span>`;
+    return `<div class="gh-row">
+      <div class="gh-main">${head}
+        <div class="gh-meta">📍 ${esc(shortAddr(o.drop))} · 📦 ${esc(itemsSummary(o))}${money} · ${ship}</div>
+      </div>
+      <div class="gh-act">
+        <button class="gh-btn gh-done" onclick="ghGiaoXong('${esc(o.code)}')">✅ Giao xong</button>
+        <button class="gh-btn gh-ret" onclick="ghBaoTra('${esc(o.code)}')">↩️ Trả</button>
+      </div>
+    </div>`;
   }
 
   /* ===== Render toàn bảng ===== */
@@ -151,6 +158,33 @@
     window.toast && window.toast('↩️ Đã báo trả ' + code + ' — kho/kế toán sẽ chốt', 'warn');
     if (window.sendTgMessage) window.sendTgMessage('alert', `↩️ SHIP BÁO TRẢ HÀNG\n📦 ${code} · ${o.custName || ''}${note ? '\n📝 ' + note : ''}\n👉 Kho phân loại + Kế toán chốt ở module Trả hàng.`);
     render();
+  };
+
+  /* ===== Link giao hàng riêng cho từng shipper (kho copy gửi Zalo/SMS) ===== */
+  window.ghShipLinks = function () {
+    const base = location.origin + location.pathname;
+    const mk = name => base + '?mode=ship' + (name ? '&me=' + encodeURIComponent(name) : '');
+    const item = (label, url) => `<div style="display:flex;gap:8px;align-items:center;padding:9px 0;border-bottom:1px solid #EEF2F0">
+        <div style="flex:1;min-width:0"><b>${label}</b><div style="font-size:11px;color:var(--muted);word-break:break-all;margin-top:1px">${esc(url)}</div></div>
+        <button class="btn btn-ghost btn-sm" data-u="${esc(url)}" onclick="window._ghCopy(this.getAttribute('data-u'))" style="flex-shrink:0">📋 Copy</button>
+      </div>`;
+    const list = shippers();
+    const rows = list.length
+      ? list.map(s => item('🛵 ' + esc(s.name), mk(s.name))).join('')
+      : '<div style="color:var(--muted);padding:8px 0">Chưa có shipper — thêm ở trang Shipper.</div>';
+    window.openModal('🔗 Link giao hàng cho shipper', `
+      <div style="font-size:12.5px;color:var(--muted);margin-bottom:10px">Copy link gửi cho từng shipper (Zalo/SMS). Shipper mở link trên điện thoại → chỉ thấy đơn <b>đang giao của mình</b> → bấm <b>✅ Giao xong</b>. Bảo shipper ⭐ lưu (bookmark) để lần sau mở nhanh.</div>
+      ${rows}
+      ${item('📋 Tất cả (không lọc tên)', mk(''))}
+    `, { width: '500px', footer: `<button class="btn btn-primary" onclick="window.closeModal()">Xong</button>` });
+  };
+  window._ghCopy = function (t) {
+    if (navigator.clipboard && navigator.clipboard.writeText) {
+      navigator.clipboard.writeText(t).then(
+        () => window.toast && window.toast('📋 Đã copy link', 'success'),
+        () => window.prompt('Copy link (Ctrl+C):', t)
+      );
+    } else { window.prompt('Copy link (Ctrl+C):', t); }
   };
 
   /* ===== Init ===== */

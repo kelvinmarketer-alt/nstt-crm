@@ -260,7 +260,7 @@
 
     if (!rows.length) {
       document.getElementById('tbody').innerHTML =
-        `<tr><td colspan="11" style="padding:40px;text-align:center;color:var(--muted)">Không có đơn nào khớp.</td></tr>`;
+        `<tr><td colspan="10" style="padding:40px;text-align:center;color:var(--muted)">Không có đơn nào khớp.</td></tr>`;
       return;
     }
 
@@ -310,10 +310,6 @@
               return kg + (nGoods ? ` <span style="color:var(--muted)">· ${nGoods} mã</span>` : '');
             })()}</td>
           <td class="num" data-field="freight" title="Click để sửa tiền hàng">${window.fmt(o.freight || 0)}</td>
-          <td class="hide-md ocol-x" style="font-size:12px">
-            <div><span data-field="driverName" title="Click để đổi shipper">${o.driverName || '—'}</span>${o.external?' <span class="alert-badge warn" style="font-size:9px">ĐT ngoài</span>':''}</div>
-            <div style="color:var(--muted);font-size:11px">${o.vehicle || ''}${o.external && o.partnerCost?' · '+window.fmtShort(o.partnerCost)+'đ':''}</div>
-          </td>
           <td class="ocol-x" onclick="event.stopPropagation()">
             <select class="status-select status-select-${statusKey}" data-code="${o.code}" data-act="status"
               title="Đổi trạng thái đơn"
@@ -335,7 +331,7 @@
         return ''; /* skip đơn lỗi, không break cả map */
       }
     }).join('') + (_totalPages > 1
-      ? `<tr class="ord-pager"><td colspan="11" style="padding:12px 14px;background:#F8FAF8">
+      ? `<tr class="ord-pager"><td colspan="10" style="padding:12px 14px;background:#F8FAF8">
            <div style="display:flex;align-items:center;justify-content:center;gap:6px;flex-wrap:wrap;font-size:13px">
              <button class="btn btn-ghost btn-sm" ${_page <= 1 ? 'disabled' : ''} onclick="window.orderGotoPage(1)">« Đầu</button>
              <button class="btn btn-ghost btn-sm" ${_page <= 1 ? 'disabled' : ''} onclick="window.orderGotoPage(${_page - 1})">‹ Trước</button>
@@ -344,7 +340,7 @@
              <button class="btn btn-ghost btn-sm" ${_page >= _totalPages ? 'disabled' : ''} onclick="window.orderGotoPage(${_totalPages})">Cuối »</button>
              <span style="color:var(--muted);margin-left:8px">${_from + 1}–${Math.min(_from + _perPage, rows.length)} / ${rows.length} đơn</span>
            </div></td></tr>`
-      : `<tr><td colspan="11" style="padding:8px 14px;background:#F8FAF8;text-align:center;color:var(--muted);font-size:12px">${rows.length} đơn</td></tr>`);
+      : `<tr><td colspan="10" style="padding:8px 14px;background:#F8FAF8;text-align:center;color:var(--muted);font-size:12px">${rows.length} đơn</td></tr>`);
 
     document.querySelectorAll('#tbody tr[data-code]').forEach(tr => {
       tr.onclick = () => openOrder(tr.dataset.code);
@@ -2433,7 +2429,6 @@ CHỈ TRẢ JSON, không giải thích gì thêm.`;
     { idx: 4, key: 'drop',     label: 'Giao đến' },
     { idx: 5, key: 'goods',    label: 'Hàng' },
     { idx: 6, key: 'freight',  label: 'Tiền hàng' },
-    { idx: 7, key: 'shipper',  label: 'Shipper / Xe' },
   ];
   function getOrdColPrefs() {
     const p = window.STORE.get('ordColPrefs', null);
