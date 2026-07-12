@@ -36,11 +36,13 @@
     const cust = esc(o.custName || o.custId || 'Khách');
     const money = o.freight ? ` · <span class="gh-money">${fmt(o.freight)}₫</span>` : '';
     const ship = o.driverName ? `<span class="gh-ship">🛵 ${esc(o.driverName)}</span>` : `<span class="gh-ship gh-noship">🛵 chưa gán</span>`;
+    const podN = ((S().get('pod_photos', {}) || {})[o.code] || []).length;
     return `<div class="gh-row">
       <div class="gh-main">
         <div class="gh-title"><span class="gh-code">#${esc(o.code)}</span><b class="gh-cust">${cust}</b></div>
         <div class="gh-meta">📍 ${esc(shortAddr(o.drop))} · 📦 ${esc(itemsSummary(o))}${money} · ${ship}
-          <a href="javascript:void(0)" onclick="ghAssignShipper('${esc(o.code)}')" style="color:#0EA5E9;font-size:11px;margin-left:2px;white-space:nowrap">✎ gán</a></div>
+          <a href="javascript:void(0)" onclick="ghAssignShipper('${esc(o.code)}')" style="color:#0EA5E9;font-size:11px;margin-left:2px;white-space:nowrap">✎ gán</a>
+          <a href="javascript:void(0)" onclick="ghAddPhoto('${esc(o.code)}')" style="color:${podN ? '#15803D' : '#0EA5E9'};font-size:11px;margin-left:6px;white-space:nowrap" title="Chụp/chọn ảnh giao hàng (bằng chứng)">📷 Ảnh${podN ? ' (' + podN + ')' : ''}</a></div>
       </div>
       <div class="gh-act">
         <button class="gh-btn gh-done" onclick="ghGiaoXong('${esc(o.code)}')">✅ Giao xong</button>
@@ -214,6 +216,49 @@
     } else { window.prompt('Copy link (Ctrl+C):', t); }
   };
 
+  /* ===== POD: shipper chụp/chọn ảnh lúc giao (lưu pod_photos[orderCode]) ===== */
+  window.ghAddPhoto = function (code) {
+    window._ghPhotoCode = code;
+    const inp = document.getElementById('ghPhoto');
+    if (inp) { inp.value = ''; inp.click(); }
+  };
+  function _resizeImg(file, cb) {
+    const fr = new FileReader();
+    fr.onload = e => {
+      const img = new Image();
+      img.onload = () => {
+        const max = 1000; let w = img.width, h = img.height;
+        if (w > max || h > max) { if (w >= h) { h = Math.round(h * max / w); w = max; } else { w = Math.round(w * max / h); h = max; } }
+        const cv = document.createElement('canvas'); cv.width = w; cv.height = h;
+        cv.getContext('2d').drawImage(img, 0, 0, w, h);
+        try { cb(cv.toDataURL('image/jpeg', 0.6)); } catch (_) { cb(e.target.result); }
+      };
+      img.onerror = () => cb(e.target.result);
+      img.src = e.target.result;
+    };
+    fr.readAsDataURL(file);
+  }
+  function _ghPhotoPicked(ev) {
+    const code = window._ghPhotoCode; const files = Array.from(ev.target.files || []);
+    if (!code || !files.length) return;
+    const urls = []; let done = 0;
+    files.forEach(f => _resizeImg(f, dataURL => {
+      urls.push(dataURL); done++;
+      if (done !== files.length) return;
+      const ts = (window.viToday ? window.viToday() : new Date().toLocaleDateString('vi-VN'));
+      const by = (window.CURRENT_USER && window.CURRENT_USER.name) || 'shipper';
+      const add = urls.map(u => ({ dataURL: u, ts, by }));
+      /* rmwKv: áp vào giá trị cloud mới nhất → KHÔNG ghi đè ảnh của đơn khác (pod_photos là KV) */
+      if (S().rmwKv) {
+        S().rmwKv('pod_photos', pods => { pods = pods || {}; if (!Array.isArray(pods[code])) pods[code] = []; pods[code].push(...add); return pods; }, {});
+      } else {
+        const pods = S().get('pod_photos', {}) || {}; if (!Array.isArray(pods[code])) pods[code] = []; pods[code].push(...add); S().set('pod_photos', pods);
+      }
+      window.toast && window.toast('📷 Đã lưu ' + add.length + ' ảnh giao cho ' + code, 'success');
+      setTimeout(render, 60);
+    }));
+  }
+
   /* ===== Init ===== */
   function init() {
     if (SHIP_MODE) {
@@ -223,10 +268,12 @@
     } else if (window.renderAppShell) {
       window.renderAppShell('giao-hang', 'Bảng giao hàng');
     }
+    const _ghp = document.getElementById('ghPhoto'); if (_ghp) _ghp.onchange = _ghPhotoPicked;
     render();
     S().subscribe('orders', render);
-    S().subscribe('__preloaded__', k => { if (k === 'orders' || k === 'shippers') render(); });
-    setTimeout(() => S().get('orders', window.ORDERS || []), 300);
+    S().subscribe('pod_photos', render);   /* cập nhật số đếm 📷 Ảnh (N) */
+    S().subscribe('__preloaded__', k => { if (k === 'orders' || k === 'shippers' || k === 'pod_photos') render(); });
+    setTimeout(() => { S().get('orders', window.ORDERS || []); S().get('pod_photos', {}); }, 300);
   }
   if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', init);
   else init();

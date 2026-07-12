@@ -57,7 +57,6 @@
         <div style="font-size:13px;color:var(--muted);margin-top:2px">Quản lý đơn trả + ảnh chứng minh giao (Proof of Delivery)</div>
       </div>
       <div class="ret-head-spacer" style="flex:1"></div>
-      <button class="btn btn-ghost ret-head-btn" onclick="document.getElementById('podSection').scrollIntoView()">📷 Đến POD</button>
       <button class="btn btn-primary ret-head-btn" onclick="window.openReturnModal()">+ Ghi nhận trả hàng</button>
     </div>
     <div id="hbHost" class="ret-procbanner"></div>
@@ -81,19 +80,14 @@
       </table>
     </div>
 
-    <h3 id="podSection" style="margin:24px 0 8px;font-size:13px;color:var(--navy);text-transform:uppercase;font-weight:700">📷 POD — Ảnh chứng minh giao hàng <span id="hb2"></span></h3>
-    <div id="podHelpHost"></div>
-    <div style="background:#fff;border:1px solid var(--line);border-radius:10px;padding:14px">
-      <p style="font-size:13px;margin:0 0 10px;color:var(--muted)">Chọn 1 đơn đã giao để upload ảnh POD (chữ ký KH / ảnh giao hàng tại bếp / hoá đơn ký nhận).</p>
-      <div class="pod-search" style="display:flex;gap:8px;margin-bottom:14px">
-        <input id="podOrder" class="pod-search-sel" list="podOrderList" autocomplete="off" placeholder="Gõ mã đơn / tên KH để tìm..." style="flex:1;border:1px solid var(--line);border-radius:7px;padding:7px 10px;font-size:13px">
-        <datalist id="podOrderList"></datalist>
-        <input type="file" id="podFile" accept="image/*" capture="environment" style="display:none">
-        <button class="btn btn-primary pod-search-btn" onclick="document.getElementById('podFile').click()">📷 Chụp / Chọn ảnh</button>
-      </div>
-      <div id="podPreview" style="font-size:12px;color:var(--muted)">Chưa chọn ảnh</div>
-      <div id="podGallery" style="display:grid;grid-template-columns:repeat(auto-fill,minmax(140px,1fr));gap:10px;margin-top:14px"></div>
+    <!-- POD chuyển sang Bảng giao hàng (shipper chụp lúc giao). Giữ các ID ẩn để JS cũ không lỗi. -->
+    <div id="podSection" style="display:none">
+      <span id="hb2"></span><div id="podHelpHost"></div>
+      <input id="podOrder" list="podOrderList"><datalist id="podOrderList"></datalist>
+      <input type="file" id="podFile" accept="image/*" style="display:none">
+      <div id="podPreview"></div><div id="podGallery"></div>
     </div>
+    <div style="font-size:12.5px;color:var(--muted);margin-top:18px;padding:11px 13px;background:#F0F9FF;border:1px solid #BAE6FD;border-radius:8px">📷 <b>Ảnh giao hàng (POD)</b> giờ shipper chụp/chọn ngay ở <a href="giao-hang.html" style="color:var(--navy);font-weight:700">Bảng giao hàng</a> lúc giao (không phải vào đây nữa). Ảnh tự hiện lại ở <b>chi tiết đơn</b> và popup <b>Duyệt phiếu trả</b> để đối chứng khi khách khiếu nại.</div>
   </main>
 </div>
 
@@ -151,7 +145,7 @@
           : `<span style="font-weight:700;color:#DC2626">${window.fmt(r.refundTotal)} ₫</span><div style="font-size:9px;color:var(--muted);font-weight:400">${r.refundMode==='cash'?'chi tiền mặt':'trừ công nợ'}</div>`
       }</td>
       <td class="hide-xs" style="padding:10px"><span style="background:${stClr[r.status]}1f;color:${stClr[r.status]};padding:2px 8px;border-radius:99px;font-size:11px;font-weight:700">${stLab[r.status]}</span></td>
-      <td class="hide-xs" style="padding:10px">${r.status==='pending' ? (r.fromShip ? `<button class="btn btn-ghost btn-sm" onclick="window.approveShipReturn('${r.id}')" title="Phiếu từ shipper — duyệt để trừ hoá đơn KH + nợ NCC">✓ Duyệt</button>` : `<button class="btn btn-ghost btn-sm" onclick="window.processReturn('${r.id}')">✓ Xử lý</button>`) : ''}</td>
+      <td class="hide-xs" style="padding:10px">${r.status==='pending' ? ((r.resolution && r.resolution.startsWith('replace')) ? `<button class="btn btn-ghost btn-sm" onclick="window.processReturn('${r.id}', true)" title="Bù hàng — tạo đơn giao bù">✓ Xử lý</button>` : `<button class="btn btn-ghost btn-sm" onclick="window.approveShipReturn('${r.id}')" title="Duyệt: xem chi tiết + trừ hoá đơn KH + nợ NCC">✓ Duyệt</button>`) : ''}</td>
     </tr>`).join('');
   }
 
@@ -187,6 +181,7 @@
     const its = (Array.isArray(r.items) && r.items.length) ? r.items : (r.item ? [{ name: r.item.name, unit: r.item.unit, qty: r.qtyReturn, total: r.refundTotal, cond: r.disposition === 'restock' ? 'good' : 'bad', note: r.note }] : []);
     const custReduce = its.reduce((s, x) => s + (+x.total || 0), 0) || (+r.refundTotal || 0);
     const badTotal = its.filter(x => (x.cond || 'bad') === 'bad').reduce((s, x) => s + (+x.total || 0), 0);
+    const pods = ((window.STORE.get('pod_photos', {}) || {})[r.orderCode]) || [];
     const itemRows = its.map(x => `<tr style="border-top:1px solid #F1F5F9">
         <td style="padding:5px 8px">${_esc0(x.name)}${x.note ? `<div style="font-size:10.5px;color:var(--muted)">📝 ${_esc0(x.note)}</div>` : ''}</td>
         <td style="padding:5px 8px;text-align:right;white-space:nowrap">${x.qty}${x.unit || ''}</td>
@@ -201,6 +196,7 @@
           <th style="padding:6px 8px;text-align:left">Mặt hàng / ghi chú</th><th style="padding:6px 8px;text-align:right">SL trả</th><th style="padding:6px 8px;text-align:left">Xử lý</th><th style="padding:6px 8px;text-align:right">Tiền</th>
         </tr></thead><tbody>${itemRows}</tbody>
       </table>
+      ${pods.length ? `<div style="margin-bottom:12px"><div style="font-size:11px;color:var(--muted);text-transform:uppercase;margin-bottom:4px">📷 Ảnh giao hàng — đối chứng (${pods.length})</div><div style="display:flex;gap:6px;flex-wrap:wrap">${pods.map(p => `<img src="${p.dataURL}" style="width:64px;height:64px;object-fit:cover;border-radius:6px;border:1px solid var(--line);cursor:pointer" onclick="window.open(this.src)">`).join('')}</div></div>` : ''}
       <div style="background:#F0FDF4;border:1px solid #BBF7D0;border-radius:8px;padding:10px 12px;margin-bottom:12px;font-size:13px">
         <div style="display:flex;justify-content:space-between;margin-bottom:4px"><span>➖ Giảm hoá đơn khách (công nợ KH −)</span><b style="color:#B45309">${window.fmt(custReduce)}₫</b></div>
         <div style="display:flex;justify-content:space-between"><span>🏭 Trả NCC — hàng xấu (công nợ NCC −)</span><b style="color:#B45309">${window.fmt(badTotal)}₫</b></div>
@@ -219,7 +215,8 @@
   };
   window._apCommit = function (id) {
     const list = getR(); const r = list.find(x => x.id === id); if (!r) return;
-    const its = (Array.isArray(r.items) && r.items.length) ? r.items : [];
+    /* items[] (phiếu shipper) HOẶC fallback item đơn lẻ (phiếu tay) — để badTotal đúng cho cả 2 loại */
+    const its = (Array.isArray(r.items) && r.items.length) ? r.items : (r.item ? [{ ...r.item, total: +r.refundTotal || 0, cond: r.disposition === 'restock' ? 'good' : 'bad' }] : []);
     const badTotal = its.filter(x => (x.cond || 'bad') === 'bad').reduce((s, x) => s + (+x.total || 0), 0);
     r.refundMode = 'debt';
     if (badTotal > 0) {
@@ -332,18 +329,8 @@
     /* Tổng tiền hàng XẤU (trả NCC) — dùng làm mức trừ nợ NCC mặc định/fallback (KHÔNG lấy cả hàng đẹp) */
     const badTotalR = rItems.filter(x => (x.cond || 'bad') === 'bad').reduce((s, x) => s + (+x.total || 0), 0);
     const res = r.resolution || 'refund';
-    const resLbl = res === 'refund'
-      ? `TRỪ hoá đơn ${window.fmt(r.refundTotal)}₫ (${r.refundMode === 'cash' ? 'tiền mặt' : 'giảm nợ'})`
-      : res === 'replace_next' ? 'Bù hàng HÔM SAU (tạo đơn giao bù + báo NCC)' : 'Bù hàng NGAY hôm nay (tạo đơn giao bù)';
-    const itemsLbl = rItems.length ? rItems.map(x => `${x.name} ${x.qty}${x.unit||'kg'}`).join(', ') : '(toàn bộ đơn)';
-    const summary = [
-      `Mặt hàng: ${itemsLbl}`,
-      `Hàng trả: ${r.disposition==='restock' ? 'NHẬP LẠI KHO (còn dùng được)' : 'BỎ (hao hụt)'}`,
-      'Cách xử lý: ' + resLbl,
-      (res==='refund' && rItems.length) ? `Gỡ khỏi hoá đơn ${r.orderCode}` : '',
-      (r.fault==='supplier' && r.supplierId) ? `Trả NCC ${r.supplierName} → TRỪ công nợ ${window.fmt((+r.supClaimAmount)||(+r.refundTotal)||0)}₫` : ''
-    ].filter(Boolean).join('\n');
-    if (!skipConfirm && !confirm(`Xử lý đơn trả ${r.id}?\n\n${summary}`)) return;
+    /* KHÔNG dùng confirm() đen của trình duyệt. Phiếu trả hàng đã được xác nhận qua popup Duyệt
+       (approveShipReturn) trước khi gọi processReturn(id, true). Giữ tham số skipConfirm để tương thích. */
 
     const msgs = [];
 

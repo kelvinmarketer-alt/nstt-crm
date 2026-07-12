@@ -865,6 +865,35 @@
       <div style="text-align:right;font-size:12px;color:var(--muted);margin-top:6px">Thành tiền hàng: <b style="color:var(--red)">${window.fmt(totalAmt)} ₫</b></div>`;
   }
 
+  /* Lịch sử TRẢ HÀNG + ảnh giao (POD) của 1 đơn — hiện trong chi tiết đơn (tab Thông tin & Hàng hóa) */
+  function _renderOrderReturns(code) {
+    const _e = s => String(s == null ? '' : s).replace(/[&<>]/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;' }[c]));
+    const rs = (window.STORE.get('returns', window.RETURNS || []) || []).filter(r => r && r.orderCode === code && r.status !== 'rejected');
+    const pods = ((window.STORE.get('pod_photos', {}) || {})[code]) || [];
+    if (!rs.length && !pods.length) return '';
+    let html = '';
+    if (rs.length) {
+      html += `<div class="section-h" style="color:#B45309">↩️ Đã trả hàng (${rs.length})</div>`;
+      rs.forEach(r => {
+        const its = (Array.isArray(r.items) && r.items.length) ? r.items : (r.item ? [{ name: r.item.name, qty: r.qtyReturn, unit: r.item.unit, total: r.refundTotal, cond: r.disposition === 'restock' ? 'good' : 'bad', note: r.note }] : []);
+        const custCut = its.reduce((s, x) => s + (+x.total || 0), 0) || (+r.refundTotal || 0);
+        const badCut = (r.fault === 'supplier' && r.supplierId) ? ((+r.supClaimAmount) || its.filter(x => (x.cond || 'bad') === 'bad').reduce((s, x) => s + (+x.total || 0), 0)) : 0;
+        const stTxt = r.status === 'pending' ? '⏳ chờ kế toán duyệt' : (r.status === 'refunded' ? '✓ đã xử lý' : _e(r.status));
+        html += `<div style="border:1px solid #FDE68A;background:#FFFBEB;border-radius:8px;padding:10px 12px;margin:0 0 8px;font-size:12.5px">
+          <div style="font-weight:700;color:#B45309;margin-bottom:6px">Phiếu ${_e(r.id)} · ${_e(r.date || '')} · ${stTxt}</div>
+          ${its.map(x => `<details style="margin-bottom:2px"><summary style="cursor:pointer">${_e(x.name)} — <b>${x.qty}${_e(x.unit || '')}</b> · ${(x.cond || 'bad') === 'good' ? '🏬 đẹp→kho' : '🗑 xấu→NCC'} · <b style="color:#B45309">−${window.fmt(+x.total || 0)}đ</b></summary><div style="padding:4px 0 6px 14px;color:var(--muted)">📝 Lý do: ${x.note ? _e(x.note) : '(không ghi chú)'}</div></details>`).join('')}
+          <div style="border-top:1px dashed #FDE68A;margin-top:6px;padding-top:6px;display:flex;justify-content:space-between"><span>➖ Giảm hoá đơn khách (công nợ KH −)</span><b style="color:#B45309">${window.fmt(custCut)}đ</b></div>
+          ${badCut ? `<div style="display:flex;justify-content:space-between;margin-top:2px"><span>🏭 Trừ nợ NCC${r.supplierName ? ' (' + _e(r.supplierName) + ')' : ''}</span><b style="color:#B45309">${window.fmt(badCut)}đ</b></div>` : ''}
+        </div>`;
+      });
+    }
+    if (pods.length) {
+      html += `<div class="section-h" style="color:#0EA5E9">📷 Ảnh giao hàng (${pods.length})</div>
+        <div style="display:flex;gap:6px;flex-wrap:wrap">${pods.map(p => `<img src="${p.dataURL}" style="width:72px;height:72px;object-fit:cover;border-radius:6px;border:1px solid var(--line);cursor:pointer" onclick="window.open(this.src)">`).join('')}</div>`;
+    }
+    return html;
+  }
+
   window.openOrder = async function(code) {
     const o = orders.find(x => x.code === code);
     if (!o) return;
@@ -904,6 +933,10 @@
     document.getElementById('dUnit').textContent = _nonKg || (_kg == null ? (o.qty + ' ' + (o.unit || 'kg').toLowerCase()) : '—');
     document.getElementById('dService').textContent = svcList.map(s => s.label).join(', ') || '—';
     document.getElementById('dMode').textContent = tm ? tm.label : '—';
+    /* Lịch sử trả hàng + ảnh giao — hiện ở tab Thông tin (#dReturns) và tab Hàng hóa (#iReturnedList) */
+    const _retHtml = _renderOrderReturns(code);
+    const _dRet = document.getElementById('dReturns'); if (_dRet) _dRet.innerHTML = _retHtml;
+    const _iRet = document.getElementById('iReturnedList'); if (_iRet) _iRet.innerHTML = _retHtml;
 
     document.getElementById('iCode').textContent  = o.code;
     document.getElementById('iCust').textContent  = o.custName + ' (' + o.cust + ')';
@@ -2707,6 +2740,8 @@ ${o.note ? `\n📝 Ghi chú: ${o.note}` : ''}
   /* Subscribe + init */
   window.STORE.subscribe('orders', scheduleRender);
   window.STORE.subscribe('returns', scheduleRender);   /* đơn bị trả → cập nhật badge "↩️ Trả" realtime */
+  window.STORE.subscribe('pod_photos', scheduleRender);
+  setTimeout(() => { window.STORE.get('returns', []); window.STORE.get('pod_photos', {}); }, 400);   /* mồi tải để chi tiết đơn có sẵn lịch sử trả + ảnh giao */
   window.STORE.subscribe('orderQtyLocks', scheduleRender);   /* khoá SL/báo giá đổi máy khác → badge/tab realtime */
   window.STORE.subscribe('orderQuoteLocks', scheduleRender);
   window.STORE.subscribe('shippers', scheduleRender);        /* bộ lọc shipper/NV refresh trong render() */
