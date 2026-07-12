@@ -5,7 +5,7 @@
 
 /* Phiên bản app hiển thị (đối chiếu với CACHE_VERSION trong sw.js) — để user tự XÁC NHẬN
    đang chạy bản mới hay còn kẹt JS cũ (hiện ở góc sidebar + log console). */
-window.APP_VERSION = 'v458';
+window.APP_VERSION = 'v459';
 console.log('%c[NSTT] App ' + window.APP_VERSION, 'color:#339B21;font-weight:bold');
 
 /* Gom NGUỒN khách về 3 nhóm chuẩn: 'mkt' / 'sales' / 'sep-gioi-thieu'.
@@ -1139,7 +1139,9 @@ window.NAV = [
     { id: 'customers-360', label: 'Chân dung KH 360°', icon: '🔍', href: 'customers-360.html' },
     { id: 'leads',      label: 'Lead/Tiềm năng', icon: '🎯', href: 'leads.html' },
     */
+    /* Ẩn theo yêu cầu: module Shipper (dùng nhân sự phòng "Ship" thay thế; Bảng giao hàng lấy shipper từ đó).
     { id: 'shippers',   label: 'Shipper',     icon: '🛵', href: 'shippers.html' },
+    */
   ]},
   { section: 'Kho & Mua hàng', items: [
     { id: 'products',   label: 'Sản phẩm & Giá', icon: '🥬', href: 'products.html' },

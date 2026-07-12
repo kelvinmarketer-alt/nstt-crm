@@ -15,7 +15,18 @@
   const nowISO = () => new Date().toISOString();
   const fmt = n => (window.fmt ? window.fmt(n) : Number(n || 0).toLocaleString('vi-VN'));
   const ordList = () => (S().get('orders', window.ORDERS || []) || []);
-  const shippers = () => (S().get('shippers', window.DRIVERS || []) || []).filter(s => s && s.name);
+  /* Nhân viên có vị trí SHIP (phần Nhân sự: dept/role = Ship / giao hàng / vận hành) */
+  const _isShipStaff = s => /ship|giao\s*h[àa]ng|v[ậa]n\s*h[àa]nh/i.test((s.dept || '') + ' ' + (s.role || ''));
+  /* Danh sách shipper = SHIP CỐ ĐỊNH (từ Nhân sự) + SHIP NGOÀI (guest). Token lưu trên hồ sơ tương ứng. */
+  const shippers = () => {
+    const staff = (S().get('staff', window.STAFF || []) || [])
+      .filter(s => s && s.name && s.status !== 'inactive' && _isShipStaff(s))
+      .map(s => ({ id: s.id, name: s.name, linkToken: s.linkToken, guest: false }));
+    const guests = (S().get('shippers', window.DRIVERS || []) || [])
+      .filter(s => s && s.name && s.guest)
+      .map(s => ({ id: s.id, name: s.name, linkToken: s.linkToken, guest: true }));
+    return staff.concat(guests);
+  };
   const ordByCode = code => ordList().find(o => o.code === code);
   const isTransit = o => o.status === 'transit' || o.status === 'pickup';   /* pickup = đơn cũ đã dispatch trước bản v455 */
   /* Shipper đang xem: ưu tiên TOKEN (?ship=), fallback ?me= (link cũ). Token không tra được tên → không lộ đơn ai. */
@@ -96,7 +107,7 @@
     const o = ordByCode(code); if (!o) return;
     const list = shippers();
     const dl = list.map(s => `<option value="${esc(s.name)}"></option>`).join('');
-    const hint = list.length ? '' : '<div style="font-size:11.5px;color:#B45309;margin-top:6px">⚠ Chưa có shipper nào — thêm ở trang <a href="shippers.html">Shipper</a> trước.</div>';
+    const hint = list.length ? '' : '<div style="font-size:11.5px;color:#B45309;margin-top:6px">⚠ Chưa có shipper — thêm nhân viên vị trí <b>Ship</b> ở <a href="staff.html">Nhân sự</a>, hoặc tạo ship ngoài ở nút 🔗 Link.</div>';
     window.openModal('🛵 Gán shipper — ' + esc(code), `
       <div style="font-size:13px;color:#334155;margin-bottom:12px">Đơn <b>#${esc(code)}</b> · ${esc(o.custName || '')}</div>
       <label style="font-size:12px;color:var(--muted);display:block;margin-bottom:4px">Shipper phụ trách (gõ tên → chọn gợi ý)</label>
@@ -237,13 +248,13 @@
     /* Đảm bảo mỗi shipper có 1 token cố định (sinh 1 lần, lưu vào hồ sơ shipper) */
     const withTok = list.map(s => {
       let tok = s.linkToken;
-      if (!tok) { tok = _mkToken(); S().update('shippers', s.id, { linkToken: tok }); }
+      if (!tok) { tok = _mkToken(); S().update(s.guest ? 'shippers' : 'staff', s.id, { linkToken: tok }); }   /* cố định → lưu hồ sơ nhân sự; ngoài → guest */
       return { id: s.id, name: s.name, tok, guest: !!s.guest };
     });
     const perm = withTok.filter(s => !s.guest);
     const guests = withTok.filter(s => s.guest);
     const permRows = perm.length ? perm.map(s => item('🛵 ' + esc(s.name), base + '?ship=' + s.tok)).join('')
-      : '<div style="color:var(--muted);padding:6px 0;font-size:12px">Chưa có shipper cố định — thêm ở trang <a href="shippers.html">Shipper</a>.</div>';
+      : '<div style="color:var(--muted);padding:6px 0;font-size:12px">Chưa có nhân viên phòng <b>Ship</b> — thêm ở <a href="staff.html">Nhân sự</a> (vị trí Ship).</div>';
     const guestRows = guests.map(s => item('🧑‍🔧 ' + esc(s.name) + ' <span style="font-size:10px;color:#B45309;background:#FEF3C7;padding:0 6px;border-radius:10px;font-weight:700">ngoài</span>', base + '?ship=' + s.tok, s.id)).join('');
     window.openModal('🔗 Link giao hàng cho shipper', `
       <div style="font-size:12.5px;color:var(--muted);margin-bottom:10px">Mỗi shipper 1 link <b>RIÊNG có mã bảo mật</b> — chỉ thấy + xác nhận đơn <b>của mình</b>, không xem được đơn người khác. Gửi Zalo/SMS, bảo họ ⭐ lưu.</div>
@@ -336,10 +347,11 @@
     const _ghp = document.getElementById('ghPhoto'); if (_ghp) _ghp.onchange = _ghPhotoPicked;
     render();
     S().subscribe('orders', render);
-    S().subscribe('shippers', render);   /* danh sách shipper / token về → render lại (gán + link) */
+    S().subscribe('staff', render);      /* ship CỐ ĐỊNH lấy từ Nhân sự (phòng Ship) */
+    S().subscribe('shippers', render);   /* ship NGOÀI (guest) + token */
     S().subscribe('pod_photos', render);   /* cập nhật số đếm 📷 Ảnh (N) */
-    S().subscribe('__preloaded__', k => { if (k === 'orders' || k === 'shippers' || k === 'pod_photos') render(); });
-    setTimeout(() => { S().get('orders', window.ORDERS || []); S().get('shippers', window.DRIVERS || []); S().get('pod_photos', {}); }, 300);
+    S().subscribe('__preloaded__', k => { if (k === 'orders' || k === 'staff' || k === 'shippers' || k === 'pod_photos') render(); });
+    setTimeout(() => { S().get('orders', window.ORDERS || []); S().get('staff', window.STAFF || []); S().get('shippers', window.DRIVERS || []); S().get('pod_photos', {}); }, 300);
   }
   if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', init);
   else init();
