@@ -188,8 +188,10 @@
       s.orders++;
       const amt = +o.freight || 0;
       s.revenue += amt;
-      /* công nợ chỉ tính đơn trả bằng Công nợ (credit) */
-      if (/nợ|cong no|credit/i.test(o.payBy || o.pay_by || '')) { s.charge += amt; s.credits.push({ date: _ordDate(o), amount: amt }); }
+      /* Công nợ chỉ phát sinh khi đơn ĐÃ GIAO (giao xong mới thành nợ). Đơn Mới/Đang lấy/Đang giao
+         chưa cộng công nợ — khớp luồng Bảng giao hàng (giao-hang.html). */
+      const delivered = (o.status === 'delivered' || o.status === 'reconciled');
+      if (delivered && /nợ|cong no|credit/i.test(o.payBy || o.pay_by || '')) { s.charge += amt; s.credits.push({ date: _ordDate(o), amount: amt }); }
     });
     ledger.forEach(e => { const id = e.custId; if (id && e.type === 'payment') g(id).paid += +e.amount || 0; });
     Object.keys(m).forEach(id => { const s = m[id]; s.debt = Math.max(0, s.charge - s.paid); s.debtOverdue = _overdueFromCredits(id, s.credits, s.paid); });

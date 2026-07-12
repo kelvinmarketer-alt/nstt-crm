@@ -295,6 +295,7 @@
   const PAGE_PERMS = {
     'dashboard.html':  'dashboard.view',
     'orders.html':     'orders.view',
+    'giao-hang.html':  'orders.view',
     'orders-hub.html': 'orders.view',
     'web-orders.html': 'orders.view',
     'order-samples.html': 'orders.view',

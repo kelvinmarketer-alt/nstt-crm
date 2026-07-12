@@ -117,12 +117,12 @@
   }
 
   const STATUS = {
-    confirmed:  { icon:'📝', label:'Mới',         sub:'chờ điều phối',     color:'#3B82F6' },
+    confirmed:  { icon:'🟡', label:'Chờ giao',    sub:'chờ điều phối',     color:'#3B82F6' },
     pickup:     { icon:'📦', label:'Đang lấy',    sub:'shipper đến lấy',   color:'#F59E0B' },
     transit:    { icon:'🚚', label:'Đang giao',   sub:'trên đường',        color:'#0EA5E9' },
-    delivered:  { icon:'✓',  label:'Đã giao',     sub:'KH đã nhận',        color:'#16A34A' },
-    reconciled: { icon:'💰', label:'Đối soát',    sub:'đã thu/chi xong',   color:'#15803D' },
-    returned:   { icon:'↩',  label:'Đã trả hàng', sub:'KH trả lại sau khi nhận', color:'#EA580C' },
+    delivered:  { icon:'✅', label:'Đã giao',     sub:'KH đã nhận',        color:'#16A34A' },
+    reconciled: { icon:'💰', label:'Đã giao ✓',  sub:'đã đối soát thu/chi', color:'#15803D' },
+    returned:   { icon:'↩',  label:'Trả hàng',    sub:'KH trả lại sau khi nhận', color:'#EA580C' },
     cancelled:  { icon:'✕',  label:'Đã hủy',      sub:'không vận chuyển',  color:'#DC2626' },
   };
   const STEPS = ['confirmed','pickup','transit','delivered','reconciled'];
@@ -130,6 +130,17 @@
   const TERMINAL_STATUSES = ['cancelled', 'returned'];
   /* Trạng thái chọn được trong dropdown — bao gồm cả off-pipeline */
   const ALL_STATUSES = [...STEPS, 'returned', 'cancelled'];
+  /* 4 trạng thái CHÍNH hiển thị (gộp từ 7). pickup/reconciled = legacy chỉ hiện nếu đơn đang ở đó;
+     cancelled = hành động hiếm, để cuối dropdown. Khớp Bảng giao hàng: Chờ giao→Đang giao→Đã giao→Trả hàng. */
+  const PRIMARY_STATUSES = ['confirmed','transit','delivered','returned'];
+  function statusOptionsFor(cur) {
+    let set = PRIMARY_STATUSES.slice();
+    if (cur === 'pickup')          set = ['confirmed','pickup','transit','delivered','returned'];
+    else if (cur === 'reconciled') set = ['confirmed','transit','delivered','reconciled','returned'];
+    else if (cur && !set.includes(cur) && cur !== 'cancelled') set.push(cur);
+    set.push('cancelled');   /* Hủy: hiếm, để cuối */
+    return set;
+  }
 
   /* Mốc thời gian (hôm nay / đầu tuần thứ 2 / tháng) — tính theo NGÀY ĐƠN (orderDateISO) */
   function computePeriodBounds() {
@@ -307,7 +318,7 @@
             <select class="status-select status-select-${statusKey}" data-code="${o.code}" data-act="status"
               title="Đổi trạng thái đơn"
               style="border:1px solid var(--line);border-radius:7px;padding:5px 8px;font-size:11.5px;font-weight:700;cursor:pointer;background:${st.color}15;color:${st.color};min-width:130px">
-              ${ALL_STATUSES.map(k => `<option value="${k}" ${statusKey===k?'selected':''}>${STATUS[k].icon} ${STATUS[k].label}</option>`).join('')}
+              ${statusOptionsFor(statusKey).map(k => `<option value="${k}" ${statusKey===k?'selected':''}>${STATUS[k].icon} ${STATUS[k].label}</option>`).join('')}
             </select>
           </td>
           <td class="ocol-x" onclick="event.stopPropagation()">
@@ -939,7 +950,7 @@
     const drawer = document.getElementById('drawer');
     const drawerSel = document.getElementById('drawerStatusSel');
     if (drawerSel) {
-      drawerSel.innerHTML = ALL_STATUSES.map(k =>
+      drawerSel.innerHTML = statusOptionsFor(o.status).map(k =>
         `<option value="${k}" ${o.status===k?'selected':''}>${STATUS[k].icon} ${STATUS[k].label} — ${STATUS[k].sub}</option>`
       ).join('');
       drawerSel.style.color = (STATUS[o.status] || {}).color || 'var(--navy)';
