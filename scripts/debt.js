@@ -102,12 +102,12 @@
       const ovLab = c.overdue === 0 ? '✓ Trong hạn' : c.overdue + ' ngày quá hạn';
       const ovBg = c.overdue > 15 ? 'var(--danger-bg)' : c.overdue > 0 ? 'var(--warn-bg)' : 'var(--ok-bg)';
       const ovFg = c.overdue > 15 ? 'var(--danger)' : c.overdue > 0 ? 'var(--warn)' : 'var(--ok)';
-      return `<tr>
+      return `<tr onclick="window.openPaymentHistory('${c.id}')" style="cursor:pointer" title="Bấm để xem lịch sử thu nợ · sửa/xoá phiếu">
         <td data-field="name">
           <div class="cust-cell">
             <div class="cust-ava" style="background:${col}">${window.initials(c.name)}</div>
             <div class="cust-info">
-              <div class="n1">${c.name}</div>
+              <div class="n1">${c.name} <span style="font-size:10px;color:var(--muted);font-weight:400">📜 lịch sử</span></div>
               <div class="n2">${c.code} · ${c.phone}</div>
             </div>
           </div>
@@ -638,10 +638,12 @@ Mong quý khách thu xếp thanh toán sớm. Cảm ơn!
       });
     }
 
-    /* Công nợ KH: KHÔNG ghi debt/debtOverdue vào customers (nguồn kép).
-       Nguồn duy nhất là addDebtLedger type 'payment' bên dưới → tính qua window.custDebt(). */
+    /* Nguồn công nợ CHUẨN = đơn − ledger payment (custDebt/rebuildCustStats). Ở TRANG CÔNG NỢ này
+       KHÔNG có rebuildCustStats (customers.js không nạp) nên c.debt là số cloud tĩnh → hạ TRỰC TIẾP
+       theo delta để danh sách + popup phản ánh ngay. Trang KH vẫn tự tính lại & ghi đè khi mở. */
     window.STORE.update('customers', custId, {
       lastContact: date,
+      debt: Math.max(0, (+c.debt || 0) - amount),
     });
 
     /* Ghi sổ quỹ */
@@ -674,6 +676,154 @@ Mong quý khách thu xếp thanh toán sớm. Cảm ơn!
       }), 500);
     }
     render();
+  };
+
+  /* ==========================================================================
+     LỊCH SỬ THU NỢ — popup xem/sửa/xoá phiếu thu (bấm 1 dòng KH ở bảng công nợ).
+     Phiếu thu = bút toán debtLedger type 'payment' + dòng sổ quỹ cashEntries (no = ref).
+     Sửa/xoá cập nhật CẢ HAI + hiệu chỉnh công nợ theo delta (vì hay bị nhầm phiếu). ========== */
+  function _custNorm(id) {
+    const c = (window.STORE.get('customers', []) || []).find(x => x.id === id);
+    if (!c) return null;
+    return { ...c, staffOwner: c.staffOwner || STAFF_MAP[c.id] || 'Hoàng Mai' };
+  }
+  function _payDateISO(ddmmyyyy) {
+    const m = String(ddmmyyyy || '').match(/(\d{1,2})\/(\d{1,2})\/(\d{4})/);
+    if (m) return `${m[3]}-${String(m[2]).padStart(2, '0')}-${String(m[1]).padStart(2, '0')}`;
+    return new Date().toISOString().slice(0, 10);
+  }
+  /* phiếu do hệ thống sinh từ TRẢ HÀNG (ref không phải PT-…) → không cho sửa tay ở đây.
+     Chỉ xét REF (diễn giải kế toán tự gõ được — không dựa vào để tránh khoá nhầm phiếu thu tay). */
+  function _isReturnCredit(e) { return !/^PT-/i.test(e.ref || ''); }
+
+  window.openPaymentHistory = function (custId) {
+    const c = _custNorm(custId);
+    if (!c) { window.toast && window.toast('Không tìm thấy KH', 'warn'); return; }
+    const pays = (window.getDebtLedger ? window.getDebtLedger(custId) : [])
+      .filter(e => e.type === 'payment')
+      .slice().sort((a, b) => (String(b.ts || b.date || '')).localeCompare(String(a.ts || a.date || '')));
+    const totalPaid = pays.reduce((s, e) => s + (+e.amount || 0), 0);
+    const curDebt = +c.debt || 0;
+    const cash = window.STORE.get('cashEntries', []) || [];
+    const accOf = ref => { const ce = cash.find(x => x.no === ref); return ce ? (ce.account || '') : ''; };
+    const F = window.fmt;
+    const body = pays.length ? pays.map(e => {
+      const ret = _isReturnCredit(e);
+      const acc = accOf(e.ref);
+      return `<tr style="border-top:1px solid var(--line)">
+        <td style="padding:7px 8px;white-space:nowrap">${e.date || '—'}</td>
+        <td style="padding:7px 8px;font-family:ui-monospace,monospace;font-size:11px">${e.ref || '—'}${ret ? ' <span style="background:#FEF3C7;color:#B45309;font-size:9px;padding:0 4px;border-radius:5px">trả hàng</span>' : ''}</td>
+        <td style="padding:7px 8px;font-size:11.5px;color:var(--muted)">${(e.desc || '').replace(/</g, '&lt;')}${acc ? '<br>TK: ' + acc : ''}</td>
+        <td style="padding:7px 8px;text-align:right;font-weight:700;color:#15803D">${F(+e.amount || 0)}</td>
+        <td style="padding:7px 8px;text-align:right;white-space:nowrap">${ret
+          ? '<span style="font-size:11px;color:var(--muted)" title="Phiếu sinh từ Trả hàng — sửa ở module Trả hàng">khoá</span>'
+          : `<button class="btn btn-ghost" style="padding:3px 8px;font-size:12px" onclick="window.editPayment('${e.id}')">✏️</button>
+             <button class="btn btn-ghost" style="padding:3px 8px;font-size:12px;color:var(--danger)" onclick="window.deletePayment('${e.id}')">🗑</button>`}</td>
+      </tr>`;
+    }).join('') : `<tr><td colspan="5" style="padding:20px;text-align:center;color:var(--muted)">Chưa có phiếu thu nào.</td></tr>`;
+
+    const html = `
+      <div style="padding:11px 13px;background:#FAFAFB;border-radius:9px;margin-bottom:12px;display:flex;justify-content:space-between;flex-wrap:wrap;gap:8px">
+        <div><b>${c.name}</b> · ${c.code} · ${c.phone || '—'}</div>
+        <div style="text-align:right">
+          <span style="color:var(--muted);font-size:12px">Đã thu: <b style="color:#15803D">${F(totalPaid)}đ</b></span>
+          &nbsp;·&nbsp;<span style="color:var(--muted);font-size:12px">Còn nợ: <b style="color:var(--danger)">${F(curDebt)}đ</b></span>
+        </div>
+      </div>
+      <div style="max-height:56vh;overflow:auto;border:1px solid var(--line);border-radius:9px">
+        <table style="width:100%;border-collapse:collapse;font-size:12.5px">
+          <thead><tr style="background:#F1F5F9;position:sticky;top:0;color:var(--muted);font-size:11px;text-transform:uppercase">
+            <th style="padding:7px 8px;text-align:left">Ngày</th>
+            <th style="padding:7px 8px;text-align:left">Số phiếu</th>
+            <th style="padding:7px 8px;text-align:left">Diễn giải</th>
+            <th style="padding:7px 8px;text-align:right">Số tiền</th>
+            <th style="padding:7px 8px;text-align:right">Sửa</th>
+          </tr></thead>
+          <tbody>${body}</tbody>
+        </table>
+      </div>
+      <div style="font-size:11px;color:var(--muted);margin-top:8px">✏️ sửa / 🗑 xoá phiếu thu tay (PT-…). Sửa/xoá tự cập nhật sổ quỹ + công nợ. Phiếu “trả hàng” chỉnh ở module Trả hàng.</div>`;
+
+    window.openModal('📜 Lịch sử thu nợ — ' + c.name, html, {
+      width: '720px',
+      footer: `<button class="btn btn-ghost" onclick="closeModal()">Đóng</button>
+               <button class="btn btn-primary" onclick="window.openReceiptFromHistory('${custId}')">＋ Thêm phiếu thu</button>`,
+    });
+  };
+
+  window.openReceiptFromHistory = function (custId) {
+    const c = _custNorm(custId);
+    if (c) openReceipt(c);
+  };
+
+  window.editPayment = function (ledgerId) {
+    const pay = (window.getDebtLedger ? window.getDebtLedger() : []).find(e => e.id === ledgerId && e.type === 'payment');
+    if (!pay) { window.toast && window.toast('Không tìm thấy phiếu', 'warn'); return; }
+    if (_isReturnCredit(pay)) { window.toast && window.toast('Phiếu trả hàng — sửa ở module Trả hàng', 'warn'); return; }
+    window.openModal('✏️ Sửa phiếu thu ' + (pay.ref || ''), `
+      <input type="hidden" id="epCust" value="${pay.custId || ''}">
+      <div class="form-row">
+        <div><label>Ngày thu</label><input id="epDate" type="date" value="${_payDateISO(pay.date)}"></div>
+        <div><label>Số tiền thu *</label><input id="epAmount" type="number" value="${+pay.amount || 0}"></div>
+      </div>
+      <div class="form-row wide"><label>Diễn giải</label><textarea id="epDesc" rows="2">${(pay.desc || '').replace(/</g, '&lt;')}</textarea></div>
+      <div style="font-size:11.5px;color:var(--muted)">Lưu sẽ cập nhật sổ quỹ (${pay.ref || '—'}) và tự tính lại công nợ theo chênh lệch.</div>
+    `, {
+      width: '480px',
+      footer: `<button class="btn btn-ghost" onclick="closeModal()">Hủy</button>
+               <button class="btn btn-primary" onclick="window.saveEditPayment('${ledgerId}')">💾 Lưu</button>`,
+    });
+  };
+
+  window.saveEditPayment = function (ledgerId) {
+    const pay = (window.getDebtLedger ? window.getDebtLedger() : []).find(e => e.id === ledgerId);
+    if (!pay) { window.toast && window.toast('Không tìm thấy phiếu', 'warn'); return; }
+    const newAmt = parseInt(window.formVal('#epAmount'), 10) || 0;
+    if (!newAmt) { window.toast && window.toast('Nhập số tiền', 'warn'); return; }
+    const dISO = window.formVal('#epDate');
+    const newDate = dISO ? new Date(dISO).toLocaleDateString('vi-VN') : pay.date;
+    const newDesc = window.formVal('#epDesc') || pay.desc;
+    const oldAmt = +pay.amount || 0, custId = pay.custId;
+    /* ledger (KV) */
+    window.STORE.rmwKv('debtLedger', arr => (Array.isArray(arr) ? arr : []).map(e => e.id === ledgerId ? { ...e, amount: newAmt, date: newDate, ts: (dISO ? new Date(dISO).toISOString() : e.ts), desc: newDesc } : e));
+    /* sổ quỹ (bảng cash_entries, key = no = ref) — đồng bộ cả số tiền/ngày/diễn giải */
+    if (pay.ref) window.STORE.update('cashEntries', pay.ref, { amount: newAmt, date: newDate, desc: newDesc });
+    /* công nợ theo delta: thu nhiều hơn → nợ giảm thêm (oldAmt - newAmt) */
+    const c = (window.STORE.get('customers', []) || []).find(x => x.id === custId);
+    if (c) window.STORE.update('customers', custId, { debt: Math.max(0, (+c.debt || 0) + (oldAmt - newAmt)) });
+    window.closeModal();
+    window.toast && window.toast('✓ Đã sửa phiếu thu', 'success');
+    render();
+    setTimeout(() => window.openPaymentHistory(custId), 80);
+  };
+
+  window.deletePayment = function (ledgerId) {
+    const pay = (window.getDebtLedger ? window.getDebtLedger() : []).find(e => e.id === ledgerId);
+    if (!pay) { window.toast && window.toast('Không tìm thấy phiếu', 'warn'); return; }
+    if (_isReturnCredit(pay)) { window.toast && window.toast('Phiếu trả hàng — xoá ở module Trả hàng', 'warn'); return; }
+    const amt = +pay.amount || 0;
+    window.openModal('🗑 Xoá phiếu thu', `
+      <div style="padding:4px 2px;line-height:1.6">Xoá phiếu thu <b>${pay.ref || ''}</b> ngày <b>${pay.date || ''}</b> số tiền <b style="color:var(--danger)">${window.fmt(amt)}đ</b>?<br>
+      <span style="font-size:12px;color:var(--muted)">→ Công nợ KH sẽ <b>TĂNG lại +${window.fmt(amt)}đ</b> và dòng thu trong sổ quỹ bị xoá. Chỉ dùng khi ghi nhầm.</span></div>
+    `, {
+      width: '470px',
+      footer: `<button class="btn btn-ghost" onclick="closeModal()">Không</button>
+               <button class="btn" style="background:var(--danger);color:#fff" onclick="window.confirmDeletePayment('${ledgerId}')">Xoá phiếu</button>`,
+    });
+  };
+
+  window.confirmDeletePayment = function (ledgerId) {
+    const pay = (window.getDebtLedger ? window.getDebtLedger() : []).find(e => e.id === ledgerId);
+    if (!pay) return;
+    const amt = +pay.amount || 0, custId = pay.custId, ref = pay.ref;
+    window.STORE.rmwKv('debtLedger', arr => (Array.isArray(arr) ? arr : []).filter(e => e.id !== ledgerId));
+    if (ref) window.STORE.remove('cashEntries', ref);
+    const c = (window.STORE.get('customers', []) || []).find(x => x.id === custId);
+    if (c) window.STORE.update('customers', custId, { debt: Math.max(0, (+c.debt || 0) + amt) });
+    window.closeModal();
+    window.toast && window.toast('✓ Đã xoá phiếu thu · công nợ +' + window.fmt(amt) + 'đ', 'success');
+    render();
+    setTimeout(() => window.openPaymentHistory(custId), 80);
   };
 
   /* === In preview phiếu thu === */

@@ -5,7 +5,7 @@
 
 /* Phiên bản app hiển thị (đối chiếu với CACHE_VERSION trong sw.js) — để user tự XÁC NHẬN
    đang chạy bản mới hay còn kẹt JS cũ (hiện ở góc sidebar + log console). */
-window.APP_VERSION = 'v464';
+window.APP_VERSION = 'v465';
 console.log('%c[NSTT] App ' + window.APP_VERSION, 'color:#339B21;font-weight:bold');
 
 /* Gom NGUỒN khách về 3 nhóm chuẩn: 'mkt' / 'sales' / 'sep-gioi-thieu'.
@@ -484,6 +484,10 @@ window.custDebt = function (custId) {
   orders.forEach(o => {
     if (o.status === 'draft' || o.status === 'cancelled') return;
     if ((o.cust || o.custId) !== custId) return;
+    /* Công nợ CHỐT KHI ĐÃ GIAO (khớp rebuildCustStats/customers.js). Đơn Mới/Đang lấy/Đang giao
+       CHƯA thành nợ → trước đây custDebt tính cả đơn chưa giao khiến Báo cáo/Dashboard phồng hơn
+       trang Khách hàng & Công nợ. Nay gate delivered để mọi nơi khớp nhau. */
+    if (o.status !== 'delivered' && o.status !== 'reconciled') return;
     if (/nợ|cong no|credit/i.test(o.payBy || o.pay_by || '')) charge += (+o.freight || 0);
   });
   let paid = 0;

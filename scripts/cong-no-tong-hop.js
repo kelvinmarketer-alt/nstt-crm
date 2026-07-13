@@ -31,9 +31,12 @@
     return placed || planned || '';
   }
   function ledgerISO(e) {
-    if (e.ts) { const d = new Date(e.ts); if (!isNaN(d)) return isoOf(d); }
+    /* Ưu tiên NGÀY NGHIỆP VỤ (e.date — kế toán chọn) hơn e.ts (giờ tạo bản ghi) để phiếu thu
+       LÙI NGÀY rơi ĐÚNG kỳ. Trước đây ưu tiên ts → thu ngày 5/7 nhưng tạo 13/7 bị tính vào kỳ 2. */
     const m = String(e.date || '').match(/(\d{1,2})\/(\d{1,2})\/(\d{4})/);
-    return m ? `${m[3]}-${pad(m[2])}-${pad(m[1])}` : '';
+    if (m) return `${m[3]}-${pad(m[2])}-${pad(m[1])}`;
+    if (e.ts) { const d = new Date(e.ts); if (!isNaN(d)) return isoOf(d); }
+    return '';
   }
   function dayList(fromISO, toISO) {
     const out = [];
@@ -110,6 +113,11 @@
       return { cost: c, hasItems: items.length > 0, known };
     }
 
+    /* CÔNG NỢ chỉ chốt khi ĐÃ GIAO + phương thức "Công nợ" (khớp custDebt/rebuildCustStats).
+       total/daily (lưới) vẫn đếm MỌI đơn để CFO thấy cả đơn hôm nay chưa giao; nhưng CÒN PHẢI THU
+       + phiếu/QR gửi khách chỉ tính phần ĐÃ GIAO → không đòi tiền đơn chưa giao, khớp CÔNG NỢ HT. */
+    const _isNo = o => /nợ|cong no|credit/i.test(o.payBy || o.pay_by || '');
+    const _isCongNo = o => (o.status === 'delivered' || o.status === 'reconciled') && _isNo(o);
     const rows = {};
     orders.forEach(o => {
       if (o.status === 'draft' || o.status === 'cancelled') return;   /* bỏ nháp/huỷ */
@@ -121,23 +129,41 @@
       if (!amt) return;
       const cust = custById[o.cust] || {};
       const r = rows[key] || (rows[key] = { key, name, addr: cust.address || o.drop || '', phone: cust.phone || '',
-        daily: {}, dailyShift: {}, dailyCost: {}, total: 0, cost: 0, noCostOrders: 0 });
+        daily: {}, dailyShift: {}, dailyCost: {}, total: 0, chargeP: 0, cost: 0, noCostOrders: 0 });
       r.daily[iso] = (r.daily[iso] || 0) + amt;
       /* tách ca cho phiếu ma trận: dailyShift[iso] = {s, c} */
       const sk = shiftKey(o);
       const ds = r.dailyShift[iso] || (r.dailyShift[iso] = { s: 0, c: 0 });
       ds[sk] += amt;
       r.total += amt;
+      if (_isCongNo(o)) r.chargeP += amt;   /* phần công nợ THẬT trong kỳ (đã giao) */
       const oc = orderCost(o, iso);
       r.dailyCost[iso] = (r.dailyCost[iso] || 0) + oc.cost;
       r.cost += oc.cost;
       if (!oc.hasItems || !oc.known) r.noCostOrders++;   /* đơn không có dữ liệu giá vốn → cảnh báo LN ước tính */
     });
-    /* Đã thu trong kỳ (phiếu thu) + công nợ hiện tại + lợi nhuận */
+    /* ===== NỢ ĐẦU KỲ (mang sang) = Σ công nợ đã giao TRƯỚC fromISO − Σ thu TRƯỚC fromISO.
+       → CÒN PHẢI THU = đầu kỳ + công nợ trong kỳ − đã thu (hết "âm giả"; nợ cũ tự chuyển kỳ sau). */
+    const openCharge = {}, openPaid = {};
+    orders.forEach(o => {
+      if (!_isCongNo(o)) return;
+      const amt = +o.freight || 0; if (!amt) return;
+      const iso = orderISO(o); if (!iso || iso >= fromISO) return;
+      const key = o.cust || o.custName || '—';
+      openCharge[key] = (openCharge[key] || 0) + amt;
+    });
+    ledger.forEach(e => {
+      if (e.type !== 'payment') return;
+      const iso = ledgerISO(e); if (!iso || iso >= fromISO) return;
+      openPaid[e.custId] = (openPaid[e.custId] || 0) + (+e.amount || 0);
+    });
+    /* Đã thu trong kỳ (phiếu thu) + nợ đầu kỳ + còn phải thu + công nợ hiện tại + lợi nhuận */
     Object.values(rows).forEach(r => {
       r.paid = ledger.filter(e => e.custId === r.key && e.type === 'payment' && daySet.has(ledgerISO(e)))
         .reduce((s, e) => s + (+e.amount || 0), 0);
-      r.remain = r.total - r.paid;
+      r.opening = (openCharge[r.key] || 0) - (openPaid[r.key] || 0);   /* nợ kỳ trước mang sang (đã giao) */
+      r.remain = r.opening + r.chargeP - r.paid;   /* CÒN PHẢI THU cuối kỳ = luỹ kế công nợ đã giao − đã thu */
+      r.undelivered = Math.max(0, r.total - r.chargeP);   /* phần đơn trong kỳ CHƯA giao (chưa thành nợ) */
       r.debtNow = (custById[r.key] && +custById[r.key].debt) || 0;
       r.profit = r.total - r.cost;
       r.margin = r.total ? (r.profit / r.total) : 0;
@@ -152,11 +178,11 @@
     list.forEach(r => {
       const bn = brandOf(r.key, r.name);
       const k = _nk(bn) || r.key;
-      const grp = g[k] || (g[k] = { brandKey: k, brand: bn, sites: [], daily: {}, dailyCost: {}, total: 0, cost: 0, paid: 0, remain: 0, debtNow: 0, profit: 0, noCostOrders: 0 });
+      const grp = g[k] || (g[k] = { brandKey: k, brand: bn, sites: [], daily: {}, dailyCost: {}, total: 0, chargeP: 0, undelivered: 0, cost: 0, paid: 0, opening: 0, remain: 0, debtNow: 0, profit: 0, noCostOrders: 0 });
       grp.sites.push(r);
       Object.keys(r.daily).forEach(d => grp.daily[d] = (grp.daily[d] || 0) + r.daily[d]);
       Object.keys(r.dailyCost).forEach(d => grp.dailyCost[d] = (grp.dailyCost[d] || 0) + r.dailyCost[d]);
-      grp.total += r.total; grp.cost += r.cost; grp.paid += r.paid; grp.remain += r.remain;
+      grp.total += r.total; grp.chargeP += (r.chargeP || 0); grp.undelivered += (r.undelivered || 0); grp.cost += r.cost; grp.paid += r.paid; grp.opening += (r.opening || 0); grp.remain += r.remain;
       grp.debtNow += r.debtNow; grp.profit += r.profit; grp.noCostOrders += r.noCostOrders;
     });
     const groups = Object.values(g);
@@ -206,8 +232,10 @@
       return;
     }
     const isCost = cnView === 'cost';
-    /* View Giá vốn cần items thật → nạp bulk 1 lần cho khoảng này (async → tự re-render). */
-    if (isCost && _costItemsKey !== (fromISO + '|' + toISO)) _loadCostItems(fromISO, toISO);
+    /* Cần items thật để tính GIÁ VỐN/LỢI NHUẬN → nạp bulk 1 lần cho khoảng này (async → tự re-render).
+       Nạp cho CẢ 2 view (kể cả "Doanh thu & Công nợ") vì cột LỢI NHUẬN + popup ngày cũng cần giá vốn —
+       trước đây chỉ nạp ở view Giá vốn nên giá nhập = 0, lợi nhuận hiện 100% ở view mặc định. */
+    if (_costItemsKey !== (fromISO + '|' + toISO)) _loadCostItems(fromISO, toISO);
     const dailyOf = r => isCost ? r.dailyCost : r.daily;
 
     /* Tổng cột theo ngày + tổng chung */
@@ -222,12 +250,12 @@
     if (!isCost) {
       headRight = `<th class="num" style="background:#DCFCE7">TỔNG PS</th>
         <th class="num" style="background:#DCFCE7">ĐÃ THU</th>
-        <th class="num" style="background:#FEF3C7">CHƯA THU</th>
+        <th class="num" style="background:#FEF3C7" title="Còn phải thu cuối kỳ = Nợ đầu kỳ (mang sang) + Công nợ đã giao trong kỳ − Đã thu. Đơn chưa giao chưa tính.">CÒN PHẢI THU</th>
         <th class="num" style="background:#FEE2E2">CÔNG NỢ HT</th>
         <th class="num" style="background:#EDE9FE">LỢI NHUẬN</th>`;
       bodyRight = r => `<td class="num"><b>${fmt(r.total)}</b></td>
         <td class="num cn-paid">${r.paid ? fmt(r.paid) : '·'}</td>
-        <td class="num cn-owe">${r.remain ? fmt(r.remain) : '·'}</td>
+        <td class="num cn-owe" title="${r.opening ? 'Gồm nợ kỳ trước mang sang ' + Math.round(r.opening).toLocaleString('vi-VN') + 'đ' : 'Không có nợ kỳ trước'}">${r.remain ? fmt(r.remain) : '·'}</td>
         <td class="num">${r.debtNow ? fmt(r.debtNow) : '·'}</td>
         <td class="num" style="font-weight:700;color:${r.profit >= 0 ? '#15803D' : '#B91C1C'}" title="Biên LN ${pct(r.margin)}${r.noCostOrders ? ' · có đơn thiếu giá vốn → ước tính' : ''}">${fmt(r.profit)}${r.noCostOrders ? ' *' : ''}</td>`;
       footRight = `<td class="num">${fmt(gT)}</td><td class="num">${fmt(gPaid)}</td><td class="num">${fmt(gRemain)}</td><td class="num">${fmt(gDebt)}</td><td class="num">${fmt(gProfit)}</td>`;
@@ -296,13 +324,19 @@
     document.getElementById('cnSummary').innerHTML =
       `📅 <b>${ddmm(fromISO)} → ${ddmm(toISO)}</b> · ${data.days.length} ngày · ${data.list.length} đối tác · đơn vị: <b>${dvi}</b> · đang xem: <b>${isCost ? 'Giá vốn & Lợi nhuận' : 'Doanh thu & Công nợ'}</b><br>` +
       `💰 Doanh thu <b>${gT.toLocaleString('vi-VN')}đ</b> · giá vốn <b>${gCost.toLocaleString('vi-VN')}đ</b> · lợi nhuận <b style="color:#15803D">${gProfit.toLocaleString('vi-VN')}đ</b> (biên ${gT ? pct(gProfit / gT) : '0%'}) · đã thu <b style="color:#16A34A">${gPaid.toLocaleString('vi-VN')}đ</b>` +
-      (isCost && _costItemsLoading ? `<br><span style="color:#1D4ED8;font-size:11.5px">⏳ Đang tải giá vốn từng đơn… (bảng sẽ tự cập nhật)</span>` : '') +
-      (anyEst && !(isCost && _costItemsLoading) ? `<br><span class="cn-est-note" style="color:#B45309;font-size:11.5px">* Có đơn thiếu giá vốn (SP ngoài DM / SP chưa có giá nhập) → lợi nhuận là ƯỚC TÍNH (chỉ trừ phần có giá nhập).</span>` : '');
+      (_costItemsLoading ? `<br><span style="color:#1D4ED8;font-size:11.5px">⏳ Đang tải giá vốn từng đơn… (bảng sẽ tự cập nhật)</span>` : '') +
+      (anyEst && !_costItemsLoading ? `<br><span class="cn-est-note" style="color:#B45309;font-size:11.5px">* Có đơn thiếu giá vốn (SP ngoài DM / SP chưa có giá nhập) → lợi nhuận là ƯỚC TÍNH (chỉ trừ phần có giá nhập).</span>` : '');
   };
 
   /* ===== Click ô NGÀY → popup đơn của đối tác trong ngày đó (mã · giá nhập · giá bán · lợi nhuận · %) ===== */
-  window.cnDayOrders = function (custKey, iso) {
+  window.cnDayOrders = async function (custKey, iso) {
     const orders = S().get('orders', window.ORDERS || []) || [];
+    const list = orders.filter(o => o.status !== 'draft' && o.status !== 'cancelled' && (o.cust || o.custName || '—') === custKey && orderISO(o) === iso);
+    /* Bảo đảm có items để tính GIÁ VỐN — nếu chưa nạp (mở popup trước khi bulk-load xong) → kéo ngay. */
+    const need = list.filter(o => !((Array.isArray(o.items) && o.items.length) || _costItems[o.code])).map(o => o.code);
+    if (need.length && window.SB_DATA && window.SB_DATA.getOrderItemsBulk) {
+      try { const map = await window.SB_DATA.getOrderItemsBulk(need); if (map) Object.assign(_costItems, map); } catch (e) { console.warn('[cnDayOrders items]', e); }
+    }
     const _buy = o => {
       const items = (Array.isArray(o.items) && o.items.length) ? o.items : (_costItems[o.code] || []);
       let c = 0, known = false;
@@ -314,7 +348,6 @@
       });
       return { cost: c, known, hasItems: items.length > 0 };
     };
-    const list = orders.filter(o => o.status !== 'draft' && o.status !== 'cancelled' && (o.cust || o.custName || '—') === custKey && orderISO(o) === iso);
     const custName = (list[0] && list[0].custName) || custKey;
     const F = n => (window.fmt ? window.fmt(n) : Math.round(n).toLocaleString('vi-VN'));
     let tSell = 0, tBuy = 0, anyEst = false;
@@ -374,22 +407,22 @@
     const { days, list, fromISO, toISO } = _last;
     const aoa = [];
     aoa.push([`CÔNG NỢ TỔNG HỢP ĐỐI TÁC · ${ddmm(fromISO)} → ${ddmm(toISO)} · đơn vị: ${unit === 1 ? 'đồng' : 'nghìn đồng'}`]);
-    aoa.push(['ĐỐI TÁC', ...days.map(ddmm), 'TỔNG PHÁT SINH', 'GIÁ VỐN', 'LỢI NHUẬN', 'BIÊN %', 'ĐÃ THU', 'CHƯA THU', 'CÔNG NỢ HIỆN TẠI']);
+    aoa.push(['ĐỐI TÁC', ...days.map(ddmm), 'NỢ ĐẦU KỲ', 'PHÁT SINH', 'GIÁ VỐN', 'LỢI NHUẬN', 'BIÊN %', 'ĐÃ THU', 'CÒN PHẢI THU', 'CÔNG NỢ HIỆN TẠI']);
     const colTot = {}; days.forEach(d => colTot[d] = 0);
-    let gT = 0, gCost = 0, gProfit = 0, gPaid = 0, gRemain = 0, gDebt = 0;
+    let gOpen = 0, gT = 0, gCost = 0, gProfit = 0, gPaid = 0, gRemain = 0, gDebt = 0;
     list.forEach(r => {
       const row = [r.name];
       days.forEach(d => { const v = r.daily[d] || 0; colTot[d] += v; row.push(v ? r1(v) : ''); });
       const marginTxt = r.total ? (Math.round(r.margin * 1000) / 10) + '%' : '';
-      row.push(r1(r.total), r1(r.cost), r1(r.profit), marginTxt, r1(r.paid), r1(r.remain), r1(r.debtNow));
-      gT += r.total; gCost += r.cost; gProfit += r.profit; gPaid += r.paid; gRemain += r.remain; gDebt += r.debtNow;
+      row.push(r1(r.opening || 0), r1(r.total), r1(r.cost), r1(r.profit), marginTxt, r1(r.paid), r1(r.remain), r1(r.debtNow));
+      gOpen += (r.opening || 0); gT += r.total; gCost += r.cost; gProfit += r.profit; gPaid += r.paid; gRemain += r.remain; gDebt += r.debtNow;
       aoa.push(row);
     });
     const gMargin = gT ? (Math.round(gProfit / gT * 1000) / 10) + '%' : '';
-    aoa.push(['TỔNG CỘNG', ...days.map(d => colTot[d] ? r1(colTot[d]) : ''), r1(gT), r1(gCost), r1(gProfit), gMargin, r1(gPaid), r1(gRemain), r1(gDebt)]);
+    aoa.push(['TỔNG CỘNG', ...days.map(d => colTot[d] ? r1(colTot[d]) : ''), r1(gOpen), r1(gT), r1(gCost), r1(gProfit), gMargin, r1(gPaid), r1(gRemain), r1(gDebt)]);
     if (list.some(r => r.noCostOrders)) aoa.push(['* Có đơn thiếu giá nhập (SP ngoài DM / chưa có giá nhập) → lợi nhuận là ƯỚC TÍNH.']);
     const ws = window.XLSX.utils.aoa_to_sheet(aoa);
-    ws['!cols'] = [{ wch: 28 }, ...days.map(() => ({ wch: 9 })), { wch: 14 }, { wch: 13 }, { wch: 13 }, { wch: 8 }, { wch: 12 }, { wch: 12 }, { wch: 14 }];
+    ws['!cols'] = [{ wch: 28 }, ...days.map(() => ({ wch: 9 })), { wch: 14 }, { wch: 13 }, { wch: 13 }, { wch: 13 }, { wch: 8 }, { wch: 12 }, { wch: 14 }, { wch: 14 }];
     const wb = window.XLSX.utils.book_new();
     window.XLSX.utils.book_append_sheet(wb, ws, 'Công nợ');
     const fn = `CONG-NO-TONG-HOP_${fromISO}_${toISO}.xlsx`;
@@ -426,7 +459,13 @@
     const rows = Object.keys(r.daily).filter(d => r.daily[d] > 0).sort()
       .map(d => { const sh = r.dailyShift[d] || { s: 0, c: 0 }; return { iso: d, date: isoVN(d), s: sh.s, c: sh.c, tot: r.daily[d] }; });
     const sumS = rows.reduce((a, e) => a + e.s, 0), sumC = rows.reduce((a, e) => a + e.c, 0);
-    const totalPS = r.total, paid = r.paid || 0, remain = r.remain != null ? r.remain : totalPS;
+    /* Công nợ theo kỳ (chuẩn kế toán): Nợ đầu kỳ + Công nợ ĐÃ GIAO trong kỳ − Đã thu = CÒN PHẢI THU.
+       totalPS = tổng đơn trong kỳ (kể cả chưa giao) để KH thấy đủ; nhưng chỉ đòi phần đã giao (chargeP). */
+    const totalPS = r.total, paid = r.paid || 0, opening = r.opening || 0;
+    const chargeP = r.chargeP != null ? r.chargeP : totalPS;
+    const undelivered = r.undelivered != null ? r.undelivered : Math.max(0, totalPS - chargeP);
+    const remain = r.remain != null ? r.remain : (opening + chargeP - paid);
+    const paidEnough = remain <= 0;
 
     /* VietQR ĐỘNG — tự điền đúng SỐ TIỀN CÔNG NỢ + ghi chú "CONG NO <khách>" khi quét. */
     const _noDia = s => (s || '').toString().normalize('NFD').replace(/[̀-ͯ]/g, '').replace(/đ/g, 'd').replace(/Đ/g, 'D').toUpperCase();
@@ -490,8 +529,14 @@
         <thead><tr><th>STT</th><th>Ngày Tháng</th><th>Sáng</th><th>Chiều</th><th>Cộng ngày</th><th>Ghi Chú</th></tr></thead>
         <tbody>${rows.map((e, i) => `<tr><td style="text-align:center">${i + 1}</td><td style="text-align:center">${e.date}</td><td style="text-align:right">${e.s ? money(e.s) : ''}</td><td style="text-align:right">${e.c ? money(e.c) : ''}</td><td style="text-align:right"><b>${money(e.tot)}</b></td><td></td></tr>`).join('') || '<tr><td colspan="6" style="text-align:center;color:#888;padding:12px">Không có phát sinh trong kỳ</td></tr>'}</tbody>
         <tfoot>
-          <tr class="totrow"><td colspan="2" style="text-align:center">Tổng</td><td style="text-align:right">${sumS ? money(sumS) : '-'}</td><td style="text-align:right">${sumC ? money(sumC) : '-'}</td><td style="text-align:right">${money(totalPS)}</td><td></td></tr>
-          <tr class="grand"><td colspan="5" style="text-align:right">TỔNG SỐ TIỀN CÔNG NỢ${paid > 0 ? ' (đã thu ' + money(paid) + 'đ → còn phải thu)' : ''}</td><td style="text-align:right">${money(paid > 0 ? remain : totalPS)}</td></tr>
+          <tr class="totrow"><td colspan="2" style="text-align:center">Tổng phát sinh trong kỳ</td><td style="text-align:right">${sumS ? money(sumS) : '-'}</td><td style="text-align:right">${sumC ? money(sumC) : '-'}</td><td style="text-align:right">${money(totalPS)}</td><td></td></tr>
+          ${undelivered > 0 ? `<tr class="totrow"><td colspan="4" style="text-align:right;color:#B45309;font-style:italic">Đơn chưa giao (chưa tính công nợ)</td><td style="text-align:right;color:#B45309">− ${money(undelivered)}</td><td></td></tr>` : ''}
+          ${opening ? `<tr class="totrow"><td colspan="4" style="text-align:right">Nợ kỳ trước mang sang <span style="font-weight:400;font-style:italic">(trước ${ddmm(_last.fromISO)})</span></td><td style="text-align:right">${opening < 0 ? '− ' + money(-opening) : '+ ' + money(opening)}</td><td></td></tr>` : ''}
+          ${paid > 0 ? `<tr class="totrow"><td colspan="4" style="text-align:right;color:#15803D">Đã thanh toán trong kỳ</td><td style="text-align:right;color:#15803D">− ${money(paid)}</td><td></td></tr>` : ''}
+          <tr class="grand"><td colspan="5" style="text-align:right">CÒN PHẢI THU${opening || paid || undelivered ? ' <span style="font-weight:400;font-size:11px">(nợ cũ + đã giao − đã thu)</span>' : ''}</td><td style="text-align:right">${money(remain > 0 ? remain : 0)}</td></tr>
+          <tr><td colspan="6" style="text-align:center;padding:7px;border:none">${paidEnough
+            ? `<span style="display:inline-block;background:#DCFCE7;color:#15803D;font-weight:800;padding:5px 16px;border-radius:20px">✓ KHÁCH ĐÃ THANH TOÁN ĐỦ${remain < 0 ? ' (dư ' + money(-remain) + 'đ)' : ''}</span>`
+            : `<span style="display:inline-block;background:#FEE2E2;color:#C0392B;font-weight:800;padding:5px 16px;border-radius:20px">⚠ CÒN THIẾU: ${money(remain)} đ</span>`}</td></tr>
         </tfoot>
       </table>
       <div class="ft">
@@ -539,7 +584,11 @@
           'Kỳ: ${ddmm(_last.fromISO)}/${_last.fromISO.slice(0,4)} - ${ddmm(_last.toISO)}/${_last.toISO.slice(0,4)}',''];
         ${JSON.stringify(rows.map((e, i) => `${i + 1}. ${e.date}: ${money(e.tot)}đ` + (e.s && e.c ? ` (Sáng ${money(e.s)} · Chiều ${money(e.c)})` : e.c ? ' (Chiều)' : '')))}.forEach(function(l){lines.push(l)});
         lines.push('');
-        lines.push('TỔNG CÔNG NỢ PHẢI THANH TOÁN: '+${JSON.stringify(money(paid > 0 ? remain : totalPS))}+'đ');
+        lines.push('Tổng phát sinh trong kỳ: '+${JSON.stringify(money(totalPS))}+'đ');
+        ${undelivered > 0 ? `lines.push('Đơn chưa giao (chưa tính công nợ): -'+${JSON.stringify(money(undelivered))}+'đ');` : ''}
+        ${opening ? `lines.push('Nợ kỳ trước mang sang: '+${JSON.stringify((opening < 0 ? '-' : '+') + money(Math.abs(opening)))}+'đ');` : ''}
+        ${paid > 0 ? `lines.push('Đã thanh toán trong kỳ: -'+${JSON.stringify(money(paid))}+'đ');` : ''}
+        lines.push('=> CÒN PHẢI THU: '+${JSON.stringify(money(remain > 0 ? remain : 0))}+'đ'+${JSON.stringify(paidEnough ? ' (ĐÃ THANH TOÁN ĐỦ)' : '')});
         lines.push('STK: '+${JSON.stringify(comp.bank + ' · ' + comp.bankOwner)});
         navigator.clipboard.writeText(lines.join('\\n')).then(function(){alert('✓ Đã copy nội dung — dán gửi khách (Zalo/SMS).');});
       }
@@ -633,7 +682,11 @@
     const _bp = String(comp.bank || '').trim().match(/^(\S+)[\s:]+(\d[\d\s]*\d|\d)$/);
     comp.bankCode = ci.bankCode || (_bp && _bp[1]) || 'MB';
     comp.bankAcc = ci.bankAcc || (_bp && _bp[2].replace(/\s/g, '')) || '228666669999';
-    const totalPS = grp.total, paid = grp.paid || 0, remain = grp.remain != null ? grp.remain : totalPS;
+    const totalPS = grp.total, paid = grp.paid || 0, opening = grp.opening || 0;
+    const chargeP = grp.chargeP != null ? grp.chargeP : totalPS;
+    const undelivered = grp.undelivered != null ? grp.undelivered : Math.max(0, totalPS - chargeP);
+    const remain = grp.remain != null ? grp.remain : (opening + chargeP - paid);
+    const paidEnough = remain <= 0;
     const _noDia = s => (s || '').toString().normalize('NFD').replace(/[̀-ͯ]/g, '').replace(/đ/g, 'd').replace(/Đ/g, 'D').toUpperCase();
     const qrAmt = Math.max(0, Math.round(remain || 0));
     const qrNote = ('CONG NO ' + _noDia(grp.brand)).slice(0, 50);
@@ -705,7 +758,14 @@
         <tfoot>
           <tr class="totrow"><td colspan="2" style="text-align:center">Tổng</td>${colTotCells}</tr>
           <tr class="totrow"><td colspan="2" style="text-align:center">Tổng theo cơ sở</td>${siteTotCells}</tr>
-          <tr class="grand"><td colspan="${nCol - 1}" style="text-align:right">TỔNG SỐ TIỀN CÔNG NỢ${paid > 0 ? ' (đã thu ' + money(paid) + 'đ → còn phải thu)' : ''}</td><td style="text-align:right">${money(paid > 0 ? remain : totalPS)}</td></tr>
+          <tr class="totrow"><td colspan="${nCol - 1}" style="text-align:right">Tổng phát sinh trong kỳ</td><td style="text-align:right">${money(totalPS)}</td></tr>
+          ${undelivered > 0 ? `<tr class="totrow"><td colspan="${nCol - 1}" style="text-align:right;color:#B45309;font-style:italic">Đơn chưa giao (chưa tính công nợ)</td><td style="text-align:right;color:#B45309">− ${money(undelivered)}</td></tr>` : ''}
+          ${opening ? `<tr class="totrow"><td colspan="${nCol - 1}" style="text-align:right">Nợ kỳ trước mang sang (trước ${ddmm(_last.fromISO)})</td><td style="text-align:right">${opening < 0 ? '− ' + money(-opening) : '+ ' + money(opening)}</td></tr>` : ''}
+          ${paid > 0 ? `<tr class="totrow"><td colspan="${nCol - 1}" style="text-align:right;color:#15803D">Đã thanh toán trong kỳ</td><td style="text-align:right;color:#15803D">− ${money(paid)}</td></tr>` : ''}
+          <tr class="grand"><td colspan="${nCol - 1}" style="text-align:right">CÒN PHẢI THU${opening || paid || undelivered ? ' (nợ cũ + đã giao − đã thu)' : ''}</td><td style="text-align:right">${money(remain > 0 ? remain : 0)}</td></tr>
+          <tr><td colspan="${nCol}" style="text-align:center;padding:7px;border:none">${paidEnough
+            ? `<span style="display:inline-block;background:#DCFCE7;color:#15803D;font-weight:800;padding:5px 16px;border-radius:20px">✓ ĐÃ THANH TOÁN ĐỦ${remain < 0 ? ' (dư ' + money(-remain) + 'đ)' : ''}</span>`
+            : `<span style="display:inline-block;background:#FEE2E2;color:#C0392B;font-weight:800;padding:5px 16px;border-radius:20px">⚠ CÒN THIẾU: ${money(remain)} đ</span>`}</td></tr>
         </tfoot>
       </table>
       <div class="ft">Xin Trân Trọng Quý Khách Hàng Đã Tin Tưởng Đồng Hành.<br>Mọi Phản Hồi Xin Liên Hệ Giám Đốc Điều Hành: ${comp.director}</div>
