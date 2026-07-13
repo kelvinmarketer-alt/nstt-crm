@@ -5,7 +5,7 @@
 
 /* Phiên bản app hiển thị (đối chiếu với CACHE_VERSION trong sw.js) — để user tự XÁC NHẬN
    đang chạy bản mới hay còn kẹt JS cũ (hiện ở góc sidebar + log console). */
-window.APP_VERSION = 'v466';
+window.APP_VERSION = 'v467';
 console.log('%c[NSTT] App ' + window.APP_VERSION, 'color:#339B21;font-weight:bold');
 
 /* Gom NGUỒN khách về 3 nhóm chuẩn: 'mkt' / 'sales' / 'sep-gioi-thieu'.
@@ -366,6 +366,82 @@ window.buyPriceOn = function(productId, dateStr) {
   const e = window.priceEntryOn(window.productById(productId), iso || (window.todayISO && window.todayISO()));
   return e ? (+e.buy || 0) : 0;
 };
+
+/* ============ ĐỊNH DẠNG Ô NHẬP TIỀN (mask 112388018 → 112.388.018) ============
+   Áp TOÀN APP tự động: mọi <input type="number"> (mặc định là TIỀN) đổi sang text +
+   hiển thị dấu chấm nghìn LIVE. Override getter `.value` để MỌI nơi đọc (formVal, .value,
+   oninput) vẫn nhận SỐ SẠCH (chỉ chữ số) → không phải sửa 1 dòng đọc nào.
+   BỎ QUA các ô KHÔNG phải tiền: có step thập phân (0.1/0.5…), từ khoá SL/kg/%/markup/công/grace,
+   hoặc max ≤ 100 (phần trăm/đếm nhỏ) → tránh làm hỏng ô số lượng thập phân. */
+(function moneyMaskSetup() {
+  if (typeof document === 'undefined' || !window.HTMLInputElement) return;
+  const NATIVE = Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, 'value');
+  if (!NATIVE || !NATIVE.get) return;
+  /* từ khoá KHÔNG phải tiền (số lượng / cân / phần trăm / thời gian / đếm / mã / điện thoại) */
+  const EXCLUDE = /qty|quantit|so_?luong|sl\b|s[oố] l[uư][ơợ]ng|weight|kh[oố]i l[uư][ơợ]ng|\bkg\b|c[aâ]n\b|percent|phan_?tram|ph[aầ]n tr[aă]m|ty_?le|t[yỷ] l[eệ]|markup|\bcomm|pct|\bgio\b|\bphut|gi[oờ]|grace|\bng[aà]y|\bday|\bmonth|th[aá]ng|\bnam\b|\bn[aă]m|\byear|tuoi|tu[oổ]i|\bstt\b|thu_?tu|th[uứ] t[uự]|\bindex|sdt|phone|dien_?thoai|đi[eệ]n tho[aạ]i|zalo|\brate\b|ty_?gia|t[yỷ] gi[aá]|\bcong\b|c[oô]ng chu[aẩ]n|nc chu[aẩ]n|s[oố] c[oô]ng/i;
+  function raw(v) { const s = String(v == null ? '' : v); const neg = /^\s*-/.test(s); const d = s.replace(/[^\d]/g, ''); return (neg && d ? '-' : '') + d; }
+  function grp(r) { if (!r || r === '-') return ''; const neg = r[0] === '-'; const d = r.replace(/\D/g, ''); return (neg ? '-' : '') + (d ? Number(d).toLocaleString('vi-VN') : ''); }
+  function isMoney(el) {
+    if (el.dataset.money === '0' || el.classList.contains('no-money')) return false;
+    if (el.dataset.money === '1' || el.classList.contains('js-money')) return true;
+    const step = (el.getAttribute('step') || '').trim();
+    if (step && parseFloat(step) > 0 && parseFloat(step) < 1) return false;   /* step thập phân → SL/%/cân */
+    if (/[.,]\d/.test(el.getAttribute('value') || '')) return false;          /* giá trị mặc định thập phân */
+    const mx = parseFloat(el.getAttribute('max') || '');
+    if (!isNaN(mx) && mx <= 100) return false;                                /* max ≤100 → % / đếm nhỏ */
+    let labTxt = '';
+    if (el.id) { const l = document.querySelector('label[for="' + el.id + '"]'); if (l) labTxt = l.textContent; }
+    if (!labTxt) { const lc = el.closest('label'); if (lc) labTxt = lc.textContent; }
+    const hay = [el.id, el.name, el.getAttribute('placeholder'), el.getAttribute('aria-label'), el.className, labTxt].join(' ').toLowerCase();
+    if (EXCLUDE.test(hay)) return false;
+    return true;   /* mặc định: ô number = TIỀN */
+  }
+  function reformat(el) {
+    const nv = NATIVE.get.call(el);
+    const caret = el.selectionStart;
+    const leftDigits = raw(nv.slice(0, caret == null ? nv.length : caret)).replace('-', '').length;
+    const out = grp(raw(nv));
+    if (out === nv) return;
+    NATIVE.set.call(el, out);
+    let p = 0, seen = 0; while (p < out.length && seen < leftDigits) { if (/\d/.test(out[p])) seen++; p++; }
+    try { el.setSelectionRange(p, p); } catch (e) {}
+  }
+  function enhance(el) {
+    if (!el || el.nodeType !== 1 || el.tagName !== 'INPUT' || el.dataset.moneyEnhanced) return;
+    const t = (el.getAttribute('type') || 'text').toLowerCase();
+    const forced = el.dataset.money === '1' || el.classList.contains('js-money');
+    if (t !== 'number' && !(forced && t === 'text')) return;
+    if (!isMoney(el)) { el.dataset.moneyEnhanced = 'skip'; return; }
+    el.dataset.moneyEnhanced = '1';
+    el.dataset.money = '1';
+    if (t === 'number') el.setAttribute('type', 'text');
+    el.setAttribute('inputmode', 'numeric');
+    NATIVE.set.call(el, grp(raw(NATIVE.get.call(el))));   /* format giá trị ban đầu */
+    /* getter trả SỐ SẠCH cho mọi nơi đọc; setter tự format khi gán */
+    try {
+      Object.defineProperty(el, 'value', {
+        configurable: true,
+        get() { return raw(NATIVE.get.call(el)); },
+        set(v) { NATIVE.set.call(el, grp(raw(v))); },
+      });
+    } catch (e) {}
+    el.addEventListener('input', function () { reformat(el); });
+  }
+  function scan(root) { try { (root || document).querySelectorAll('input').forEach(enhance); } catch (e) {} }
+  /* focus = chắc chắn enhance trước khi gõ; observer = bắt ô trong popup động; scan đầu = HTML tĩnh */
+  document.addEventListener('focusin', function (e) { if (e.target && e.target.tagName === 'INPUT') enhance(e.target); }, true);
+  try {
+    new MutationObserver(function (muts) {
+      for (const m of muts) for (const n of m.addedNodes) {
+        if (n.nodeType !== 1) continue;
+        if (n.tagName === 'INPUT') enhance(n); else if (n.querySelectorAll) scan(n);
+      }
+    }).observe(document.documentElement, { childList: true, subtree: true });
+  } catch (e) {}
+  if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', function () { scan(document); });
+  else scan(document);
+  window.enhanceMoneyInputs = scan;   /* gọi tay sau khi render bảng nếu cần */
+})();
 
 /* ===== CÔNG CHUẨN (NC chuẩn) theo phòng ban =====
    - Khối VĂN PHÒNG: theo LỊCH tháng — T2-T6 = 1 công · T7 = 0.5 (nghỉ chiều) · CN = 0 (nghỉ).
