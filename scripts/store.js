@@ -252,6 +252,7 @@
     'khoDuty',         /* Lịch TRỰC KHO {date:{sang:[],chieu:[],note}} — nguồn DUY NHẤT sinh tiền trực kho */
     'bonusLog',        /* Sổ ghi thưởng hỗ trợ hàng ngày [{date,staffId,task,weight,farId,amount}] — tự vào phiếu lương */
     'pod_photos',      /* Ảnh giao hàng — MED (base64 lớn) */
+    'shipperTokens',   /* Token link giao hàng riêng mỗi shipper {shipperId: token} — staff/shippers KHÔNG có cột link_token nên PHẢI lưu KV */
     'telegramChannels', /* Cấu hình routing (legacy, deprecated) */
     /* usage_stats: KHÔNG sync — tracker theo per-machine (deviceId) */
   ]);

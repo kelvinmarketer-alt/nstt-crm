@@ -17,26 +17,34 @@
   const ordList = () => (S().get('orders', window.ORDERS || []) || []);
   /* Nhân viên có vị trí SHIP (phần Nhân sự: dept/role = Ship / giao hàng / vận hành) */
   const _isShipStaff = s => /ship|giao\s*h[àa]ng|v[ậa]n\s*h[àa]nh/i.test((s.dept || '') + ' ' + (s.role || ''));
-  /* Danh sách shipper = SHIP CỐ ĐỊNH (từ Nhân sự) + SHIP NGOÀI (guest). Token lưu trên hồ sơ tương ứng. */
+  /* Token link riêng mỗi shipper — LƯU KV 'shipperTokens' {id: token} (staff/shippers KHÔNG có cột link_token → phải KV) */
+  const shipTokenMap = () => (S().get('shipperTokens', {}) || {});
+  /* Danh sách shipper = SHIP CỐ ĐỊNH (Nhân sự phòng Ship) + SHIP NGOÀI (guest). Token lấy từ KV. */
   const shippers = () => {
+    const tk = shipTokenMap();
     const staff = (S().get('staff', window.STAFF || []) || [])
       .filter(s => s && s.name && s.status !== 'inactive' && _isShipStaff(s))
-      .map(s => ({ id: s.id, name: s.name, linkToken: s.linkToken, guest: false }));
+      .map(s => ({ id: s.id, name: s.name, linkToken: tk[s.id], guest: false }));
     const guests = (S().get('shippers', window.DRIVERS || []) || [])
       .filter(s => s && s.name && s.guest)
-      .map(s => ({ id: s.id, name: s.name, linkToken: s.linkToken, guest: true }));
+      .map(s => ({ id: s.id, name: s.name, linkToken: tk[s.id], guest: true }));
     return staff.concat(guests);
   };
   const ordByCode = code => ordList().find(o => o.code === code);
   const isTransit = o => o.status === 'transit' || o.status === 'pickup';   /* pickup = đơn cũ đã dispatch trước bản v455 */
-  /* Shipper đang xem: ưu tiên TOKEN (?ship=), fallback ?me= (link cũ). Token không tra được tên → không lộ đơn ai. */
+  /* Đã nạp xong dữ liệu để tra token chưa (tránh báo "hết hạn" oan khi đang tải) */
+  const _tokReady = () => { const st = S(); return st.isPreloaded ? (st.isPreloaded('shipperTokens') && (st.isPreloaded('staff') || st.isPreloaded('shippers'))) : (Object.keys(shipTokenMap()).length > 0); };
+  /* Shipper đang xem: ưu tiên TOKEN (?ship=), fallback ?me= (link cũ). */
   function resolveMe() {
     if (SHIP_TOKEN) {
-      const list = shippers();
-      const s = list.find(x => x.linkToken === SHIP_TOKEN);
-      if (s) return { name: s.name };
-      if (!list.length) return { name: '', loading: true };
-      return { name: '', invalid: true };
+      const tk = shipTokenMap();
+      const id = Object.keys(tk).find(k => tk[k] === SHIP_TOKEN);
+      if (id) {
+        const sp = shippers().find(x => x.id === id);
+        if (sp) return { name: sp.name };
+        return _tokReady() ? { name: '', invalid: true } : { name: '', loading: true };   /* NV nghỉ/xoá → invalid */
+      }
+      return _tokReady() ? { name: '', invalid: true } : { name: '', loading: true };
     }
     return { name: (qs.get('me') || '').trim() };
   }
@@ -245,12 +253,13 @@
         ${guestId ? `<button class="btn btn-ghost btn-sm" onclick="window.ghRemoveGuest('${guestId}')" title="Xoá ship ngoài (link hết hiệu lực)" style="flex-shrink:0;color:#DC2626">🗑</button>` : ''}
       </div>`;
     const list = shippers();
-    /* Đảm bảo mỗi shipper có 1 token cố định (sinh 1 lần, lưu vào hồ sơ shipper) */
-    const withTok = list.map(s => {
-      let tok = s.linkToken;
-      if (!tok) { tok = _mkToken(); S().update(s.guest ? 'shippers' : 'staff', s.id, { linkToken: tok }); }   /* cố định → lưu hồ sơ nhân sự; ngoài → guest */
-      return { id: s.id, name: s.name, tok, guest: !!s.guest };
-    });
+    const tk = shipTokenMap();
+    /* Token CỐ ĐỊNH trong KV (sinh 1 lần, giữ mãi). Sinh cho ai chưa có rồi lưu 1 lần qua rmwKv. */
+    const withTok = list.map(s => ({ id: s.id, name: s.name, tok: tk[s.id] || _mkToken(), guest: !!s.guest }));
+    const need = withTok.filter(x => !tk[x.id]);
+    if (need.length && S().rmwKv) {
+      S().rmwKv('shipperTokens', m => { m = m || {}; withTok.forEach(x => { if (!m[x.id]) m[x.id] = x.tok; }); return m; }, {});
+    }
     const perm = withTok.filter(s => !s.guest);
     const guests = withTok.filter(s => s.guest);
     const permRows = perm.length ? perm.map(s => item('🛵 ' + esc(s.name), base + '?ship=' + s.tok)).join('')
@@ -274,17 +283,20 @@
     const el = document.getElementById('ghGuestName');
     const name = el ? el.value.trim() : '';
     if (!name) { window.toast && window.toast('Nhập tên ship ngoài', 'warn'); return; }
-    S().add('shippers', { id: 'SHPG' + Date.now().toString(36).toUpperCase(), name, phone: '', active: true, guest: true, linkToken: _mkToken(), createdAt: nowISO() });
+    const id = 'SHPG' + Date.now().toString(36).toUpperCase();
+    S().add('shippers', { id, name, phone: '', active: true, guest: true, createdAt: nowISO() });
+    if (S().rmwKv) S().rmwKv('shipperTokens', m => { m = m || {}; if (!m[id]) m[id] = _mkToken(); return m; }, {});   /* token vào KV (giữ mãi) */
     window.toast && window.toast('➕ Đã tạo ship ngoài: ' + name, 'success');
     if (window.closeModal) window.closeModal();
-    setTimeout(() => window.ghShipLinks(), 130);   /* mở lại modal để hiện link mới */
+    setTimeout(() => window.ghShipLinks(), 200);   /* mở lại modal để hiện link mới */
   };
   window.ghRemoveGuest = function (id) {
     if (!confirm('Xoá ship ngoài này? Link của họ sẽ hết hiệu lực.')) return;
     S().remove('shippers', id);
+    if (S().rmwKv) S().rmwKv('shipperTokens', m => { if (m) delete m[id]; return m || {}; }, {});   /* thu hồi token */
     window.toast && window.toast('Đã xoá ship ngoài', 'info');
     if (window.closeModal) window.closeModal();
-    setTimeout(() => window.ghShipLinks(), 130);
+    setTimeout(() => window.ghShipLinks(), 150);
   };
   window._ghCopy = function (t) {
     if (navigator.clipboard && navigator.clipboard.writeText) {
@@ -348,10 +360,11 @@
     render();
     S().subscribe('orders', render);
     S().subscribe('staff', render);      /* ship CỐ ĐỊNH lấy từ Nhân sự (phòng Ship) */
-    S().subscribe('shippers', render);   /* ship NGOÀI (guest) + token */
+    S().subscribe('shippers', render);   /* ship NGOÀI (guest) */
+    S().subscribe('shipperTokens', render);   /* token link (KV) về → tra ra tên shipper */
     S().subscribe('pod_photos', render);   /* cập nhật số đếm 📷 Ảnh (N) */
-    S().subscribe('__preloaded__', k => { if (k === 'orders' || k === 'staff' || k === 'shippers' || k === 'pod_photos') render(); });
-    setTimeout(() => { S().get('orders', window.ORDERS || []); S().get('staff', window.STAFF || []); S().get('shippers', window.DRIVERS || []); S().get('pod_photos', {}); }, 300);
+    S().subscribe('__preloaded__', k => { if (['orders', 'staff', 'shippers', 'shipperTokens', 'pod_photos'].includes(k)) render(); });
+    setTimeout(() => { S().get('orders', window.ORDERS || []); S().get('staff', window.STAFF || []); S().get('shippers', window.DRIVERS || []); S().get('shipperTokens', {}); S().get('pod_photos', {}); }, 300);
   }
   if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', init);
   else init();
