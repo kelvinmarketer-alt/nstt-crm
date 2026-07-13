@@ -27,10 +27,12 @@
   .gh-money{font-weight:800;color:var(--navy)}
   .gh-ship{font-weight:700;color:#0EA5E9}
   .gh-noship{color:#B45309}
-  .gh-act{display:flex;gap:8px;flex-shrink:0}
-  .gh-btn{border:0;border-radius:9px;padding:10px 15px;font-size:13.5px;font-weight:800;cursor:pointer;color:#fff;white-space:nowrap}
+  .gh-act{display:flex;flex-direction:column;gap:6px;flex-shrink:0;min-width:210px}
+  .gh-act-row{display:flex;gap:8px}
+  .gh-act-row .gh-btn{flex:1}
+  .gh-btn{border:0;border-radius:9px;padding:11px 14px;font-size:13.5px;font-weight:800;cursor:pointer;color:#fff;white-space:nowrap;text-align:center}
   .gh-btn:active{transform:scale(.97)}
-  .gh-go{background:#0EA5E9}
+  .gh-photo{background:#0EA5E9}
   .gh-done{background:#15803D}
   .gh-ret{background:#EA580C}
   .gh-empty{padding:44px 20px;text-align:center;color:var(--muted);font-size:14px}
@@ -48,12 +50,12 @@
   .ght-note{flex:1;min-width:0;padding:7px 8px;border:1px solid var(--line);border-radius:7px;font-size:12.5px}
   /* Ship mode + điện thoại: nút xuống dòng full-width, to cho dễ bấm 1 tay */
   html.embed .gh-row{flex-wrap:wrap;padding:14px 16px}
-  html.embed .gh-act{width:100%}
-  html.embed .gh-btn{flex:1;padding:15px;font-size:15px}
+  html.embed .gh-act{width:100%;min-width:0}
+  html.embed .gh-btn{padding:16px;font-size:15px}
   @media (max-width:560px){
     .gh-row{flex-wrap:wrap}
-    .gh-act{width:100%}
-    .gh-btn{flex:1;padding:13px}
+    .gh-act{width:100%;min-width:0}
+    .gh-btn{padding:14px}
     .gh-meta{white-space:normal}
     .gh-tab{font-size:13px;min-width:0}
   }

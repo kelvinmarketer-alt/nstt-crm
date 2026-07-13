@@ -11,6 +11,9 @@
   const qs = new URLSearchParams(location.search);
   const SHIP_TOKEN = (qs.get('ship') || '').trim();          /* link bảo mật riêng mỗi shipper */
   const SHIP_MODE = qs.get('mode') === 'ship' || !!SHIP_TOKEN;
+  /* Chỉ người ĐĂNG NHẬP tài khoản (mở board đầy đủ) mới được gán/đổi shipper.
+     Vào bằng link shipper (SHIP_MODE) → KHÔNG có nút gán (tránh shipper tự chuyển đơn cho người khác). */
+  const CAN_ASSIGN = !SHIP_MODE;
 
   const nowISO = () => new Date().toISOString();
   const fmt = n => (window.fmt ? window.fmt(n) : Number(n || 0).toLocaleString('vi-VN'));
@@ -72,16 +75,19 @@
     const money = o.freight ? ` · <span class="gh-money">${fmt(o.freight)}₫</span>` : '';
     const ship = o.driverName ? `<span class="gh-ship">🛵 ${esc(o.driverName)}</span>` : `<span class="gh-ship gh-noship">🛵 chưa gán</span>`;
     const podN = ((S().get('pod_photos', {}) || {})[o.code] || []).length;
+    /* Nút GÁN chỉ hiện cho người ĐĂNG NHẬP tài khoản (kho/điều phối) — shipper vào bằng link KHÔNG được gán */
+    const gan = CAN_ASSIGN ? `<a href="javascript:void(0)" onclick="ghAssignShipper('${esc(o.code)}')" style="color:#0EA5E9;font-size:11px;margin-left:6px;white-space:nowrap">✎ gán</a>` : '';
     return `<div class="gh-row">
       <div class="gh-main">
         <div class="gh-title"><span class="gh-code">#${esc(o.code)}</span><b class="gh-cust">${cust}</b></div>
-        <div class="gh-meta">📍 ${esc(shortAddr(o.drop))} · 📦 ${esc(itemsSummary(o))}${money} · ${ship}
-          <a href="javascript:void(0)" onclick="ghAssignShipper('${esc(o.code)}')" style="color:#0EA5E9;font-size:11px;margin-left:2px;white-space:nowrap">✎ gán</a>
-          <a href="javascript:void(0)" onclick="ghAddPhoto('${esc(o.code)}')" style="color:${podN ? '#15803D' : '#0EA5E9'};font-size:11px;margin-left:6px;white-space:nowrap" title="Chụp/chọn ảnh giao hàng (bằng chứng)">📷 Ảnh${podN ? ' (' + podN + ')' : ''}</a></div>
+        <div class="gh-meta">📍 ${esc(shortAddr(o.drop))} · 📦 ${esc(itemsSummary(o))}${money} · ${ship}${gan}</div>
       </div>
       <div class="gh-act">
-        <button class="gh-btn gh-done" onclick="ghGiaoXong('${esc(o.code)}')">✅ Giao xong</button>
-        <button class="gh-btn gh-ret" onclick="ghBaoTra('${esc(o.code)}')">↩️ Trả</button>
+        <button class="gh-btn gh-photo" onclick="ghAddPhoto('${esc(o.code)}')" title="Chụp mới hoặc chọn ảnh trong máy làm bằng chứng giao hàng">📷 Chụp/Chọn ảnh giao${podN ? ' · ' + podN + ' ảnh' : ''}</button>
+        <div class="gh-act-row">
+          <button class="gh-btn gh-done" onclick="ghGiaoXong('${esc(o.code)}')">✅ Giao xong</button>
+          <button class="gh-btn gh-ret" onclick="ghBaoTra('${esc(o.code)}')">↩️ Trả</button>
+        </div>
       </div>
     </div>`;
   }
