@@ -587,6 +587,11 @@ Mong quý khách thu xếp thanh toán sớm. Cảm ơn!
         ⚠️ Số tiền thu lớn hơn tổng nợ — số dư thừa sẽ ghi nhận như "trả trước".
       </div>
       <div class="form-row wide">
+        <label>Thanh toán cho kỳ công nợ nào? *</label>
+        <select id="rPeriod">${_periodOptions(_periodKeyOf(_todayD()))}</select>
+        <div style="font-size:11.5px;color:var(--muted);margin-top:3px">Phiếu sẽ ghi nhận vào ĐÚNG kỳ này ở bảng công nợ (dù ngày thu thực nằm kỳ khác). VD thu ngày 20 nhưng trả cho Kỳ 1 → chọn Kỳ 1.</div>
+      </div>
+      <div class="form-row wide">
         <label>Diễn giải</label>
         <textarea id="rDesc" rows="2">Thanh toán công nợ ${c.code} ${c.name}</textarea>
       </div>
@@ -625,6 +630,7 @@ Mong quý khách thu xếp thanh toán sớm. Cảm ơn!
     const dateInput = window.formVal('#rDate');
     const date = dateInput ? new Date(dateInput).toLocaleDateString('vi-VN') : new Date().toLocaleDateString('vi-VN');
     const account = window.formVal('#rAccount');
+    const payPeriod = window.formVal('#rPeriod') || _periodKeyOf(_todayD());   /* kỳ công nợ phiếu áp vào */
     const desc = window.formVal('#rDesc') || 'Thanh toán công nợ';
     const phieuNo = window.formVal('#rNo');
 
@@ -656,10 +662,10 @@ Mong quý khách thu xếp thanh toán sớm. Cảm ơn!
       staff: window.CURRENT_USER.name,
     });
 
-    /* Ghi SỔ CÔNG NỢ (payment) */
+    /* Ghi SỔ CÔNG NỢ (payment) — kèm KỲ kế toán chọn → bảng công nợ + bộ lọc rơi đúng kỳ */
     window.addDebtLedger && window.addDebtLedger({
-      custId, type: 'payment', amount, ref: phieuNo, date,
-      desc: desc + (appliedInvoices.length ? ' (' + appliedInvoices.length + ' HĐ)' : ''),
+      custId, type: 'payment', amount, ref: phieuNo, date, payPeriod,
+      desc: desc + (appliedInvoices.length ? ' (' + appliedInvoices.length + ' HĐ)' : '') + ' · ' + _periodShort(payPeriod),
     });
 
     /* Số dư TK tính ĐỘNG từ cashEntries (phiếu thu 'in' đã ghi ở trên) — KHÔNG cộng dồn field balance. */
@@ -687,6 +693,17 @@ Mong quý khách thu xếp thanh toán sớm. Cảm ơn!
     if (!c) return null;
     return { ...c, staffOwner: c.staffOwner || STAFF_MAP[c.id] || 'Hoàng Mai' };
   }
+  /* ===== KỲ CÔNG NỢ cho phiếu thu (kỳ 1 = ngày 1–15, kỳ 2 = 16–cuối tháng). payPeriod = 'YYYY-MM-1|2' ===== */
+  function _todayD() { return window.todayDate ? window.todayDate() : new Date(); }
+  function _periodKeyOf(d) { const y = d.getFullYear(), mo = String(d.getMonth() + 1).padStart(2, '0'), h = d.getDate() <= 15 ? 1 : 2; return `${y}-${mo}-${h}`; }
+  function _periodLabel(k) { const m = String(k).match(/^(\d{4})-(\d{2})-([12])$/); return m ? `Kỳ ${m[3]} · Tháng ${+m[2]}/${m[1]} (${m[3] === '1' ? 'ngày 1–15' : 'ngày 16–cuối'})` : (k || '—'); }
+  function _periodShort(k) { const m = String(k).match(/^(\d{4})-(\d{2})-([12])$/); return m ? `Kỳ ${m[3]}/T${+m[2]}` : ''; }
+  function _periodOptions(sel) {
+    const t = _todayD(); let y = t.getFullYear(), mo = t.getMonth(); const list = [];
+    for (let i = 0; i < 6; i++) { const mm = String(mo + 1).padStart(2, '0'); list.push(`${y}-${mm}-2`); list.push(`${y}-${mm}-1`); mo--; if (mo < 0) { mo = 11; y--; } }
+    if (sel && !list.includes(sel)) list.unshift(sel);
+    return list.map(k => `<option value="${k}" ${k === sel ? 'selected' : ''}>${_periodLabel(k)}</option>`).join('');
+  }
   function _payDateISO(ddmmyyyy) {
     const m = String(ddmmyyyy || '').match(/(\d{1,2})\/(\d{1,2})\/(\d{4})/);
     if (m) return `${m[3]}-${String(m[2]).padStart(2, '0')}-${String(m[1]).padStart(2, '0')}`;
@@ -710,8 +727,9 @@ Mong quý khách thu xếp thanh toán sớm. Cảm ơn!
     const body = pays.length ? pays.map(e => {
       const ret = _isReturnCredit(e);
       const acc = accOf(e.ref);
+      const kyTag = e.payPeriod ? `<span style="background:#EDE9FE;color:#5B21B6;font-size:9px;padding:0 5px;border-radius:5px;white-space:nowrap">${_periodShort(e.payPeriod)}</span>` : '';
       return `<tr style="border-top:1px solid var(--line)">
-        <td style="padding:7px 8px;white-space:nowrap">${e.date || '—'}</td>
+        <td style="padding:7px 8px;white-space:nowrap">${e.date || '—'}${kyTag ? '<br>' + kyTag : ''}</td>
         <td style="padding:7px 8px;font-family:ui-monospace,monospace;font-size:11px">${e.ref || '—'}${ret ? ' <span style="background:#FEF3C7;color:#B45309;font-size:9px;padding:0 4px;border-radius:5px">trả hàng</span>' : ''}</td>
         <td style="padding:7px 8px;font-size:11.5px;color:var(--muted)">${(e.desc || '').replace(/</g, '&lt;')}${acc ? '<br>TK: ' + acc : ''}</td>
         <td style="padding:7px 8px;text-align:right;font-weight:700;color:#15803D">${F(+e.amount || 0)}</td>
@@ -766,6 +784,8 @@ Mong quý khách thu xếp thanh toán sớm. Cảm ơn!
         <div><label>Ngày thu</label><input id="epDate" type="date" value="${_payDateISO(pay.date)}"></div>
         <div><label>Số tiền thu *</label><input id="epAmount" type="number" value="${+pay.amount || 0}"></div>
       </div>
+      <div class="form-row wide"><label>Thanh toán cho kỳ công nợ nào?</label>
+        <select id="epPeriod">${_periodOptions(pay.payPeriod || _periodKeyOf(_todayD()))}</select></div>
       <div class="form-row wide"><label>Diễn giải</label><textarea id="epDesc" rows="2">${(pay.desc || '').replace(/</g, '&lt;')}</textarea></div>
       <div style="font-size:11.5px;color:var(--muted)">Lưu sẽ cập nhật sổ quỹ (${pay.ref || '—'}) và tự tính lại công nợ theo chênh lệch.</div>
     `, {
@@ -782,10 +802,11 @@ Mong quý khách thu xếp thanh toán sớm. Cảm ơn!
     if (!newAmt) { window.toast && window.toast('Nhập số tiền', 'warn'); return; }
     const dISO = window.formVal('#epDate');
     const newDate = dISO ? new Date(dISO).toLocaleDateString('vi-VN') : pay.date;
+    const newPeriod = window.formVal('#epPeriod') || pay.payPeriod || '';
     const newDesc = window.formVal('#epDesc') || pay.desc;
     const oldAmt = +pay.amount || 0, custId = pay.custId;
-    /* ledger (KV) */
-    window.STORE.rmwKv('debtLedger', arr => (Array.isArray(arr) ? arr : []).map(e => e.id === ledgerId ? { ...e, amount: newAmt, date: newDate, ts: (dISO ? new Date(dISO).toISOString() : e.ts), desc: newDesc } : e));
+    /* ledger (KV) — cập nhật cả KỲ công nợ phiếu áp vào */
+    window.STORE.rmwKv('debtLedger', arr => (Array.isArray(arr) ? arr : []).map(e => e.id === ledgerId ? { ...e, amount: newAmt, date: newDate, ts: (dISO ? new Date(dISO).toISOString() : e.ts), payPeriod: newPeriod, desc: newDesc } : e));
     /* sổ quỹ (bảng cash_entries, key = no = ref) — đồng bộ cả số tiền/ngày/diễn giải */
     if (pay.ref) window.STORE.update('cashEntries', pay.ref, { amount: newAmt, date: newDate, desc: newDesc });
     /* công nợ theo delta: thu nhiều hơn → nợ giảm thêm (oldAmt - newAmt) */

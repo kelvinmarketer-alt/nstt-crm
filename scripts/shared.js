@@ -5,7 +5,7 @@
 
 /* Phiên bản app hiển thị (đối chiếu với CACHE_VERSION trong sw.js) — để user tự XÁC NHẬN
    đang chạy bản mới hay còn kẹt JS cũ (hiện ở góc sidebar + log console). */
-window.APP_VERSION = 'v465';
+window.APP_VERSION = 'v466';
 console.log('%c[NSTT] App ' + window.APP_VERSION, 'color:#339B21;font-weight:bold');
 
 /* Gom NGUỒN khách về 3 nhóm chuẩn: 'mkt' / 'sales' / 'sep-gioi-thieu'.
@@ -438,6 +438,9 @@ window.addDebtLedger = function (e) {
     amount: Math.round(+e.amount || 0),
     ref: e.ref || '',
     desc: e.desc || '',
+    /* Kỳ công nợ phiếu thu áp vào (payment) — 'YYYY-MM-1'|'YYYY-MM-2' (kỳ 1 = ngày 1–15, kỳ 2 = 16–cuối).
+       Kế toán chọn khi tạo phiếu → phiếu rơi đúng kỳ dù ngày thu thực nằm kỳ khác. '' = theo ngày thu. */
+    payPeriod: e.payPeriod || '',
   };
   if (!entry.amount) return;
   /* rmwKv: áp lên bản CLOUD MỚI NHẤT → 2 NV ghi phiếu thu/bút toán cùng lúc KHÔNG mất của nhau

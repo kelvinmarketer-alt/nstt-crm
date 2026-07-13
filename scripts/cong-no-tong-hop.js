@@ -38,6 +38,15 @@
     if (e.ts) { const d = new Date(e.ts); if (!isNaN(d)) return isoOf(d); }
     return '';
   }
+  /* Ngày ĐẠI DIỆN của kỳ mà phiếu thu được KẾ TOÁN CHỈ ĐỊNH (payPeriod 'YYYY-MM-1|2').
+     Kỳ 1 → ngày 01, Kỳ 2 → ngày 16 (đều nằm trong kỳ) → lọc theo khoảng ngày vẫn đúng kỳ. */
+  function kyRefISO(pp) {
+    const m = String(pp || '').match(/^(\d{4})-(\d{2})-([12])$/);
+    if (!m) return '';
+    return m[3] === '1' ? `${m[1]}-${m[2]}-01` : `${m[1]}-${m[2]}-16`;
+  }
+  /* Ngày phân bổ phiếu thu vào kỳ công nợ: ưu tiên kỳ kế toán CHỌN (payPeriod); chưa chọn → ngày thu. */
+  function paymentISO(e) { return kyRefISO(e.payPeriod) || ledgerISO(e); }
   function dayList(fromISO, toISO) {
     const out = [];
     let d = new Date(fromISO + 'T00:00:00'), end = new Date(toISO + 'T00:00:00');
@@ -154,12 +163,12 @@
     });
     ledger.forEach(e => {
       if (e.type !== 'payment') return;
-      const iso = ledgerISO(e); if (!iso || iso >= fromISO) return;
+      const iso = paymentISO(e); if (!iso || iso >= fromISO) return;   /* theo KỲ kế toán chọn */
       openPaid[e.custId] = (openPaid[e.custId] || 0) + (+e.amount || 0);
     });
-    /* Đã thu trong kỳ (phiếu thu) + nợ đầu kỳ + còn phải thu + công nợ hiện tại + lợi nhuận */
+    /* Đã thu trong kỳ (phiếu thu — theo kỳ kế toán chọn) + nợ đầu kỳ + còn phải thu + công nợ HT + lợi nhuận */
     Object.values(rows).forEach(r => {
-      r.paid = ledger.filter(e => e.custId === r.key && e.type === 'payment' && daySet.has(ledgerISO(e)))
+      r.paid = ledger.filter(e => e.custId === r.key && e.type === 'payment' && daySet.has(paymentISO(e)))
         .reduce((s, e) => s + (+e.amount || 0), 0);
       r.opening = (openCharge[r.key] || 0) - (openPaid[r.key] || 0);   /* nợ kỳ trước mang sang (đã giao) */
       r.remain = r.opening + r.chargeP - r.paid;   /* CÒN PHẢI THU cuối kỳ = luỹ kế công nợ đã giao − đã thu */
