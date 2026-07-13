@@ -97,7 +97,11 @@
 <script src="../scripts/supabase-client.js"></script>
 <script src="../scripts/shared.js"></script><script src="../scripts/store.js"></script>
 <script src="../scripts/auth.js"></script><script src="../scripts/help-tips.js"></script>
-<script>if(window.AUTH) window.AUTH.requireAuth();</script>
+<script>
+/* Link shipper CÓ TOKEN (?ship=…) mở thẳng — KHÔNG cần đăng nhập (token là chìa khoá, dữ liệu đọc/ghi qua anon key).
+   Mọi URL khác (kho, ?mode=ship không token) vẫn yêu cầu đăng nhập. */
+(function(){ try{ if(new URLSearchParams(location.search).get('ship')) return; }catch(e){} if(window.AUTH) window.AUTH.requireAuth(); })();
+</script>
 <script src="../data/orders.js"></script>
 <script src="../scripts/giao-hang.js"></script>
 <script src="../scripts/system-core.js"></script>
