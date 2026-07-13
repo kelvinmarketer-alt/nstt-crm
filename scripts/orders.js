@@ -1139,7 +1139,7 @@
       </div>
       <!-- ====== YÊU CẦU GIAO CỦA KHÁCH (ngày + ca + giờ) ====== -->
       <div class="form-row">
-        <div><label>📅 Ngày giao ${window.helpTip ? window.helpTip('Ngày KH muốn nhận hàng — Kho gom đơn + đặt NCC theo ngày này. KHÔNG chọn ngày quá khứ (không giao trước khi đặt).') : ''}</label><input id="oDeliverDate" type="date" min="${(window.todayDate?window.todayDate():new Date()).toISOString().slice(0,10)}" value="${(window.todayDate?window.todayDate():new Date()).toISOString().slice(0,10)}"></div>
+        <div><label>📅 Ngày giao ${window.helpTip ? window.helpTip('Ngày KH nhận hàng — Kho gom đơn + đặt NCC theo ngày này. Nhập đơn giao hôm qua (giao trễ) vẫn được; cảnh báo nếu lùi quá 1 ngày.') : ''}</label><input id="oDeliverDate" type="date" value="${(window.todayDate?window.todayDate():new Date()).toISOString().slice(0,10)}"></div>
         <div><label>🕐 Ca giao</label>
           <select id="oShipShift" onchange="window._oShiftHint(this.value)"><option value="">— chọn ca —</option><option value="Sáng">Sáng</option><option value="Trưa">Trưa</option><option value="Chiều">Chiều</option><option value="Tối">Tối</option></select>
           <div id="oShiftHint" style="font-size:11.5px;color:#92400E;margin-top:4px;display:none;line-height:1.45"></div></div>
@@ -1267,6 +1267,13 @@
       box.innerHTML = '<div style="font-size:12px;color:var(--muted);padding:4px 0">Chưa có mặt hàng. Chọn sản phẩm + số lượng rồi bấm "+ Thêm".</div>';
     } else {
       const total = orderItems.reduce((s, x) => s + x.total, 0);
+      /* GIÁ NHẬP theo đúng NGÀY ĐƠN (priceHistory[].buy) → lợi nhuận từng dòng + tổng đơn */
+      const _odate = (document.getElementById('oDeliverDate') && document.getElementById('oDeliverDate').value) || window._editOrderDate || (window.todayISO && window.todayISO());
+      const _buyOf = it => it.custom ? (+it.buyPrice || 0) : (window.buyPriceOn ? window.buyPriceOn(it.id, _odate) : 0);
+      let _totBuy = 0, _hasNoBuy = false;
+      orderItems.forEach(it => { const b = _buyOf(it); _totBuy += (+it.qty || 0) * b; if (!b && (+it.total || 0) > 0) _hasNoBuy = true; });
+      const _totProfit = total - _totBuy;
+      const _margin = total ? Math.round(_totProfit / total * 1000) / 10 : 0;
       /* Danh sách đơn vị (cho SP ngoài DM tự chọn) */
       let units = ((window.MD && window.MD.get && window.MD.get('units')) || []).map(u => (u.label || u)).filter(Boolean);
       if (!units.length) units = ['kg', 'quả', 'bó', 'hộp', 'cây', 'túi', 'gói', 'lạng', 'con', 'chai', 'mớ'];
@@ -1297,6 +1304,8 @@
             <span title="Sale có quyền sửa giá theo đối tác — bấm vào ô đơn giá để gõ">✏</span>
           </th>
           <th class="num">Thành tiền</th>
+          <th class="num" title="Giá nhập theo đúng ngày đơn (từ Sản phẩm & Giá)">Giá nhập</th>
+          <th class="num" title="Lợi nhuận = Thành tiền − (SL × Giá nhập)">Lợi nhuận</th>
           <th>Ghi chú</th>
           <th></th>
         </tr></thead>
@@ -1315,6 +1324,8 @@
             ${it.priceConfirmed!==false?'<span style="color:#15803D">✓</span>':'<span style="color:#A16207">!</span>'}
           </label></td>
           <td class="num"><b>${window.fmt(it.total)}</b></td>
+          <td class="num" style="color:#B45309">${(() => { const b = _buyOf(it); return b ? window.fmt(b) : '—'; })()}</td>
+          <td class="num">${(() => { const p = (+it.total || 0) - (+it.qty || 0) * _buyOf(it); return `<b style="color:${p >= 0 ? '#15803D' : '#DC2626'}">${window.fmt(p)}</b>`; })()}</td>
           <td><input type="text" value="${(it.note || '').replace(/"/g, '&quot;')}" data-idx="${i}" class="oi-note" placeholder="ghi chú…" style="width:130px;padding:4px 7px;border:1px solid var(--line);border-radius:5px;font-size:12px" title="Ghi chú riêng cho mặt hàng này (vd: cắt nhỏ, loại 1, giao sớm...)"></td>
           <td class="num"><button type="button" class="icon-btn" style="color:var(--danger)" onclick="window.removeOrderItem(${i})" title="Xóa dòng sản phẩm này khỏi đơn">✕</button></td>
         </tr>`).join('')}</tbody>
@@ -1325,11 +1336,13 @@
             <td class="num">—</td>
             <td class="num">${orderItems.filter(x => x.priceConfirmed === false).length ? '<span style="color:#A16207;font-size:11px">⚠ '+orderItems.filter(x => x.priceConfirmed === false).length+' chưa xác nhận</span>' : '<span style="color:#15803D;font-size:11px">✓ đã xác nhận hết</span>'}</td>
             <td class="num"><b style="color:var(--red);font-size:14px">${window.fmt(total)} ₫</b></td>
+            <td class="num" title="Tổng giá nhập (giá vốn) đơn này"><b style="color:#B45309">${window.fmt(_totBuy)}</b></td>
+            <td class="num" title="Lợi nhuận đơn = tổng bán − tổng nhập"><b style="color:${_totProfit >= 0 ? '#15803D' : '#DC2626'};font-size:13px">${window.fmt(_totProfit)}</b><div style="font-size:10px;color:${_totProfit >= 0 ? '#15803D' : '#DC2626'};font-weight:700">${_margin}%</div></td>
             <td></td>
             <td></td>
           </tr>
         </tfoot>
-      </table></div>`;
+      </table></div>${_hasNoBuy ? '<div style="font-size:11px;color:#B45309;margin-top:6px">⚠ Có mặt hàng chưa có giá nhập (SP ngoài DM / chưa đặt giá nhập) → lợi nhuận là <b>ƯỚC TÍNH</b>. Đặt giá nhập ở <b>Sản phẩm &amp; Giá</b>.</div>' : ''}`;
       /* Wire input tên SP thủ công (cập nhật live, không re-render để giữ focus) */
       box.querySelectorAll('.oi-name').forEach(inp => {
         inp.addEventListener('input', (e) => {
@@ -1521,6 +1534,7 @@
       try { await window.STORE.ensureOrderItems(code); } catch (e) {}
     }
     _editItemsCode = code;
+    window._editOrderDate = o.deliverDate || o.date || '';   /* để tính GIÁ NHẬP theo đúng ngày đơn */
     orderItems = (o.items || []).map(it => Object.assign({}, it));   /* clone — không sửa trực tiếp tới khi Lưu */
     const custId = o.cust || o.custId || '';
     _curOrderCust = custId;   /* để lastCustPrice tra đúng giá đối tác khi đổi đơn vị */
@@ -2399,10 +2413,11 @@ CHỈ TRẢ JSON, không giải thích gì thêm.`;
     const drivers = window.STORE.get('shippers', window.DRIVERS || []);
     const cust = customers.find(c => c.id === custId);
 
-    /* Chặn NGÀY GIAO trong QUÁ KHỨ (không thể giao trước khi đặt) — tránh đơn nhảy công nợ về ngày cũ */
+    /* Cảnh báo NGÀY GIAO lùi QUÁ 1 NGÀY (giao hôm qua thì OK — nhập trễ; lùi 2+ ngày dễ là chọn nhầm) */
     const _dd = window.formVal('#oDeliverDate') || '';
     const _todayISO = (window.todayISO ? window.todayISO() : new Date().toISOString().slice(0, 10));
-    if (_dd && _dd < _todayISO && !confirm('⚠️ Ngày giao (' + _dd + ') TRƯỚC hôm nay (' + _todayISO + ').\nKhông thể giao trước khi đặt — kiểm tra lại. Vẫn lưu?')) return;
+    const _yst = (function () { const p = _todayISO.split('-').map(Number); const d = new Date(Date.UTC(p[0], p[1] - 1, p[2])); d.setUTCDate(d.getUTCDate() - 1); return d.toISOString().slice(0, 10); })();
+    if (_dd && _dd < _yst && !confirm('⚠️ Ngày giao (' + _dd + ') lùi quá 1 ngày so với hôm nay (' + _todayISO + ').\nKiểm tra lại kẻo lệch gom hàng + công nợ. Vẫn lưu?')) return;
 
     const drvId = window.formVal('#oDriver');
     const drv = drivers.find(d => d.id === drvId);

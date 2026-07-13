@@ -17,10 +17,16 @@
     return '';
   }
   function orderISO(o) {
-    /* Ngày công nợ = NGÀY GIAO (deliverDate). NHƯNG deliverDate KHÔNG được TRƯỚC ngày đặt/tạo đơn
-       (giao trước khi đặt = dữ liệu chọn nhầm) → khi đó dùng ngày ĐẶT. Tránh đơn nhảy công nợ về ngày quá khứ. */
     const placed = _rawISO(o.date || o.createdAt || o.orderDate || '');
     const planned = _rawISO(o.deliverDate || '');
+    /* ĐÃ GIAO → ngày giao THẬT (deliverDate; fallback deliveredAt). KHÔNG clamp — nhập đơn TRỄ sau ngày giao
+       (giao 04/07 nhập 05/07) là bình thường, công nợ phải nằm ngày giao thật. */
+    if (o.status === 'delivered' || o.status === 'reconciled' || o.deliveredAt) {
+      if (planned) return planned;
+      if (o.deliveredAt) { const d = new Date(o.deliveredAt); if (!isNaN(d)) return isoOf(d); }
+      return placed;
+    }
+    /* CHƯA GIAO → ngày giao dự kiến, nhưng KHÔNG được trước ngày đặt (chọn nhầm ngày quá khứ) → dùng ngày đặt. */
     if (planned && (!placed || planned >= placed)) return planned;
     return placed || planned || '';
   }
@@ -267,14 +273,14 @@
           ${bodyRight(g)}</tr>`;
         const siteRows = multi ? g.sites.map(r => `<tr>
           <td class="par" style="padding-left:18px;font-weight:400" title="${(r.addr || r.name).replace(/"/g, '&quot;')}"><a href="javascript:void(0)" onclick="window.cnShowNotice('${(r.key || '').replace(/'/g, "\\'")}')" style="color:#475569;text-decoration:none;border-bottom:1px dotted #94A3B8">↳ ${r.addr || r.name}</a>${_dupBadge(r)}</td>
-          ${data.days.map(d => { const v = dailyOf(r)[d] || 0; return `<td class="num ${v ? '' : 'z'}">${v ? fmt(v) : '·'}</td>`; }).join('')}
+          ${data.days.map(d => { const v = dailyOf(r)[d] || 0; const kEsc = String(r.key || '').replace(/\\/g, '\\\\').replace(/'/g, "\\'"); return `<td class="num ${v ? 'cn-daycell' : 'z'}"${v ? ` onclick="window.cnDayOrders('${kEsc}','${d}')" style="cursor:pointer" title="Xem đơn + lợi nhuận ngày ${ddmm(d)}"` : ''}>${v ? fmt(v) : '·'}</td>`; }).join('')}
           ${bodyRight(r)}</tr>`).join('') : '';
         return brandRow + siteRows;
       }).join('')}</tbody>`;
     } else {
       body = `<tbody>${data.list.map(r => `<tr>
         <td class="par" title="Bấm để xem Thông báo công nợ — in / copy gửi khách"><a href="javascript:void(0)" onclick="window.cnShowNotice('${(r.key || '').replace(/'/g, "\\'")}')" style="color:var(--navy);font-weight:700;text-decoration:none;border-bottom:1px dotted var(--navy)">${r.name}</a>${_dupBadge(r)}</td>
-        ${data.days.map(d => { const v = dailyOf(r)[d] || 0; return `<td class="num ${v ? '' : 'z'}">${v ? fmt(v) : '·'}</td>`; }).join('')}
+        ${data.days.map(d => { const v = dailyOf(r)[d] || 0; const kEsc = String(r.key || '').replace(/\\/g, '\\\\').replace(/'/g, "\\'"); return `<td class="num ${v ? 'cn-daycell' : 'z'}"${v ? ` onclick="window.cnDayOrders('${kEsc}','${d}')" style="cursor:pointer" title="Xem đơn + lợi nhuận ngày ${ddmm(d)}"` : ''}>${v ? fmt(v) : '·'}</td>`; }).join('')}
         ${bodyRight(r)}
       </tr>`).join('')}</tbody>`;
     }
@@ -292,6 +298,57 @@
       `💰 Doanh thu <b>${gT.toLocaleString('vi-VN')}đ</b> · giá vốn <b>${gCost.toLocaleString('vi-VN')}đ</b> · lợi nhuận <b style="color:#15803D">${gProfit.toLocaleString('vi-VN')}đ</b> (biên ${gT ? pct(gProfit / gT) : '0%'}) · đã thu <b style="color:#16A34A">${gPaid.toLocaleString('vi-VN')}đ</b>` +
       (isCost && _costItemsLoading ? `<br><span style="color:#1D4ED8;font-size:11.5px">⏳ Đang tải giá vốn từng đơn… (bảng sẽ tự cập nhật)</span>` : '') +
       (anyEst && !(isCost && _costItemsLoading) ? `<br><span class="cn-est-note" style="color:#B45309;font-size:11.5px">* Có đơn thiếu giá vốn (SP ngoài DM / SP chưa có giá nhập) → lợi nhuận là ƯỚC TÍNH (chỉ trừ phần có giá nhập).</span>` : '');
+  };
+
+  /* ===== Click ô NGÀY → popup đơn của đối tác trong ngày đó (mã · giá nhập · giá bán · lợi nhuận · %) ===== */
+  window.cnDayOrders = function (custKey, iso) {
+    const orders = S().get('orders', window.ORDERS || []) || [];
+    const _buy = o => {
+      const items = (Array.isArray(o.items) && o.items.length) ? o.items : (_costItems[o.code] || []);
+      let c = 0, known = false;
+      items.forEach(it => {
+        if (+it.buyTotal > 0) { c += +it.buyTotal; known = true; return; }
+        const b = (it.id && window.buyPriceOn) ? window.buyPriceOn(it.id, iso) : 0;
+        if (b > 0) known = true;
+        c += (+it.qty || 0) * b;
+      });
+      return { cost: c, known, hasItems: items.length > 0 };
+    };
+    const list = orders.filter(o => o.status !== 'draft' && o.status !== 'cancelled' && (o.cust || o.custName || '—') === custKey && orderISO(o) === iso);
+    const custName = (list[0] && list[0].custName) || custKey;
+    const F = n => (window.fmt ? window.fmt(n) : Math.round(n).toLocaleString('vi-VN'));
+    let tSell = 0, tBuy = 0, anyEst = false;
+    const rows = list.map(o => {
+      const sell = +o.freight || 0;
+      const bc = _buy(o); const buy = bc.cost; const profit = sell - buy;
+      const mg = sell ? Math.round(profit / sell * 1000) / 10 : 0;
+      tSell += sell; tBuy += buy; if (!bc.known || !bc.hasItems) anyEst = true;
+      return `<tr style="border-top:1px solid #F1F5F9">
+        <td style="padding:6px 8px"><a href="orders.html?open=${encodeURIComponent(o.code)}" style="color:var(--navy);font-weight:700;text-decoration:none;border-bottom:1px dotted var(--navy)">${o.code} ↗</a></td>
+        <td style="padding:6px 8px;text-align:right;color:#B45309">${F(buy)}</td>
+        <td style="padding:6px 8px;text-align:right">${F(sell)}</td>
+        <td style="padding:6px 8px;text-align:right;color:${profit >= 0 ? '#15803D' : '#DC2626'};font-weight:700">${F(profit)}</td>
+        <td style="padding:6px 8px;text-align:right;color:${profit >= 0 ? '#15803D' : '#DC2626'}">${mg}%${bc.known ? '' : ' <span title="thiếu giá nhập" style="color:#B45309">*</span>'}</td>
+      </tr>`;
+    }).join('') || '<tr><td colspan="5" style="padding:12px;text-align:center;color:var(--muted)">Không có đơn.</td></tr>';
+    const tProfit = tSell - tBuy, tMg = tSell ? Math.round(tProfit / tSell * 1000) / 10 : 0;
+    window.openModal(`📦 Đơn ngày ${ddmm(iso)} — ${String(custName).replace(/</g, '')}`, `
+      <table style="width:100%;border-collapse:collapse;font-size:12.5px;border:1px solid var(--line);border-radius:8px;overflow:hidden">
+        <thead><tr style="background:#F8FAF8;color:var(--muted);font-size:11px;text-transform:uppercase">
+          <th style="padding:6px 8px;text-align:left">Mã đơn</th><th style="padding:6px 8px;text-align:right">Giá nhập</th><th style="padding:6px 8px;text-align:right">Giá bán</th><th style="padding:6px 8px;text-align:right">Lợi nhuận</th><th style="padding:6px 8px;text-align:right">Biên %</th>
+        </tr></thead>
+        <tbody>${rows}</tbody>
+        <tfoot><tr style="background:#F0FDF4;border-top:2px solid #15803D;font-weight:700">
+          <td style="padding:7px 8px">TỔNG ${list.length} đơn</td>
+          <td style="padding:7px 8px;text-align:right;color:#B45309">${F(tBuy)}</td>
+          <td style="padding:7px 8px;text-align:right">${F(tSell)}</td>
+          <td style="padding:7px 8px;text-align:right;color:${tProfit >= 0 ? '#15803D' : '#DC2626'}">${F(tProfit)}</td>
+          <td style="padding:7px 8px;text-align:right;color:${tProfit >= 0 ? '#15803D' : '#DC2626'}">${tMg}%</td>
+        </tr></tfoot>
+      </table>
+      ${anyEst ? '<div style="font-size:11px;color:#B45309;margin-top:8px">* Đơn thiếu giá nhập (SP ngoài DM / chưa có giá nhập) → lợi nhuận ước tính.</div>' : ''}
+      <div style="font-size:11px;color:var(--muted);margin-top:6px">Bấm <b>mã đơn</b> để mở chi tiết đơn hàng.</div>
+    `, { width: '580px', footer: `<button class="btn btn-primary" onclick="window.closeModal()">Đóng</button>` });
   };
 
   /* ===== Preset khoảng ngày ===== */

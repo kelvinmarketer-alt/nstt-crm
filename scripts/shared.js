@@ -5,7 +5,7 @@
 
 /* Phiên bản app hiển thị (đối chiếu với CACHE_VERSION trong sw.js) — để user tự XÁC NHẬN
    đang chạy bản mới hay còn kẹt JS cũ (hiện ở góc sidebar + log console). */
-window.APP_VERSION = 'v463';
+window.APP_VERSION = 'v464';
 console.log('%c[NSTT] App ' + window.APP_VERSION, 'color:#339B21;font-weight:bold');
 
 /* Gom NGUỒN khách về 3 nhóm chuẩn: 'mkt' / 'sales' / 'sep-gioi-thieu'.
@@ -355,6 +355,16 @@ window.priceEntryOn = function(product, dateISO) {
 window.priceOn = function(productId, dateISO) {
   const e = window.priceEntryOn(window.productById(productId), dateISO || window.todayISO());
   return e ? e.sell : 0;
+};
+/* Giá NHẬP của 1 sản phẩm tại 1 ngày (số) — date-versioned theo priceHistory[].buy.
+   VD nhập 50k từ 11/7, 45k từ 12/7 → đơn ngày ≤11/7 = 50k, ngày ≥12/7 = 45k. Nhận cả ISO & dd/mm/yyyy. */
+window.buyPriceOn = function(productId, dateStr) {
+  let iso = String(dateStr || '');
+  const m = iso.match(/(\d{1,2})\/(\d{1,2})\/(\d{4})/);
+  if (m) iso = `${m[3]}-${String(m[2]).padStart(2, '0')}-${String(m[1]).padStart(2, '0')}`;
+  else if (!/^\d{4}-\d{2}-\d{2}/.test(iso)) iso = window.todayISO ? window.todayISO() : '';
+  const e = window.priceEntryOn(window.productById(productId), iso || (window.todayISO && window.todayISO()));
+  return e ? (+e.buy || 0) : 0;
 };
 
 /* ===== CÔNG CHUẨN (NC chuẩn) theo phòng ban =====

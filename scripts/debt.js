@@ -489,7 +489,7 @@ Mong quý khách thu xếp thanh toán sớm. Cảm ơn!
     const debtors = loadDebtors();
     if (!debtors.length) { window.toast('Không có KH nào đang nợ', 'info'); return; }
     const list = debtors.map(c => `
-      <button class="check-item" style="width:100%;text-align:left;border:1px solid var(--line);cursor:pointer;background:#fff" onclick="closeModal();setTimeout(()=>window._openReceiptById('${c.id}'),100)">
+      <button class="check-item dbt-item" data-s="${((c.name || '') + ' ' + (c.code || '') + ' ' + (c.phone || '')).toLowerCase().replace(/"/g, '')}" style="width:100%;text-align:left;border:1px solid var(--line);cursor:pointer;background:#fff" onclick="closeModal();setTimeout(()=>window._openReceiptById('${c.id}'),100)">
         <div style="flex:1">
           <div style="font-weight:600">${c.name}</div>
           <div style="font-size:11px;color:var(--muted)">${c.code} · ${c.phone}</div>
@@ -497,10 +497,24 @@ Mong quý khách thu xếp thanh toán sớm. Cảm ơn!
         <div style="font-weight:700;color:var(--danger)">${window.fmt(c.debt)} ₫</div>
       </button>
     `).join('');
-    window.openModal('💵 Chọn KH cần tạo phiếu thu nợ', list, {
+    const html = `
+      <input id="debtorSearch" type="search" placeholder="🔎 Tìm tên / mã KH / SĐT…" autocomplete="off" oninput="window._filterDebtors(this.value)" style="width:100%;box-sizing:border-box;padding:9px 12px;border:1px solid var(--line);border-radius:8px;font-size:14px;margin-bottom:10px">
+      <div id="debtorList" style="max-height:60vh;overflow:auto;display:flex;flex-direction:column;gap:6px">${list}</div>
+      <div id="debtorEmpty" style="display:none;text-align:center;color:var(--muted);padding:16px;font-size:13px">Không tìm thấy KH khớp.</div>`;
+    window.openModal('💵 Chọn KH cần tạo phiếu thu nợ', html, {
       footer: `<button class="btn btn-ghost" onclick="closeModal()">Đóng</button>`,
       width: '560px'
     });
+    setTimeout(() => { const el = document.getElementById('debtorSearch'); if (el) el.focus(); }, 150);
+  };
+  window._filterDebtors = function (q) {
+    q = (q || '').trim().toLowerCase();
+    let shown = 0;
+    document.querySelectorAll('#debtorList .dbt-item').forEach(b => {
+      const ok = !q || (b.getAttribute('data-s') || '').includes(q);
+      b.style.display = ok ? '' : 'none'; if (ok) shown++;
+    });
+    const emp = document.getElementById('debtorEmpty'); if (emp) emp.style.display = shown ? 'none' : 'block';
   };
   window._openReceiptById = function(custId) {
     const c = loadDebtors().find(x => x.id === custId);
