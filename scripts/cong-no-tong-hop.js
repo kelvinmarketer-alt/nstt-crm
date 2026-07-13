@@ -47,6 +47,11 @@
   }
   /* Ngày phân bổ phiếu thu vào kỳ công nợ: ưu tiên kỳ kế toán CHỌN (payPeriod); chưa chọn → ngày thu. */
   function paymentISO(e) { return kyRefISO(e.payPeriod) || ledgerISO(e); }
+  /* Mã KỲ của 1 ngày ISO ('YYYY-MM-1|2' — kỳ 1 = 1–15, kỳ 2 = 16–cuối) + nhãn hiển thị. */
+  function kyOf(iso) { const m = String(iso).match(/^(\d{4})-(\d{2})-(\d{2})/); return m ? `${m[1]}-${m[2]}-${(+m[3] <= 15) ? 1 : 2}` : ''; }
+  function kyLabel(k) { const m = String(k).match(/^(\d{4})-(\d{2})-([12])$/); return m ? `Kỳ ${m[3]} · T${+m[2]}/${m[1]}` : k; }
+  /* Kỳ mà phiếu thu áp vào: kỳ kế toán chọn (payPeriod) hoặc kỳ theo ngày thu (phiếu cũ). */
+  function payKy(e) { return (/^\d{4}-\d{2}-[12]$/.test(e.payPeriod || '') ? e.payPeriod : '') || kyOf(paymentISO(e)); }
   function dayList(fromISO, toISO) {
     const out = [];
     let d = new Date(fromISO + 'T00:00:00'), end = new Date(toISO + 'T00:00:00');
@@ -138,14 +143,20 @@
       if (!amt) return;
       const cust = custById[o.cust] || {};
       const r = rows[key] || (rows[key] = { key, name, addr: cust.address || o.drop || '', phone: cust.phone || '',
-        daily: {}, dailyShift: {}, dailyCost: {}, total: 0, chargeP: 0, cost: 0, noCostOrders: 0 });
+        daily: {}, dailyShift: {}, dDaily: {}, dShift: {}, dailyCost: {}, total: 0, chargeP: 0, cost: 0, noCostOrders: 0 });
       r.daily[iso] = (r.daily[iso] || 0) + amt;
       /* tách ca cho phiếu ma trận: dailyShift[iso] = {s, c} */
       const sk = shiftKey(o);
       const ds = r.dailyShift[iso] || (r.dailyShift[iso] = { s: 0, c: 0 });
       ds[sk] += amt;
       r.total += amt;
-      if (_isCongNo(o)) r.chargeP += amt;   /* phần công nợ THẬT trong kỳ (đã giao) */
+      if (_isCongNo(o)) {
+        r.chargeP += amt;   /* phần công nợ THẬT trong kỳ (đã giao) */
+        /* daily CHỈ đơn đã giao — cho PHIẾU công nợ (bỏ hẳn đơn chưa giao khỏi phiếu) */
+        r.dDaily[iso] = (r.dDaily[iso] || 0) + amt;
+        const dds = r.dShift[iso] || (r.dShift[iso] = { s: 0, c: 0 });
+        dds[sk] += amt;
+      }
       const oc = orderCost(o, iso);
       r.dailyCost[iso] = (r.dailyCost[iso] || 0) + oc.cost;
       r.cost += oc.cost;
@@ -153,24 +164,32 @@
     });
     /* ===== NỢ ĐẦU KỲ (mang sang) = Σ công nợ đã giao TRƯỚC fromISO − Σ thu TRƯỚC fromISO.
        → CÒN PHẢI THU = đầu kỳ + công nợ trong kỳ − đã thu (hết "âm giả"; nợ cũ tự chuyển kỳ sau). */
-    const openCharge = {}, openPaid = {};
+    const openCharge = {}, openPaid = {}, openByPeriod = {};   /* openByPeriod[key][kỳ] = net nợ kỳ đó mang sang */
+    const _pnAdd = (key, ky, v) => { if (!ky) return; (openByPeriod[key] || (openByPeriod[key] = {}))[ky] = (openByPeriod[key][ky] || 0) + v; };
     orders.forEach(o => {
       if (!_isCongNo(o)) return;
       const amt = +o.freight || 0; if (!amt) return;
       const iso = orderISO(o); if (!iso || iso >= fromISO) return;
       const key = o.cust || o.custName || '—';
       openCharge[key] = (openCharge[key] || 0) + amt;
+      _pnAdd(key, kyOf(iso), amt);        /* cộng nợ vào KỲ phát sinh */
     });
     ledger.forEach(e => {
       if (e.type !== 'payment') return;
       const iso = paymentISO(e); if (!iso || iso >= fromISO) return;   /* theo KỲ kế toán chọn */
       openPaid[e.custId] = (openPaid[e.custId] || 0) + (+e.amount || 0);
+      _pnAdd(e.custId, payKy(e), -(+e.amount || 0));   /* trừ vào ĐÚNG kỳ phiếu thu áp vào */
     });
     /* Đã thu trong kỳ (phiếu thu — theo kỳ kế toán chọn) + nợ đầu kỳ + còn phải thu + công nợ HT + lợi nhuận */
     Object.values(rows).forEach(r => {
       r.paid = ledger.filter(e => e.custId === r.key && e.type === 'payment' && daySet.has(paymentISO(e)))
         .reduce((s, e) => s + (+e.amount || 0), 0);
       r.opening = (openCharge[r.key] || 0) - (openPaid[r.key] || 0);   /* nợ kỳ trước mang sang (đã giao) */
+      /* tách nợ đầu kỳ theo TỪNG KỲ cụ thể (net > 0), cũ → mới, để phiếu ghi rõ "nợ của kỳ nào" */
+      /* tách nợ đầu kỳ theo TỪNG KỲ (net ≠ 0 — giữ cả kỳ trả dư để Σ = đúng nợ đầu kỳ), cũ → mới */
+      r.openingByPeriod = Object.keys(openByPeriod[r.key] || {})
+        .map(k => ({ ky: k, net: Math.round(openByPeriod[r.key][k]) }))
+        .filter(x => x.net !== 0).sort((a, b) => a.ky < b.ky ? -1 : 1);
       r.remain = r.opening + r.chargeP - r.paid;   /* CÒN PHẢI THU cuối kỳ = luỹ kế công nợ đã giao − đã thu */
       r.undelivered = Math.max(0, r.total - r.chargeP);   /* phần đơn trong kỳ CHƯA giao (chưa thành nợ) */
       r.debtNow = (custById[r.key] && +custById[r.key].debt) || 0;
@@ -187,15 +206,20 @@
     list.forEach(r => {
       const bn = brandOf(r.key, r.name);
       const k = _nk(bn) || r.key;
-      const grp = g[k] || (g[k] = { brandKey: k, brand: bn, sites: [], daily: {}, dailyCost: {}, total: 0, chargeP: 0, undelivered: 0, cost: 0, paid: 0, opening: 0, remain: 0, debtNow: 0, profit: 0, noCostOrders: 0 });
+      const grp = g[k] || (g[k] = { brandKey: k, brand: bn, sites: [], daily: {}, dDaily: {}, dShift: {}, dailyCost: {}, _pn: {}, total: 0, chargeP: 0, undelivered: 0, cost: 0, paid: 0, opening: 0, remain: 0, debtNow: 0, profit: 0, noCostOrders: 0 });
       grp.sites.push(r);
       Object.keys(r.daily).forEach(d => grp.daily[d] = (grp.daily[d] || 0) + r.daily[d]);
+      Object.keys(r.dDaily || {}).forEach(d => { grp.dDaily[d] = (grp.dDaily[d] || 0) + r.dDaily[d]; const s = r.dShift[d] || { s: 0, c: 0 }; const t = grp.dShift[d] || (grp.dShift[d] = { s: 0, c: 0 }); t.s += s.s; t.c += s.c; });
       Object.keys(r.dailyCost).forEach(d => grp.dailyCost[d] = (grp.dailyCost[d] || 0) + r.dailyCost[d]);
+      (r.openingByPeriod || []).forEach(x => grp._pn[x.ky] = (grp._pn[x.ky] || 0) + x.net);
       grp.total += r.total; grp.chargeP += (r.chargeP || 0); grp.undelivered += (r.undelivered || 0); grp.cost += r.cost; grp.paid += r.paid; grp.opening += (r.opening || 0); grp.remain += r.remain;
       grp.debtNow += r.debtNow; grp.profit += r.profit; grp.noCostOrders += r.noCostOrders;
     });
     const groups = Object.values(g);
-    groups.forEach(gr => { gr.margin = gr.total ? gr.profit / gr.total : 0; gr.sites.sort((a, b) => b.total - a.total); });
+    groups.forEach(gr => {
+      gr.margin = gr.total ? gr.profit / gr.total : 0; gr.sites.sort((a, b) => b.total - a.total);
+      gr.openingByPeriod = Object.keys(gr._pn).map(k => ({ ky: k, net: Math.round(gr._pn[k]) })).filter(x => x.net !== 0).sort((a, b) => a.ky < b.ky ? -1 : 1);
+    });
     return groups.sort((a, b) => b.total - a.total);
   }
 
@@ -465,14 +489,16 @@
     comp.bankAcc = ci.bankAcc || (_bp && _bp[2].replace(/\s/g, '')) || '228666669999';
     /* các ngày phát sinh → dòng phiếu, TÁCH Sáng/Chiều (ca giao của đơn).
        Khách chỉ giao 1 buổi → buổi kia để trống. */
-    const rows = Object.keys(r.daily).filter(d => r.daily[d] > 0).sort()
-      .map(d => { const sh = r.dailyShift[d] || { s: 0, c: 0 }; return { iso: d, date: isoVN(d), s: sh.s, c: sh.c, tot: r.daily[d] }; });
+    /* PHIẾU chỉ hiện đơn ĐÃ GIAO (r.dDaily) — bỏ hẳn đơn chưa giao khỏi phiếu công nợ gửi khách. */
+    const _dd = r.dDaily || {}, _dsh = r.dShift || {};
+    const rows = Object.keys(_dd).filter(d => _dd[d] > 0).sort()
+      .map(d => { const sh = _dsh[d] || { s: 0, c: 0 }; return { iso: d, date: isoVN(d), s: sh.s, c: sh.c, tot: _dd[d] }; });
     const sumS = rows.reduce((a, e) => a + e.s, 0), sumC = rows.reduce((a, e) => a + e.c, 0);
-    /* Công nợ theo kỳ (chuẩn kế toán): Nợ đầu kỳ + Công nợ ĐÃ GIAO trong kỳ − Đã thu = CÒN PHẢI THU.
-       totalPS = tổng đơn trong kỳ (kể cả chưa giao) để KH thấy đủ; nhưng chỉ đòi phần đã giao (chargeP). */
-    const totalPS = r.total, paid = r.paid || 0, opening = r.opening || 0;
-    const chargeP = r.chargeP != null ? r.chargeP : totalPS;
-    const undelivered = r.undelivered != null ? r.undelivered : Math.max(0, totalPS - chargeP);
+    /* Công nợ theo kỳ (chuẩn kế toán): Nợ đầu kỳ + Công nợ ĐÃ GIAO trong kỳ − Đã thu = CÒN PHẢI THU. */
+    const paid = r.paid || 0, opening = r.opening || 0;
+    const chargeP = r.chargeP != null ? r.chargeP : (sumS + sumC);
+    const totalPS = chargeP;   /* tổng phát sinh trên phiếu = phần đã giao (đúng con nợ) */
+    const openByPeriod = r.openingByPeriod || [];
     const remain = r.remain != null ? r.remain : (opening + chargeP - paid);
     const paidEnough = remain <= 0;
 
@@ -539,10 +565,10 @@
         <tbody>${rows.map((e, i) => `<tr><td style="text-align:center">${i + 1}</td><td style="text-align:center">${e.date}</td><td style="text-align:right">${e.s ? money(e.s) : ''}</td><td style="text-align:right">${e.c ? money(e.c) : ''}</td><td style="text-align:right"><b>${money(e.tot)}</b></td><td></td></tr>`).join('') || '<tr><td colspan="6" style="text-align:center;color:#888;padding:12px">Không có phát sinh trong kỳ</td></tr>'}</tbody>
         <tfoot>
           <tr class="totrow"><td colspan="2" style="text-align:center">Tổng phát sinh trong kỳ</td><td style="text-align:right">${sumS ? money(sumS) : '-'}</td><td style="text-align:right">${sumC ? money(sumC) : '-'}</td><td style="text-align:right">${money(totalPS)}</td><td></td></tr>
-          ${undelivered > 0 ? `<tr class="totrow"><td colspan="4" style="text-align:right;color:#B45309;font-style:italic">Đơn chưa giao (chưa tính công nợ)</td><td style="text-align:right;color:#B45309">− ${money(undelivered)}</td><td></td></tr>` : ''}
-          ${opening ? `<tr class="totrow"><td colspan="4" style="text-align:right">Nợ kỳ trước mang sang <span style="font-weight:400;font-style:italic">(trước ${ddmm(_last.fromISO)})</span></td><td style="text-align:right">${opening < 0 ? '− ' + money(-opening) : '+ ' + money(opening)}</td><td></td></tr>` : ''}
+          ${openByPeriod.map(p => `<tr class="totrow"><td colspan="4" style="text-align:right">Nợ cũ mang sang · <b>${kyLabel(p.ky)}</b>${p.net < 0 ? ' <span style="font-weight:400;font-style:italic;color:#15803D">(trả dư)</span>' : ''}</td><td style="text-align:right;${p.net < 0 ? 'color:#15803D' : ''}">${p.net < 0 ? '− ' + money(-p.net) : '+ ' + money(p.net)}</td><td></td></tr>`).join('')}
+          ${(!openByPeriod.length && opening) ? `<tr class="totrow"><td colspan="4" style="text-align:right">Nợ kỳ trước mang sang <span style="font-weight:400;font-style:italic">(trước ${ddmm(_last.fromISO)})</span></td><td style="text-align:right">${opening < 0 ? '− ' + money(-opening) : '+ ' + money(opening)}</td><td></td></tr>` : ''}
           ${paid > 0 ? `<tr class="totrow"><td colspan="4" style="text-align:right;color:#15803D">Đã thanh toán trong kỳ</td><td style="text-align:right;color:#15803D">− ${money(paid)}</td><td></td></tr>` : ''}
-          <tr class="grand"><td colspan="5" style="text-align:right">CÒN PHẢI THU${opening || paid || undelivered ? ' <span style="font-weight:400;font-size:11px">(nợ cũ + đã giao − đã thu)</span>' : ''}</td><td style="text-align:right">${money(remain > 0 ? remain : 0)}</td></tr>
+          <tr class="grand"><td colspan="5" style="text-align:right">CÒN PHẢI THU${opening || paid ? ' <span style="font-weight:400;font-size:11px">(nợ cũ + đã giao − đã thu)</span>' : ''}</td><td style="text-align:right">${money(remain > 0 ? remain : 0)}</td></tr>
           <tr><td colspan="6" style="text-align:center;padding:7px;border:none">${paidEnough
             ? `<span style="display:inline-block;background:#DCFCE7;color:#15803D;font-weight:800;padding:5px 16px;border-radius:20px">✓ KHÁCH ĐÃ THANH TOÁN ĐỦ${remain < 0 ? ' (dư ' + money(-remain) + 'đ)' : ''}</span>`
             : `<span style="display:inline-block;background:#FEE2E2;color:#C0392B;font-weight:800;padding:5px 16px;border-radius:20px">⚠ CÒN THIẾU: ${money(remain)} đ</span>`}</td></tr>
@@ -594,8 +620,8 @@
         ${JSON.stringify(rows.map((e, i) => `${i + 1}. ${e.date}: ${money(e.tot)}đ` + (e.s && e.c ? ` (Sáng ${money(e.s)} · Chiều ${money(e.c)})` : e.c ? ' (Chiều)' : '')))}.forEach(function(l){lines.push(l)});
         lines.push('');
         lines.push('Tổng phát sinh trong kỳ: '+${JSON.stringify(money(totalPS))}+'đ');
-        ${undelivered > 0 ? `lines.push('Đơn chưa giao (chưa tính công nợ): -'+${JSON.stringify(money(undelivered))}+'đ');` : ''}
-        ${opening ? `lines.push('Nợ kỳ trước mang sang: '+${JSON.stringify((opening < 0 ? '-' : '+') + money(Math.abs(opening)))}+'đ');` : ''}
+        ${openByPeriod.map(p => `lines.push('Nợ cũ mang sang · ${kyLabel(p.ky)}: '+${JSON.stringify((p.net < 0 ? '-' : '+') + money(Math.abs(p.net)))}+'đ');`).join('\n        ')}
+        ${(!openByPeriod.length && opening) ? `lines.push('Nợ kỳ trước mang sang: '+${JSON.stringify((opening < 0 ? '-' : '+') + money(Math.abs(opening)))}+'đ');` : ''}
         ${paid > 0 ? `lines.push('Đã thanh toán trong kỳ: -'+${JSON.stringify(money(paid))}+'đ');` : ''}
         lines.push('=> CÒN PHẢI THU: '+${JSON.stringify(money(remain > 0 ? remain : 0))}+'đ'+${JSON.stringify(paidEnough ? ' (ĐÃ THANH TOÁN ĐỦ)' : '')});
         lines.push('STK: '+${JSON.stringify(comp.bank + ' · ' + comp.bankOwner)});
@@ -680,7 +706,7 @@
     if (!grp) { window.toast && window.toast('Không tìm thấy thương hiệu', 'warn'); return; }
     if (grp.sites.length === 1) return window.cnShowNotice(grp.sites[0].key);   /* 1 cơ sở → phiếu thường */
     const sites = grp.sites;
-    const days = _last.days.filter(d => (grp.daily[d] || 0) > 0);
+    const days = _last.days.filter(d => ((grp.dDaily && grp.dDaily[d]) || 0) > 0);   /* chỉ ngày có đơn ĐÃ GIAO */
     const ci = S().get('companyInfo', {}) || {};
     const comp = {
       name: ci.name || 'CÔNG TY TNHH NÔNG SẢN TUẤN TÚ HÀ NỘI', tax: ci.tax || '0110302211',
@@ -691,9 +717,10 @@
     const _bp = String(comp.bank || '').trim().match(/^(\S+)[\s:]+(\d[\d\s]*\d|\d)$/);
     comp.bankCode = ci.bankCode || (_bp && _bp[1]) || 'MB';
     comp.bankAcc = ci.bankAcc || (_bp && _bp[2].replace(/\s/g, '')) || '228666669999';
-    const totalPS = grp.total, paid = grp.paid || 0, opening = grp.opening || 0;
-    const chargeP = grp.chargeP != null ? grp.chargeP : totalPS;
-    const undelivered = grp.undelivered != null ? grp.undelivered : Math.max(0, totalPS - chargeP);
+    const paid = grp.paid || 0, opening = grp.opening || 0;
+    const chargeP = grp.chargeP != null ? grp.chargeP : grp.total;
+    const totalPS = chargeP;   /* phiếu chỉ tính phần đã giao */
+    const openByPeriod = grp.openingByPeriod || [];
     const remain = grp.remain != null ? grp.remain : (opening + chargeP - paid);
     const paidEnough = remain <= 0;
     const _noDia = s => (s || '').toString().normalize('NFD').replace(/[̀-ͯ]/g, '').replace(/đ/g, 'd').replace(/Đ/g, 'D').toUpperCase();
@@ -706,18 +733,18 @@
     const h2 = sites.map(() => `<th style="text-align:center">Sáng</th><th style="text-align:center">Chiều</th>`).join('');
     const bodyRows = days.map((d, i) => {
       const cells = sites.map(s => {
-        const sh = s.dailyShift[d] || { s: 0, c: 0 };
+        const sh = (s.dShift && s.dShift[d]) || { s: 0, c: 0 };   /* chỉ đơn đã giao */
         return `<td style="text-align:right">${sh.s ? money(sh.s) : ''}</td><td style="text-align:right">${sh.c ? money(sh.c) : ''}</td>`;
       }).join('');
       return `<tr><td style="text-align:center">${i + 1}</td><td style="white-space:nowrap">${isoVN(d)}</td>${cells}</tr>`;
     }).join('');
     /* dòng Tổng theo từng cột (Sáng/Chiều mỗi cơ sở) */
     const colTotCells = sites.map(s => {
-      let ts = 0, tc = 0; days.forEach(d => { const sh = s.dailyShift[d] || { s: 0, c: 0 }; ts += sh.s; tc += sh.c; });
+      let ts = 0, tc = 0; days.forEach(d => { const sh = (s.dShift && s.dShift[d]) || { s: 0, c: 0 }; ts += sh.s; tc += sh.c; });
       return `<td style="text-align:right">${ts ? money(ts) : '-'}</td><td style="text-align:right">${tc ? money(tc) : '-'}</td>`;
     }).join('');
-    /* dòng Tổng mỗi cơ sở (gộp 2 cột) */
-    const siteTotCells = sites.map(s => `<td colspan="2" style="text-align:right;font-weight:700">${money(s.total)}</td>`).join('');
+    /* dòng Tổng mỗi cơ sở (gộp 2 cột) — phần đã giao */
+    const siteTotCells = sites.map(s => `<td colspan="2" style="text-align:right;font-weight:700">${money(s.chargeP != null ? s.chargeP : s.total)}</td>`).join('');
     const nCol = 2 + sites.length * 2;
     const html = `<!doctype html><html lang="vi"><head><meta charset="utf-8"><title>Công nợ thương hiệu — ${esc(grp.brand)}</title>
     <style>
@@ -768,10 +795,10 @@
           <tr class="totrow"><td colspan="2" style="text-align:center">Tổng</td>${colTotCells}</tr>
           <tr class="totrow"><td colspan="2" style="text-align:center">Tổng theo cơ sở</td>${siteTotCells}</tr>
           <tr class="totrow"><td colspan="${nCol - 1}" style="text-align:right">Tổng phát sinh trong kỳ</td><td style="text-align:right">${money(totalPS)}</td></tr>
-          ${undelivered > 0 ? `<tr class="totrow"><td colspan="${nCol - 1}" style="text-align:right;color:#B45309;font-style:italic">Đơn chưa giao (chưa tính công nợ)</td><td style="text-align:right;color:#B45309">− ${money(undelivered)}</td></tr>` : ''}
-          ${opening ? `<tr class="totrow"><td colspan="${nCol - 1}" style="text-align:right">Nợ kỳ trước mang sang (trước ${ddmm(_last.fromISO)})</td><td style="text-align:right">${opening < 0 ? '− ' + money(-opening) : '+ ' + money(opening)}</td></tr>` : ''}
+          ${openByPeriod.map(p => `<tr class="totrow"><td colspan="${nCol - 1}" style="text-align:right">Nợ cũ mang sang · <b>${kyLabel(p.ky)}</b>${p.net < 0 ? ' (trả dư)' : ''}</td><td style="text-align:right;${p.net < 0 ? 'color:#15803D' : ''}">${p.net < 0 ? '− ' + money(-p.net) : '+ ' + money(p.net)}</td></tr>`).join('')}
+          ${(!openByPeriod.length && opening) ? `<tr class="totrow"><td colspan="${nCol - 1}" style="text-align:right">Nợ kỳ trước mang sang (trước ${ddmm(_last.fromISO)})</td><td style="text-align:right">${opening < 0 ? '− ' + money(-opening) : '+ ' + money(opening)}</td></tr>` : ''}
           ${paid > 0 ? `<tr class="totrow"><td colspan="${nCol - 1}" style="text-align:right;color:#15803D">Đã thanh toán trong kỳ</td><td style="text-align:right;color:#15803D">− ${money(paid)}</td></tr>` : ''}
-          <tr class="grand"><td colspan="${nCol - 1}" style="text-align:right">CÒN PHẢI THU${opening || paid || undelivered ? ' (nợ cũ + đã giao − đã thu)' : ''}</td><td style="text-align:right">${money(remain > 0 ? remain : 0)}</td></tr>
+          <tr class="grand"><td colspan="${nCol - 1}" style="text-align:right">CÒN PHẢI THU${opening || paid ? ' (nợ cũ + đã giao − đã thu)' : ''}</td><td style="text-align:right">${money(remain > 0 ? remain : 0)}</td></tr>
           <tr><td colspan="${nCol}" style="text-align:center;padding:7px;border:none">${paidEnough
             ? `<span style="display:inline-block;background:#DCFCE7;color:#15803D;font-weight:800;padding:5px 16px;border-radius:20px">✓ ĐÃ THANH TOÁN ĐỦ${remain < 0 ? ' (dư ' + money(-remain) + 'đ)' : ''}</span>`
             : `<span style="display:inline-block;background:#FEE2E2;color:#C0392B;font-weight:800;padding:5px 16px;border-radius:20px">⚠ CÒN THIẾU: ${money(remain)} đ</span>`}</td></tr>

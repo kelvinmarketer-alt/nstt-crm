@@ -1294,7 +1294,7 @@
           ${nUnconf?`<button type="button" class="btn btn-primary btn-sm" onclick="window.confirmAllPrices()">✓ Xác nhận tất cả giá (${nUnconf})</button>`:''}
         </div>`;
       box.innerHTML = bulkBar + `<div class="oi-scroll" style="overflow-x:auto;-webkit-overflow-scrolling:touch;max-width:100%">
-      <table class="mini-table oi-table" style="margin:0;min-width:860px">
+      <table class="mini-table oi-table" style="margin:0;min-width:960px">
         <thead><tr>
           <th style="width:40px" class="num">STT</th>
           <th>Sản phẩm</th>
@@ -1304,8 +1304,9 @@
             <span title="Sale có quyền sửa giá theo đối tác — bấm vào ô đơn giá để gõ">✏</span>
           </th>
           <th class="num">Thành tiền</th>
-          <th class="num" title="Giá nhập theo đúng ngày đơn (từ Sản phẩm & Giá)">Giá nhập</th>
-          <th class="num" title="Lợi nhuận = Thành tiền − (SL × Giá nhập)">Lợi nhuận</th>
+          <th class="num" title="Giá nhập / đơn vị theo đúng ngày đơn (từ Sản phẩm & Giá)">Giá nhập</th>
+          <th class="num" title="Thành tiền nhập = SL × Giá nhập">TT nhập</th>
+          <th class="num" title="Lợi nhuận = Thành tiền − Thành tiền nhập">Lợi nhuận</th>
           <th>Ghi chú</th>
           <th></th>
         </tr></thead>
@@ -1325,6 +1326,7 @@
           </label></td>
           <td class="num"><b>${window.fmt(it.total)}</b></td>
           <td class="num" style="color:#B45309">${(() => { const b = _buyOf(it); return b ? window.fmt(b) : '—'; })()}</td>
+          <td class="num" style="color:#B45309">${(() => { const bt = (+it.qty || 0) * _buyOf(it); return bt ? '<b>' + window.fmt(bt) + '</b>' : '—'; })()}</td>
           <td class="num">${(() => { const p = (+it.total || 0) - (+it.qty || 0) * _buyOf(it); return `<b style="color:${p >= 0 ? '#15803D' : '#DC2626'}">${window.fmt(p)}</b>`; })()}</td>
           <td><input type="text" value="${(it.note || '').replace(/"/g, '&quot;')}" data-idx="${i}" class="oi-note" placeholder="ghi chú…" style="width:130px;padding:4px 7px;border:1px solid var(--line);border-radius:5px;font-size:12px" title="Ghi chú riêng cho mặt hàng này (vd: cắt nhỏ, loại 1, giao sớm...)"></td>
           <td class="num"><button type="button" class="icon-btn" style="color:var(--danger)" onclick="window.removeOrderItem(${i})" title="Xóa dòng sản phẩm này khỏi đơn">✕</button></td>
@@ -1336,7 +1338,8 @@
             <td class="num">—</td>
             <td class="num">${orderItems.filter(x => x.priceConfirmed === false).length ? '<span style="color:#A16207;font-size:11px">⚠ '+orderItems.filter(x => x.priceConfirmed === false).length+' chưa xác nhận</span>' : '<span style="color:#15803D;font-size:11px">✓ đã xác nhận hết</span>'}</td>
             <td class="num"><b style="color:var(--red);font-size:14px">${window.fmt(total)} ₫</b></td>
-            <td class="num" title="Tổng giá nhập (giá vốn) đơn này"><b style="color:#B45309">${window.fmt(_totBuy)}</b></td>
+            <td class="num"></td>
+            <td class="num" title="Tổng thành tiền giá nhập (giá vốn) đơn này"><b style="color:#B45309;font-size:13px">${window.fmt(_totBuy)}</b></td>
             <td class="num" title="Lợi nhuận đơn = tổng bán − tổng nhập"><b style="color:${_totProfit >= 0 ? '#15803D' : '#DC2626'};font-size:13px">${window.fmt(_totProfit)}</b><div style="font-size:10px;color:${_totProfit >= 0 ? '#15803D' : '#DC2626'};font-weight:700">${_margin}%</div></td>
             <td></td>
             <td></td>
@@ -1595,7 +1598,7 @@
         : `<button class="btn btn-ghost" onclick="window.closeModal()">Hủy</button>
            <button class="btn btn-ghost" onclick="window.submitEditOrderItems('${codeEsc}', 'draft')" title="Lưu nháp — chưa chốt sản lượng">💾 Lưu nháp</button>
            <button class="btn btn-primary" onclick="window.submitEditOrderItems('${codeEsc}', 'qty')" title="Chốt sản lượng — khoá SL + ghi tên bạn (KT1), chuyển sang chờ báo giá">📦 Chốt sản lượng</button>`,
-      width: '780px', stack: true
+      width: '90vw', stack: true
     });
     renderOrderItems();
     if (mode !== 'edit') return;
