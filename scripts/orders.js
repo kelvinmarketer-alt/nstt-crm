@@ -1139,7 +1139,7 @@
       </div>
       <!-- ====== YÊU CẦU GIAO CỦA KHÁCH (ngày + ca + giờ) ====== -->
       <div class="form-row">
-        <div><label>📅 Ngày giao ${window.helpTip ? window.helpTip('Ngày KH muốn nhận hàng — Kho gom đơn + đặt NCC theo ngày này.') : ''}</label><input id="oDeliverDate" type="date" value="${(window.todayDate?window.todayDate():new Date()).toISOString().slice(0,10)}"></div>
+        <div><label>📅 Ngày giao ${window.helpTip ? window.helpTip('Ngày KH muốn nhận hàng — Kho gom đơn + đặt NCC theo ngày này. KHÔNG chọn ngày quá khứ (không giao trước khi đặt).') : ''}</label><input id="oDeliverDate" type="date" min="${(window.todayDate?window.todayDate():new Date()).toISOString().slice(0,10)}" value="${(window.todayDate?window.todayDate():new Date()).toISOString().slice(0,10)}"></div>
         <div><label>🕐 Ca giao</label>
           <select id="oShipShift" onchange="window._oShiftHint(this.value)"><option value="">— chọn ca —</option><option value="Sáng">Sáng</option><option value="Trưa">Trưa</option><option value="Chiều">Chiều</option><option value="Tối">Tối</option></select>
           <div id="oShiftHint" style="font-size:11.5px;color:#92400E;margin-top:4px;display:none;line-height:1.45"></div></div>
@@ -2398,6 +2398,11 @@ CHỈ TRẢ JSON, không giải thích gì thêm.`;
     const customers = window.STORE.get('customers', []);
     const drivers = window.STORE.get('shippers', window.DRIVERS || []);
     const cust = customers.find(c => c.id === custId);
+
+    /* Chặn NGÀY GIAO trong QUÁ KHỨ (không thể giao trước khi đặt) — tránh đơn nhảy công nợ về ngày cũ */
+    const _dd = window.formVal('#oDeliverDate') || '';
+    const _todayISO = (window.todayISO ? window.todayISO() : new Date().toISOString().slice(0, 10));
+    if (_dd && _dd < _todayISO && !confirm('⚠️ Ngày giao (' + _dd + ') TRƯỚC hôm nay (' + _todayISO + ').\nKhông thể giao trước khi đặt — kiểm tra lại. Vẫn lưu?')) return;
 
     const drvId = window.formVal('#oDriver');
     const drv = drivers.find(d => d.id === drvId);

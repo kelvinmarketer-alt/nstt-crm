@@ -9,13 +9,20 @@
   const isoOf = d => `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}`;
 
   /* Chuẩn hoá ngày 1 đơn → ISO yyyy-mm-dd (ưu tiên ngày GIAO) */
-  function orderISO(o) {
-    const raw = o.deliverDate || o.date || o.createdAt || '';
+  function _rawISO(raw) {
     let m = String(raw).match(/^(\d{4})-(\d{2})-(\d{2})/);          /* ISO */
     if (m) return `${m[1]}-${m[2]}-${m[3]}`;
     m = String(raw).match(/(\d{1,2})\/(\d{1,2})\/(\d{4})/);         /* dd/mm/yyyy */
     if (m) return `${m[3]}-${pad(m[2])}-${pad(m[1])}`;
     return '';
+  }
+  function orderISO(o) {
+    /* Ngày công nợ = NGÀY GIAO (deliverDate). NHƯNG deliverDate KHÔNG được TRƯỚC ngày đặt/tạo đơn
+       (giao trước khi đặt = dữ liệu chọn nhầm) → khi đó dùng ngày ĐẶT. Tránh đơn nhảy công nợ về ngày quá khứ. */
+    const placed = _rawISO(o.date || o.createdAt || o.orderDate || '');
+    const planned = _rawISO(o.deliverDate || '');
+    if (planned && (!placed || planned >= placed)) return planned;
+    return placed || planned || '';
   }
   function ledgerISO(e) {
     if (e.ts) { const d = new Date(e.ts); if (!isNaN(d)) return isoOf(d); }
