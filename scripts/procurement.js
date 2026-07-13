@@ -1063,10 +1063,20 @@
     });
     return slots.map(s => s.items);
   }
-  /* Gộp phần chia theo TÊN khách (1 khách có thể nằm ở >1 slot NCC) → 1 dòng túi/khách */
+  /* Nhãn AN TOÀN gửi NCC: NGƯỜI ĐẶT (customer.contact) → mã KH → mã đơn. TUYỆT ĐỐI không dùng
+     tên nhà hàng (custName) để NCC không biết hàng về nhà hàng nào (tránh NCC bán thẳng cho khách). */
+  const getCustomers = () => S().get('customers', window.CUSTOMERS || []) || [];
+  function _supCustLabel(x) {
+    const o = getOrders().find(r => r.code === x.code);
+    const cid = o && (o.cust || o.customer_id);
+    const c = cid ? getCustomers().find(k => k.id === cid) : null;
+    const contact = c && c.contact != null ? String(c.contact).trim() : '';
+    return contact || cid || x.code || '?';
+  }
+  /* Gộp phần chia theo NGƯỜI ĐẶT (ẩn tên nhà hàng); 1 khách có thể nằm ở >1 slot NCC → 1 dòng túi/khách */
   function _mergeCusts(custs) {
     const m = new Map();
-    (custs || []).forEach(x => { const k = x.custName || x.code || '?'; m.set(k, (m.get(k) || 0) + (+x.qty || 0)); });
+    (custs || []).forEach(x => { const k = _supCustLabel(x); m.set(k, (m.get(k) || 0) + (+x.qty || 0)); });
     return [...m.entries()].map(([name, qty]) => ({ name, qty: +qty.toFixed(2) }));
   }
   /* Dữ liệu đặt hàng cho 1 NCC: gộp các mã NCC đó cung cấp + chia khách (cho NCC lẻ) */

@@ -372,6 +372,7 @@
             </div>
           </div>
         </td>
+        <td class="hide-md" data-field="contact" title="Click để sửa Người đặt" style="font-size:12px;color:${c.contact ? 'var(--navy)' : 'var(--muted)'};font-weight:${c.contact ? '600' : '400'}">${c.contact ? String(c.contact).replace(/</g, '&lt;') : '—'}</td>
         <td class="hide-md" data-field="address" title="Click để sửa địa chỉ" style="font-size:12px;color:var(--muted);max-width:280px;white-space:normal;line-height:1.35">${c.address || '—'}</td>
         <td class="hide-md" data-field="staffOwner"><span class="staff-pill">${c.staffOwner}</span></td>
         <td class="num" data-field="orders">${c.orders}</td>
@@ -426,6 +427,7 @@
           store: 'customers',
           fields: {
             name:       { type: 'text', format: v => v },
+            contact:    { type: 'text', format: v => v || '—' },
             type:       { type: 'select',
                           options: () => window.MD.get('custTypes').map(t => ({ value: t.id, label: t.label })),
                           format: v => { const m = typeMeta(v); return `<span class="tag" style="background:${m.color}1f;color:${m.color}">${m.label}</span>`; } },
@@ -725,9 +727,13 @@
           <select id="addType">${window.MD.options('custTypes')}</select></div>
       </div>
       <div class="form-row">
-        <div><label>Tên KH / Tên Cty *</label><input id="addName" placeholder="VD: Anh Tuấn / Cty ABC"></div>
+        <div><label>Tên KH / Nhà hàng / Cty *</label><input id="addName" placeholder="VD: Nhà hàng ABC"></div>
         <div><label>Nhóm</label>
           <select id="addGroup">${window.MD.options('custGroups', 'Mới')}</select></div>
+      </div>
+      <div class="form-row">
+        <div><label>Người đặt <span style="color:var(--muted);font-weight:400;font-size:11px">(người trực tiếp đặt — ẩn với NCC)</span></label><input id="addContact" placeholder="VD: A Tùng bếp"></div>
+        <div><label>&nbsp;</label><div style="font-size:11px;color:var(--muted);padding-top:9px;line-height:1.4">Trống → khi gọi hàng NCC hiện mã KH thay tên nhà hàng.</div></div>
       </div>
       <div class="form-row">
         <div><label>SĐT <span style="color:var(--muted);font-weight:400;font-size:11px">(không bắt buộc)</span></label><input id="addPhone" placeholder="0912 xxx xxx"></div>
@@ -1049,6 +1055,7 @@
   function _readAddForm() {
     return {
       name: window.formVal('#addName'), phone: window.formVal('#addPhone'),
+      contact: window.formVal('#addContact'),
       type: window.formVal('#addType'), group: window.formVal('#addGroup'),
       priceTier: window.formVal('#addPriceTier'), email: window.formVal('#addEmail'),
       zalo: window.formVal('#addZalo'), fb: window.formVal('#addFb'),
@@ -1095,7 +1102,7 @@
     const newCust = decorate({
       id: code, code,
       type: f.type, group: f.group, priceTier: f.priceTier,
-      name: f.name, contact: f.name,
+      name: f.name, contact: f.contact || '',
       phone: f.phone, email: f.email, zalo: f.zalo, fb: f.fb,
       address: f.address, province: f.province, orderFreq: f.orderFreq, mainCats: [],
       /* Sale tạo KH → BẮT BUỘC chủ sở hữu = chính mình (nếu không sẽ không thấy lại KH vừa tạo) */
@@ -1137,8 +1144,12 @@
           <select id="eGroup">${window.MD.options('custGroups', c.group)}</select></div>
       </div>
       <div class="form-row">
-        <div><label>Tên KH</label><input id="eName" value="${c.name}"></div>
+        <div><label>Tên KH <span style="color:var(--muted);font-weight:400;font-size:11px">(tên nhà hàng / công ty)</span></label><input id="eName" value="${c.name}"></div>
         <div><label>SĐT</label><input id="ePhone" value="${c.phone}"></div>
+      </div>
+      <div class="form-row">
+        <div><label>Người đặt <span style="color:var(--muted);font-weight:400;font-size:11px">(người trực tiếp đặt)</span></label><input id="eContact" value="${(c.contact||'').replace(/"/g,'&quot;')}" placeholder="VD: A Tùng bếp"></div>
+        <div><label>&nbsp;</label><div style="font-size:11px;color:var(--muted);padding-top:9px;line-height:1.4">Khi gọi hàng NCC sẽ hiện <b>Người đặt</b> (không lộ tên nhà hàng). Trống → hiện mã KH.</div></div>
       </div>
       <div class="form-row">
         <div><label>Zalo <span style="color:var(--muted);font-weight:400;font-size:11px">(SĐT hoặc link)</span></label><input id="eZalo" value="${(c.zalo||'').replace(/"/g,'&quot;')}" placeholder="0912… hoặc https://zalo.me/..."></div>
@@ -1193,6 +1204,7 @@
       contact: window.formVal('#eName'),
       phone: window.formVal('#ePhone'),
       email: window.formVal('#eEmail'),
+      contact: window.formVal('#eContact'),   /* Người đặt (người liên hệ) — dùng cho cú pháp gọi NCC, ẩn tên nhà hàng */
       zalo: window.formVal('#eZalo'),
       fb: window.formVal('#eFb'),
       staffOwner: window.formVal('#eStaff'),
@@ -1323,11 +1335,12 @@
 
   /* ============ CỘT HIỂN THỊ ============ */
   const COL_DEFS = [
-    { idx: 2, key: 'address',   label: 'Địa chỉ' },
-    { idx: 3, key: 'staff',     label: 'NV phụ trách' },
-    { idx: 4, key: 'orders',    label: 'Số đơn' },
-    { idx: 5, key: 'revenue',   label: 'Doanh thu' },
-    { idx: 6, key: 'debt',      label: 'Công nợ' },
+    { idx: 2, key: 'contact',   label: 'Người đặt' },
+    { idx: 3, key: 'address',   label: 'Địa chỉ' },
+    { idx: 4, key: 'staff',     label: 'NV phụ trách' },
+    { idx: 5, key: 'orders',    label: 'Số đơn' },
+    { idx: 6, key: 'revenue',   label: 'Doanh thu' },
+    { idx: 7, key: 'debt',      label: 'Công nợ' },
   ];
   function getColPrefs() {
     const p = window.STORE.get('custColPrefs', null);

@@ -556,7 +556,7 @@
           <div style="font-size:9.5px;color:#555">${comp.bank}</div>
         </div>
       </div>
-      <div class="greet"><div><b>Kính Gửi Quý Khách Hàng:</b> ${c.name || ''}<br><b>Địa Chỉ:</b> ${c.address || '—'}</div><div><b>Số Điện Thoại:</b> ${c.phone || '—'}</div></div>
+      <div class="greet"><div><b>Kính Gửi Quý Khách Hàng:</b> ${c.name || ''}${c.contact ? `<br><b>Người đặt:</b> ${String(c.contact).replace(/</g, '&lt;')}` : ''}<br><b>Địa Chỉ:</b> ${c.address || '—'}</div><div><b>Số Điện Thoại:</b> ${c.phone || '—'}</div></div>
       <h1>THÔNG BÁO CÔNG NỢ – KIÊM ĐỀ NGHỊ THANH TOÁN</h1>
       <div class="sub">từ ngày ${ddmm(_last.fromISO)}/${_last.fromISO.slice(0,4)} – ${ddmm(_last.toISO)}/${_last.toISO.slice(0,4)}</div>
       <div class="note0">Chuyên Sỉ Rau Củ Quả Đà Lạt Và Rau Vùng Miền.</div>
