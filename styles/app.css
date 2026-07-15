@@ -62,24 +62,25 @@ html.embed .main{padding:14px 16px 40px}
   /* THU GỌN: brand gọn + logo căn giữa (chữ width:0 để KHÔNG đội chiều cao brand) */
   .app:not(.side-pinned) .sidebar .brand{ justify-content:center; padding:14px 6px; border-bottom-color:transparent }
   .app:not(.side-pinned) .sidebar:hover .brand{ justify-content:flex-start; padding:16px 18px; border-bottom-color:rgba(255,255,255,0.08) }
-  /* icon CĂN GIỮA rail; chữ .lbl width:0 để icon nằm chính giữa, sát nhau */
+  /* icon CĂN GIỮA rail: a canh giữa + CHỮ display:none (không chiếm width) → icon nằm đúng giữa, thẳng cột */
   .app:not(.side-pinned) .sidebar .nav a{ justify-content:center; padding:10px 0; gap:0; margin-bottom:3px }
+  .app:not(.side-pinned) .sidebar .nav a .ico{ width:auto; font-size:19px }
   .app:not(.side-pinned) .sidebar:hover .nav a{ justify-content:flex-start; padding:9px 12px; gap:10px; margin-bottom:2px }
+  .app:not(.side-pinned) .sidebar:hover .nav a .ico{ width:18px; font-size:inherit }
   .app:not(.side-pinned) .sidebar .side-foot{ justify-content:center; padding-left:0; padding-right:0 }
   .app:not(.side-pinned) .sidebar:hover .side-foot{ justify-content:flex-start; padding:10px 14px }
-  /* brand-text ẨN HẲN khi thu gọn (display:none) — vì .b1 white-space:normal, để width:0 sẽ
-     xuống dòng từng ký tự → brand cao vọt. Hiện lại khi hover. */
-  .app:not(.side-pinned) .sidebar .brand-text{ display:none }
-  .app:not(.side-pinned) .sidebar:hover .brand-text{ display:block; flex:1; min-width:0 }
-  /* các phần CHỮ 1 dòng: co width về 0 khi thu gọn (không chiếm chỗ), hiện khi hover */
+  /* THU GỌN: ẨN HẲN mọi phần CHỮ (display:none) — nếu chỉ để width:0/opacity:0 thì chữ VẪN chiếm chỗ,
+     đẩy icon lệch mỗi dòng một kiểu. display:none loại chữ khỏi layout → icon thẳng cột tuyệt đối. */
+  .app:not(.side-pinned) .sidebar .brand-text,
   .app:not(.side-pinned) .sidebar .lbl,
-  .app:not(.side-pinned) .sidebar .side-foot .user-block{ width:0; min-width:0; flex:0 0 0; overflow:hidden; opacity:0; transition:opacity .12s ease }
   .app:not(.side-pinned) .sidebar .nav a .badge-n,
-  .app:not(.side-pinned) .sidebar .side-foot > button{ opacity:0; width:0; overflow:hidden }
-  .app:not(.side-pinned) .sidebar:hover .lbl,
-  .app:not(.side-pinned) .sidebar:hover .side-foot .user-block{ width:auto; flex:1; opacity:1 }
-  .app:not(.side-pinned) .sidebar:hover .nav a .badge-n{ width:auto; opacity:1 }
-  .app:not(.side-pinned) .sidebar:hover .side-foot > button{ width:auto; opacity:1 }
+  .app:not(.side-pinned) .sidebar .side-foot .user-block,
+  .app:not(.side-pinned) .sidebar .side-foot > button{ display:none }
+  .app:not(.side-pinned) .sidebar:hover .brand-text{ display:block; flex:1; min-width:0 }
+  .app:not(.side-pinned) .sidebar:hover .lbl{ display:inline }
+  .app:not(.side-pinned) .sidebar:hover .nav a .badge-n{ display:inline-block }
+  .app:not(.side-pinned) .sidebar:hover .side-foot .user-block{ display:block; flex:1; min-width:0 }
+  .app:not(.side-pinned) .sidebar:hover .side-foot > button{ display:inline-flex }
   /* nhãn nhóm: BIẾN MẤT hoàn toàn khi thu gọn → icon sát ngay dưới logo (hết khoảng hở) */
   .app:not(.side-pinned) .sidebar .nav{ padding-top:6px }
   .app:not(.side-pinned) .sidebar .nav-section{ height:0; padding:0; margin:0; overflow:hidden; opacity:0 }
