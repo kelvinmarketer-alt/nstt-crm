@@ -53,5 +53,6 @@
 
   /* === Layout === */
   --sidebar-w: 230px;
+  --rail-w:    66px;   /* bề rộng sidebar thu gọn (chỉ icon) — hover mới bung ra --sidebar-w */
   --topbar-h:  56px;
 }

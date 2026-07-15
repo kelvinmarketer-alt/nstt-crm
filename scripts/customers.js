@@ -372,8 +372,8 @@
             </div>
           </div>
         </td>
-        <td class="hide-md" data-field="contact" title="Click để sửa Người đặt" style="font-size:12px;color:${c.contact ? 'var(--navy)' : 'var(--muted)'};font-weight:${c.contact ? '600' : '400'}">${c.contact ? String(c.contact).replace(/</g, '&lt;') : '—'}</td>
-        <td class="hide-md" data-field="address" title="Click để sửa địa chỉ" style="font-size:12px;color:var(--muted);max-width:280px;white-space:normal;line-height:1.35">${c.address || '—'}</td>
+        <td class="hide-md" data-field="contact" title="${c.contact ? String(c.contact).replace(/"/g, '&quot;') : 'Click để sửa Người đặt'}" style="font-size:12px;color:${c.contact ? 'var(--navy)' : 'var(--muted)'};font-weight:${c.contact ? '600' : '400'};max-width:130px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${c.contact ? String(c.contact).replace(/</g, '&lt;') : '—'}</td>
+        <td class="hide-md" data-field="address" title="Click để sửa địa chỉ" style="font-size:12px;color:var(--muted);min-width:260px;max-width:440px;white-space:normal;line-height:1.35">${c.address || '—'}</td>
         <td class="hide-md" data-field="staffOwner"><span class="staff-pill">${c.staffOwner}</span></td>
         <td class="num" data-field="orders">${c.orders}</td>
         <td class="num" data-field="revenue">${window.fmt(c.revenue)}</td>

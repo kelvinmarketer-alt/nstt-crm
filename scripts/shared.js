@@ -5,7 +5,7 @@
 
 /* Phiên bản app hiển thị (đối chiếu với CACHE_VERSION trong sw.js) — để user tự XÁC NHẬN
    đang chạy bản mới hay còn kẹt JS cũ (hiện ở góc sidebar + log console). */
-window.APP_VERSION = 'v469';
+window.APP_VERSION = 'v470';
 console.log('%c[NSTT] App ' + window.APP_VERSION, 'color:#339B21;font-weight:bold');
 
 /* Gom NGUỒN khách về 3 nhóm chuẩn: 'mkt' / 'sales' / 'sep-gioi-thieu'.
@@ -1558,6 +1558,7 @@ window.renderAppShell = function(activeId, breadcrumbText) {
     })).filter(g => g.items.length > 0);
 
     sb.innerHTML = `
+      <button class="side-pin" title="Ghim menu mở rộng / thu gọn" onclick="window.toggleSidePin()">📌</button>
       <div class="brand">
         <div class="brand-logo">${window.brandLogo('compact', '../')}</div>
         <div class="brand-text">
@@ -1573,8 +1574,8 @@ window.renderAppShell = function(activeId, breadcrumbText) {
             let badgeVal = item.badge;
             if (item.badgeKey && window.navBadgeCount) badgeVal = window.navBadgeCount(item.badgeKey);
             return `
-            <a href="${item.href}" class="${item.id === activeId ? 'active' : ''}">
-              <span class="ico">${item.icon}</span> ${item.label}
+            <a href="${item.href}" class="${item.id === activeId ? 'active' : ''}" title="${String(item.label).replace(/"/g, '&quot;')}">
+              <span class="ico">${item.icon}</span> <span class="lbl">${item.label}</span>
               ${badgeVal ? `<span class="badge-n">${badgeVal}</span>` : ''}
             </a>`;
           }).join('')}
@@ -1614,6 +1615,21 @@ window.renderAppShell = function(activeId, breadcrumbText) {
     ov.onclick = () => window.toggleSidebar(false);
     document.body.appendChild(ov);
   }
+
+  /* === GHIM sidebar: icon-rail (auto thu gọn, hover mới bung) ↔ mở rộng cố định. Nhớ theo máy. === */
+  window.toggleSidePin = window.toggleSidePin || function () {
+    const app = document.querySelector('.app'); if (!app) return;
+    const pinned = app.classList.toggle('side-pinned');
+    try { localStorage.setItem('nstt_side_pinned', pinned ? '1' : '0'); } catch (e) {}
+    const btn = document.querySelector('.side-pin');
+    if (btn) { btn.textContent = pinned ? '📌' : '📍'; btn.title = pinned ? 'Bỏ ghim → tự thu gọn' : 'Ghim menu mở rộng'; }
+  };
+  try {
+    const app = document.querySelector('.app');
+    if (app && localStorage.getItem('nstt_side_pinned') === '1') app.classList.add('side-pinned');
+    const pin = document.querySelector('.side-pin');
+    if (pin) pin.textContent = (app && app.classList.contains('side-pinned')) ? '📌' : '📍';
+  } catch (e) {}
   /* Auto đóng sidebar khi click vào link nav */
   document.querySelectorAll('.sidebar .nav a').forEach(a => {
     a.addEventListener('click', () => {
