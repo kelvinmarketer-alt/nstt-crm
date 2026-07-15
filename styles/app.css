@@ -59,24 +59,32 @@ html.embed .main{padding:14px 16px 40px}
   }
   .app:not(.side-pinned) .sidebar:hover{ width:var(--sidebar-w); box-shadow:6px 0 30px rgba(0,0,0,.32); }
   .app:not(.side-pinned) .sidebar::-webkit-scrollbar{ width:0 }
-  /* icon căn ~giữa rail khi thu gọn */
-  .app:not(.side-pinned) .sidebar .nav a{ padding-left:20px; padding-right:12px }
-  .app:not(.side-pinned) .sidebar .brand{ padding-left:12px }
-  .app:not(.side-pinned) .sidebar .side-foot{ padding-left:14px }
-  /* các phần CHỮ: ẩn khi thu gọn, hiện khi hover */
+  /* THU GỌN: brand gọn + logo căn giữa (chữ width:0 để KHÔNG đội chiều cao brand) */
+  .app:not(.side-pinned) .sidebar .brand{ justify-content:center; padding:14px 6px; border-bottom-color:transparent }
+  .app:not(.side-pinned) .sidebar:hover .brand{ justify-content:flex-start; padding:16px 18px; border-bottom-color:rgba(255,255,255,0.08) }
+  /* icon CĂN GIỮA rail; chữ .lbl width:0 để icon nằm chính giữa, sát nhau */
+  .app:not(.side-pinned) .sidebar .nav a{ justify-content:center; padding:10px 0; gap:0; margin-bottom:3px }
+  .app:not(.side-pinned) .sidebar:hover .nav a{ justify-content:flex-start; padding:9px 12px; gap:10px; margin-bottom:2px }
+  .app:not(.side-pinned) .sidebar .side-foot{ justify-content:center; padding-left:0; padding-right:0 }
+  .app:not(.side-pinned) .sidebar:hover .side-foot{ justify-content:flex-start; padding:10px 14px }
+  /* brand-text ẨN HẲN khi thu gọn (display:none) — vì .b1 white-space:normal, để width:0 sẽ
+     xuống dòng từng ký tự → brand cao vọt. Hiện lại khi hover. */
+  .app:not(.side-pinned) .sidebar .brand-text{ display:none }
+  .app:not(.side-pinned) .sidebar:hover .brand-text{ display:block; flex:1; min-width:0 }
+  /* các phần CHỮ 1 dòng: co width về 0 khi thu gọn (không chiếm chỗ), hiện khi hover */
   .app:not(.side-pinned) .sidebar .lbl,
-  .app:not(.side-pinned) .sidebar .brand-text,
+  .app:not(.side-pinned) .sidebar .side-foot .user-block{ width:0; min-width:0; flex:0 0 0; overflow:hidden; opacity:0; transition:opacity .12s ease }
   .app:not(.side-pinned) .sidebar .nav a .badge-n,
-  .app:not(.side-pinned) .sidebar .side-foot .user-block,
-  .app:not(.side-pinned) .sidebar .side-foot > button{ opacity:0; transition:opacity .1s ease }
+  .app:not(.side-pinned) .sidebar .side-foot > button{ opacity:0; width:0; overflow:hidden }
   .app:not(.side-pinned) .sidebar:hover .lbl,
-  .app:not(.side-pinned) .sidebar:hover .brand-text,
-  .app:not(.side-pinned) .sidebar:hover .nav a .badge-n,
-  .app:not(.side-pinned) .sidebar:hover .side-foot .user-block,
-  .app:not(.side-pinned) .sidebar:hover .side-foot > button{ opacity:1 }
-  /* nhãn nhóm: thu gọn thành khoảng cách mảnh, hover mới hiện chữ */
-  .app:not(.side-pinned) .sidebar .nav-section{ opacity:0; height:12px; padding:12px 12px 0; overflow:hidden }
-  .app:not(.side-pinned) .sidebar:hover .nav-section{ opacity:.5; height:auto; padding:14px 12px 6px }
+  .app:not(.side-pinned) .sidebar:hover .side-foot .user-block{ width:auto; flex:1; opacity:1 }
+  .app:not(.side-pinned) .sidebar:hover .nav a .badge-n{ width:auto; opacity:1 }
+  .app:not(.side-pinned) .sidebar:hover .side-foot > button{ width:auto; opacity:1 }
+  /* nhãn nhóm: BIẾN MẤT hoàn toàn khi thu gọn → icon sát ngay dưới logo (hết khoảng hở) */
+  .app:not(.side-pinned) .sidebar .nav{ padding-top:6px }
+  .app:not(.side-pinned) .sidebar .nav-section{ height:0; padding:0; margin:0; overflow:hidden; opacity:0 }
+  .app:not(.side-pinned) .sidebar:hover .nav{ padding-top:10px }
+  .app:not(.side-pinned) .sidebar:hover .nav-section{ height:auto; padding:14px 12px 6px; margin:0; opacity:.5 }
   /* nút GHIM để khoá mở rộng (hiện khi hover) */
   .side-pin{ display:block; position:absolute; top:10px; right:8px; width:26px; height:26px; border:none; border-radius:7px;
     background:rgba(255,255,255,.14); color:#fff; cursor:pointer; font-size:13px; opacity:0; transition:opacity .12s; z-index:2 }
