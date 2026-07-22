@@ -632,26 +632,41 @@
       const typ = supplyTypeOf(b.id);
       const isLe = typ === 'le' || typ === 'both';
       const bags = isLe ? supReqByCust(run, b.id) : [];
-      return `<div class="sup-block" style="margin-bottom:12px">
-        <div class="hd">${isLe ? '🛵' : '📦'} ${esc(b.name)} <span style="opacity:.85;font-weight:400;font-size:11px">${TYPE_LABEL[typ]} · ${b.items.length} mã · ${fmtQty(b.kg)}kg${b.cost ? ' · ' + money(b.cost) + '₫' : ''}</span>
+      const siLines = isLe ? [] : supReqSiLines(run, b.id);
+      const called = !!(run.supCalled && run.supCalled[b.id]);
+      return `<div class="sup-block" style="margin-bottom:12px;${called ? 'opacity:.6' : ''}">
+        <div class="hd">${isLe ? '🛵' : '📦'} ${esc(b.name)} <span style="opacity:.85;font-weight:400;font-size:11px">${b.items.length} mã · ${fmtQty(b.kg)}kg${b.cost ? ' · ' + money(b.cost) + '₫' : ''}</span>
+          <select onchange="window.pcSetSupType('${b.id}',this.value)" title="Loại gọi hàng NCC này" style="margin-left:6px;font-size:11px;border-radius:5px;border:none;padding:2px 4px;background:rgba(255,255,255,.92);color:#111;cursor:pointer">
+            <option value="le"${typ === 'le' ? ' selected' : ''}>🛵 Lẻ</option>
+            <option value="si"${typ === 'si' ? ' selected' : ''}>📦 Sỉ</option>
+            <option value="both"${typ === 'both' ? ' selected' : ''}>Sỉ+Lẻ</option>
+          </select>
           <div style="flex:1"></div>
-          <button class="btn btn-ghost btn-sm" style="background:rgba(255,255,255,.2);color:#fff;border:none" onclick="window.pcCopySupReq('${run.id}','${b.id}')" title="Chép gộp cả nhà vào 1 tin">📋 Cả nhà</button>
+          <label style="display:inline-flex;align-items:center;gap:4px;font-size:11.5px;font-weight:700;color:#fff;cursor:pointer;margin-right:8px;background:${called ? 'rgba(34,197,94,.45)' : 'rgba(255,255,255,.15)'};padding:3px 9px;border-radius:6px" title="Đánh dấu đã gọi hàng NCC này">
+            <input type="checkbox" ${called ? 'checked' : ''} onchange="window.pcSetSupCalled('${run.id}','${b.id}',this.checked)" style="cursor:pointer;accent-color:#16A34A"> ${called ? '✓ Đã gọi' : 'Đã gọi hàng'}</label>
+          <button class="btn btn-ghost btn-sm" style="background:rgba(255,255,255,.2);color:#fff;border:none" onclick="window.pcCopySupReq('${run.id}','${b.id}')" title="${isLe ? 'Chép gộp cả nhà 1 tin' : 'Chép cú pháp sỉ theo thùng'}">📋 ${isLe ? 'Cả nhà' : 'Copy'}</button>
         </div>
         <div style="padding:8px 12px">
-        ${supReqData(run, b.id).lines.map(it => `<div style="font-size:12px;padding:3px 0;border-bottom:1px dashed #EEF2F0">
-          <b>${esc(it.name)}</b>: ${isLe ? 'tổng ' : ''}${fmtQty(it.qty)} ${it.unit}${it.unitCost ? ` <span style="color:var(--muted)">× ${money(it.unitCost)}₫</span>` : ''}
+        ${isLe ? `${supReqData(run, b.id).lines.map(it => `<div style="font-size:12px;padding:3px 0;border-bottom:1px dashed #EEF2F0">
+          <b>${esc(it.name)}</b>: tổng ${fmtQty(it.qty)} ${it.unit}${it.unitCost ? ` <span style="color:var(--muted)">× ${money(it.unitCost)}₫</span>` : ''}
         </div>`).join('')}
-        ${isLe && bags.length ? `
-        <div style="margin-top:9px;padding-top:8px;border-top:1px solid #E5E7EB">
+        ${bags.length ? `<div style="margin-top:9px;padding-top:8px;border-top:1px solid #E5E7EB">
           <div style="font-size:11px;font-weight:700;color:#15803D;margin-bottom:5px">📨 Copy theo TỪNG TÚI — mỗi khách 1 tin gửi NCC</div>
           ${bags.map((bag, i) => `<div style="display:flex;gap:8px;align-items:flex-start;padding:5px 0;border-bottom:1px dashed #EEF2F0">
             <button class="btn btn-ghost btn-sm" style="flex:0 0 auto;padding:3px 9px;font-size:12px;background:#DCFCE7;color:#15803D;border:1px solid #86EFAC" onclick="window.pcCopySupCust('${run.id}','${b.id}',${i})" title="Chép riêng túi này">📋</button>
-            <div style="font-size:12px;line-height:1.5">
-              <b>${esc(bag.cust)}</b><br>
-              <span style="color:#374151">${bag.items.map(it => esc(it.name) + ' ' + fmtQty(it.qty) + it.unit).join(' · ')}</span>
-            </div>
+            <div style="font-size:12px;line-height:1.5"><b>${esc(bag.cust)}</b><br><span style="color:#374151">${bag.items.map(it => esc(it.name) + ' ' + fmtQty(it.qty) + it.unit).join(' · ')}</span></div>
           </div>`).join('')}
-        </div>` : ''}
+        </div>` : ''}`
+        : `<div style="font-size:10.5px;color:var(--muted);margin-bottom:6px">📦 Gọi theo thùng/bọc — chỉnh <b>số thùng</b> &amp; <b>sản lượng (kg)</b> rồi bấm 📋 Copy gửi NCC.</div>
+        ${siLines.map(row => `<div style="display:flex;gap:6px;align-items:center;padding:5px 0;border-bottom:1px dashed #EEF2F0;flex-wrap:wrap">
+          <b style="flex:1;min-width:104px;font-size:12px">${esc(row.name)}</b>
+          <input type="number" data-money="0" min="0" step="1" value="${row.cases}" onchange="window.pcSetSupPack('${run.id}','${b.id}','${row.key}','cases',this.value)" style="width:50px;text-align:right;font-size:12px;border:1px solid var(--line);border-radius:5px;padding:3px 6px" title="Số thùng/bọc">
+          <select onchange="window.pcSetSupPack('${run.id}','${b.id}','${row.key}','unit',this.value)" style="font-size:11.5px;border:1px solid var(--line);border-radius:5px;padding:3px 4px">
+            ${['thùng', 'bọc', 'bao', 'khay', 'túi'].map(u => `<option value="${u}"${row.caseUnit === u ? ' selected' : ''}>${u}</option>`).join('')}
+          </select>
+          <input type="number" data-money="0" min="0" step="0.1" value="${row.kg}" onchange="window.pcSetSupPack('${run.id}','${b.id}','${row.key}','kg',this.value)" style="width:64px;text-align:right;font-size:12px;border:1px solid var(--line);border-radius:5px;padding:3px 6px" title="Sản lượng (kg)">
+          <span style="font-size:11px;color:var(--muted)">${esc(row.unit || 'kg')}</span>
+        </div>`).join('')}`}
         </div>
       </div>`;
     };
@@ -660,7 +675,7 @@
       const leArr = supArr.filter(b => supplyTypeOf(b.id) !== 'si');   /* lẻ + chưa rõ */
       const siArr = supArr.filter(b => supplyTypeOf(b.id) === 'si');
       if (leArr.length) body += `<div style="font-weight:800;color:#15803D;font-size:12.5px;margin:0 0 8px">🛵 GỌI HÀNG LẺ <span style="font-weight:400;color:var(--muted);font-size:11px">— NCC chia mô sẵn theo khách · bấm 📋 chép cú pháp gửi Zalo</span></div>` + leArr.map(_supBlock).join('');
-      if (siArr.length) body += `<div style="font-weight:800;color:#1E40AF;font-size:12.5px;margin:14px 0 8px">📦 GỌI HÀNG SỈ <span style="font-weight:400;color:var(--muted);font-size:11px">— NCC giao cả lô theo tổng, kho tự chia</span></div>` + siArr.map(_supBlock).join('');
+      if (siArr.length) body += `<div style="font-weight:800;color:#1E40AF;font-size:12.5px;margin:14px 0 8px">📦 GỌI HÀNG SỈ <span style="font-weight:400;color:var(--muted);font-size:11px">— gọi theo thùng/bọc, chỉnh số thùng &amp; sản lượng · bấm 📋 chép gửi NCC</span></div>` + siArr.map(_supBlock).join('');
     }
 
     /* ===== THU MUA NGOÀI (mã chưa có NCC) ===== */
@@ -1103,6 +1118,22 @@
   function _bagSyntax(bag) {
     return `${bag.cust}\n${bag.items.map(it => `${it.name} ${fmtQty(it.qty)}${it.unit}`).join('\n')}`;
   }
+  /* SỈ: gọi theo THÙNG/BỌC. Mỗi mã: số thùng (mặc định 1) + sản lượng kg (mặc định = tổng gom),
+     chỉnh tay lưu run.supPack[supId][lineKey] = {cases, unit, kg}. */
+  function supReqSiLines(run, supId) {
+    const { lines } = supReqData(run, supId);
+    const pack = (run.supPack && run.supPack[supId]) || {};
+    return lines.map(l => {
+      const pk = pack[l.key] || {};
+      return {
+        key: l.key, name: l.name, unit: l.unit,
+        cases: pk.cases != null ? pk.cases : 1,
+        caseUnit: pk.unit || 'thùng',
+        kg: pk.kg != null ? pk.kg : l.qty,
+      };
+    });
+  }
+  const _siSyntax = row => `${row.name} - ${fmtQty(row.cases)} ${row.caseUnit} - ${fmtQty(row.kg)}${row.unit || 'kg'}`;
   /* Dữ liệu đặt hàng cho 1 NCC: gộp các mã NCC đó cung cấp + chia khách (cho NCC lẻ) */
   function supReqData(run, supId) {
     const sObj = getSuppliers().find(s => s.id === supId) || {};
@@ -1117,7 +1148,7 @@
         qty += +a.qty || 0; cost += (+a.qty || 0) * (+a.unitCost || 0);
         (splits[ai] || []).forEach(x => custs.push(x));
       });
-      if (qty > 0.0001) items.push({ name: l.name, unit: l.unit, qty: +qty.toFixed(2), unitCost: qty ? cost / qty : 0, custs });
+      if (qty > 0.0001) items.push({ key: l.key, name: l.name, unit: l.unit, qty: +qty.toFixed(2), unitCost: qty ? cost / qty : 0, custs });
     });
     return { lines: items, supName, type };
   }
@@ -1338,13 +1369,38 @@ tbody tr:nth-child(even){background:#F4FAF2}tfoot td{background:#E8F5E9;font-wei
     readConfirmInputs(run);
     const { lines, type } = supReqData(run, supKey);
     const isLe = type === 'le' || type === 'both';
-    /* Cú pháp GỌN như sheet: LẺ gom THEO KHÁCH (mỗi khách 1 túi, liệt kê SP+SL);
-       SỈ chỉ liệt kê SP + tổng SL (kho tự chia). KHÔNG chữ ký cuối. */
+    /* Cú pháp GỌN: LẺ gom THEO KHÁCH (mỗi khách 1 túi); SỈ theo THÙNG/BỌC (SP - N thùng - kg).
+       KHÔNG chữ ký cuối. */
     const txt = isLe
       ? supReqByCust(run, supKey).map(_bagSyntax).join('\n\n')
-      : lines.map(l => `${l.name} ${fmtQty(l.qty)}${l.unit}`).join('\n');
+      : supReqSiLines(run, supKey).map(_siSyntax).join('\n');
     if (!txt) { window.toast && window.toast('Chưa có mã cho NCC này', 'info'); return; }
-    copyText(txt, 'cú pháp gọi hàng (cả nhà)');
+    copyText(txt, isLe ? 'cú pháp gọi hàng (cả nhà)' : 'cú pháp gọi sỉ');
+  };
+  /* Đổi loại gọi hàng NCC (sỉ/lẻ/cả hai) — lưu kv supplierMeta (như trang Nhà cung cấp), re-render phiên. */
+  window.pcSetSupType = function (supId, type) {
+    if (['si', 'le', 'both'].indexOf(type) < 0) return;
+    window.STORE.rmwKv('supplierMeta', m => { m = m || {}; m[supId] = { ...(m[supId] || {}), type }; return m; }, {});
+    if (window._pcActiveRun) window.pcOpenRun(window._pcActiveRun);
+    window.toast && window.toast('✓ Đổi loại NCC → ' + (type === 'si' ? 'Sỉ' : type === 'le' ? 'Lẻ' : 'Sỉ+Lẻ'), 'success');
+  };
+  /* Tích "đã gọi hàng" cho 1 NCC trong phiên — lưu run.supCalled, block mờ + ✓ Đã gọi. */
+  window.pcSetSupCalled = function (runId, supId, on) {
+    const run = getRuns().find(r => r.id === runId); if (!run) return;
+    run.supCalled = run.supCalled || {};
+    if (on) run.supCalled[supId] = true; else delete run.supCalled[supId];
+    saveRun(run);
+    window.pcOpenRun(runId);
+  };
+  /* Chỉnh số thùng/bọc + sản lượng kg cho 1 mã của NCC sỉ — lưu run.supPack (KHÔNG re-render → khỏi mất focus). */
+  window.pcSetSupPack = function (runId, supId, lineKey, field, value) {
+    const run = getRuns().find(r => r.id === runId); if (!run) return;
+    run.supPack = run.supPack || {};
+    run.supPack[supId] = run.supPack[supId] || {};
+    const pk = run.supPack[supId][lineKey] || (run.supPack[supId][lineKey] = {});
+    if (field === 'unit') pk.unit = value;
+    else pk[field] = (value === '' || value == null) ? null : +value;
+    saveRun(run);
   };
   /* Chép cú pháp CHỈ 1 TÚI (1 khách) của NCC — mỗi khách 1 tin gửi riêng, không chữ ký. */
   window.pcCopySupCust = function (runId, supKey, idx) {
