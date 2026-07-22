@@ -516,7 +516,7 @@
       *{box-sizing:border-box} body{font-family:'Segoe UI',Arial,sans-serif;margin:0;padding:18px;color:#1a1a1a;background:#fff}
       .pg{max-width:880px;margin:0 auto;padding:26px 32px 52px;background:#fff}
       .hd{display:flex;gap:14px;align-items:flex-start;border-bottom:2px solid #1B5E20;padding-bottom:8px}
-      .hd img{width:74px;height:74px;object-fit:contain}
+      .hd img{width:152px;height:auto;object-fit:contain}
       .cinfo{flex:1;font-size:12.5px;line-height:1.5}
       .cinfo b{font-size:15px;color:#1B5E20}
       .greet{display:flex;justify-content:space-between;margin-top:10px;font-size:13px}
@@ -544,7 +544,7 @@
     </div>
     <div class="pg" id="pg">
       <div class="hd">
-        <img src="${location.origin}/assets/logo-icon.png?v=485" crossorigin="anonymous" onerror="this.style.display='none'">
+        <img src="${location.origin}/assets/logo-name.png?v=486" crossorigin="anonymous" onerror="this.style.display='none'">
         <div class="cinfo">
           <b>${comp.name}</b><br>
           Mã Số Thuế: ${comp.tax}<br>
@@ -753,7 +753,7 @@
       *{box-sizing:border-box} body{font-family:'Segoe UI',Arial,sans-serif;margin:0;padding:18px;color:#1a1a1a;background:#fff}
       .pg{max-width:1180px;margin:0 auto;padding:24px 28px 48px;background:#fff}
       .hd{display:flex;gap:14px;align-items:flex-start;border-bottom:2px solid #1B5E20;padding-bottom:8px}
-      .hd img.logo{width:74px;height:74px;object-fit:contain}
+      .hd img.logo{width:152px;height:auto;object-fit:contain}
       .cinfo{flex:1;font-size:12.5px;line-height:1.5}.cinfo b{font-size:15px;color:#1B5E20}
       .greet{display:flex;justify-content:space-between;margin-top:10px;font-size:13px}
       h1{color:#C0392B;text-align:center;font-size:20px;margin:8px 0 2px}
@@ -777,7 +777,7 @@
     </div>
     <div class="pg" id="pg">
       <div class="hd">
-        <img class="logo" src="${location.origin}/assets/logo-icon.png?v=485" crossorigin="anonymous" onerror="this.style.display='none'">
+        <img class="logo" src="${location.origin}/assets/logo-name.png?v=486" crossorigin="anonymous" onerror="this.style.display='none'">
         <div class="cinfo"><b>${comp.name}</b><br>Mã Số Thuế: ${comp.tax}<br>Địa Chỉ: ${comp.address}<br>
           Số Tài Khoản: ${comp.bank} &nbsp;·&nbsp; Chủ TK: ${comp.bankOwner}<br>Email: ${comp.email} &nbsp;·&nbsp; GĐĐH: ${comp.director}</div>
         <div style="flex:0 0 auto;text-align:center;min-width:132px">

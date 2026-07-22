@@ -862,7 +862,7 @@
   /* Logo thương hiệu → dataURL (nhúng vào ảnh để không bị chặn CORS lúc vẽ canvas) */
   async function _logoDataURL() {
     try {
-      const r = await fetch((location.origin || '') + '/assets/logo-icon.png?v=485');
+      const r = await fetch((location.origin || '') + '/assets/logo-name.png?v=486');
       const b = await r.blob();
       return await new Promise(res => { const fr = new FileReader(); fr.onload = () => res(fr.result); fr.onerror = () => res(''); fr.readAsDataURL(b); });
     } catch (e) { return ''; }

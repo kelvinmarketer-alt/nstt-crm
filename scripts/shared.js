@@ -5,7 +5,7 @@
 
 /* Phiên bản app hiển thị (đối chiếu với CACHE_VERSION trong sw.js) — để user tự XÁC NHẬN
    đang chạy bản mới hay còn kẹt JS cũ (hiện ở góc sidebar + log console). */
-window.APP_VERSION = 'v486';
+window.APP_VERSION = 'v487';
 console.log('%c[NSTT] App ' + window.APP_VERSION, 'color:#339B21;font-weight:bold');
 
 /* Gom NGUỒN khách về 3 nhóm chuẩn: 'mkt' / 'sales' / 'sep-gioi-thieu'.
@@ -1934,7 +1934,7 @@ window.openModal = function(title, bodyHTML, opts = {}) {
     : '';
   const html = `
     <div id="${id}" class="modal-bg open" style="z-index:${z}" ${backdropClick}>
-      <div class="modal" style="width:min(${opts.width||'520px'},94vw);max-width:${opts.width||'520px'}">
+      <div class="modal" style="width:min(90vw,1400px);max-width:90vw">
         <div class="modal-head">
           <h3>${title}</h3>
           <button class="modal-close" onclick="window.closeModal()" title="Đóng (Esc)">✕</button>

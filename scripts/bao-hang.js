@@ -14,7 +14,7 @@
       addr: ci.address || '36/147A Tân Mai, Hoàng Mai, Hà Nội',
       phone: ci.hotline || '0836 676 086',
       website: ci.website || 'nongsantuantuhanoi.com',
-      logo: ci.logo || (origin + '/assets/logo-icon.png?v=485'),
+      logo: ci.logo || (origin + '/assets/logo-name.png?v=486'),
     };
   }
 
@@ -54,7 +54,7 @@
   body{color:#1a1a1a;font-size:13px;background:#fff}
   .wrap{max-width:780px;margin:0 auto;padding:6px 4px}
   .top{display:flex;align-items:center;gap:16px;border-bottom:3px solid #1B5E20;padding-bottom:12px;margin-bottom:4px}
-  .top img.logo{width:74px;height:74px;object-fit:contain;flex:0 0 auto}
+  .top img.logo{width:152px;height:auto;object-fit:contain;flex:0 0 auto}
   .brand{flex:1;min-width:0}
   .brand h1{font-size:21px;color:#1B5E20;font-weight:800;letter-spacing:.4px;line-height:1.15}
   .brand .sub{font-size:11.5px;color:#555;margin-top:5px}

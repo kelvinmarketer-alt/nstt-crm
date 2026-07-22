@@ -35,7 +35,7 @@
   }
   function getLogo() {
     /* Logo thương hiệu chính thức (assets/logo.png) — dùng chung mọi hoá đơn. */
-    return window.BRAND_LOGO_DATAURL || ((location.origin || '') + '/assets/logo-icon.png?v=485');
+    return window.BRAND_LOGO_DATAURL || ((location.origin || '') + '/assets/logo-name.png?v=486');
   }
   function fmt(n) { return (n || 0).toLocaleString('vi-VN'); }
   function fmtDate(s) {
@@ -88,7 +88,7 @@ ${FAV ? `<link rel="icon" type="image/svg+xml" href="${FAV}">` : ''}
   /* === HEADER (3 cột: logo | thông tin DN | QR chuyển khoản) === */
   .head{display:grid;grid-template-columns:104px 1fr 152px;gap:14px;align-items:flex-start;padding-bottom:6px}
   .logo-wrap{text-align:center}
-  .logo-wrap img{width:92px;height:92px;object-fit:contain;display:block;margin:0 auto}
+  .logo-wrap img{width:178px;height:auto;object-fit:contain;display:block;margin:0 auto}
   .logo-wrap .tag{font-size:9px;color:#008000;font-weight:700;margin-top:4px;line-height:1.25}
   .logo-wrap .tag2{font-size:8px;color:#2c8a48;margin-top:2px;font-style:italic}
 

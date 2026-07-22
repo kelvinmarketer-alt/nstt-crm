@@ -366,7 +366,7 @@
 
       <div class="seller">
         <div style="display:flex;align-items:center;gap:10px;margin-bottom:4px">
-          <img src="${(location.origin||'')+'/assets/logo-icon.png?v=485'}" alt="Nông Sản Tuấn Tú Hà Nội" style="width:48px;height:48px;object-fit:contain;flex:0 0 auto" onerror="this.style.display='none'">
+          <img src="${(location.origin||'')+'/assets/logo-name.png?v=486'}" alt="Nông Sản Tuấn Tú Hà Nội" style="width:128px;height:auto;object-fit:contain;flex:0 0 auto" onerror="this.style.display='none'">
           <h3 style="margin:0">Bên bán hàng (Bên cung cấp dịch vụ)</h3>
         </div>
         <div class="row"><div class="lab">Tên đơn vị:</div><div><b>${company.name}</b></div></div>

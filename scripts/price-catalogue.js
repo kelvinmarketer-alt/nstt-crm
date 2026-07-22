@@ -16,8 +16,8 @@ body{font-family:-apple-system,'Segoe UI',Roboto,Arial,sans-serif;color:#1c2b22;
 header{background:linear-gradient(135deg,#1f7a3d,#2fae5a);color:#fff;padding:22px 0;margin-bottom:18px;box-shadow:0 2px 14px rgba(0,0,0,.12)}
 header .wrap{padding-bottom:0}
 .hwrap{display:flex;align-items:center;gap:20px}
-.logo{width:96px;height:96px;border-radius:50%;flex:none;background:#fff;box-shadow:0 4px 14px rgba(0,0,0,.25)}
-.logo img{width:100%;height:100%;border-radius:50%;display:block}
+.logo{width:170px;height:auto;flex:none;background:#fff}
+.logo img{width:100%;height:auto;display:block}
 .hbody{flex:1;min-width:0}
 .brand{font-size:21px;font-weight:800;letter-spacing:.3px;color:#fff}
 .brand .en{font-size:13.5px;font-weight:600;opacity:1;display:block;margin-top:3px;font-style:normal;color:#FFE082 !important;letter-spacing:.6px;text-shadow:0 1px 2px rgba(0,0,0,0.2)}
@@ -37,7 +37,7 @@ a.badge{color:#fff;text-decoration:none}
 .vatcard li b{font-size:13px;padding:2px 11px;border-radius:20px;color:#fff;flex:none}
 .t0{background:#2c8a48}.t5{background:#0277bd}.t8{background:#d0491f}
 .vatnote{font-size:12.5px;color:#5a6b60;margin-top:10px;font-style:italic}
-@media(max-width:560px){.vatgrid{grid-template-columns:1fr}.logo{width:74px;height:74px}.brand{font-size:18px}}
+@media(max-width:560px){.vatgrid{grid-template-columns:1fr}.logo{width:128px;height:auto}.brand{font-size:18px}}
 .toolbar{position:sticky;top:0;z-index:20;background:#f4f7f3;padding:12px 0;display:flex;flex-wrap:wrap;gap:10px;align-items:center;border-bottom:1px solid #e0e7e0}
 #q{flex:1;min-width:200px;padding:10px 14px;border:1px solid #cdd8cd;border-radius:10px;font-size:14px;outline:none}
 .nav{display:flex;flex-wrap:wrap;gap:6px}
@@ -82,7 +82,7 @@ footer b{color:#1f7a3d}
      Fallback SVG đơn giản nếu chưa load */
   function getLogo() {
     /* Logo thương hiệu chính thức (assets/logo.png) — dùng chung mọi hoá đơn. */
-    return window.BRAND_LOGO_DATAURL || ((location.origin || '') + '/assets/logo-icon.png?v=485');
+    return window.BRAND_LOGO_DATAURL || ((location.origin || '') + '/assets/logo-name.png?v=486');
   }
 
   const esc = s => String(s == null ? '' : s).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
