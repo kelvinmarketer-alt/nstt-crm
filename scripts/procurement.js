@@ -1182,9 +1182,17 @@
     /* 1 phiếu / NCC (giá khai sẵn) */
     const bySup = summarizeBySupplier(run);
     Object.values(bySup).forEach(b => {
+      const isSi = supplyTypeOf(b.id) === 'si';
+      const pack = (run.supPack && run.supPack[b.id]) || {};
       const items = b.items.filter(it => +it.qty > 0).map(it => {
-        const qty = +(+it.qty).toFixed(2), price = +it.unitCost || 0;
-        return { productId: it.productId || null, name: it.name, unit: it.unit, qty, price, total: Math.round(qty * price) };
+        const price = +it.unitCost || 0;
+        const pk = pack[it.key] || {};
+        /* SỈ: NHẬP nguyên THÙNG theo sản lượng đã chỉnh (supPack.kg) → công nợ NCC + kho tính đủ thùng.
+           Mặc định = nhu cầu gom (it.qty). demandQty = phần khách thật cần (để tính hàng dư vào kho). */
+        const qty = +(+(isSi && pk.kg != null ? pk.kg : it.qty)).toFixed(2);
+        const o = { productId: it.productId || null, name: it.name, unit: it.unit, qty, price, total: Math.round(qty * price) };
+        if (isSi) { o.cases = pk.cases != null ? pk.cases : 1; o.caseUnit = pk.unit || 'thùng'; o.demandQty = +(+it.qty).toFixed(2); }
+        return o;
       });
       if (items.length) desired['PN-' + run.id + '-' + b.id] = { supplierId: b.id, items };
     });

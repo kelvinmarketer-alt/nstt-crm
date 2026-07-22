@@ -15,6 +15,12 @@
   function getSup() { return window.STORE.get('suppliers', window.SUPPLIERS || []) || []; }
   function getProds() { return window.STORE.get('products', window.PRODUCTS || []) || []; }
   function findSup(id) { return id === EXT_SUP_ID ? EXT_SUP : getSup().find(s => s.id === id); }
+  /* Loại NCC + cờ "cho trả hàng" — lưu kv supplierMeta (dùng chung procurement/suppliers). */
+  const _supMeta = () => window.STORE.get('supplierMeta', {}) || {};
+  const _canReturnOf = id => !!((_supMeta()[id] || {}).canReturn);
+  const _isGomNcc = p => /^PN-GOM-/.test((p && p.id) || '');   /* phiếu NCC từ phiên gom (không phải TMN thu mua ngoài) */
+  const _q = v => (+v || 0).toFixed(2).replace(/\.00$/, '').replace(/(\.\d)0$/, '$1');
+  const _escP = v => String(v == null ? '' : v).replace(/[&<>"]/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]));
 
   /* ===== Trường KHÔNG có cột trên cloud purchases (bị strip khi sync) → tự chứa ===== */
   /* Số hoá đơn NCC (đầu vào) — lưu KV đồng bộ được, theo mã phiếu */
@@ -155,7 +161,9 @@
             const priceCell = p.status === 'ordered'
               ? `<input class="pn-eprice" type="number" min="0" step="1000" value="${it.price||''}" data-i="${i}" data-qty="${it.qty}" placeholder="giá" oninput="window.pnRecalcDrawer()" style="width:98px;text-align:right;border:1px solid #F59E0B;border-radius:5px;padding:5px 7px;font-size:12.5px;background:#FFFBEB">`
               : window.fmt(it.price);
-            return `<tr style="border-top:1px solid #F1F5F9"><td style="padding:6px 8px"><b>${it.name}</b><div style="font-size:10.5px;color:var(--muted)">${it.productId||''} · ${it.qty} ${it.unit||'kg'}</div></td><td style="text-align:right;padding:6px 8px">${it.qty}</td><td style="text-align:right;padding:6px 8px">${priceCell}</td><td class="pn-etot" data-i="${i}" style="text-align:right;padding:6px 8px;font-weight:600">${window.fmt(it.total)}</td></tr>`;
+            const siInfo = it.cases != null ? ` · <b>${_q(it.cases)} ${_escP(it.caseUnit||'thùng')}</b>${it.demandQty != null ? ` · khách cần ${_q(it.demandQty)}${_escP(it.unit||'kg')}` : ''}` : '';
+            const recvInfo = it.recvQty != null ? `<div style="font-size:10.5px;color:${it.defectQty ? '#B45309' : '#15803D'}">✓ thực nhận ${_q(it.recvQty)}${it.defectQty ? ` · lỗi ${_q(it.defectQty)} (${it.canReturn ? 'trả NCC' : 'hao hụt'})` : ''}${it.stockedQty ? ` · dư vào kho ${_q(it.stockedQty)}` : ''}</div>` : '';
+            return `<tr style="border-top:1px solid #F1F5F9"><td style="padding:6px 8px"><b>${it.name}</b><div style="font-size:10.5px;color:var(--muted)">${it.productId||''} · ${it.qty} ${it.unit||'kg'}${siInfo}</div>${recvInfo}</td><td style="text-align:right;padding:6px 8px">${it.qty}</td><td style="text-align:right;padding:6px 8px">${priceCell}</td><td class="pn-etot" data-i="${i}" style="text-align:right;padding:6px 8px;font-weight:600">${window.fmt(it.total)}</td></tr>`;
           }).join('')}
           <tr style="background:#FAFBFC;font-weight:700"><td colspan="3" style="padding:8px;text-align:right">TỔNG</td><td id="pnEditTotal" style="text-align:right;padding:8px">${window.fmt(p.total)} ₫</td></tr>
         </tbody>
@@ -246,6 +254,8 @@
     const i = list.findIndex(x => x.id === id);
     if (i < 0 || list[i].status !== 'ordered') return;
     const isExt = list[i].supplierId === EXT_SUP_ID || (findSup(list[i].supplierId) || {}).system;
+    /* Phiếu NCC từ phiên gom → mở hộp thoại NHẬN (thực nhận + hàng lỗi + cho trả / hao hụt). */
+    if (!isExt && _isGomNcc(list[i])) { window.openReceiveDialog(id); return; }
     const willStock = !_pnNoStock(list[i]);
     const confMsg = isExt
       ? 'Xác nhận đã nhận hàng thu mua ngoài?\n→ Ghi CHI TIỀN MẶT vào sổ quỹ kế toán + cập nhật giá vốn' + (willStock ? ' + cộng kho.' : ' (không cộng kho).')
@@ -295,6 +305,81 @@
       : '✓ Đã nhận hàng' + (willStock ? ', cộng kho' : '') + ' + cập nhật giá nhập', 'success');
   };
 
+  /* ===== HỘP THOẠI NHẬN HÀNG NCC (phiếu gom) — thực nhận + hàng lỗi + cho trả / hao hụt ===== */
+  window.openReceiveDialog = function (id) {
+    const p = getPur().find(x => x.id === id); if (!p || p.status !== 'ordered') return;
+    const sup = findSup(p.supplierId) || {};
+    const canRet = _canReturnOf(p.supplierId);
+    const rows = (p.items || []).map((it, i) => {
+      const ordered = +it.qty || 0;
+      const isSi = it.cases != null;
+      const demand = it.demandQty != null ? +it.demandQty : ordered;
+      return `<tr style="border-top:1px solid #F1F5F9">
+        <td style="padding:6px 8px"><b>${_escP(it.name)}</b>${isSi ? `<div style="font-size:10.5px;color:var(--muted)">${_q(it.cases)} ${_escP(it.caseUnit || 'thùng')} · khách cần ${_q(demand)}${_escP(it.unit || 'kg')}</div>` : ''}</td>
+        <td style="padding:6px 8px;text-align:right;color:var(--muted)">${_q(ordered)} ${_escP(it.unit || 'kg')}</td>
+        <td style="padding:6px 8px;text-align:right"><input type="number" data-money="0" class="rcv-recv" data-i="${i}" value="${ordered}" min="0" step="0.1" style="width:74px;text-align:right;border:1px solid var(--line);border-radius:5px;padding:4px 6px"></td>
+        <td style="padding:6px 8px;text-align:right"><input type="number" data-money="0" class="rcv-def" data-i="${i}" value="0" min="0" step="0.1" style="width:64px;text-align:right;border:1px solid #FCA5A5;border-radius:5px;padding:4px 6px"></td>
+      </tr>`;
+    }).join('');
+    const body = `<div style="font-size:12px;color:var(--muted);margin-bottom:8px">Nhập <b>thực nhận</b> + <b>hàng lỗi</b> từng mã. Phần <b>dư</b> (thực nhận − lỗi − khách cần) tự vào <b>kho</b>.</div>
+      <table style="width:100%;border-collapse:collapse;font-size:12.5px;border:1px solid var(--line);border-radius:8px;overflow:hidden">
+        <thead><tr style="background:#F8FAF8;color:var(--muted);font-size:11px;text-transform:uppercase">
+          <th style="padding:6px 8px;text-align:left">Mặt hàng</th><th style="padding:6px 8px;text-align:right">Đặt</th><th style="padding:6px 8px;text-align:right">Thực nhận</th><th style="padding:6px 8px;text-align:right">Hàng lỗi</th>
+        </tr></thead><tbody>${rows}</tbody></table>
+      <div style="margin-top:12px;background:#F8FAFC;border:1px solid var(--line);border-radius:8px;padding:10px 12px;font-size:12.5px">
+        <div style="font-weight:700;margin-bottom:5px">Hàng lỗi xử lý thế nào?</div>
+        <label style="display:block;margin-bottom:4px;cursor:pointer"><input type="radio" name="rcvRet" value="1" ${canRet ? 'checked' : ''}> <b>NCC CHO trả</b> → trừ thẳng công nợ NCC (mình không mất tiền)</label>
+        <label style="display:block;cursor:pointer"><input type="radio" name="rcvRet" value="0" ${!canRet ? 'checked' : ''}> <b>NCC KHÔNG cho trả</b> → ghi HAO HỤT (mình chịu, vẫn nợ đủ)</label>
+      </div>`;
+    window.openModal('✓ Nhận hàng — ' + _escP(sup.name || p.supplierId), body, {
+      width: '640px',
+      footer: `<button class="btn btn-ghost" onclick="window.closeModal()">Huỷ</button><button class="btn btn-primary" onclick="window.confirmReceive('${id}')">✓ Xác nhận nhận</button>`,
+    });
+  };
+  window.confirmReceive = function (id) {
+    const canReturn = ((document.querySelector('input[name=rcvRet]:checked') || {}).value === '1');
+    const recvMap = {}, defMap = {};
+    document.querySelectorAll('.rcv-recv').forEach(inp => { recvMap[inp.dataset.i] = +inp.value || 0; });
+    document.querySelectorAll('.rcv-def').forEach(inp => { defMap[inp.dataset.i] = +inp.value || 0; });
+    _applyReceiveGom(id, recvMap, defMap, canReturn);
+  };
+  function _applyReceiveGom(id, recvMap, defMap, canReturn) {
+    const list = getPur(); const i = list.findIndex(x => x.id === id);
+    if (i < 0 || list[i].status !== 'ordered') return;
+    const p = list[i];
+    const prods = getProds(); const today = window.todayISO();
+    let payable = 0, lossVal = 0, surplusTot = 0;
+    (p.items || []).forEach((it, idx) => {
+      const price = +it.price || 0, ordered = +it.qty || 0;
+      const recv = recvMap[idx] != null ? recvMap[idx] : ordered;
+      const defect = Math.min(Math.max(0, defMap[idx] || 0), recv);
+      const good = Math.max(0, recv - defect);
+      const demand = it.demandQty != null ? +it.demandQty : ordered;
+      const surplus = Math.max(0, good - demand);
+      const lineDebt = Math.round((canReturn ? good : recv) * price);   /* cho trả → trả phần tốt; không → trả đủ (đã nhận) */
+      payable += lineDebt; surplusTot += surplus;
+      if (!canReturn) lossVal += Math.round(defect * price);
+      it.recvQty = recv; it.defectQty = defect; it.goodQty = good; it.total = lineDebt; it.canReturn = canReturn; it.stockedQty = surplus;
+      /* phiếu gom = giao thẳng (noStock) → CHỈ phần DƯ vào kho, tự tay ghi (hook bỏ qua gom) */
+      if (surplus > 0 && it.productId) {
+        if (window.invApply) window.invApply(it.productId, +surplus);
+        if (window.invRecordMovement) window.invRecordMovement(it.productId, +surplus, 'purchase', 'Dư hàng sỉ vào kho · ' + p.id, p.id);
+      }
+      const pr = prods.find(x => x.id === it.productId);
+      if (pr && price) { pr.priceHistory = pr.priceHistory || []; const last = pr.priceHistory[pr.priceHistory.length - 1]; if (!last || last.date !== today) pr.priceHistory.push({ date: today, buy: price, sell: Math.round(price * 1.55) }); else last.buy = price; }
+    });
+    window.STORE.set('products', prods);
+    p.status = 'received'; p.total = payable; p.lossValue = lossVal; p.canReturn = canReturn;
+    window.STORE.set('purchases', list);
+    const sup = getSup().find(s => s.id === p.supplierId);
+    if (sup) window.STORE.update('suppliers', sup.id, { debt: (+sup.debt || 0) + payable, totalSpend: (+sup.totalSpend || 0) + payable });
+    /* nhớ cờ cho-trả của NCC cho lần sau */
+    if (window.STORE.rmwKv) window.STORE.rmwKv('supplierMeta', m => { m = m || {}; m[p.supplierId] = { ...(m[p.supplierId] || {}), canReturn }; return m; }, {});
+    if (window.audit) window.audit.log('purchase.receive', `Nhận ${id} · công nợ ${window.fmt(payable)}₫${lossVal ? ` · hao hụt ${window.fmt(lossVal)}₫` : ''}${surplusTot ? ` · kho +${_q(surplusTot)}` : ''}`);
+    window.closeModal && window.closeModal();
+    window.toast(`✓ Đã nhận · công nợ NCC ${window.fmt(payable)}₫` + (surplusTot ? ` · kho +${_q(surplusTot)}kg` : '') + (lossVal ? ` · ⚠ hao hụt ${window.fmt(lossVal)}₫` : ''), 'success');
+  }
+
   window.cancelPur = function (id) {
     if (!confirm('Hủy phiếu nhập? Nếu đã nhận hàng, tồn kho sẽ trừ lại.')) return;
     const list = getPur();
@@ -311,9 +396,12 @@
       (p.items || []).forEach(it => {
         if (!it.productId) return;
         if (hasPurchase(it.productId) && !alreadyReversed(it.productId)) {
-          const q = it.qty || 0;
-          if (window.invRecordMovement) window.invRecordMovement(it.productId, -q, 'adjust', 'Hủy phiếu nhập ' + p.id, p.id);
-          if (window.invApply) window.invApply(it.productId, -q);
+          /* phiếu gom sỉ chỉ cộng phần DƯ (it.stockedQty) vào kho → hủy phải trừ đúng phần đã cộng */
+          const q = (it.stockedQty != null ? +it.stockedQty : +it.qty) || 0;
+          if (q > 0) {
+            if (window.invRecordMovement) window.invRecordMovement(it.productId, -q, 'adjust', 'Hủy phiếu nhập ' + p.id, p.id);
+            if (window.invApply) window.invApply(it.productId, -q);
+          }
         }
       });
       /* Hoàn công nợ NCC nếu NCC là NET (đã cộng debt/totalSpend lúc nhận) */
