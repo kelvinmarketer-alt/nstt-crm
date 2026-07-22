@@ -5,7 +5,7 @@
 
 /* Phiên bản app hiển thị (đối chiếu với CACHE_VERSION trong sw.js) — để user tự XÁC NHẬN
    đang chạy bản mới hay còn kẹt JS cũ (hiện ở góc sidebar + log console). */
-window.APP_VERSION = 'v480';
+window.APP_VERSION = 'v481';
 console.log('%c[NSTT] App ' + window.APP_VERSION, 'color:#339B21;font-weight:bold');
 
 /* Gom NGUỒN khách về 3 nhóm chuẩn: 'mkt' / 'sales' / 'sep-gioi-thieu'.
@@ -1274,6 +1274,7 @@ window.NAV = [
     { id: 'inventory',  label: 'Kho / Tồn',   icon: '📥', href: 'inventory.html' },
     { id: 'suppliers',  label: 'Nhà cung cấp', icon: '🏭', href: 'suppliers.html' },
     { id: 'procurement', label: 'Gom hàng',    icon: '🧺', href: 'procurement.html' },
+    { id: 'nhan-hang',  label: 'Nhận hàng NCC', icon: '📦', href: 'nhan-hang.html' },
     { id: 'giao-hang',  label: 'Bảng giao hàng', icon: '🚚', href: 'giao-hang.html' },
     { id: 'returns',    label: 'Trả hàng',    icon: '↩️', href: 'returns.html' },
     /* Ẩn: Shipper — { id:'shippers', label:'Shipper', icon:'🛵', href:'shippers.html' }, */

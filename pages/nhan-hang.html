@@ -1,0 +1,39 @@
+<!doctype html>
+<html lang="vi">
+<head>
+<meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Nhận hàng NCC · Nông Sản Tuấn Tú</title>
+<link rel="stylesheet" href="../styles/tokens.css"><link rel="stylesheet" href="../styles/app.css">
+</head>
+<body>
+<div class="app">
+  <aside class="sidebar"></aside>
+  <header class="topbar">
+    <div class="breadcrumb"></div><div class="top-spacer"></div>
+    <div class="search-global"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="7"/><path d="m21 21-4.3-4.3"/></svg><input placeholder="Tìm... (Ctrl+K)"></div>
+    <button class="icon-btn" title="Thông báo"><span style="font-size:18px">🔔</span><span class="dot"></span></button>
+    <button class="icon-btn" title="Hướng dẫn" onclick="window.location.href='docs.html'"><span style="font-size:18px">❓</span></button>
+  </header>
+  <main class="main">
+    <div class="page-head">
+      <div>
+        <h1>📦 Nhận hàng NCC</h1>
+        <div class="sub">Kho xác nhận số lượng thực nhận &amp; hàng lỗi từ phiên gom → cập nhật tồn kho. (Kế toán chốt công nợ ở Tài chính → Phiếu nhập)</div>
+      </div>
+    </div>
+    <div id="nhHost" style="max-width:920px"></div>
+  </main>
+</div>
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<script src="../scripts/supabase-config.js"></script>
+<script src="../scripts/supabase-client.js"></script>
+<script src="../scripts/shared.js"></script>
+<script src="../scripts/store.js"></script>
+<script src="../scripts/auth.js"></script>
+<script src="../scripts/help-tips.js"></script>
+<script>if(window.AUTH) window.AUTH.requireAuth();</script>
+<script src="../scripts/inventory.js"></script>
+<script src="../scripts/cross-module-hooks.js"></script>
+<script src="../scripts/nhan-hang.js"></script>
+</body>
+</html>

@@ -58,8 +58,9 @@
       return ['dashboard.view', 'marketing.send', 'adspend.view', 'adspend.edit', 'customers.view', 'products.view', 'reports.view', 'reports.sales', 'payroll.viewSelf'];
     if (has('thu mua', 'mua hàng', 'procurement'))
       return ['dashboard.view', 'suppliers.view', 'suppliers.edit', 'purchases.view', 'purchases.create', 'inventory.view', 'products.view', 'reports.view', 'payroll.viewSelf'];
-    if (has('kho', 'ship'))   /* Kho & Ship — gộp kho + giao hàng */
-      return ['dashboard.view', 'inventory.view', 'inventory.adjust', 'suppliers.view', 'suppliers.edit', 'purchases.view', 'purchases.create', 'returns.view', 'returns.process', 'products.view', 'orders.view', 'shippers.view', 'shippers.edit', 'payroll.viewSelf'];
+    if (has('kho', 'ship'))   /* Kho & Ship — gộp kho + giao hàng. KHÔNG có purchases/tài chính:
+         kho nhận hàng ở trang "Nhận hàng NCC" (inventory.adjust) → kế toán mới chốt công nợ. */
+      return ['dashboard.view', 'inventory.view', 'inventory.adjust', 'suppliers.view', 'suppliers.edit', 'returns.view', 'returns.process', 'products.view', 'orders.view', 'shippers.view', 'shippers.edit', 'payroll.viewSelf'];
     if (has('shipper', 'giao hàng', 'tài xế'))
       return ['dashboard.view', 'orders.view', 'shippers.view', 'payroll.viewSelf'];
     if (has('sale', 'kinh doanh', 'cskh', 'bán hàng', 'chăm sóc'))
@@ -317,6 +318,7 @@
     'san-luong.html':  'reports.view',
     /* Modules mới */
     'inventory.html':  'inventory.view',
+    'nhan-hang.html':  'inventory.adjust',   /* KHO nhận hàng NCC (bước 1) — quyền kho, KHÔNG cần tài chính */
     'suppliers.html':  'suppliers.view',
     'procurement.html': 'suppliers.view',
     'purchases.html':  'purchases.view',
