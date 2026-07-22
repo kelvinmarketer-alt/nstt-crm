@@ -78,6 +78,7 @@
         <div style="font-size:13px;color:var(--muted);margin-top:2px">Đơn <b>đang giao</b> — shipper bấm ✅ Giao xong / ↩️ Trả. Kho giao shipper ở <b>Gom hàng → ③ Xuất kho</b>.</div>
       </div>
       <div style="flex:1"></div>
+      <button class="btn btn-ghost gh-link-btn" onclick="window.ghShipperStats()" title="Bảng thống kê hiệu suất shipper — số đơn + sản lượng theo ngày/tháng, xuất Excel/ảnh">📊 Thống kê shipper</button>
       <button class="btn btn-ghost gh-link-btn" onclick="window.ghShipLinks()" title="Lấy link giao hàng riêng cho từng shipper">🔗 Link cho shipper</button>
     </div>
 
@@ -105,6 +106,7 @@
 (function(){ try{ if(new URLSearchParams(location.search).get('ship')) return; }catch(e){} if(window.AUTH) window.AUTH.requireAuth(); })();
 </script>
 <script src="../data/orders.js"></script>
+<script src="https://cdn.sheetjs.com/xlsx-0.20.3/package/dist/xlsx.full.min.js"></script>
 <script src="../scripts/giao-hang.js"></script>
 <script src="../scripts/system-core.js"></script>
 </body>

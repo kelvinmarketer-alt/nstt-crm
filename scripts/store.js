@@ -1171,12 +1171,13 @@
     },
 
     nextOrderCode() {
+      /* Mã đơn NGẮN GỌN: DH0001, DH0002… (đơn cũ NSTT-52xxxx giữ nguyên làm lịch sử — đếm riêng theo DH). */
       const arr = this.get('orders', []);
       const max = arr.reduce((m, o) => {
-        const m2 = (o.code || '').match(/NSTT-(\d+)/);
+        const m2 = (o.code || '').match(/^DH0*(\d+)$/i);
         return m2 ? Math.max(m, parseInt(m2[1], 10)) : m;
-      }, 526052);
-      return 'NSTT-' + (max + 1);
+      }, 0);
+      return 'DH' + String(max + 1).padStart(4, '0');
     },
 
     /* Mã KH kế tiếp AN TOÀN (chống trùng tận gốc): lấy MAX của cả CLOUD lẫn LOCAL rồi +1.

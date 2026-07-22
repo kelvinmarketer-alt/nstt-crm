@@ -575,7 +575,7 @@ Mong quý khách thu xếp thanh toán sớm. Cảm ơn!
       <div class="check-grid" style="grid-template-columns:1fr;margin-bottom:14px">${invHtml}</div>
 
       <div class="form-row">
-        <div><label>Số phiếu</label><input id="rNo" value="PT-${Date.now().toString(36).toUpperCase()}" readonly style="background:#FAFAFB"></div>
+        <div><label>Số phiếu</label><input id="rNo" value="${(function(){const cash=window.STORE.get('cashEntries',[])||[];let mx=0;cash.forEach(x=>{const m=String(x.no||'').match(/^PT0*(\d+)$/);if(m)mx=Math.max(mx,+m[1]);});return 'PT'+String(mx+1).padStart(4,'0');})()}" readonly style="background:#FAFAFB"></div>
         <div><label>Ngày thu</label><input id="rDate" type="date" value="${new Date().toISOString().slice(0,10)}"></div>
       </div>
       <div class="form-row">
@@ -711,7 +711,7 @@ Mong quý khách thu xếp thanh toán sớm. Cảm ơn!
   }
   /* phiếu do hệ thống sinh từ TRẢ HÀNG (ref không phải PT-…) → không cho sửa tay ở đây.
      Chỉ xét REF (diễn giải kế toán tự gõ được — không dựa vào để tránh khoá nhầm phiếu thu tay). */
-  function _isReturnCredit(e) { return !/^PT-/i.test(e.ref || ''); }
+  function _isReturnCredit(e) { return !/^PT/i.test(e.ref || ''); }   /* PT-… (cũ) hoặc PT0001 (mới) = phiếu thu tay */
 
   window.openPaymentHistory = function (custId) {
     const c = _custNorm(custId);

@@ -279,7 +279,7 @@
       list[i].paid = list[i].total;
       const cash = window.STORE.get('cashEntries', []) || [];
       cash.unshift({
-        no: _nextCashNo(cash, 'PCTMN'), date: list[i].date || window.todayVN(),
+        no: _nextCashNo(cash, 'PC'), date: list[i].date || window.todayVN(),
         type: 'out', party: 'Thu mua ngoài', account: 'Tiền mặt',
         amount: list[i].total,
         desc: 'Thu mua ngoài ' + list[i].id + ' · ' + (list[i].items || []).length + ' mã',
