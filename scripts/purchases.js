@@ -660,7 +660,7 @@
     const s = findSup(p.supplierId) || {};
     const ci = window.STORE.get('companyInfo', {}) || {};
     const origin = (typeof location !== 'undefined' && location.origin && location.origin !== 'null') ? location.origin : 'https://app.nongsantuantuhanoi.vn';
-    const comp = { name: 'NÔNG SẢN TUẤN TÚ HÀ NỘI', addr: ci.address || '36/147A Tân Mai, Hoàng Mai, Hà Nội', phone: ci.hotline || '0836 676 086', logo: ci.logo || (origin + '/assets/logo.png') };
+    const comp = { name: 'NÔNG SẢN TUẤN TÚ HÀ NỘI', addr: ci.address || '36/147A Tân Mai, Hoàng Mai, Hà Nội', phone: ci.hotline || '0836 676 086', logo: ci.logo || (origin + '/assets/logo-icon.png?v=485') };
     const esc = v => String(v == null ? '' : v).replace(/[&<>"]/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]));
     const items = p.items || [];
     const rows = items.map((it, i) => `<tr><td class="stt">${i + 1}</td><td><b>${esc(it.name)}</b></td><td class="num">${it.qty} ${it.unit || 'kg'}</td><td class="num">${(it.price || 0).toLocaleString('vi-VN')}</td><td class="num">${(it.total || 0).toLocaleString('vi-VN')}</td></tr>`).join('');

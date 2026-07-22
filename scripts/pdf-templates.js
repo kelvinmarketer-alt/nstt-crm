@@ -120,7 +120,7 @@ ${FAV ? `<link rel="icon" type="image/svg+xml" href="${FAV}">` : ''}
 </style></head><body>
   <div class="header">
     <div class="logo">
-      <img class="icon" src="${(location.origin||'')+'/assets/logo.png'}" alt="Nông Sản Tuấn Tú Hà Nội" onerror="this.style.display='none'">
+      <img class="icon" src="${(location.origin||'')+'/assets/logo-icon.png?v=485'}" alt="Nông Sản Tuấn Tú Hà Nội" onerror="this.style.display='none'">
       <div class="txt">
         <h1>${comp.name.toUpperCase()}</h1>
         <div class="sub">${comp.addr}<br>☎ ${comp.phone} · ${comp.email || ''}${comp.tax?' · MST '+comp.tax:''}</div>

@@ -881,7 +881,7 @@ Mong quý khách thu xếp thanh toán sớm. Cảm ơn!
         @media print { body{padding:20px} .noprint{display:none} }
       </style></head><body>
       <div class="head">
-        <img class="logo" src="${(location.origin||'')+'/assets/logo.png'}" alt="Nông Sản Tuấn Tú Hà Nội" onerror="this.style.display='none'">
+        <img class="logo" src="${(location.origin||'')+'/assets/logo-icon.png?v=485'}" alt="Nông Sản Tuấn Tú Hà Nội" onerror="this.style.display='none'">
         <div class="info">
           <div class="n1">${company.name.toUpperCase()}</div>
           <div class="n2">

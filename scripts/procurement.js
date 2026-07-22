@@ -1330,7 +1330,7 @@ tbody tr:nth-child(even){background:#FFFBEB}tfoot td{background:#FEF3C7;font-wei
   function company() {
     const ci = S().get('companyInfo', {}) || {};
     const origin = (typeof location !== 'undefined' && location.origin && location.origin !== 'null') ? location.origin : 'https://app.nongsantuantuhanoi.vn';
-    return { name: 'NÔNG SẢN TUẤN TÚ HÀ NỘI', addr: ci.address || '36/147A Tân Mai, Hoàng Mai, Hà Nội', phone: ci.hotline || '0836 676 086', logo: ci.logo || (origin + '/assets/logo.png') };
+    return { name: 'NÔNG SẢN TUẤN TÚ HÀ NỘI', addr: ci.address || '36/147A Tân Mai, Hoàng Mai, Hà Nội', phone: ci.hotline || '0836 676 086', logo: ci.logo || (origin + '/assets/logo-icon.png?v=485') };
   }
 
   window.pcPrintSupReq = function (runId, supKey) {

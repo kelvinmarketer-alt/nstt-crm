@@ -224,7 +224,7 @@
       if (n >= 1_000)         return (n/1_000).toFixed(0) + ' nghìn đồng';
       return n + ' đồng';
     }
-    const LOGO_SVG = `<img src="${(location.origin||'')+'/assets/logo.png'}" alt="Nông Sản Tuấn Tú Hà Nội" style="width:72px;height:72px;object-fit:contain;flex:0 0 auto" onerror="this.style.display='none'">`;
+    const LOGO_SVG = `<img src="${(location.origin||'')+'/assets/logo-icon.png?v=485'}" alt="Nông Sản Tuấn Tú Hà Nội" style="width:72px;height:72px;object-fit:contain;flex:0 0 auto" onerror="this.style.display='none'">`;
 
     /* Lookup products để lấy ảnh + EN name. Map theo productId hoặc fuzzy theo name */
     const products = window.STORE.get('products', window.PRODUCTS || []) || [];

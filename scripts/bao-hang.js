@@ -14,7 +14,7 @@
       addr: ci.address || '36/147A Tân Mai, Hoàng Mai, Hà Nội',
       phone: ci.hotline || '0836 676 086',
       website: ci.website || 'nongsantuantuhanoi.com',
-      logo: ci.logo || (origin + '/assets/logo.png'),
+      logo: ci.logo || (origin + '/assets/logo-icon.png?v=485'),
     };
   }
 

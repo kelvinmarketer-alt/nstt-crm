@@ -82,7 +82,7 @@ footer b{color:#1f7a3d}
      Fallback SVG đơn giản nếu chưa load */
   function getLogo() {
     /* Logo thương hiệu chính thức (assets/logo.png) — dùng chung mọi hoá đơn. */
-    return window.BRAND_LOGO_DATAURL || ((location.origin || '') + '/assets/logo.png');
+    return window.BRAND_LOGO_DATAURL || ((location.origin || '') + '/assets/logo-icon.png?v=485');
   }
 
   const esc = s => String(s == null ? '' : s).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');

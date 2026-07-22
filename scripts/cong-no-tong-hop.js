@@ -544,7 +544,7 @@
     </div>
     <div class="pg" id="pg">
       <div class="hd">
-        <img src="${location.origin}/assets/logo.png" crossorigin="anonymous" onerror="this.style.display='none'">
+        <img src="${location.origin}/assets/logo-icon.png?v=485" crossorigin="anonymous" onerror="this.style.display='none'">
         <div class="cinfo">
           <b>${comp.name}</b><br>
           Mã Số Thuế: ${comp.tax}<br>
@@ -777,7 +777,7 @@
     </div>
     <div class="pg" id="pg">
       <div class="hd">
-        <img class="logo" src="${location.origin}/assets/logo.png" crossorigin="anonymous" onerror="this.style.display='none'">
+        <img class="logo" src="${location.origin}/assets/logo-icon.png?v=485" crossorigin="anonymous" onerror="this.style.display='none'">
         <div class="cinfo"><b>${comp.name}</b><br>Mã Số Thuế: ${comp.tax}<br>Địa Chỉ: ${comp.address}<br>
           Số Tài Khoản: ${comp.bank} &nbsp;·&nbsp; Chủ TK: ${comp.bankOwner}<br>Email: ${comp.email} &nbsp;·&nbsp; GĐĐH: ${comp.director}</div>
         <div style="flex:0 0 auto;text-align:center;min-width:132px">

@@ -35,7 +35,7 @@
   }
   function getLogo() {
     /* Logo thương hiệu chính thức (assets/logo.png) — dùng chung mọi hoá đơn. */
-    return window.BRAND_LOGO_DATAURL || ((location.origin || '') + '/assets/logo.png');
+    return window.BRAND_LOGO_DATAURL || ((location.origin || '') + '/assets/logo-icon.png?v=485');
   }
   function fmt(n) { return (n || 0).toLocaleString('vi-VN'); }
   function fmtDate(s) {
