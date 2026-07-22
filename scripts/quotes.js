@@ -224,7 +224,7 @@
       if (n >= 1_000)         return (n/1_000).toFixed(0) + ' nghìn đồng';
       return n + ' đồng';
     }
-    const LOGO_SVG = `<svg viewBox="0 0 200 130" xmlns="http://www.w3.org/2000/svg" style="width:78px;height:54px"><g><circle cx="100" cy="46" r="40" fill="#E8F5E2"/><circle cx="100" cy="46" r="40" fill="none" stroke="#1B5E20" stroke-width="3.5"/><circle cx="91" cy="50" r="20" fill="#4EB83C"/><path d="M91 30 C 79 37 76 53 85 66" fill="none" stroke="#1B5E20" stroke-width="2.2" stroke-linecap="round"/><path d="M91 30 C 103 37 106 53 97 66" fill="none" stroke="#1B5E20" stroke-width="2.2" stroke-linecap="round"/><path d="M72 50 C 84 48 98 48 110 50" fill="none" stroke="#1B5E20" stroke-width="2.2" stroke-linecap="round"/><circle cx="91" cy="50" r="6" fill="#1B5E20"/><g transform="rotate(30 118 54)"><path d="M114 48 L122 48 L118 72 Z" fill="#E8862E"/><path d="M114 48 C 111 40 117 38 118 44 C 119 38 125 40 122 48 Z" fill="#1B5E20"/></g></g></svg>`;
+    const LOGO_SVG = `<img src="${(location.origin||'')+'/assets/logo.png'}" alt="Nông Sản Tuấn Tú Hà Nội" style="width:72px;height:72px;object-fit:contain;flex:0 0 auto" onerror="this.style.display='none'">`;
 
     /* Lookup products để lấy ảnh + EN name. Map theo productId hoặc fuzzy theo name */
     const products = window.STORE.get('products', window.PRODUCTS || []) || [];

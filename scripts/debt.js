@@ -858,7 +858,7 @@ Mong quý khách thu xếp thanh toán sớm. Cảm ơn!
       <style>
         body{font-family:'Times New Roman',serif;max-width:800px;margin:0 auto;padding:30px;color:#000;font-size:13px}
         .head{display:flex;gap:16px;border-bottom:2px solid #339B21;padding-bottom:14px;margin-bottom:20px}
-        .logo{width:70px;height:70px;background:#339B21;color:#fff;border-radius:10px;display:grid;place-items:center;font-weight:800;font-size:22px}
+        .logo{width:84px;height:84px;object-fit:contain;flex:0 0 auto}
         .info{flex:1}
         .info .n1{font-size:18px;font-weight:700;color:#1B5E20}
         .info .n2{font-size:12px;color:#555;margin-top:3px;line-height:1.5}
@@ -881,7 +881,7 @@ Mong quý khách thu xếp thanh toán sớm. Cảm ơn!
         @media print { body{padding:20px} .noprint{display:none} }
       </style></head><body>
       <div class="head">
-        <div class="logo">NSTT</div>
+        <img class="logo" src="${(location.origin||'')+'/assets/logo.png'}" alt="Nông Sản Tuấn Tú Hà Nội" onerror="this.style.display='none'">
         <div class="info">
           <div class="n1">${company.name.toUpperCase()}</div>
           <div class="n2">

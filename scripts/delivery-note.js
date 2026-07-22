@@ -34,8 +34,8 @@
     };
   }
   function getLogo() {
-    return window.BRAND_LOGO_DATAURL ||
-      'data:image/svg+xml,' + encodeURIComponent(`<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 100"><circle cx="50" cy="50" r="48" fill="#008000"/><text x="50" y="62" text-anchor="middle" font-family="Arial Black" font-size="32" fill="#fff" font-weight="900">TT</text></svg>`);
+    /* Logo thương hiệu chính thức (assets/logo.png) — dùng chung mọi hoá đơn. */
+    return window.BRAND_LOGO_DATAURL || ((location.origin || '') + '/assets/logo.png');
   }
   function fmt(n) { return (n || 0).toLocaleString('vi-VN'); }
   function fmtDate(s) {
@@ -143,8 +143,7 @@ ${FAV ? `<link rel="icon" type="image/svg+xml" href="${FAV}">` : ''}
   <!-- ============ HEADER (logo | thông tin DN | QR chuyển khoản) ============ -->
   <div class="head">
     <div class="logo-wrap">
-      <img src="${getLogo()}" alt="Tuấn Tú Farm">
-      <div class="tag">Uy Tín Làm Nên Thương&nbsp;Hiệu</div>
+      <img src="${getLogo()}" alt="Nông Sản Tuấn Tú Hà Nội">
     </div>
     <div class="comp-info">
       <h1>${(comp.name || 'Công Ty TNHH XNK Nông Sản Tuấn Tú Hà Nội').toUpperCase().replace(/\s*[-–—]\s*/, '<br>')}</h1>

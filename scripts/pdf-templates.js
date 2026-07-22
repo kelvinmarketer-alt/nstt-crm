@@ -81,7 +81,7 @@ ${FAV ? `<link rel="icon" type="image/svg+xml" href="${FAV}">` : ''}
   body{padding:14mm 12mm}
   .header{display:flex;justify-content:space-between;align-items:flex-start;border-bottom:2.5px solid #008000;padding-bottom:10px;margin-bottom:12px}
   .logo{display:flex;align-items:center;gap:9px}
-  .logo .icon{width:42px;height:42px;border-radius:50%;background:#E8F5E2;display:grid;place-items:center;font-size:22px}
+  .logo .icon{width:56px;height:56px;object-fit:contain;flex:0 0 auto}
   .logo .txt h1{font-size:15px;color:#008000;font-weight:800;letter-spacing:0.3px}
   .logo .txt .sub{font-size:9.5px;color:#475569;margin-top:1px}
   .doc-meta{text-align:right;font-size:10px;color:#6B7280}
@@ -120,7 +120,7 @@ ${FAV ? `<link rel="icon" type="image/svg+xml" href="${FAV}">` : ''}
 </style></head><body>
   <div class="header">
     <div class="logo">
-      <div class="icon">🌱</div>
+      <img class="icon" src="${(location.origin||'')+'/assets/logo.png'}" alt="Nông Sản Tuấn Tú Hà Nội" onerror="this.style.display='none'">
       <div class="txt">
         <h1>${comp.name.toUpperCase()}</h1>
         <div class="sub">${comp.addr}<br>☎ ${comp.phone} · ${comp.email || ''}${comp.tax?' · MST '+comp.tax:''}</div>

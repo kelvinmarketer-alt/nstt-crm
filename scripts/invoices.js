@@ -365,7 +365,10 @@
       </div>
 
       <div class="seller">
-        <h3>Bên bán hàng (Bên cung cấp dịch vụ)</h3>
+        <div style="display:flex;align-items:center;gap:10px;margin-bottom:4px">
+          <img src="${(location.origin||'')+'/assets/logo.png'}" alt="Nông Sản Tuấn Tú Hà Nội" style="width:48px;height:48px;object-fit:contain;flex:0 0 auto" onerror="this.style.display='none'">
+          <h3 style="margin:0">Bên bán hàng (Bên cung cấp dịch vụ)</h3>
+        </div>
         <div class="row"><div class="lab">Tên đơn vị:</div><div><b>${company.name}</b></div></div>
         <div class="row"><div class="lab">Mã số thuế:</div><div><b>${company.tax}</b></div></div>
         <div class="row"><div class="lab">Địa chỉ:</div><div>${company.address}</div></div>

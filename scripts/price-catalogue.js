@@ -81,8 +81,8 @@ footer b{color:#1f7a3d}
   /* LOGO TUẤN TÚ FARM — ưu tiên PNG thật của user (data/brand-logo.js)
      Fallback SVG đơn giản nếu chưa load */
   function getLogo() {
-    return window.BRAND_LOGO_DATAURL ||
-      'data:image/svg+xml,' + encodeURIComponent(`<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 100"><circle cx="50" cy="50" r="48" fill="#1B5E20"/><text x="50" y="62" text-anchor="middle" font-family="Arial Black" font-size="32" fill="#fff" font-weight="900">TT</text></svg>`);
+    /* Logo thương hiệu chính thức (assets/logo.png) — dùng chung mọi hoá đơn. */
+    return window.BRAND_LOGO_DATAURL || ((location.origin || '') + '/assets/logo.png');
   }
 
   const esc = s => String(s == null ? '' : s).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
