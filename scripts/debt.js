@@ -965,7 +965,7 @@ Mong quý khách thu xếp thanh toán sớm. Cảm ơn!
   };
 
   window.STORE.subscribe('customers', render);
-  window.renderAppShell('debt', 'Công nợ');
+  window.renderAppShell('debt', 'Đòi nợ & Nhắc nợ');
   ['qSearch', 'fBucket'].forEach(id => document.getElementById(id)?.addEventListener('input', render));
   render();
 })();
