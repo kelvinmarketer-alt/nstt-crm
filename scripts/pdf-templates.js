@@ -327,6 +327,10 @@ ${FAV2 ? `<link rel="icon" type="image/svg+xml" href="${FAV2}">` : ''}
 
   .footer{margin-top:8px;text-align:center;font-size:9px;color:#9CA3AF;padding-top:6px;border-top:1px dashed #D1D5DB}
 </style></head><body>
+  <div style="display:flex;align-items:center;gap:9px;margin-bottom:8px">
+    <img src="${(location.origin||'')+'/assets/logo-icon.png?v=485'}" style="width:46px;height:46px;object-fit:contain;flex:0 0 auto" alt="Nông Sản Tuấn Tú Hà Nội" onerror="this.style.display='none'">
+    <div style="font-size:16px;font-weight:800;color:#008000;letter-spacing:.3px;line-height:1.1">NÔNG SẢN TUẤN TÚ<span style="display:block;font-size:9px;font-weight:500;color:#6B7280;letter-spacing:.5px;margin-top:1px">NÔNG SẢN HÀ NỘI · Giao hàng tận nơi</span></div>
+  </div>
   <div class="header">
     <h1>🛵 PHIẾU GIAO HÀNG</h1>
     <div class="code">${o.code}</div>
