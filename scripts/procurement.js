@@ -1522,23 +1522,71 @@ ${o.shortages && o.shortages.length ? `<div style="margin-top:10px;font-size:11.
     } finally { _printBusy = false; }
   };
 
+  /* Danh sách shipper = NV phòng Ship (staff) + ship ngoài (guest trong 'shippers') */
+  const _isShipStaff = s => /ship|giao\s*h[àa]ng|v[ậa]n\s*h[àa]nh/i.test((s.dept || '') + ' ' + (s.role || ''));
+  function _shipperList() {
+    const staff = (S().get('staff', window.STAFF || []) || [])
+      .filter(s => s && s.name && s.status !== 'inactive' && _isShipStaff(s))
+      .map(s => ({ id: s.id, name: s.name, guest: false }));
+    const guests = (S().get('shippers', window.DRIVERS || []) || [])
+      .filter(s => s && s.name && s.guest)
+      .map(s => ({ id: s.id, name: s.name, guest: true }));
+    return staff.concat(guests);
+  }
+
+  /* Giao shipper: 2 CÁCH — ① kho chọn shipper luôn, ② đưa lên bảng cho shipper tự nhận */
   window.pcDispatch = function (code) {
     const orders = getOrders(); const o = orders.find(x => x.code === code); if (!o) return;
+    const list = _shipperList();
+    const opts = list.map(s => `<option value="${esc(s.id)}">${esc(s.name)}${s.guest ? ' (ngoài)' : ''}</option>`).join('');
+    const noShip = list.length ? '' : '<div style="font-size:11.5px;color:#B45309;margin-top:6px">⚠ Chưa có shipper — thêm NV vị trí <b>Ship</b> ở Nhân sự, hoặc tạo ship ngoài ở Bảng giao hàng.</div>';
+    window.openModal('🛵 Giao shipper — ' + esc(code), `
+      <div style="font-size:13px;color:#334155;margin-bottom:14px">Đơn <b>#${esc(code)}</b> · ${esc(o.custName || '')}${o.drop ? ' · 📍 ' + esc(String(o.drop).slice(0, 48)) : ''}</div>
+      <div style="display:flex;flex-direction:column;gap:12px">
+        <div style="border:1.5px solid var(--line);border-radius:11px;padding:13px">
+          <div style="font-weight:800;color:var(--navy);margin-bottom:9px">① Kho phân bổ shipper luôn</div>
+          <label style="font-size:12px;color:var(--muted);display:block;margin-bottom:4px">Chọn shipper phụ trách</label>
+          <select id="pcShipSel" style="width:100%;box-sizing:border-box;padding:10px;border:1px solid var(--line);border-radius:8px;font-size:14px">
+            <option value="">— Chọn shipper —</option>${opts}
+          </select>${noShip}
+          <button class="btn btn-primary" style="margin-top:11px;width:100%" onclick="window._pcDispatchTo('${esc(code)}')">🛵 Giao cho shipper đã chọn</button>
+        </div>
+        <div style="border:1.5px dashed var(--line);border-radius:11px;padding:13px;background:#FAFBFA">
+          <div style="font-weight:800;color:var(--navy);margin-bottom:6px">② Đưa lên bảng — shipper tự nhận</div>
+          <div style="font-size:12px;color:var(--muted);margin-bottom:11px">Đơn hiện ở Bảng giao hàng cho <b>mọi shipper</b>. Ai rảnh bấm <b>“Nhận đơn”</b> thì đơn thành của người đó — shipper khác không thấy nữa.</div>
+          <button class="btn btn-navy" style="width:100%" onclick="window._pcDispatchOpen('${esc(code)}')">📋 Đưa lên bảng (chưa gán shipper)</button>
+        </div>
+      </div>
+    `, { width: '460px' });
+  };
+  /* Thực hiện chuyển đơn sang "Đang giao" + báo group. driverName đã set (hoặc rỗng = chưa gán). */
+  function _pcDoDispatch(code, driverId, driverName) {
+    const orders = getOrders(); const o = orders.find(x => x.code === code); if (!o) return;
     o.whStatus = 'released';
-    o.status = 'transit';   /* Giao shipper = đơn sang "Đang giao" (hiện ở Bảng giao hàng cho shipper) */
+    o.status = 'transit';   /* Giao shipper = đơn sang "Đang giao" (hiện ở Bảng giao hàng) */
     o.transitAt = new Date().toISOString();
+    o.driver = driverId || '';
+    o.driverName = driverName || '';
     S().set('orders', orders);
-    /* CHỈ TẠI ĐÂY (gom xong → giao shipper) mới bắn group + phân đơn shipper.
-       Dùng format chung "ĐƠN MỚI CẦN GIAO" (có shipper, chống gửi trùng). */
+    window.closeModal && window.closeModal();
+    /* CHỈ TẠI ĐÂY (gom xong → giao shipper) mới bắn group + phân đơn shipper. */
     if (window.sendShipperDispatch) {
       window.sendShipperDispatch(o).then(r => {
-        window.toast?.(r && r.ok ? (r.dup ? '🛵 ' + code + ' đã phân giao trước đó' : '🛵 Đã giao shipper ' + code + ' (đã báo group)') : 'Đã chuyển ' + code + ' sang giao (chưa cấu hình TG shipper)', r && r.ok ? 'success' : 'info');
+        const okMsg = driverName ? ('🛵 Đã giao ' + code + ' cho ' + driverName + ' (đã báo group)') : ('📋 Đã đưa ' + code + ' lên bảng — chờ shipper nhận (đã báo group)');
+        window.toast?.(r && r.ok ? (r.dup ? '🛵 ' + code + ' đã phân giao trước đó' : okMsg) : ('Đã chuyển ' + code + ' sang giao' + (driverName ? ' cho ' + driverName : '') + ' (chưa cấu hình TG shipper)'), r && r.ok ? 'success' : 'info');
       });
     } else {
-      window.toast?.('Đã chuyển ' + code + ' sang Đang giao', 'success');
+      window.toast?.(driverName ? ('🛵 Đã giao ' + code + ' cho ' + driverName) : ('📋 Đã đưa ' + code + ' lên bảng — chờ shipper nhận'), 'success');
     }
     renderRelease();
+  }
+  window._pcDispatchTo = function (code) {
+    const sel = document.getElementById('pcShipSel'); const id = sel ? sel.value : '';
+    if (!id) { window.toast?.('Chọn shipper trước, hoặc dùng cách ② đưa lên bảng', 'warn'); return; }
+    const sp = _shipperList().find(x => String(x.id) === String(id));
+    _pcDoDispatch(code, id, sp ? sp.name : '');
   };
+  window._pcDispatchOpen = function (code) { _pcDoDispatch(code, '', ''); };
 
   /* ===== Helpers in/copy ===== */
   function printViaIframe(html) {

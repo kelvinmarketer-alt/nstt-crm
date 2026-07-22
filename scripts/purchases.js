@@ -216,9 +216,9 @@
     window.toast && window.toast('✓ Đã lưu số hoá đơn', 'success');
   };
   /* ↩ Về phiên gom để sửa (từ phiếu tự tạo) — điều hướng sang trang Gom hàng + trả phiên về bước gán NCC */
-  window.pnBackToGom = function (id) {
+  window.pnBackToGom = async function (id) {
     const p = getPur().find(x => x.id === id); const run = _pnGomRun(p); if (!p || !run) return;
-    if (!confirm(`Về phiên gom ${run} để sửa?\nPhiếu nháp này (chưa nhận) sẽ được gỡ khi trả phiên về — chốt lại sẽ tạo phiếu mới.`)) return;
+    if (!(await window.uiConfirm(`Về phiên gom ${run} để sửa?\nPhiếu nháp này (chưa nhận) sẽ được gỡ khi trả phiên về — chốt lại sẽ tạo phiếu mới.`, { title: '↩ Về phiên gom', okText: 'Về phiên gom' }))) return;
     window.closeModal && window.closeModal();
     const top = window.top || window;
     try { top.location.href = 'procurement.html?reopen=' + encodeURIComponent(run); }
@@ -254,7 +254,7 @@
     window.STORE.set('purchases', list);
     if (!silent) { window.toast && window.toast('✓ Đã lưu giá — bấm "✓ Đã nhận" khi hàng về', 'success'); window.openPurDrawer(id); }
   };
-  window.markReceived = function (id) {
+  window.markReceived = async function (id) {
     const list = getPur();
     const i = list.findIndex(x => x.id === id);
     if (i < 0) return;
@@ -270,7 +270,7 @@
     const confMsg = isExt
       ? 'Xác nhận đã nhận hàng thu mua ngoài?\n→ Ghi CHI TIỀN MẶT vào sổ quỹ kế toán + cập nhật giá vốn' + (willStock ? ' + cộng kho.' : ' (không cộng kho).')
       : 'Xác nhận đã nhận hàng?\n→ Ghi CÔNG NỢ phải trả NCC + cập nhật giá vốn' + (willStock ? ' + cộng kho.' : ' (không cộng kho).');
-    if (!confirm(confMsg)) return;
+    if (!(await window.uiConfirm(confMsg, { title: isExt ? '🛒 Nhận hàng thu mua ngoài' : '📦 Nhận hàng NCC', okText: '✓ Đã nhận' }))) return;
     list[i].status = 'received';
     list[i]._invApplied = false; /* trigger inventory.js subscribe (bị bỏ qua nếu noStock) */
     const sup = findSup(list[i].supplierId);
@@ -409,8 +409,8 @@
     window.toast(`✓ Đã chốt công nợ NCC ${window.fmt(payable)}₫` + (lossVal ? ` · ⚠ hao hụt ${window.fmt(lossVal)}₫` : ''), 'success');
   }
 
-  window.cancelPur = function (id) {
-    if (!confirm('Hủy phiếu nhập? Nếu đã nhận hàng, tồn kho sẽ trừ lại.')) return;
+  window.cancelPur = async function (id) {
+    if (!(await window.uiConfirm('Hủy phiếu nhập? Nếu đã nhận hàng, tồn kho sẽ trừ lại.', { title: '🗑 Huỷ phiếu nhập', okText: 'Huỷ phiếu', danger: true }))) return;
     const list = getPur();
     const i = list.findIndex(x => x.id === id);
     if (i < 0) return;

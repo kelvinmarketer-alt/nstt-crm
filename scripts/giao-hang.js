@@ -51,11 +51,16 @@
     }
     return { name: (qs.get('me') || '').trim() };
   }
+  const _norm = s => String(s || '').trim().toLowerCase();
+  /* Đơn CHƯA có shipper nào nhận (để trống hoặc gạch ngang) → mọi shipper thấy để tự nhận */
+  const _unclaimed = o => { const d = String(o.driverName || '').trim(); return !d || d === '—'; };
+  const _isMine = (o, me) => _norm(o.driverName) === _norm(me.name);
   const mineOnly = o => {
     const me = resolveMe();
     if (me.invalid || me.loading) return false;
-    if (!me.name) return true;                     /* kho xem tất cả */
-    return String(o.driverName || '').trim().toLowerCase() === me.name.trim().toLowerCase();
+    if (!me.name) return true;                     /* kho / điều phối xem TẤT CẢ */
+    /* shipper: thấy đơn CỦA MÌNH + đơn CHƯA ai nhận (nhận rồi → chỉ người nhận thấy) */
+    return _isMine(o, me) || _unclaimed(o);
   };
 
   function itemsSummary(o) {
@@ -70,25 +75,29 @@
   const shortAddr = a => { a = String(a || '').trim(); return a.length > 46 ? a.slice(0, 44) + '…' : (a || '—'); };
 
   /* ===== 1 dòng đơn ĐANG GIAO ===== */
-  function cardHtml(o) {
+  function cardHtml(o, me) {
+    me = me || resolveMe();
     const cust = esc(o.custName || o.custId || 'Khách');
     const money = o.freight ? ` · <span class="gh-money">${fmt(o.freight)}₫</span>` : '';
-    const ship = o.driverName ? `<span class="gh-ship">🛵 ${esc(o.driverName)}</span>` : `<span class="gh-ship gh-noship">🛵 chưa gán</span>`;
+    const ship = o.driverName ? `<span class="gh-ship">🛵 ${esc(o.driverName)}</span>` : `<span class="gh-ship gh-noship">🛵 chưa ai nhận</span>`;
     const podN = ((S().get('pod_photos', {}) || {})[o.code] || []).length;
     /* Nút GÁN chỉ hiện cho người ĐĂNG NHẬP tài khoản (kho/điều phối) — shipper vào bằng link KHÔNG được gán */
     const gan = CAN_ASSIGN ? `<a href="javascript:void(0)" onclick="ghAssignShipper('${esc(o.code)}')" style="color:#0EA5E9;font-size:11px;margin-left:6px;white-space:nowrap">✎ gán</a>` : '';
-    return `<div class="gh-row">
-      <div class="gh-main">
-        <div class="gh-title"><span class="gh-code">#${esc(o.code)}</span><b class="gh-cust">${cust}</b></div>
-        <div class="gh-meta">📍 ${esc(shortAddr(o.drop))} · 📦 ${esc(itemsSummary(o))}${money} · ${ship}${gan}</div>
-      </div>
-      <div class="gh-act">
-        <button class="gh-btn gh-photo" onclick="ghAddPhoto('${esc(o.code)}')" title="Chụp mới hoặc chọn ảnh trong máy làm bằng chứng giao hàng">📷 Chụp/Chọn ảnh giao${podN ? ' · ' + podN + ' ảnh' : ''}</button>
+    /* SHIP MODE + đơn CHƯA nhận → chỉ hiện nút "Nhận đơn" (phải nhận rồi mới giao/trả được) */
+    const claimable = SHIP_MODE && me.name && _unclaimed(o);
+    const actions = claimable
+      ? `<button class="gh-btn gh-claim" onclick="ghClaim('${esc(o.code)}')" title="Nhận đơn này về cho mình — shipper khác sẽ không thấy nữa">🙋 Nhận đơn này</button>`
+      : `<button class="gh-btn gh-photo" onclick="ghAddPhoto('${esc(o.code)}')" title="Chụp mới hoặc chọn ảnh trong máy làm bằng chứng giao hàng">📷 Chụp/Chọn ảnh giao${podN ? ' · ' + podN + ' ảnh' : ''}</button>
         <div class="gh-act-row">
           <button class="gh-btn gh-done" onclick="ghGiaoXong('${esc(o.code)}')">✅ Giao xong</button>
           <button class="gh-btn gh-ret" onclick="ghBaoTra('${esc(o.code)}')">↩️ Trả</button>
-        </div>
+        </div>`;
+    return `<div class="gh-row${claimable ? ' gh-unclaimed' : ''}">
+      <div class="gh-main">
+        <div class="gh-title"><span class="gh-code">#${esc(o.code)}</span><b class="gh-cust">${cust}</b>${claimable ? '<span class="gh-flag">chưa ai nhận</span>' : ''}</div>
+        <div class="gh-meta">📍 ${esc(shortAddr(o.drop))} · 📦 ${esc(itemsSummary(o))}${money} · ${ship}${gan}</div>
       </div>
+      <div class="gh-act">${actions}</div>
     </div>`;
   }
 
@@ -102,19 +111,38 @@
       return;
     }
     if (me.loading) { host.innerHTML = `<div class="gh-empty">Đang tải…</div>`; return; }
-    const list = ordList().filter(o => isTransit(o) && mineOnly(o))
+    let list = ordList().filter(o => isTransit(o) && mineOnly(o))
       .sort((a, b) => String(b.date || '').localeCompare(String(a.date || '')));
+    /* Shipper: đơn CỦA MÌNH lên trên, đơn CHƯA nhận (tự nhận được) xuống dưới */
+    const isShipper = SHIP_MODE && !!me.name;
+    if (isShipper) list.sort((a, b) => (_unclaimed(a) ? 1 : 0) - (_unclaimed(b) ? 1 : 0));
+    const nMine = isShipper ? list.filter(o => _isMine(o, me)).length : 0;
+    const nOpen = isShipper ? list.filter(o => _unclaimed(o)).length : 0;
     const tabsEl = document.getElementById('ghTabs');
-    if (tabsEl) tabsEl.innerHTML = `<div class="gh-count">🚚 Đang giao: <b>${list.length}</b> đơn${me.name ? ' · ' + esc(me.name) : ''}</div>`;
+    if (tabsEl) tabsEl.innerHTML = `<div class="gh-count">🚚 Đang giao: <b>${list.length}</b> đơn${isShipper ? ` · của tôi <b>${nMine}</b> · chưa ai nhận <b style="color:#B45309">${nOpen}</b>` : (me.name ? ' · ' + esc(me.name) : '')}</div>`;
     if (!list.length) {
       host.innerHTML = `<div class="gh-empty">${me.name
-        ? `Không có đơn đang giao cho "<b>${esc(me.name)}</b>".`
+        ? `Không có đơn đang giao cho "<b>${esc(me.name)}</b>", cũng chưa có đơn nào chờ nhận.`
         : '✓ Không có đơn nào đang giao.<br><span style="font-size:12px">Kho giao shipper ở <b>Gom hàng → ③ Xuất kho</b>, đơn sẽ hiện ở đây.</span>'}</div>`;
       return;
     }
-    host.innerHTML = list.map(cardHtml).join('');
+    host.innerHTML = list.map(o => cardHtml(o, me)).join('');
   }
   window._ghRender = render;
+
+  /* ===== SHIPPER TỰ NHẬN đơn chưa ai nhận → gán mình làm shipper ===== */
+  window.ghClaim = async function (code) {
+    const o = ordByCode(code); if (!o) return;
+    const me = resolveMe();
+    if (!me.name) { window.toast && window.toast('Không xác định được shipper (mở bằng link riêng của bạn)', 'warn'); return; }
+    if (!_unclaimed(o)) { window.toast && window.toast('Đơn này đã có người nhận rồi', 'info'); render(); return; }
+    if (!(await window.uiConfirm(`Nhận đơn #${code} về cho bạn?\nKhách: ${o.custName || ''}\n\n→ Đơn thành của bạn, shipper khác sẽ không thấy nữa.`, { title: '🙋 Nhận đơn', okText: '🙋 Nhận đơn' }))) return;
+    const sp = shippers().find(x => _norm(x.name) === _norm(me.name));
+    S().update('orders', code, { driver: sp ? sp.id : '', driverName: me.name });
+    window.toast && window.toast('🙋 Đã nhận đơn ' + code + ' — chúc đi giao thuận lợi!', 'success');
+    if (window.sendTgMessage) window.sendTgMessage('alert', `🙋 ${me.name} đã NHẬN đơn\n📦 ${code} · ${o.custName || ''}`);
+    render();
+  };
 
   /* ===== Gán / đổi shipper cho đơn (nhập tên → gợi ý) — KHÔNG đổi trạng thái ===== */
   window.ghAssignShipper = function (code) {
@@ -147,9 +175,9 @@
   };
 
   /* ===== SHIP: Giao xong → Đã giao (công nợ chốt) ===== */
-  window.ghGiaoXong = function (code) {
+  window.ghGiaoXong = async function (code) {
     const o = ordByCode(code); if (!o) return;
-    if (!confirm(`Xác nhận GIAO XONG đơn ${code}?\nKhách: ${o.custName || ''}\n\n→ Đơn thành "Đã giao", công nợ khách được chốt.`)) return;
+    if (!(await window.uiConfirm(`Xác nhận GIAO XONG đơn ${code}?\nKhách: ${o.custName || ''}\n\n→ Đơn thành "Đã giao", công nợ khách được chốt.`, { title: '✅ Giao xong', okText: '✅ Giao xong' }))) return;
     S().update('orders', code, { status: 'delivered', deliveredAt: nowISO() });
     window.toast && window.toast('✓ Đã giao xong ' + code, 'success');
     if (window.sendTgMessage) window.sendTgMessage('alert', `✅ GIAO THÀNH CÔNG\n📦 ${code} · ${o.custName || ''}`);

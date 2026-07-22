@@ -120,10 +120,10 @@
   };
 
   /* ===== Hoàn tác nhận kho (nhập nhầm) → trừ lại tồn dư, về 'ordered' ===== */
-  window.nhUndo = function (id) {
+  window.nhUndo = async function (id) {
     const list = getPur(); const i = list.findIndex(x => x.id === id);
     if (i < 0 || list[i].status !== 'wh_received') return;
-    if (!confirm('Hoàn tác "đã nhận kho"? Phần tồn kho đã cộng sẽ bị trừ lại.')) return;
+    if (!(await window.uiConfirm('Hoàn tác "đã nhận kho"? Phần tồn kho đã cộng sẽ bị trừ lại.', { title: '↩ Hoàn tác nhận kho', okText: 'Hoàn tác', danger: true }))) return;
     const p = list[i];
     (p.items || []).forEach(it => {
       if (+it.stockedQty > 0 && it.productId) {

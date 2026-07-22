@@ -5,7 +5,7 @@
 
 /* Phiên bản app hiển thị (đối chiếu với CACHE_VERSION trong sw.js) — để user tự XÁC NHẬN
    đang chạy bản mới hay còn kẹt JS cũ (hiện ở góc sidebar + log console). */
-window.APP_VERSION = 'v489';
+window.APP_VERSION = 'v490';
 console.log('%c[NSTT] App ' + window.APP_VERSION, 'color:#339B21;font-weight:bold');
 
 /* Gom NGUỒN khách về 3 nhóm chuẩn: 'mkt' / 'sales' / 'sep-gioi-thieu'.
@@ -1962,6 +1962,44 @@ window.closeModal = function() {
     t.style.display = '';
     t.removeAttribute('data-stack-hidden');
   }
+};
+
+/* ============ POPUP XÁC NHẬN (thay confirm() mặc định của trình duyệt) ============
+   window.uiConfirm(message, {title, okText, cancelText, icon, danger}) → Promise<boolean>
+   Dùng: if (!(await window.uiConfirm('…'))) return; */
+window.uiConfirm = function (message, opts = {}) {
+  opts = opts || {};
+  return new Promise(resolve => {
+    const old = document.getElementById('ui-confirm-bg'); if (old) old.remove();
+    const title = opts.title || 'Xác nhận';
+    const icon = opts.icon != null ? opts.icon : '❓';
+    const okText = opts.okText || 'Xác nhận';
+    const cancelText = opts.cancelText || 'Huỷ';
+    const okStyle = opts.danger ? 'background:#DC2626;border-color:#DC2626;color:#fff' : '';
+    const okClass = opts.danger ? 'btn' : 'btn btn-primary';
+    const msg = String(message == null ? '' : message)
+      .replace(/[&<>]/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;' }[c]))
+      .replace(/\n/g, '<br>');
+    const el = document.createElement('div');
+    el.id = 'ui-confirm-bg';
+    el.className = 'modal-bg open';
+    el.style.zIndex = 4000;
+    el.innerHTML = `<div class="modal" style="width:min(92vw,440px);max-width:92vw">
+        <div class="modal-head"><h3>${icon ? icon + ' ' : ''}${title}</h3></div>
+        <div class="modal-body" style="font-size:14.5px;line-height:1.65;color:var(--text)">${msg}</div>
+        <div class="modal-foot" style="display:flex;gap:10px;justify-content:flex-end">
+          <button class="btn btn-ghost" id="uicf-cancel">${cancelText}</button>
+          <button class="${okClass}" id="uicf-ok" style="${okStyle}">${okText}</button>
+        </div></div>`;
+    document.body.appendChild(el);
+    const done = v => { el.remove(); document.removeEventListener('keydown', onKey); resolve(v); };
+    const onKey = e => { if (e.key === 'Escape') done(false); else if (e.key === 'Enter') { e.preventDefault(); done(true); } };
+    document.addEventListener('keydown', onKey);
+    el.querySelector('#uicf-ok').onclick = () => done(true);
+    el.querySelector('#uicf-cancel').onclick = () => done(false);
+    el.onclick = e => { if (e.target === el) done(false); };
+    setTimeout(() => { const b = el.querySelector('#uicf-ok'); if (b) b.focus(); }, 30);
+  });
 };
 
 /* ============ HELP GUIDES ============ */
