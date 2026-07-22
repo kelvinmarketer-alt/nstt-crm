@@ -15,6 +15,7 @@
   const esc = v => String(v == null ? '' : v).replace(/[&<>"]/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]));
   const _isGom = p => /^PN-GOM-/.test((p && p.id) || '');
   const supName = id => (getSups().find(s => s.id === id) || {}).name || id;
+  const _sel = new Set();   /* id các phiếu 'ordered' đang chọn để thao tác hàng loạt */
 
   function itemRows(p) {
     return (p.items || []).map((it, i) => {
@@ -42,6 +43,7 @@
     const empty = !(p.items || []).length;
     return `<div class="card" style="background:#fff;border:1px solid var(--line);border-radius:12px;overflow:hidden;margin-bottom:14px">
       <div style="background:linear-gradient(135deg,#1B5E20,#15803D);color:#fff;padding:11px 14px;display:flex;align-items:center;gap:10px;flex-wrap:wrap">
+        <input type="checkbox" class="nh-selphieu" data-pid="${esc(p.id)}" onclick="window.nhToggleSel('${esc(p.id)}',this.checked)" ${_sel.has(p.id) ? 'checked' : ''} title="Chọn phiếu để nhận / xoá hàng loạt" style="width:18px;height:18px;cursor:pointer;accent-color:#E8A33D">
         <span style="font-size:15px">🏭</span><b style="font-size:14.5px">${esc(supName(p.supplierId))}</b>
         <span style="opacity:.85;font-size:11.5px">${(p.items || []).length} mã · ${_q(kg)}kg đặt · phiếu ${esc(p.id)}</span>
         <div style="flex:1"></div>
@@ -79,10 +81,23 @@
     const list = getPur().filter(_isGom);
     const pending = list.filter(p => p.status === 'ordered');
     const waiting = list.filter(p => p.status === 'wh_received');
+    /* dọn selection: chỉ giữ id còn ở trạng thái chờ nhận */
+    const pendIds = new Set(pending.map(p => p.id));
+    Array.from(_sel).forEach(id => { if (!pendIds.has(id)) _sel.delete(id); });
+    const selCount = _sel.size;
     let html = '';
     html += `<div style="background:#EFF6FF;border:1px solid #BFDBFE;border-radius:10px;padding:11px 14px;font-size:12.5px;color:#1E40AF;margin-bottom:16px">
       📦 <b>Kho chỉ xác nhận số lượng thực nhận & hàng lỗi.</b> Phần dư tự vào tồn kho. Giá & công nợ do <b>Kế toán</b> chốt sau (Tài chính → Phiếu nhập).</div>`;
-    html += `<div style="font-weight:800;color:#1B5E20;font-size:13px;margin:0 0 10px">⏳ Chờ nhận kho (${pending.length})</div>`;
+    html += `<div style="display:flex;align-items:center;gap:12px;flex-wrap:wrap;margin:0 0 10px;position:sticky;top:0;background:var(--bg,#F7F8F7);z-index:5;padding:4px 0">
+        <div style="font-weight:800;color:#1B5E20;font-size:13px">⏳ Chờ nhận kho (${pending.length})</div>
+        ${pending.length ? `<label style="font-size:12.5px;color:var(--muted);display:flex;align-items:center;gap:6px;cursor:pointer"><input type="checkbox" id="nhSelAll" onclick="window.nhToggleAll(this.checked)" ${selCount && selCount === pending.length ? 'checked' : ''} style="width:16px;height:16px;cursor:pointer;accent-color:#E8A33D">Chọn tất cả</label>` : ''}
+        <div style="flex:1"></div>
+        <div id="nhBulkActions" style="display:${selCount ? 'flex' : 'none'};gap:8px;align-items:center;flex-wrap:wrap">
+          <span style="font-size:12.5px;color:var(--muted)">Đã chọn <b data-selcount>${selCount}</b> phiếu</span>
+          <button class="btn btn-primary btn-sm" onclick="window.nhReceiveBulk()" title="Xác nhận đã nhận kho tất cả phiếu đã chọn (dùng số Thực nhận đang hiển thị)">✓ Nhận kho hàng loạt</button>
+          <button class="btn btn-ghost btn-sm" style="color:#DC2626" onclick="window.nhDelBulk()" title="Xoá các phiếu đã chọn">🗑 Xoá</button>
+        </div>
+      </div>`;
     html += pending.length ? pending.map(pendingCard).join('')
       : `<div style="background:#fff;border:1px dashed var(--line);border-radius:10px;padding:26px;text-align:center;color:var(--muted);margin-bottom:16px">Không có phiếu nào chờ nhận. Phiếu tự sinh khi <b>chốt phiên gom hàng</b>.</div>`;
     if (waiting.length) {
@@ -98,15 +113,15 @@
     host.innerHTML = html;
   }
 
-  /* ===== Kho xác nhận nhận hàng: cập nhật TỒN KHO (phần dư) + lưu SL/lỗi, KHÔNG chốt công nợ ===== */
-  window.nhReceive = function (id) {
-    const list = getPur(); const i = list.findIndex(x => x.id === id);
-    if (i < 0 || list[i].status !== 'ordered') return;
-    const p = list[i];
+  /* ===== Kho xác nhận nhận hàng: cập nhật TỒN KHO (phần dư) + lưu SL/lỗi, KHÔNG chốt công nợ =====
+     _receiveOne đọc ô Thực nhận / Hàng lỗi đang hiển thị + cộng kho phần dư; KHÔNG gọi S().set
+     (để nhận-hàng-loạt gộp 1 lần lưu). Trả tổng dư + lỗi. */
+  function _receiveOne(p) {
     let surplusTot = 0, defTot = 0;
+    const pid = (p.id + '').replace(/"/g, '\\"');
     (p.items || []).forEach((it, idx) => {
-      const recvEl = document.querySelector('.nh-recv[data-p="' + (id + '').replace(/"/g, '\\"') + '"][data-i="' + idx + '"]');
-      const defEl = document.querySelector('.nh-def[data-p="' + (id + '').replace(/"/g, '\\"') + '"][data-i="' + idx + '"]');
+      const recvEl = document.querySelector('.nh-recv[data-p="' + pid + '"][data-i="' + idx + '"]');
+      const defEl = document.querySelector('.nh-def[data-p="' + pid + '"][data-i="' + idx + '"]');
       const ordered = +it.qty || 0;
       const recv = recvEl ? (+recvEl.value || 0) : ordered;
       const defect = Math.min(Math.max(0, defEl ? (+defEl.value || 0) : 0), recv);
@@ -126,9 +141,61 @@
     p.status = 'wh_received';
     p.whReceivedAt = window.todayVN ? window.todayVN() : '';
     p.whBy = (window.CURRENT_USER && window.CURRENT_USER.name) || '';
+    return { surplusTot, defTot };
+  }
+  window.nhReceive = function (id) {
+    const list = getPur(); const i = list.findIndex(x => x.id === id);
+    if (i < 0 || list[i].status !== 'ordered') return;
+    const { surplusTot, defTot } = _receiveOne(list[i]);
+    _sel.delete(id);
     S().set('purchases', list);
     if (window.audit) window.audit.log('purchase.wh_receive', 'Kho nhận ' + id + (surplusTot ? ' · tồn +' + _q(surplusTot) : '') + (defTot ? ' · lỗi ' + _q(defTot) : ''));
     window.toast && window.toast('✓ Đã nhận kho' + (surplusTot ? ' · tồn +' + _q(surplusTot) + 'kg' : '') + ' · chờ kế toán chốt công nợ', 'success');
+  };
+
+  /* ===== Chọn phiếu để thao tác hàng loạt (cập nhật thanh công cụ, KHÔNG render lại kẻo mất số đã gõ) ===== */
+  function _syncBulkBar() {
+    const acts = document.getElementById('nhBulkActions');
+    if (acts) { acts.style.display = _sel.size ? 'flex' : 'none'; const c = acts.querySelector('[data-selcount]'); if (c) c.textContent = _sel.size; }
+    const all = document.getElementById('nhSelAll');
+    const total = document.querySelectorAll('.nh-selphieu').length;
+    if (all) all.checked = total > 0 && _sel.size === total;
+  }
+  window.nhToggleSel = function (id, on) { if (on) _sel.add(id); else _sel.delete(id); _syncBulkBar(); };
+  window.nhToggleAll = function (on) {
+    document.querySelectorAll('.nh-selphieu').forEach(cb => { cb.checked = on; const id = cb.dataset.pid; if (on) _sel.add(id); else _sel.delete(id); });
+    _syncBulkBar();
+  };
+
+  const _selectedPendingIds = () => getPur().filter(p => _isGom(p) && p.status === 'ordered' && _sel.has(p.id)).map(p => p.id);
+
+  window.nhReceiveBulk = async function () {
+    let ids = _selectedPendingIds();
+    if (!ids.length) { window.toast && window.toast('Chưa chọn phiếu nào', 'warn'); return; }
+    if (!(await window.uiConfirm(`Xác nhận đã nhận kho ${ids.length} phiếu đã chọn?\nDùng số "Thực nhận" đang hiển thị (mặc định = số đặt). Phần dư tự vào tồn kho.`, { title: '✓ Nhận kho hàng loạt', okText: 'Nhận ' + ids.length + ' phiếu' }))) return;
+    const list = getPur();   /* lấy lại bản mới nhất SAU khi xác nhận */
+    ids = ids.filter(id => { const p = list.find(x => x.id === id); return p && p.status === 'ordered'; });
+    if (!ids.length) { window.toast && window.toast('Các phiếu đã được xử lý', 'info'); return; }
+    let ns = 0, nd = 0;
+    ids.forEach(id => { const p = list.find(x => x.id === id); const r = _receiveOne(p); ns += r.surplusTot; nd += r.defTot; });
+    _sel.clear();
+    S().set('purchases', list);
+    if (window.audit) window.audit.log('purchase.wh_receive_bulk', 'Kho nhận hàng loạt ' + ids.length + ' phiếu' + (ns ? ' · tồn +' + _q(ns) : ''));
+    window.toast && window.toast('✓ Đã nhận kho ' + ids.length + ' phiếu' + (ns ? ' · tồn +' + _q(ns) + 'kg' : ''), 'success');
+  };
+
+  window.nhDelBulk = async function () {
+    let ids = _selectedPendingIds();
+    if (!ids.length) { window.toast && window.toast('Chưa chọn phiếu nào', 'warn'); return; }
+    if (!(await window.uiConfirm(`Xoá HẲN ${ids.length} phiếu nhập đã chọn?\nDùng khi gom sai / ấn nhầm. Không ảnh hưởng đơn khách.`, { title: '🗑 Xoá phiếu hàng loạt', okText: 'Xoá ' + ids.length + ' phiếu', danger: true }))) return;
+    const list = getPur();
+    const idset = new Set(ids.filter(id => { const p = list.find(x => x.id === id); return p && p.status === 'ordered'; }));
+    if (!idset.size) { window.toast && window.toast('Các phiếu đã được xử lý', 'info'); return; }
+    const kept = list.filter(p => !idset.has(p.id));
+    _sel.clear();
+    S().set('purchases', kept);
+    if (window.audit) window.audit.log('purchase.delete_bulk', 'Xoá hàng loạt ' + idset.size + ' phiếu nhập (chưa nhận)');
+    window.toast && window.toast('Đã xoá ' + idset.size + ' phiếu', 'info');
   };
 
   /* ===== Hoàn tác nhận kho (nhập nhầm) → trừ lại tồn dư, về 'ordered' ===== */
