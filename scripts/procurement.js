@@ -631,18 +631,27 @@
     const _supBlock = (b) => {
       const typ = supplyTypeOf(b.id);
       const isLe = typ === 'le' || typ === 'both';
+      const bags = isLe ? supReqByCust(run, b.id) : [];
       return `<div class="sup-block" style="margin-bottom:12px">
         <div class="hd">${isLe ? '🛵' : '📦'} ${esc(b.name)} <span style="opacity:.85;font-weight:400;font-size:11px">${TYPE_LABEL[typ]} · ${b.items.length} mã · ${fmtQty(b.kg)}kg${b.cost ? ' · ' + money(b.cost) + '₫' : ''}</span>
           <div style="flex:1"></div>
-          <button class="btn btn-ghost btn-sm" style="background:rgba(255,255,255,.2);color:#fff;border:none" onclick="window.pcCopySupReq('${run.id}','${b.id}')">📋 Copy cú pháp</button>
+          <button class="btn btn-ghost btn-sm" style="background:rgba(255,255,255,.2);color:#fff;border:none" onclick="window.pcCopySupReq('${run.id}','${b.id}')" title="Chép gộp cả nhà vào 1 tin">📋 Cả nhà</button>
         </div>
         <div style="padding:8px 12px">
-        ${supReqData(run, b.id).lines.map(it => {
-          const bags = isLe ? _mergeCusts(it.custs) : [];
-          return `<div style="font-size:12px;padding:3px 0;border-bottom:1px dashed #EEF2F0">
+        ${supReqData(run, b.id).lines.map(it => `<div style="font-size:12px;padding:3px 0;border-bottom:1px dashed #EEF2F0">
           <b>${esc(it.name)}</b>: ${isLe ? 'tổng ' : ''}${fmtQty(it.qty)} ${it.unit}${it.unitCost ? ` <span style="color:var(--muted)">× ${money(it.unitCost)}₫</span>` : ''}
-          ${bags.length ? `<div style="font-size:10.5px;color:var(--muted);margin-top:1px">📦 Túi: ${bags.map(bd => esc(bd.name) + ' - ' + fmtQty(bd.qty) + it.unit).join(' · ')}</div>` : ''}
-        </div>`; }).join('')}
+        </div>`).join('')}
+        ${isLe && bags.length ? `
+        <div style="margin-top:9px;padding-top:8px;border-top:1px solid #E5E7EB">
+          <div style="font-size:11px;font-weight:700;color:#15803D;margin-bottom:5px">📨 Copy theo TỪNG TÚI — mỗi khách 1 tin gửi NCC</div>
+          ${bags.map((bag, i) => `<div style="display:flex;gap:8px;align-items:flex-start;padding:5px 0;border-bottom:1px dashed #EEF2F0">
+            <button class="btn btn-ghost btn-sm" style="flex:0 0 auto;padding:3px 9px;font-size:12px;background:#DCFCE7;color:#15803D;border:1px solid #86EFAC" onclick="window.pcCopySupCust('${run.id}','${b.id}',${i})" title="Chép riêng túi này">📋</button>
+            <div style="font-size:12px;line-height:1.5">
+              <b>${esc(bag.cust)}</b><br>
+              <span style="color:#374151">${bag.items.map(it => esc(it.name) + ' ' + fmtQty(it.qty) + it.unit).join(' · ')}</span>
+            </div>
+          </div>`).join('')}
+        </div>` : ''}
         </div>
       </div>`;
     };
@@ -1079,6 +1088,21 @@
     (custs || []).forEach(x => { const k = _supCustLabel(x); m.set(k, (m.get(k) || 0) + (+x.qty || 0)); });
     return [...m.entries()].map(([name, qty]) => ({ name, qty: +qty.toFixed(2) }));
   }
+  /* Chia đơn 1 NCC theo TỪNG TÚI (khách/người đặt) → [{cust, items:[{name,qty,unit}]}].
+     Dùng cho cả hiển thị per-túi lẫn copy cú pháp từng túi (thứ tự khách deterministic → idx khớp). */
+  function supReqByCust(run, supId) {
+    const { lines } = supReqData(run, supId);
+    const byCust = new Map();
+    lines.forEach(l => _mergeCusts(l.custs).forEach(bd => {
+      if (!byCust.has(bd.name)) byCust.set(bd.name, []);
+      byCust.get(bd.name).push({ name: l.name, qty: bd.qty, unit: l.unit });
+    }));
+    return [...byCust.entries()].map(([cust, items]) => ({ cust, items }));
+  }
+  /* Cú pháp 1 túi: tên khách + từng dòng SP (KHÔNG chữ ký) — gửi thẳng NCC. */
+  function _bagSyntax(bag) {
+    return `${bag.cust}\n${bag.items.map(it => `${it.name} ${fmtQty(it.qty)}${it.unit}`).join('\n')}`;
+  }
   /* Dữ liệu đặt hàng cho 1 NCC: gộp các mã NCC đó cung cấp + chia khách (cho NCC lẻ) */
   function supReqData(run, supId) {
     const sObj = getSuppliers().find(s => s.id === supId) || {};
@@ -1177,7 +1201,7 @@
     const totalKg = lines.reduce((s, l) => s + l.qty, 0);
     const txt = `🛒 DANH SÁCH THU MUA NGOÀI — ${run.id}\n📅 ${new Date().toLocaleDateString('vi-VN')}\n────────────\n`
       + lines.map((l, i) => `${i + 1}. ${l.name}: ${fmtQty(l.qty)} ${l.unit}` + (l.custs.length ? `\n   Cho: ${l.custs.map(b => (b.custName || b.code) + ' ' + fmtQty(b.qty) + l.unit).join(' · ')}` : '')).join('\n')
-      + `\n────────────\n📦 Tổng: ${fmtQty(totalKg)} kg\n⚠ Mua xong GHI RÕ GIÁ từng mã để cuối ngày nhập sổ (Phiếu nhập → Thu mua ngoài). Cảm ơn!\n— Nông Sản Tuấn Tú`;
+      + `\n────────────\n📦 Tổng: ${fmtQty(totalKg)} kg\n⚠ Mua xong GHI RÕ GIÁ từng mã để cuối ngày nhập sổ (Phiếu nhập → Thu mua ngoài). Cảm ơn!`;
     copyText(txt, 'danh sách thu mua ngoài');
   };
   /* 📸 Chụp danh sách thu mua ngoài thành ẢNH → copy clipboard (dán thẳng Zalo). Lỗi → fallback copy chữ. */
@@ -1315,20 +1339,20 @@ tbody tr:nth-child(even){background:#F4FAF2}tfoot td{background:#E8F5E9;font-wei
     const { lines, type } = supReqData(run, supKey);
     const isLe = type === 'le' || type === 'both';
     /* Cú pháp GỌN như sheet: LẺ gom THEO KHÁCH (mỗi khách 1 túi, liệt kê SP+SL);
-       SỈ chỉ liệt kê SP + tổng SL (kho tự chia). 1 tin/nhà, không header rườm rà. */
-    let txt;
-    if (isLe) {
-      const byCust = new Map();
-      lines.forEach(l => _mergeCusts(l.custs).forEach(b => {
-        if (!byCust.has(b.name)) byCust.set(b.name, []);
-        byCust.get(b.name).push(`${l.name} ${fmtQty(b.qty)}${l.unit}`);
-      }));
-      txt = [...byCust.entries()].map(([cust, items]) => `${cust}\n${items.join('\n')}`).join('\n\n');
-    } else {
-      txt = lines.map(l => `${l.name} ${fmtQty(l.qty)}${l.unit}`).join('\n');
-    }
+       SỈ chỉ liệt kê SP + tổng SL (kho tự chia). KHÔNG chữ ký cuối. */
+    const txt = isLe
+      ? supReqByCust(run, supKey).map(_bagSyntax).join('\n\n')
+      : lines.map(l => `${l.name} ${fmtQty(l.qty)}${l.unit}`).join('\n');
     if (!txt) { window.toast && window.toast('Chưa có mã cho NCC này', 'info'); return; }
-    copyText(txt + `\n\n— Nông Sản Tuấn Tú`, 'cú pháp gọi hàng');
+    copyText(txt, 'cú pháp gọi hàng (cả nhà)');
+  };
+  /* Chép cú pháp CHỈ 1 TÚI (1 khách) của NCC — mỗi khách 1 tin gửi riêng, không chữ ký. */
+  window.pcCopySupCust = function (runId, supKey, idx) {
+    const run = getRuns().find(r => r.id === runId); if (!run) return;
+    readConfirmInputs(run);
+    const bag = supReqByCust(run, supKey)[idx];
+    if (!bag) { window.toast && window.toast('Không tìm thấy túi', 'info'); return; }
+    copyText(_bagSyntax(bag), 'túi ' + bag.cust);
   };
 
   /* ============ ③ XUẤT KHO → SHIP ============ */
