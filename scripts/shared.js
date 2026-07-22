@@ -5,7 +5,7 @@
 
 /* Phiên bản app hiển thị (đối chiếu với CACHE_VERSION trong sw.js) — để user tự XÁC NHẬN
    đang chạy bản mới hay còn kẹt JS cũ (hiện ở góc sidebar + log console). */
-window.APP_VERSION = 'v481';
+window.APP_VERSION = 'v482';
 console.log('%c[NSTT] App ' + window.APP_VERSION, 'color:#339B21;font-weight:bold');
 
 /* Gom NGUỒN khách về 3 nhóm chuẩn: 'mkt' / 'sales' / 'sep-gioi-thieu'.
@@ -1243,12 +1243,6 @@ window.attachBulkOps = function (opts) {
 /* Nhóm menu THEO PHÒNG BAN — khớp presetPerms(role,dept) trong auth.js.
    filteredNav (renderAppShell) tự lọc theo quyền + bỏ nhóm rỗng → mỗi phòng chỉ thấy nhóm của mình. */
 window.NAV = [
-  { section: 'Quản trị', items: [
-    { id: 'dashboard',  label: 'Dashboard',   icon: '📊', href: 'dashboard.html' },
-    { id: 'reports',    label: 'Báo cáo',     icon: '📈', href: 'reports.html' },
-    { id: 'settings',   label: 'Cài đặt',     icon: '⚙️', href: 'settings.html' },
-    { id: 'audit',      label: 'Nhật ký',     icon: '📋', href: 'audit.html' },
-  ]},
   { section: 'Sale', items: [
     { id: 'orders',     label: 'Đơn hàng',    icon: '📦', href: 'orders.html', badgeKey: 'orders' },
     { id: 'customers',  label: 'Khách hàng',  icon: '👥', href: 'customers.html', badgeKey: 'customers' },
@@ -1282,6 +1276,12 @@ window.NAV = [
   { section: 'Nhân sự', items: [
     { id: 'staff',      label: 'Nhân sự',     icon: '🧑‍💼', href: 'staff.html' },
     { id: 'tai-khoan',  label: 'Tài khoản đăng nhập', icon: '🔐', href: 'tai-khoan.html' },
+  ]},
+  { section: 'Quản trị', items: [
+    { id: 'dashboard',  label: 'Dashboard',   icon: '📊', href: 'dashboard.html' },
+    { id: 'reports',    label: 'Báo cáo',     icon: '📈', href: 'reports.html' },
+    { id: 'settings',   label: 'Cài đặt',     icon: '⚙️', href: 'settings.html' },
+    { id: 'audit',      label: 'Nhật ký',     icon: '📋', href: 'audit.html' },
   ]},
   /* Chung mọi phòng — không nhóm (section rỗng → không hiện tiêu đề) */
   { section: '', items: [

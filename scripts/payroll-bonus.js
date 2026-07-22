@@ -218,6 +218,27 @@
 
   /* ===== STATE ===== */
   let _bMonth = null;
+  let _bStaffFilter = '';   /* lọc sổ thưởng theo 1 NV (rỗng = tất cả) */
+
+  /* Copy clipboard an toàn (clipboard API → fallback textarea) */
+  function _bCopy(txt, label) {
+    const done = () => window.toast && window.toast('✓ Đã copy ' + (label || ''), 'success');
+    if (navigator.clipboard && navigator.clipboard.writeText) {
+      navigator.clipboard.writeText(txt).then(done).catch(() => _bCopyFb(txt, done));
+    } else _bCopyFb(txt, done);
+  }
+  function _bCopyFb(txt, done) {
+    const ta = document.createElement('textarea'); ta.value = txt; ta.style.position = 'fixed'; ta.style.opacity = '0';
+    document.body.appendChild(ta); ta.select();
+    try { document.execCommand('copy'); done(); } catch (e) { window.toast && window.toast('Không copy được — thử lại', 'warn'); }
+    document.body.removeChild(ta);
+  }
+  /* Gom sổ thưởng tháng (tay + ca trực) theo bộ lọc NV hiện hành */
+  function _monthEntries() {
+    const manual = getLog().filter(e => String(e.date || '').slice(0, 7) === _bMonth).filter(e => TASKS[e.task] && TASKS[e.task].manual !== false);
+    const duty = (window.KHODUTY && window.KHODUTY.bonusEntriesMonth) ? window.KHODUTY.bonusEntriesMonth(_bMonth) : [];
+    return manual.concat(duty);
+  }
 
   /* ===== RENDER TAB ===== */
   function renderBonusTab() {
@@ -233,10 +254,16 @@
     const monthLog = manualLog.concat(dutyLog);
     /* Tiền LUÔN tính lại theo quy chế (đúng khối Kho/Ship) phủ NGÀY của từng dòng */
     const calc = e => { const pol = policyForEntry(e); return { pol, amt: pol ? computeAmount(e, pol.rules) : 0 }; };
-    const grandTotal = monthLog.reduce((s, e) => s + calc(e).amt, 0);
-    const nNoPolicy = monthLog.filter(e => !policyForEntry(e)).length;
+    /* Danh sách NV có thưởng trong tháng → dropdown lọc */
+    const seenS = {}, staffInMonth = [];
+    monthLog.forEach(e => { if (!seenS[e.staffId]) { seenS[e.staffId] = 1; const st = staffById(e.staffId); staffInMonth.push({ id: e.staffId, name: st.name || e.staffName || e.staffId, dept: st.dept || '' }); } });
+    staffInMonth.sort((a, b) => String(a.name).localeCompare(String(b.name)));
+    if (_bStaffFilter && !seenS[_bStaffFilter]) _bStaffFilter = '';
+    const shownLog = _bStaffFilter ? monthLog.filter(e => e.staffId === _bStaffFilter) : monthLog;
+    const grandTotal = shownLog.reduce((s, e) => s + calc(e).amt, 0);
+    const nNoPolicy = shownLog.filter(e => !policyForEntry(e)).length;
 
-    const rowsHtml = monthLog
+    const rowsHtml = shownLog
       .sort((a, b) => (a.date < b.date ? 1 : a.date > b.date ? -1 : 0))
       .map(e => {
         const st = staffById(e.staffId);
@@ -263,8 +290,13 @@
 
     host.innerHTML = `
       <div style="display:flex;align-items:center;gap:10px;flex-wrap:wrap;margin-bottom:12px">
-        <div style="font-size:12.5px;color:var(--muted)">Sổ thưởng hỗ trợ tháng <b style="color:var(--navy)">${_bMonth.slice(5)}/${_bMonth.slice(0, 4)}</b> · ${monthLog.length} khoản · Σ <b style="color:#15803D">${fmt(grandTotal)}đ</b> → tự cộng vào phiếu lương.</div>
+        <div style="font-size:12.5px;color:var(--muted)">Sổ thưởng hỗ trợ tháng <b style="color:var(--navy)">${_bMonth.slice(5)}/${_bMonth.slice(0, 4)}</b> · ${shownLog.length}${_bStaffFilter ? '/' + monthLog.length : ''} khoản · Σ <b style="color:#15803D">${fmt(grandTotal)}đ</b>${_bStaffFilter ? ' <span style="color:#B45309">(đang lọc)</span>' : ''} → tự cộng vào phiếu lương.</div>
         <div style="flex:1"></div>
+        <select onchange="window.BONUS.setStaffFilter(this.value)" title="Lọc sổ thưởng theo nhân viên" style="padding:7px 9px;border:1px solid var(--line);border-radius:7px;font-size:12.5px;max-width:210px">
+          <option value="">👥 Tất cả NV (${staffInMonth.length})</option>
+          ${staffInMonth.map(s => `<option value="${esc(s.id)}" ${s.id === _bStaffFilter ? 'selected' : ''}>${esc(s.name)}${s.dept ? ' — ' + esc(s.dept) : ''}</option>`).join('')}
+        </select>
+        <button class="btn btn-ghost" onclick="window.BONUS.copySummary()" title="Copy bảng tổng hợp thưởng tháng theo từng NV (dán Zalo/Excel)">📋 Copy tổng hợp</button>
         <button class="btn btn-ghost" onclick="window.BONUS.openPolicies()" title="Quy chế thưởng theo giai đoạn">⚙ Quy chế thưởng</button>
         <button class="btn btn-primary" onclick="window.BONUS.openBatch()">➕ Ghi phiếu thưởng</button>
       </div>
@@ -801,8 +833,41 @@
 
   function setBonusMonth(m) { _bMonth = m; renderBonusTab(); }
 
+  /* Lọc sổ thưởng theo NV */
+  function setStaffFilter(v) { _bStaffFilter = v || ''; renderBonusTab(); }
+  /* Copy BẢNG TỔNG HỢP thưởng tháng — gom theo TỪNG NV (tôn trọng bộ lọc đang chọn) */
+  function copySummary() {
+    let log = _monthEntries();
+    if (_bStaffFilter) log = log.filter(e => e.staffId === _bStaffFilter);
+    if (!log.length) { window.toast && window.toast('Không có khoản thưởng nào để copy', 'info'); return; }
+    const amtOf = e => { const pol = policyForEntry(e); return pol ? computeAmount(e, pol.rules) : 0; };
+    const byStaff = {};
+    log.forEach(e => { (byStaff[e.staffId] = byStaff[e.staffId] || []).push(e); });
+    const mLabel = _bMonth.slice(5) + '/' + _bMonth.slice(0, 4);
+    const groups = Object.keys(byStaff).map(k => {
+      const st = staffById(k);
+      const entries = byStaff[k].slice().sort((a, b) => (a.date < b.date ? -1 : 1));
+      const tot = entries.reduce((s, e) => s + amtOf(e), 0);
+      return { name: st.name || byStaff[k][0].staffName || k, dept: st.dept || '', entries, tot };
+    }).sort((a, b) => b.tot - a.tot);
+    let grand = 0;
+    const lines = ['🎁 THƯỞNG HỖ TRỢ THÁNG ' + mLabel, '────────────'];
+    groups.forEach(g => {
+      grand += g.tot;
+      lines.push('');
+      lines.push('• ' + g.name + (g.dept ? ' (' + g.dept + ')' : '') + ': ' + fmt(g.tot) + 'đ');
+      g.entries.forEach(e => {
+        const a = amtOf(e);
+        lines.push('   - ' + (e.date || '').split('-').reverse().join('/') + ' · ' + _labelOf(e) + ': ' + (a ? '+' + fmt(a) : '0') + (e.note ? ' — ' + e.note : ''));
+      });
+    });
+    lines.push(''); lines.push('────────────'); lines.push('TỔNG: ' + fmt(grand) + 'đ');
+    _bCopy(lines.join('\n'), _bStaffFilter && groups[0] ? 'thưởng ' + groups[0].name : 'tổng hợp thưởng T' + mLabel);
+  }
+
   window.BONUS = {
     getRules, getLog, computeAmount, helperFor, TASKS,
+    setStaffFilter, copySummary,
     /* saveLog (ghi cả sổ) đã BỎ — 3 hàm dưới áp thay đổi lên BẢN CLOUD MỚI NHẤT */
     saveEntryRec, saveEntryRecs, removeEntry,
     /* Quy chế theo giai đoạn, TÁCH khối Kho/Ship (v421) */

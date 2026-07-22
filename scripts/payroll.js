@@ -1281,6 +1281,23 @@
       </div>`;
   }
 
+  /* ====== 🧹 LÀM SẠCH chấm công tháng đang xem (up nhầm → xoá, up lại) ====== */
+  window.clearTimesheetMonth = function () {
+    if (!canUpload()) { window.toast('🔒 Bạn không có quyền làm sạch chấm công (cần payroll.upload)', 'warn'); return; }
+    const mth = month;
+    if (!confirm('🧹 Làm sạch TOÀN BỘ chấm công tháng ' + mth + '?\n\n→ Xoá dữ liệu công (X / V / P / đi muộn) của MỌI nhân viên trong tháng này, bảng về mặc định.\nDùng khi lỡ up nhầm file — xoá rồi up lại. KHÔNG ảnh hưởng tháng khác.')) return;
+    if (window.STORE.rmwKv) {
+      window.STORE.rmwKv('timesheet', arr => (Array.isArray(arr) ? arr.filter(t => !(t && t.month === mth)) : []), []);
+      window.STORE.rmwKv('timesheetMeta', m => { m = (m && typeof m === 'object' && !Array.isArray(m)) ? m : {}; Object.keys(m).forEach(k => { if (k.endsWith('_' + mth)) delete m[k]; }); return m; }, {});
+    } else {
+      window.STORE.set('timesheet', (SHEETS() || []).filter(t => !(t && t.month === mth)));
+      const mm = window.STORE.get('timesheetMeta', {}) || {}; Object.keys(mm).forEach(k => { if (k.endsWith('_' + mth)) delete mm[k]; }); window.STORE.set('timesheetMeta', mm);
+    }
+    if (window.audit) window.audit.log('payroll.clearTimesheet', 'Làm sạch chấm công ' + mth);
+    window.toast('✓ Đã làm sạch chấm công tháng ' + mth + '. Up file mới để cập nhật lại.', 'success');
+    render();
+  };
+
   /* ====== Upload Excel chấm công ====== */
   window.openUploadTimesheet = function () {
     if (!canUpload()) { window.toast('🔒 Bạn không có quyền upload chấm công (cần perm payroll.upload)', 'warn'); return; }
@@ -1348,10 +1365,21 @@
     return null;
   }
   function _applyTsDays(sheets, staffId, dayStat, last) {
+    const staff = (window.STORE.get('staff', window.STAFFS || []) || []).find(x => x.id === staffId);
+    const fullWeek = staff ? _fullWeekStaff(staff) : false;
     let sh = sheets.find(t => t.staffId === staffId && t.month === month);
     if (!sh) { sh = { staffId, month, days: defaultDays() }; sheets.unshift(sh); }
     sh.days = sh.days.slice();
-    Object.keys(dayStat).forEach(k => { const di = +k; if (di >= last || sh.days[di] === '_') return; sh.days[di] = dayStat[k]; });
+    if (fullWeek) {
+      /* KHO/SHIP làm CẢ TUẦN → nhập file GHI ĐÈ nguyên tháng: nền = 'V' (vắng) rồi áp X/L/V/P từ máy.
+         FIX: trước đây ngày CN ('_') bị bỏ qua + Kho hiển thị '_' = X → công PHỒNG (máy 27 → app 28).
+         Nay không còn ngày mặc định X nào → công = ĐÚNG "có mặt thực tế" của máy chấm công. */
+      sh.days = Array.from({ length: last }, () => 'V');
+      Object.keys(dayStat).forEach(k => { const di = +k; if (di >= 0 && di < last) sh.days[di] = dayStat[k]; });
+    } else {
+      /* Văn phòng: giữ CN nghỉ ('_'), chỉ ghi ngày máy có dữ liệu. */
+      Object.keys(dayStat).forEach(k => { const di = +k; if (di >= last || sh.days[di] === '_') return; sh.days[di] = dayStat[k]; });
+    }
   }
 
   const _tsHnorm = s => String(s || '').toLowerCase().normalize('NFD').replace(/[̀-ͯ]/g, '').replace(/đ/g, 'd').replace(/\s+/g, ' ').trim();
