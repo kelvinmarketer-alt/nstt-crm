@@ -189,13 +189,12 @@
     if (!ids.length) { window.toast && window.toast('Chưa chọn phiếu nào', 'warn'); return; }
     if (!(await window.uiConfirm(`Xoá HẲN ${ids.length} phiếu nhập đã chọn?\nDùng khi gom sai / ấn nhầm. Không ảnh hưởng đơn khách.`, { title: '🗑 Xoá phiếu hàng loạt', okText: 'Xoá ' + ids.length + ' phiếu', danger: true }))) return;
     const list = getPur();
-    const idset = new Set(ids.filter(id => { const p = list.find(x => x.id === id); return p && p.status === 'ordered'; }));
-    if (!idset.size) { window.toast && window.toast('Các phiếu đã được xử lý', 'info'); return; }
-    const kept = list.filter(p => !idset.has(p.id));
+    const delIds = ids.filter(id => { const p = list.find(x => x.id === id); return p && p.status === 'ordered'; });
+    if (!delIds.length) { window.toast && window.toast('Các phiếu đã được xử lý', 'info'); return; }
     _sel.clear();
-    S().set('purchases', kept);
-    if (window.audit) window.audit.log('purchase.delete_bulk', 'Xoá hàng loạt ' + idset.size + ' phiếu nhập (chưa nhận)');
-    window.toast && window.toast('Đã xoá ' + idset.size + ' phiếu', 'info');
+    delIds.forEach(id => S().remove('purchases', id));   /* remove() xoá THẬT từng phiếu trên cloud + đặt bia mộ chống hồi sinh */
+    if (window.audit) window.audit.log('purchase.delete_bulk', 'Xoá hàng loạt ' + delIds.length + ' phiếu nhập (chưa nhận)');
+    window.toast && window.toast('Đã xoá ' + delIds.length + ' phiếu', 'info');
   };
 
   /* ===== Hoàn tác nhận kho (nhập nhầm) → trừ lại tồn dư, về 'ordered' ===== */
@@ -287,11 +286,11 @@
   };
 
   window.nhDelPhieu = async function (pid) {
-    const list = getPur(); const i = list.findIndex(x => x.id === pid); if (i < 0) return;
-    if (list[i].status !== 'ordered') { window.toast && window.toast('Phiếu đã nhận kho — hoàn tác trước khi xoá', 'warn'); return; }
-    if (!(await window.uiConfirm(`Xoá HẲN phiếu nhập ${pid}?\nNCC: ${supName(list[i].supplierId)}\n\nDùng khi gom hàng ấn nhầm / sai NCC. Không ảnh hưởng đơn khách.`, { title: '🗑 Xoá phiếu nhập', okText: 'Xoá phiếu', danger: true }))) return;
-    list.splice(i, 1);
-    S().set('purchases', list);
+    const list = getPur(); const p = list.find(x => x.id === pid); if (!p) return;
+    if (p.status !== 'ordered') { window.toast && window.toast('Phiếu đã nhận kho — hoàn tác trước khi xoá', 'warn'); return; }
+    if (!(await window.uiConfirm(`Xoá HẲN phiếu nhập ${pid}?\nNCC: ${supName(p.supplierId)}\n\nDùng khi gom hàng ấn nhầm / sai NCC. Không ảnh hưởng đơn khách.`, { title: '🗑 Xoá phiếu nhập', okText: 'Xoá phiếu', danger: true }))) return;
+    _sel.delete(pid);
+    S().remove('purchases', pid);   /* remove() mới xoá THẬT trên cloud (set() không xoá → reload hồi lại) */
     if (window.audit) window.audit.log('purchase.delete', 'Xoá phiếu nhập ' + pid + ' (chưa nhận, từ Nhận hàng NCC)');
     window.toast && window.toast('Đã xoá phiếu ' + pid, 'info');
   };
