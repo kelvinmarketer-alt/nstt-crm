@@ -296,7 +296,7 @@
           <option value="">👥 Tất cả NV (${staffInMonth.length})</option>
           ${staffInMonth.map(s => `<option value="${esc(s.id)}" ${s.id === _bStaffFilter ? 'selected' : ''}>${esc(s.name)}${s.dept ? ' — ' + esc(s.dept) : ''}</option>`).join('')}
         </select>
-        <button class="btn btn-ghost" onclick="window.BONUS.copySummary()" title="Copy bảng tổng hợp thưởng tháng theo từng NV (dán Zalo/Excel)">📋 Copy tổng hợp</button>
+        <button class="btn btn-ghost" onclick="window.BONUS.copySummary()" title="Copy ẢNH bảng thưởng tháng (logo + bảng từng ngày theo NV) → dán Zalo">📸 Copy bảng thưởng</button>
         <button class="btn btn-ghost" onclick="window.BONUS.openPolicies()" title="Quy chế thưởng theo giai đoạn">⚙ Quy chế thưởng</button>
         <button class="btn btn-primary" onclick="window.BONUS.openBatch()">➕ Ghi phiếu thưởng</button>
       </div>
@@ -835,34 +835,99 @@
 
   /* Lọc sổ thưởng theo NV */
   function setStaffFilter(v) { _bStaffFilter = v || ''; renderBonusTab(); }
-  /* Copy BẢNG TỔNG HỢP thưởng tháng — gom theo TỪNG NV (tôn trọng bộ lọc đang chọn) */
-  function copySummary() {
+  /* Gom sổ thưởng tháng theo TỪNG NV (tôn trọng bộ lọc) → dữ liệu chung cho ảnh + chữ */
+  function _summaryData() {
     let log = _monthEntries();
     if (_bStaffFilter) log = log.filter(e => e.staffId === _bStaffFilter);
-    if (!log.length) { window.toast && window.toast('Không có khoản thưởng nào để copy', 'info'); return; }
     const amtOf = e => { const pol = policyForEntry(e); return pol ? computeAmount(e, pol.rules) : 0; };
     const byStaff = {};
     log.forEach(e => { (byStaff[e.staffId] = byStaff[e.staffId] || []).push(e); });
-    const mLabel = _bMonth.slice(5) + '/' + _bMonth.slice(0, 4);
     const groups = Object.keys(byStaff).map(k => {
       const st = staffById(k);
-      const entries = byStaff[k].slice().sort((a, b) => (a.date < b.date ? -1 : 1));
-      const tot = entries.reduce((s, e) => s + amtOf(e), 0);
-      return { name: st.name || byStaff[k][0].staffName || k, dept: st.dept || '', entries, tot };
+      const entries = byStaff[k].slice().sort((a, b) => (a.date < b.date ? -1 : 1))
+        .map(e => ({ date: (e.date || '').split('-').reverse().join('/'), label: _labelOf(e), note: e.note || '', amt: amtOf(e) }));
+      return { name: st.name || byStaff[k][0].staffName || k, dept: st.dept || '', entries, tot: entries.reduce((s, e) => s + e.amt, 0) };
     }).sort((a, b) => b.tot - a.tot);
-    let grand = 0;
-    const lines = ['🎁 THƯỞNG HỖ TRỢ THÁNG ' + mLabel, '────────────'];
-    groups.forEach(g => {
-      grand += g.tot;
-      lines.push('');
-      lines.push('• ' + g.name + (g.dept ? ' (' + g.dept + ')' : '') + ': ' + fmt(g.tot) + 'đ');
-      g.entries.forEach(e => {
-        const a = amtOf(e);
-        lines.push('   - ' + (e.date || '').split('-').reverse().join('/') + ' · ' + _labelOf(e) + ': ' + (a ? '+' + fmt(a) : '0') + (e.note ? ' — ' + e.note : ''));
-      });
+    return { groups, grand: groups.reduce((s, g) => s + g.tot, 0), mLabel: _bMonth.slice(5) + '/' + _bMonth.slice(0, 4) };
+  }
+  function _summaryText(d) {
+    const lines = ['🎁 THƯỞNG HỖ TRỢ THÁNG ' + d.mLabel, '────────────'];
+    d.groups.forEach(g => {
+      lines.push('', '• ' + g.name + (g.dept ? ' (' + g.dept + ')' : '') + ': ' + fmt(g.tot) + 'đ');
+      g.entries.forEach(e => lines.push('   - ' + e.date + ' · ' + e.label + ': ' + (e.amt ? '+' + fmt(e.amt) : '0') + (e.note ? ' — ' + e.note : '')));
     });
-    lines.push(''); lines.push('────────────'); lines.push('TỔNG: ' + fmt(grand) + 'đ');
-    _bCopy(lines.join('\n'), _bStaffFilter && groups[0] ? 'thưởng ' + groups[0].name : 'tổng hợp thưởng T' + mLabel);
+    lines.push('', '────────────', 'TỔNG: ' + fmt(d.grand) + 'đ');
+    return lines.join('\n');
+  }
+  /* Logo thương hiệu → dataURL (nhúng vào ảnh để không bị chặn CORS lúc vẽ canvas) */
+  async function _logoDataURL() {
+    try {
+      const r = await fetch((location.origin || '') + '/assets/logo.png');
+      const b = await r.blob();
+      return await new Promise(res => { const fr = new FileReader(); fr.onload = () => res(fr.result); fr.onerror = () => res(''); fr.readAsDataURL(b); });
+    } catch (e) { return ''; }
+  }
+  /* Copy BẢNG THƯỞNG dạng ẢNH có logo + màu thương hiệu, bảng biểu từng ngày (fallback chữ nếu máy k hỗ trợ) */
+  async function copySummary() {
+    const d = _summaryData();
+    if (!d.groups.length) { window.toast && window.toast('Không có khoản thưởng nào để copy', 'info'); return; }
+    const _x = s => String(s == null ? '' : s).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+    const logo = await _logoDataURL();
+    const W = 660;
+    const groupHtml = d.groups.map(g => {
+      const rows = g.entries.map((e, i) => `<tr style="background:${i % 2 ? '#F6FBF4' : '#ffffff'}">
+        <td style="padding:6px 10px;border-bottom:1px solid #E5EFE1;white-space:nowrap;color:#374151">${_x(e.date)}</td>
+        <td style="padding:6px 10px;border-bottom:1px solid #E5EFE1;color:#111827">${_x(e.label)}${e.note ? ` <span style="color:#9CA3AF">· ${_x(e.note)}</span>` : ''}</td>
+        <td style="padding:6px 10px;border-bottom:1px solid #E5EFE1;text-align:right;white-space:nowrap;font-weight:700;color:#15803D">${e.amt ? '+' + fmt(e.amt) : '0'}</td>
+      </tr>`).join('');
+      return `<div style="margin-top:15px">
+        <div style="font-size:14.5px;font-weight:800;color:#1B5E20;margin-bottom:6px">👤 ${_x(g.name)}${g.dept ? ` <span style="font-weight:500;color:#6B7280;font-size:12px">(${_x(g.dept)})</span>` : ''}</div>
+        <table style="width:100%;border-collapse:collapse;font-size:12.5px;border:1px solid #CFE3C7">
+          <thead><tr style="background:#E8F5E2;color:#1B5E20;font-size:11px;text-transform:uppercase">
+            <th style="padding:7px 10px;text-align:left">Ngày</th><th style="padding:7px 10px;text-align:left">Nhiệm vụ</th><th style="padding:7px 10px;text-align:right">Thưởng</th>
+          </tr></thead>
+          <tbody>${rows}</tbody>
+          <tfoot><tr style="background:#FEF7E0;font-weight:800;color:#B45309"><td colspan="2" style="padding:7px 10px;text-align:right">Tổng thưởng</td><td style="padding:7px 10px;text-align:right">${fmt(g.tot)}đ</td></tr></tfoot>
+        </table>
+      </div>`;
+    }).join('');
+    const html = `<div xmlns="http://www.w3.org/1999/xhtml" style="width:${W}px;box-sizing:border-box;padding:22px 26px;font-family:-apple-system,BlinkMacSystemFont,Segoe UI,Roboto,Arial,sans-serif;background:#ffffff;color:#1f2937">
+      <div style="display:flex;align-items:center;gap:13px;border-bottom:2.5px solid #1B5E20;padding-bottom:12px">
+        ${logo ? `<img src="${logo}" style="width:60px;height:60px;object-fit:contain"/>` : '<div style="font-size:36px">🎁</div>'}
+        <div><div style="font-size:20px;font-weight:800;color:#1B5E20;letter-spacing:.3px">NÔNG SẢN TUẤN TÚ</div>
+          <div style="font-size:13px;color:#6B7280">BẢNG THƯỞNG HỖ TRỢ · Tháng ${d.mLabel}${_bStaffFilter && d.groups[0] ? ' · ' + _x(d.groups[0].name) : ' · ' + d.groups.length + ' nhân viên'}</div></div>
+      </div>
+      ${groupHtml}
+      <div style="display:flex;justify-content:space-between;align-items:center;margin-top:18px;background:#1B5E20;color:#fff;border-radius:9px;padding:12px 18px;font-size:16.5px;font-weight:800">
+        <span>TỔNG THƯỞNG THÁNG ${d.mLabel}</span><span>${fmt(d.grand)}đ</span>
+      </div>
+      <div style="font-size:11px;color:#9CA3AF;margin-top:9px;font-style:italic">Tinh tuý từ thiên nhiên, giá trị cho cuộc sống 🌿</div>
+    </div>`;
+    /* đo chiều cao thật bằng DOM ẩn → SVG không cắt nội dung */
+    let H = 800;
+    try {
+      const meas = document.createElement('div');
+      meas.style.cssText = 'position:fixed;left:-99999px;top:0;width:' + W + 'px';
+      meas.innerHTML = html; document.body.appendChild(meas);
+      H = Math.ceil((meas.firstElementChild || meas).getBoundingClientRect().height) + 4;
+      document.body.removeChild(meas);
+    } catch (e) {}
+    const svg = `<svg xmlns="http://www.w3.org/2000/svg" width="${W}" height="${H}"><foreignObject width="100%" height="100%">${html}</foreignObject></svg>`;
+    try {
+      if (!(navigator.clipboard && window.ClipboardItem)) throw new Error('no clipboard-image');
+      const renderBlob = async () => {
+        const img = new Image();
+        await new Promise((res, rej) => { img.onload = res; img.onerror = () => rej(new Error('svg load')); img.src = 'data:image/svg+xml;charset=utf-8,' + encodeURIComponent(svg); });
+        const scale = 2, cv = document.createElement('canvas'); cv.width = W * scale; cv.height = H * scale;
+        const ctx = cv.getContext('2d'); ctx.scale(scale, scale); ctx.fillStyle = '#ffffff'; ctx.fillRect(0, 0, W, H); ctx.drawImage(img, 0, 0);
+        const blob = await new Promise(r => cv.toBlob(r, 'image/png')); if (!blob) throw new Error('no blob'); return blob;
+      };
+      await navigator.clipboard.write([new ClipboardItem({ 'image/png': renderBlob() })]);
+      window.toast && window.toast('📸 Đã copy ẢNH bảng thưởng — dán vào Zalo (Ctrl/⌘+V)', 'success');
+    } catch (e) {
+      console.warn('[copySummary img→text]', e);
+      _bCopy(_summaryText(d), 'bảng thưởng (chữ)');
+    }
   }
 
   window.BONUS = {

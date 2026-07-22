@@ -42,7 +42,7 @@
           };
           inv.push(item);
         }
-        item.stock = Math.round(Math.max(0, (item.stock || 0) + deltaQty));   /* cột stock INTEGER → làm tròn kg lẻ */
+        item.stock = Math.max(0, Math.round(((item.stock || 0) + deltaQty) * 100) / 100);   /* stock numeric → giữ kg lẻ (2 chữ số) */
         const today = window.todayDate();
         const vi = `${String(today.getDate()).padStart(2,'0')}/${String(today.getMonth()+1).padStart(2,'0')}/${today.getFullYear()}`;
         if (deltaQty > 0) item.lastIn = vi;
