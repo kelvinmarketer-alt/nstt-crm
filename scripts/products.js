@@ -301,12 +301,12 @@
       /* Cột giá: GỐC = input bprice; NHÓM = giá nhóm (override hoặc gốc±%) */
       let priceCell, lastCell;
       if (!tier) {
-        priceCell = `<input class="bprice" data-id="${p.id}" type="text" inputmode="numeric" oninput="window.fmtMoneyInput(this)" value="${todaySell ? _mfmt(todaySell) : ''}" style="width:110px;text-align:right;padding:6px 8px;border:1px solid var(--line);border-radius:6px">`;
+        priceCell = `<input class="bprice js-money" data-id="${p.id}" type="text" inputmode="numeric" value="${todaySell ? _mfmt(todaySell) : ''}" style="width:110px;text-align:right;padding:6px 8px;border:1px solid var(--line);border-radius:6px">`;
         lastCell = `<td class="num hide-xs">${delta}</td>`;
       } else {
         const hasOv = tier.overrides && tier.overrides[p.id] != null;
         const tp = tierPriceOf(tier, p.id, todaySell);
-        priceCell = `<input class="tprice" data-id="${p.id}" type="text" inputmode="numeric" oninput="window.fmtMoneyInput(this)" value="${tp ? _mfmt(tp) : ''}" title="${hasOv ? 'Giá ghi đè riêng' : 'Giá gốc ' + (tier.markup >= 0 ? '+' : '') + tier.markup + '%'}" style="width:110px;text-align:right;padding:6px 8px;border:1px solid ${hasOv ? '#F59E0B' : 'var(--line)'};border-radius:6px;${hasOv ? 'background:#FEF9C3;font-weight:700' : ''}">`;
+        priceCell = `<input class="tprice js-money" data-id="${p.id}" type="text" inputmode="numeric" value="${tp ? _mfmt(tp) : ''}" title="${hasOv ? 'Giá ghi đè riêng' : 'Giá gốc ' + (tier.markup >= 0 ? '+' : '') + tier.markup + '%'}" style="width:110px;text-align:right;padding:6px 8px;border:1px solid ${hasOv ? '#F59E0B' : 'var(--line)'};border-radius:6px;${hasOv ? 'background:#FEF9C3;font-weight:700' : ''}">`;
         lastCell = `<td class="num hide-xs">${hasOv ? `<button class="btn btn-ghost btn-sm" title="Bỏ ghi đè, về giá gốc ±%" onclick="window.tierResetOverride('${p.id}')">↺</button>` : `<span style="color:var(--muted);font-size:11px">theo %</span>`}</td>`;
       }
       return `<tr data-id="${p.id}">
@@ -476,7 +476,7 @@
         <td data-field="unit" style="color:var(--muted)">/${p.unit}</td>
         <td data-field="ref" class="num" style="color:var(--muted)">${window.fmt(real)}</td>
         <td data-field="price" class="num">
-          <input class="mktprice" data-id="${p.id}" type="text" inputmode="numeric" oninput="window.fmtMoneyInput(this)" value="${mkt ? _mfmt(mkt) : ''}" style="width:110px;text-align:right;padding:6px 8px;border:1px solid ${isOverride?'#A16207':'var(--line)'};border-radius:6px;background:${isOverride?'#FEF9C3':'#fff'}" title="${isOverride?'Đã sửa tay':'Tự tính = giá thật + offset'}">
+          <input class="mktprice js-money" data-id="${p.id}" type="text" inputmode="numeric" value="${mkt ? _mfmt(mkt) : ''}" style="width:110px;text-align:right;padding:6px 8px;border:1px solid ${isOverride?'#A16207':'var(--line)'};border-radius:6px;background:${isOverride?'#FEF9C3':'#fff'}" title="${isOverride?'Đã sửa tay':'Tự tính = giá thật + offset'}">
           ${isOverride ? `<button onclick="window._mktClearOne('${p.id}')" title="Bỏ sửa tay, về công thức" style="background:none;border:none;color:#A16207;cursor:pointer;font-size:11px">↺</button>` : ''}
         </td>
         <td class="num hide-xs">${diffTxt}</td>

@@ -5,7 +5,7 @@
 
 /* Phiên bản app hiển thị (đối chiếu với CACHE_VERSION trong sw.js) — để user tự XÁC NHẬN
    đang chạy bản mới hay còn kẹt JS cũ (hiện ở góc sidebar + log console). */
-window.APP_VERSION = 'v472';
+window.APP_VERSION = 'v473';
 console.log('%c[NSTT] App ' + window.APP_VERSION, 'color:#339B21;font-weight:bold');
 
 /* Gom NGUỒN khách về 3 nhóm chuẩn: 'mkt' / 'sales' / 'sep-gioi-thieu'.
@@ -396,16 +396,7 @@ window.buyPriceOn = function(productId, dateStr) {
     if (EXCLUDE.test(hay)) return false;
     return true;   /* mặc định: ô number = TIỀN */
   }
-  function reformat(el) {
-    const nv = NATIVE.get.call(el);
-    const caret = el.selectionStart;
-    const leftDigits = raw(nv.slice(0, caret == null ? nv.length : caret)).replace('-', '').length;
-    const out = grp(raw(nv));
-    if (out === nv) return;
-    NATIVE.set.call(el, out);
-    let p = 0, seen = 0; while (p < out.length && seen < leftDigits) { if (/\d/.test(out[p])) seen++; p++; }
-    try { el.setSelectionRange(p, p); } catch (e) {}
-  }
+  function fmtNow(el) { NATIVE.set.call(el, grp(raw(NATIVE.get.call(el)))); }
   function enhance(el) {
     if (!el || el.nodeType !== 1 || el.tagName !== 'INPUT' || el.dataset.moneyEnhanced) return;
     const t = (el.getAttribute('type') || 'text').toLowerCase();
@@ -417,15 +408,20 @@ window.buyPriceOn = function(productId, dateStr) {
     if (t === 'number') el.setAttribute('type', 'text');
     el.setAttribute('inputmode', 'numeric');
     NATIVE.set.call(el, grp(raw(NATIVE.get.call(el))));   /* format giá trị ban đầu */
-    /* getter trả SỐ SẠCH cho mọi nơi đọc; setter tự format khi gán */
+    /* getter trả SỐ SẠCH cho mọi nơi đọc; setter format khi gán (nếu đang gõ thì để RAW, format lúc blur). */
     try {
       Object.defineProperty(el, 'value', {
         configurable: true,
         get() { return raw(NATIVE.get.call(el)); },
-        set(v) { NATIVE.set.call(el, grp(raw(v))); },
+        set(v) { NATIVE.set.call(el, document.activeElement === el ? raw(v) : grp(raw(v))); },
       });
     } catch (e) {}
-    el.addEventListener('input', function () { reformat(el); });
+    /* KHÔNG format khi đang gõ (input) — vì tự set value + con trỏ giữa lúc gõ gây LẶP KÝ TỰ trên
+       bàn phím ảo mobile (VD 24.000 → 224.000). Chỉ:
+       - focus: bỏ dấu chấm → gõ sạch, con trỏ tự nhiên.
+       - blur : format lại có dấu chấm nghìn. */
+    el.addEventListener('focus', function () { NATIVE.set.call(el, raw(NATIVE.get.call(el))); });
+    el.addEventListener('blur', function () { fmtNow(el); });
   }
   function scan(root) { try { (root || document).querySelectorAll('input').forEach(enhance); } catch (e) {} }
   /* focus = chắc chắn enhance trước khi gõ; observer = bắt ô trong popup động; scan đầu = HTML tĩnh */
