@@ -149,9 +149,12 @@
     }));
     const topProducts = Object.values(byProd).sort((a, b) => b.rev - a.rev).slice(0, 5);
 
-    /* === TOP NV bán === */
+    /* === TOP NV bán — CHỈ nhân viên phòng Sale (loại CFO/Kế toán/GĐ/Kho...) === */
+    const _saleNames = new Set(staff.filter(s => /sale|kinh doanh|cskh|chăm sóc|bán hàng/i.test((s.dept || '') + ' ' + (s.role || ''))).map(s => (s.name || '').trim().toLowerCase()));
+    const _isSaleName = n => _saleNames.has((n || '').trim().toLowerCase());
     const byStaff = {};
     monthOrders.forEach(o => {
+      if (!_isSaleName(o.staff)) return;
       const b = byStaff[o.staff] || (byStaff[o.staff] = { name: o.staff, orders: 0, rev: 0 });
       b.orders++; b.rev += (o.freight || 0);
     });
@@ -335,11 +338,34 @@
 
   /* Subscribe data changes */
   ['orders', 'customers', 'staff', 'drivers', 'timesheet', 'adspend', 'products'].forEach(k => window.STORE.subscribe(k, render));
+  /* Chart 7 ngày CHỈ vẽ 1 lần lúc init → khi orders đồng bộ về sau, phải vẽ lại (trước đây bị trắng) */
+  window.STORE.subscribe('orders', renderChart);
+
+  /* === Nạp items cho đơn trong tháng (lazy) → Top SP mới có dữ liệu === */
+  let _spHydrating = false; const _spDone = new Set();
+  async function hydrateMonthItems() {
+    if (_spHydrating) return;
+    if (!(window.SB_DATA && window.SB_DATA.getOrderItemsBulk)) return;
+    const orders = window.STORE.get('orders', []) || [];
+    const need = orders.filter(o => isThisMonth(o) && o.status !== 'cancelled'
+      && !(Array.isArray(o.items) && o.items.length) && !_spDone.has(o.code)).map(o => o.code);
+    if (!need.length) return;
+    _spHydrating = true;
+    try {
+      const map = await window.SB_DATA.getOrderItemsBulk(need);
+      need.forEach(c => _spDone.add(c));
+      if (map) orders.forEach(o => { if (map[o.code]) o.items = map[o.code]; });
+      render();
+    } catch (e) { console.warn('[dashboard hydrate items]', e); }
+    finally { _spHydrating = false; }
+  }
+  window.STORE.subscribe('orders', hydrateMonthItems);
 
   /* Init */
   window.renderAppShell('dashboard', 'Dashboard');
   render();
   renderChart();
+  setTimeout(hydrateMonthItems, 400);
 
   /* Welcome banner — real data + thời gian thật + tên user thật */
   function renderWelcome() {

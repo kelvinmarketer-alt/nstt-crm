@@ -370,9 +370,14 @@
   function renderSalesReport() {
     const orders = window.STORE.get('orders', window.ORDERS || []);
     const customers = window.STORE.get('customers', window.CUSTOMERS || []);
+    const staff = window.STORE.get('staff', window.STAFFS || []) || [];
+    /* CHỈ tính nhân viên phòng SALE (loại CFO/Kế toán/Giám đốc/Kho/Ship...) */
+    const _saleNames = new Set(staff.filter(s => /sale|kinh doanh|cskh|chăm sóc|bán hàng/i.test((s.dept || '') + ' ' + (s.role || ''))).map(s => (s.name || '').trim().toLowerCase()));
+    const _isSaleName = n => _saleNames.has((n || '').trim().toLowerCase());
     const byStaff = {};
     orders.forEach(o => {
       if (o.status === 'cancelled') return;
+      if (!_isSaleName(o.staff)) return;   /* bỏ đơn của NV không thuộc Sale */
       const k = o.staff || 'Khác';
       const b = byStaff[k] || (byStaff[k] = { orders: 0, rev: 0, custs: new Set() });
       b.orders++; b.rev += (o.freight || 0); if (o.cust) b.custs.add(o.cust);
@@ -865,6 +870,13 @@
     const PREV_M = _prev.getMonth() + 1, PREV_Y = _prev.getFullYear();
     const CUR_ISO = CUR_Y + '-' + String(CUR_M).padStart(2, '0');
     const DAYS_IN_CUR = new Date(CUR_Y, CUR_M, 0).getDate();
+
+    /* Nhãn tháng ĐỘNG (trước đây header cứng "Tháng 5/2026") */
+    const _setTxt = (id, t) => { const e = document.getElementById(id); if (e) e.textContent = t; };
+    _setTxt('ovHeadTitle', `Tổng quan toàn DN — Tháng ${CUR_M}/${CUR_Y}`);
+    _setTxt('ovCompareH', `📊 So sánh T${CUR_M}/${CUR_Y} vs T${PREV_M}/${PREV_Y}`);
+    _setTxt('ovCmpPrev', `T${PREV_M}/${PREV_Y}`);
+    _setTxt('ovCmpCur', `T${CUR_M}/${CUR_Y}`);
 
     const isInMonth = (o, mo, y) => {
       const m = (o.date || '').match(/(\d+)\/(\d+)\/(\d+)/);

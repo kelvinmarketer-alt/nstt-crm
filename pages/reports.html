@@ -273,8 +273,6 @@
       <div class="rpt-tab" onclick="switchTab(event,'sales')">🧑‍💼 Hiệu quả NV KD</div>
       <div class="rpt-tab" onclick="switchTab(event,'debt')">📉 Công nợ</div>
       <div class="rpt-tab" onclick="switchTab(event,'daily')">📅 Báo cáo hôm nay</div>
-      <div class="rpt-tab" onclick="switchTab(event,'forecast')">🔮 Dự báo + Cohort</div>
-      <div class="rpt-tab" onclick="switchTab(event,'variance')">📊 Plan vs Actual</div>
     </div>
 
     <!-- Pane Forecast -->
@@ -309,7 +307,7 @@
       <div style="background:linear-gradient(135deg,#1B5E20 0%,#15803D 100%);color:#fff;padding:18px 22px;border-radius:12px;margin-bottom:16px;display:flex;align-items:center;gap:14px;flex-wrap:wrap">
         <div style="flex:1;min-width:200px">
           <div style="font-size:11.5px;opacity:0.8;text-transform:uppercase;letter-spacing:0.5px;font-weight:700">🎯 Báo cáo điều hành</div>
-          <div style="font-size:22px;font-weight:800;margin-top:2px">Tổng quan toàn DN — Tháng 5/2026</div>
+          <div style="font-size:22px;font-weight:800;margin-top:2px" id="ovHeadTitle">Tổng quan toàn DN</div>
           <div style="font-size:12.5px;opacity:0.85;margin-top:4px" id="ovHeadSub">Tổng hợp 5 phòng ban · cập nhật realtime từ data app</div>
         </div>
         <button class="btn btn-primary" onclick="window.sendDailyReport()" style="background:rgba(255,255,255,0.15);border:1px solid rgba(255,255,255,0.3);color:#fff">📤 Gửi báo cáo Telegram</button>
@@ -341,9 +339,9 @@
 
       <!-- So sánh tháng này vs tháng trước -->
       <div class="chart-card" style="margin-top:14px">
-        <h3>📊 So sánh T5/2026 vs T4/2026</h3>
+        <h3 id="ovCompareH">📊 So sánh tháng này vs tháng trước</h3>
         <table class="mini-table" id="ovCompareTbl">
-          <thead><tr><th>Chỉ số</th><th class="num">T4/2026</th><th class="num">T5/2026</th><th class="num">Thay đổi</th><th>Xu hướng</th></tr></thead>
+          <thead><tr><th>Chỉ số</th><th class="num" id="ovCmpPrev">Tháng trước</th><th class="num" id="ovCmpCur">Tháng này</th><th class="num">Thay đổi</th><th>Xu hướng</th></tr></thead>
           <tbody></tbody>
         </table>
       </div>
