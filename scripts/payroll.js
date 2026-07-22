@@ -216,6 +216,7 @@
       `<div class="rpt-tab ${tab === 'calendar' ? 'active' : ''}" onclick="window.setPayTab('calendar')">🗓️ Lịch công</div>` +
       `<div class="rpt-tab ${tab === 'duty' ? 'active' : ''}" onclick="window.setPayTab('duty')">🏭 Lịch trực kho</div>` +
       `<div class="rpt-tab ${tab === 'bonus' ? 'active' : ''}" onclick="window.setPayTab('bonus')">🎁 Thưởng hỗ trợ</div>` +
+      `<div class="rpt-tab ${tab === 'shipper' ? 'active' : ''}" onclick="window.setPayTab('shipper')">🛵 Hiệu suất Shipper</div>` +
       `<div class="rpt-tab ${tab === 'payroll' ? 'active' : ''}" onclick="window.setPayTab('payroll')">💰 Bảng lương</div>`;
     document.getElementById('payMonth').value = month;
     /* Hide upload button if user lacks perm */
@@ -231,6 +232,7 @@
     else if (tab === 'calendar') renderCalendar();
     else if (tab === 'duty') { if (window.KHODUTY) window.KHODUTY.renderDutyTab(month); }
     else if (tab === 'bonus') { if (window.BONUS) window.BONUS.setBonusMonth(month); }
+    else if (tab === 'shipper') { if (window.SHIPSTATS) window.SHIPSTATS.renderInto('payView', month); else document.getElementById('payView').innerHTML = '<div style="padding:24px;color:var(--muted)">Đang tải…</div>'; }
     else renderPayroll();
   }
   window.setPayTab = t => { tab = t; render(); };
