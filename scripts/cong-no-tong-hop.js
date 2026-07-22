@@ -131,7 +131,9 @@
        total/daily (lưới) vẫn đếm MỌI đơn để CFO thấy cả đơn hôm nay chưa giao; nhưng CÒN PHẢI THU
        + phiếu/QR gửi khách chỉ tính phần ĐÃ GIAO → không đòi tiền đơn chưa giao, khớp CÔNG NỢ HT. */
     const _isNo = o => /nợ|cong no|credit/i.test(o.payBy || o.pay_by || '');
-    const _isCongNo = o => (o.status === 'delivered' || o.status === 'reconciled') && _isNo(o);
+    /* Công nợ THẬT = trả bằng nợ + ĐÃ GIAO. "Đã giao" gồm cả đơn Chờ giao mà ngày giao đã tới/qua
+       (window.orderDelivered) → phiếu khớp thực tế, không phải chờ bấm "Đã giao" từng đơn. */
+    const _isCongNo = o => _isNo(o) && (window.orderDelivered ? window.orderDelivered(o) : (o.status === 'delivered' || o.status === 'reconciled'));
     const rows = {};
     orders.forEach(o => {
       if (o.status === 'draft' || o.status === 'cancelled') return;   /* bỏ nháp/huỷ */

@@ -188,9 +188,10 @@
       s.orders++;
       const amt = +o.freight || 0;
       s.revenue += amt;
-      /* Công nợ chỉ phát sinh khi đơn ĐÃ GIAO (giao xong mới thành nợ). Đơn Mới/Đang lấy/Đang giao
-         chưa cộng công nợ — khớp luồng Bảng giao hàng (giao-hang.html). */
-      const delivered = (o.status === 'delivered' || o.status === 'reconciled');
+      /* Công nợ chỉ phát sinh khi đơn ĐÃ GIAO (giao xong mới thành nợ). "Đã giao" = đã bấm giao
+         HOẶC ngày giao đã tới/qua (window.orderDelivered) → đơn quá ngày giao tự thành nợ.
+         Đơn ngày mai/tương lai chưa cộng công nợ — khớp custDebt + cong-no-tong-hop. */
+      const delivered = window.orderDelivered ? window.orderDelivered(o) : (o.status === 'delivered' || o.status === 'reconciled');
       if (delivered && /nợ|cong no|credit/i.test(o.payBy || o.pay_by || '')) { s.charge += amt; s.credits.push({ date: _ordDate(o), amount: amt }); }
     });
     ledger.forEach(e => { const id = e.custId; if (id && e.type === 'payment') g(id).paid += +e.amount || 0; });

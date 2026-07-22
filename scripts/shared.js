@@ -5,7 +5,7 @@
 
 /* Phiên bản app hiển thị (đối chiếu với CACHE_VERSION trong sw.js) — để user tự XÁC NHẬN
    đang chạy bản mới hay còn kẹt JS cũ (hiện ở góc sidebar + log console). */
-window.APP_VERSION = 'v473';
+window.APP_VERSION = 'v474';
 console.log('%c[NSTT] App ' + window.APP_VERSION, 'color:#339B21;font-weight:bold');
 
 /* Gom NGUỒN khách về 3 nhóm chuẩn: 'mkt' / 'sales' / 'sep-gioi-thieu'.
@@ -552,6 +552,30 @@ window.addrLooksSame = function (a, b) {
   return common >= 3;
 };
 
+/* Ngày GIAO (ISO yyyy-mm-dd) của 1 đơn — ưu tiên ngày giao (deliverDate), fallback ngày đặt. */
+window.orderDeliverISO = function (o) {
+  if (!o) return '';
+  let s = String(o.deliverDate || o.deliver_date || '');
+  let m = s.match(/^(\d{4})-(\d{2})-(\d{2})/);          if (m) return `${m[1]}-${m[2]}-${m[3]}`;
+  s = String(o.date || o.order_date || o.createdAt || o.created_at || '');
+  m = s.match(/^(\d{4})-(\d{2})-(\d{2})/);              if (m) return `${m[1]}-${m[2]}-${m[3]}`;
+  m = s.match(/(\d{1,2})\/(\d{1,2})\/(\d{4})/);         if (m) return `${m[3]}-${String(m[2]).padStart(2,'0')}-${String(m[1]).padStart(2,'0')}`;
+  return '';
+};
+/* Đơn đã (coi như) GIAO → công nợ CHỐT. Trả true khi:
+   • status = delivered / reconciled (đã bấm Đã giao), HOẶC
+   • status Chờ giao / Đang lấy / Đang giao mà NGÀY GIAO đã tới/qua (hôm nay trở về trước)
+     → giao hàng ngày, công nợ tự chốt khỏi phải bấm tay.
+   draft / cancelled / returned KHÔNG tính. Đơn ngày mai/tương lai CHƯA tính (chưa giao). */
+window.orderDelivered = function (o) {
+  if (!o) return false;
+  const st = o.status;
+  if (st === 'delivered' || st === 'reconciled') return true;
+  if (st === 'draft' || st === 'cancelled' || st === 'returned') return false;
+  const iso = window.orderDeliverISO(o);
+  return !!iso && iso <= window.todayISO();
+};
+
 window.custDebt = function (custId) {
   if (!custId || !window.STORE) return 0;
   const orders = window.STORE.get('orders', []) || [];
@@ -559,10 +583,10 @@ window.custDebt = function (custId) {
   orders.forEach(o => {
     if (o.status === 'draft' || o.status === 'cancelled') return;
     if ((o.cust || o.custId) !== custId) return;
-    /* Công nợ CHỐT KHI ĐÃ GIAO (khớp rebuildCustStats/customers.js). Đơn Mới/Đang lấy/Đang giao
-       CHƯA thành nợ → trước đây custDebt tính cả đơn chưa giao khiến Báo cáo/Dashboard phồng hơn
-       trang Khách hàng & Công nợ. Nay gate delivered để mọi nơi khớp nhau. */
-    if (o.status !== 'delivered' && o.status !== 'reconciled') return;
+    /* Công nợ CHỐT KHI ĐÃ GIAO (khớp rebuildCustStats/customers.js + cong-no-tong-hop).
+       "Đã giao" = đã bấm giao HOẶC ngày giao đã tới/qua (window.orderDelivered) → đơn quá ngày
+       giao tự thành nợ khỏi phải bấm tay. Đơn ngày mai/tương lai CHƯA tính. */
+    if (!window.orderDelivered(o)) return;
     if (/nợ|cong no|credit/i.test(o.payBy || o.pay_by || '')) charge += (+o.freight || 0);
   });
   let paid = 0;
