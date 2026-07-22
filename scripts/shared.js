@@ -5,7 +5,7 @@
 
 /* Phiên bản app hiển thị (đối chiếu với CACHE_VERSION trong sw.js) — để user tự XÁC NHẬN
    đang chạy bản mới hay còn kẹt JS cũ (hiện ở góc sidebar + log console). */
-window.APP_VERSION = 'v479';
+window.APP_VERSION = 'v480';
 console.log('%c[NSTT] App ' + window.APP_VERSION, 'color:#339B21;font-weight:bold');
 
 /* Gom NGUỒN khách về 3 nhóm chuẩn: 'mkt' / 'sales' / 'sep-gioi-thieu'.
@@ -1240,51 +1240,50 @@ window.attachBulkOps = function (opts) {
 };
 
 /* ============ Navigation config ============ */
+/* Nhóm menu THEO PHÒNG BAN — khớp presetPerms(role,dept) trong auth.js.
+   filteredNav (renderAppShell) tự lọc theo quyền + bỏ nhóm rỗng → mỗi phòng chỉ thấy nhóm của mình. */
 window.NAV = [
-  { section: 'Vận hành', items: [
+  { section: 'Quản trị', items: [
     { id: 'dashboard',  label: 'Dashboard',   icon: '📊', href: 'dashboard.html' },
+    { id: 'reports',    label: 'Báo cáo',     icon: '📈', href: 'reports.html' },
+    { id: 'settings',   label: 'Cài đặt',     icon: '⚙️', href: 'settings.html' },
+    { id: 'audit',      label: 'Nhật ký',     icon: '📋', href: 'audit.html' },
+  ]},
+  { section: 'Sale', items: [
     { id: 'orders',     label: 'Đơn hàng',    icon: '📦', href: 'orders.html', badgeKey: 'orders' },
-    /* Ẩn theo yêu cầu: Đơn định kỳ (file + auto-gen vẫn giữ, chỉ gỡ khỏi sidebar)
-    { id: 'recurring',  label: 'Đơn định kỳ', icon: '🔁', href: 'recurring.html' }, */
-    { id: 'order-samples', label: 'Mẫu đơn AI (nhớ nét chữ)', icon: '🧠', href: 'order-samples.html' },
     { id: 'customers',  label: 'Khách hàng',  icon: '👥', href: 'customers.html', badgeKey: 'customers' },
-    /* Ẩn theo yêu cầu: Chân dung KH 360° + Lead/Tiềm năng
+    { id: 'order-samples', label: 'Mẫu đơn AI (nhớ nét chữ)', icon: '🧠', href: 'order-samples.html' },
+    /* Ẩn: Chân dung KH 360°, Lead/Tiềm năng, Đơn định kỳ (file vẫn giữ)
     { id: 'customers-360', label: 'Chân dung KH 360°', icon: '🔍', href: 'customers-360.html' },
     { id: 'leads',      label: 'Lead/Tiềm năng', icon: '🎯', href: 'leads.html' },
-    */
-    /* Ẩn theo yêu cầu: module Shipper (dùng nhân sự phòng "Ship" thay thế; Bảng giao hàng lấy shipper từ đó).
-    { id: 'shippers',   label: 'Shipper',     icon: '🛵', href: 'shippers.html' },
-    */
+    { id: 'recurring',  label: 'Đơn định kỳ', icon: '🔁', href: 'recurring.html' }, */
   ]},
-  { section: 'Kho & Mua hàng', items: [
+  { section: 'Kế toán', items: [
     { id: 'products',   label: 'Sản phẩm & Giá', icon: '🥬', href: 'products.html' },
+    { id: 'debt-summary', label: 'Công nợ tổng hợp (CFO)', icon: '🧮', href: 'cong-no-tong-hop.html' },
+    { id: 'ncc-debt',   label: 'Công nợ NCC',  icon: '🏭', href: 'ncc-cong-no.html' },
+    { id: 'finance',    label: 'Tài chính',   icon: '💰', href: 'finance.html', badgeKey: 'debt' },
+    { id: 'san-luong',  label: 'Sản lượng & doanh thu', icon: '📦', href: 'san-luong.html' },
+    /* Ẩn: Loyalty — { id:'loyalty', label:'Loyalty (tích điểm)', icon:'⭐', href:'loyalty.html' }, */
+  ]},
+  { section: 'Marketing', items: [
+    { id: 'adspend',    label: 'Chi phí Ads', icon: '📣', href: 'adspend.html' },
+    /* Ẩn: Email/Zalo blast — { id:'marketing', label:'Email/Zalo blast', icon:'📨', href:'marketing.html' }, */
+  ]},
+  { section: 'Kho & Ship', items: [
     { id: 'inventory',  label: 'Kho / Tồn',   icon: '📥', href: 'inventory.html' },
     { id: 'suppliers',  label: 'Nhà cung cấp', icon: '🏭', href: 'suppliers.html' },
     { id: 'procurement', label: 'Gom hàng',    icon: '🧺', href: 'procurement.html' },
     { id: 'giao-hang',  label: 'Bảng giao hàng', icon: '🚚', href: 'giao-hang.html' },
     { id: 'returns',    label: 'Trả hàng',    icon: '↩️', href: 'returns.html' },
+    /* Ẩn: Shipper — { id:'shippers', label:'Shipper', icon:'🛵', href:'shippers.html' }, */
   ]},
-  { section: 'Tài chính', items: [
-    { id: 'finance',    label: 'Tài chính',   icon: '💰', href: 'finance.html', badgeKey: 'debt' },
-    { id: 'debt-summary', label: 'Công nợ tổng hợp (CFO)', icon: '🧮', href: 'cong-no-tong-hop.html' },
-    { id: 'ncc-debt',   label: 'Công nợ NCC',  icon: '🏭', href: 'ncc-cong-no.html' },
-    { id: 'san-luong',  label: 'Sản lượng & doanh thu', icon: '📦', href: 'san-luong.html' },
-    { id: 'adspend',    label: 'Chi phí Ads', icon: '📣', href: 'adspend.html' },
-    /* Ẩn theo yêu cầu: Loyalty (chiết khấu/tích điểm)
-    { id: 'loyalty',    label: 'Loyalty (tích điểm)', icon: '⭐', href: 'loyalty.html' },
-    */
-  ]},
-  { section: 'Quản trị', items: [
+  { section: 'Nhân sự', items: [
     { id: 'staff',      label: 'Nhân sự',     icon: '🧑‍💼', href: 'staff.html' },
     { id: 'tai-khoan',  label: 'Tài khoản đăng nhập', icon: '🔐', href: 'tai-khoan.html' },
-    { id: 'reports',    label: 'Báo cáo',     icon: '📈', href: 'reports.html' },
-    /* Ẩn theo yêu cầu (chưa dùng — bật lại khi cần gửi blast):
-    { id: 'marketing',  label: 'Email/Zalo blast', icon: '📨', href: 'marketing.html' },
-    */
-    { id: 'audit',      label: 'Nhật ký',     icon: '📋', href: 'audit.html' },
-    /* tg-bot.html ẩn — chỉ là simulator demo, chưa hoạt động thật.
-       Khi có backend Telegram webhook thật → unhide lại. */
-    { id: 'settings',   label: 'Cài đặt',     icon: '⚙️', href: 'settings.html' },
+  ]},
+  /* Chung mọi phòng — không nhóm (section rỗng → không hiện tiêu đề) */
+  { section: '', items: [
     { id: 'docs',       label: 'Hướng dẫn',   icon: '📖', href: 'docs.html' },
   ]},
 ];
@@ -1588,7 +1587,7 @@ window.renderAppShell = function(activeId, breadcrumbText) {
       </div>
       <nav class="nav">
         ${filteredNav.map(group => `
-          <div class="nav-section">${group.section}</div>
+          ${group.section ? `<div class="nav-section">${group.section}</div>` : '<div class="nav-sep"></div>'}
           ${group.items.map(item => {
             /* badge động: tính số thực từ STORE theo badgeKey (0 thì ẩn) */
             let badgeVal = item.badge;
