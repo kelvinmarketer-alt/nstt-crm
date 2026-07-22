@@ -58,16 +58,18 @@
     const item = getInv().find(i => i.productId === productId);
     const today = window.todayDate();
     const vi = `${String(today.getDate()).padStart(2,'0')}/${String(today.getMonth()+1).padStart(2,'0')}/${today.getFullYear()}`;
+    /* ⚠ Cột inventory.stock trên cloud là INTEGER → làm tròn (kg lẻ nông sản không lưu được số thập phân).
+       Muốn tồn kho theo kg lẻ: ALTER COLUMN stock TYPE numeric trong Supabase (xem ghi chú). */
     if (!item) {
       /* STORE.add → insert thẳng lên cloud (tránh bug same-reference của STORE.set) */
       window.STORE.add('inventory', {
         id: 'INV' + Date.now().toString(36), productId,
-        stock: Math.max(0, deltaQty), minStock: 10, maxStock: 100, avgDaily: 5,
+        stock: Math.round(Math.max(0, deltaQty)), minStock: 10, maxStock: 100, avgDaily: 5,
         lastIn: deltaQty > 0 ? vi : '', lastOut: deltaQty < 0 ? vi : '', location: 'Kho A1',
       });
       return;
     }
-    const patch = { stock: Math.max(0, (item.stock || 0) + deltaQty) };
+    const patch = { stock: Math.round(Math.max(0, (item.stock || 0) + deltaQty)) };
     if (deltaQty > 0) patch.lastIn = vi; else patch.lastOut = vi;
     window.STORE.update('inventory', item.id, patch);
   };

@@ -100,7 +100,9 @@
       const defect = Math.min(Math.max(0, defEl ? (+defEl.value || 0) : 0), recv);
       const good = Math.max(0, recv - defect);
       const demand = it.demandQty != null ? +it.demandQty : ordered;
-      const surplus = Math.max(0, good - demand);
+      /* Tồn kho cloud là số NGUYÊN → làm tròn phần dư (kg lẻ nông sản). stockedQty = số đã cộng kho
+         (cũng dùng để trừ lại khi hoàn tác) → phải khớp với cái đã invApply. */
+      const surplus = Math.round(Math.max(0, good - demand));
       it.recvQty = recv; it.defectQty = defect; it.goodQty = good; it.stockedQty = surplus;
       surplusTot += surplus; defTot += defect;
       /* phiếu gom = giao thẳng khách phần "demand"; chỉ phần DƯ vào kho */
