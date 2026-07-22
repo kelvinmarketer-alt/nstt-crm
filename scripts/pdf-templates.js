@@ -420,11 +420,9 @@ ${FAV2 ? `<link rel="icon" type="image/svg+xml" href="${FAV2}">` : ''}
         <div style="flex:1"><div style="font-weight:700;color:${color};font-size:13px">${icon} ${title}</div>
         <div style="font-size:11px;color:var(--muted);margin-top:2px">${desc}</div></div>
       </label>`;
-    window.openModal('🖨 In phiếu đơn ' + code, `
-      <div style="font-size:12.5px;color:var(--muted);margin-bottom:12px">Tick (các) phiếu cần in theo giai đoạn — in 1 cái hoặc cả 3 tuỳ ý:</div>
-      ${row('prt_cust', true,  '📄', '#008000', 'Phiếu xác nhận đơn (Khách)', 'Đơn giá + tổng tiền · công nợ · TK ngân hàng · ô ký 2 bên')}
-      ${row('prt_ship', false, '🛵', '#D97706', 'Phiếu giao cho Shipper', 'Địa chỉ + SĐT to · tick mặt hàng · khung COD · ô POD')}
-      ${row('prt_wh',   false, '🧾', '#C00000', 'Phiếu báo hàng / xuất kho (Kho)', 'Mặt hàng + số lượng cho Kho chuẩn bị — không có giá')}
+    window.openModal('🧾 In phiếu báo hàng / xuất kho ' + code, `
+      <div style="font-size:12.5px;color:var(--muted);margin-bottom:12px">Phiếu mặt hàng + số lượng cho Kho chuẩn bị (không có giá):</div>
+      ${row('prt_wh',   true,  '🧾', '#C00000', 'Phiếu báo hàng / xuất kho (Kho)', 'Mặt hàng + số lượng cho Kho chuẩn bị — không có giá')}
       <div style="margin-top:6px;padding:11px 12px;background:#F0FDF4;border:1px solid #BBF7D0;border-radius:9px">
         <div style="font-size:12px;color:#15803D;font-weight:600;margin-bottom:6px">📤 Bắt đầu quy trình Kho</div>
         <div style="font-size:11.5px;color:var(--muted);margin-bottom:8px">Gửi phiếu báo hàng vào nhóm Kho (Telegram) rồi chuyển thẳng sang <b>Gom hàng → NCC</b> để Kho làm tiếp.</div>

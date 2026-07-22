@@ -286,11 +286,9 @@ ${FAV ? `<link rel="icon" type="image/svg+xml" href="${FAV}">` : ''}
         <div style="flex:1"><div style="font-weight:700;color:${color};font-size:13px">${icon} ${title}</div>
         <div style="font-size:11px;color:var(--muted);margin-top:2px">${desc}</div></div>
       </label>`;
-    window.openModal('📸 Phiếu đơn ' + code + ' — Copy ảnh gửi khách', `
-      <div style="font-size:12.5px;color:var(--muted);margin-bottom:12px">Tick phiếu cần → mở ra bấm <b>“Copy ảnh gửi khách”</b> dán vào Zalo/Messenger (vẫn có nút In giấy nếu cần):</div>
-      ${row('prt_cust', true,  '📄', '#008000', 'Phiếu xác nhận đơn (Khách)', 'Đơn giá + tổng tiền · công nợ · đối chiếu trước khi giao')}
-      ${row('prt_ship', false, '🛵', '#D97706', 'Phiếu giao cho Shipper', 'Địa chỉ + SĐT to · tick mặt hàng · khung COD · ô POD')}
-      ${row('prt_wh',   false, '🧾', '#C00000', 'Phiếu báo hàng / xuất kho (Kho)', 'Mặt hàng + số lượng cho Kho chuẩn bị')}
+    window.openModal('🧾 Phiếu đơn ' + code + ' — Báo hàng / Xuất kho', `
+      <div style="font-size:12.5px;color:var(--muted);margin-bottom:12px">Mở phiếu → bấm <b>“Copy ảnh gửi khách”</b> dán vào Zalo nhóm Kho (vẫn có nút In giấy nếu cần):</div>
+      ${row('prt_wh',   true,  '🧾', '#C00000', 'Phiếu báo hàng / xuất kho (Kho)', 'Mặt hàng + số lượng cho Kho chuẩn bị')}
       <div style="margin-top:6px;padding:11px 12px;background:#F0FDF4;border:1px solid #BBF7D0;border-radius:9px">
         <div style="font-size:12px;color:#15803D;font-weight:600;margin-bottom:6px">📤 Bắt đầu quy trình Kho</div>
         <div style="font-size:11.5px;color:var(--muted);margin-bottom:8px">Gửi phiếu báo hàng vào nhóm Kho (Telegram) rồi chuyển thẳng sang <b>Gom hàng → NCC</b>.</div>
