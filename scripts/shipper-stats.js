@@ -31,8 +31,13 @@
       const day = +iso.slice(8, 10); if (!(day >= 1 && day <= last)) return;
       const kg = _kg(o);
       const s = byShip[drv] || (byShip[drv] = { name: drv, daily: {}, totO: 0, totKg: 0 });
-      const d = s.daily[day] || (s.daily[day] = { o: 0, kg: 0 });
+      const d = s.daily[day] || (s.daily[day] = { o: 0, kg: 0, orders: [] });
       d.o++; d.kg += kg; s.totO++; s.totKg += kg;
+      d.orders.push({
+        code: o.code, cust: o.custName || o.custId || '', kg,
+        drop: o.drop || '', freight: +o.freight || 0,
+        items: Array.isArray(o.items) ? o.items.map(it => ({ name: it.name || it.id, qty: +it.qty || 0, unit: it.unit || 'kg' })) : [],
+      });
     });
     return { list: Object.values(byShip).sort((a, b) => b.totO - a.totO), last, y, m };
   }
@@ -54,9 +59,9 @@
       ${days.map(d => { const w = new Date(D.y, D.m - 1, d).getDay(); const we = w === 0; return `<th style="padding:4px 3px;background:${we ? '#FEE2E2' : '#E8F5E2'};color:${we ? '#B91C1C' : '#1B5E20'};min-width:38px;font-size:10px">${d}<div style="font-size:8px;opacity:.7">${dow[w]}</div></th>`; }).join('')}
       <th style="padding:6px 8px;background:#DCFCE7;color:#15803D;min-width:50px">Tổng đơn</th>
       <th style="padding:6px 8px;background:#FEF3C7;color:#B45309;min-width:60px">Tổng kg</th></tr>`;
-    const rows = D.list.length ? D.list.map(s => `<tr>
+    const rows = D.list.length ? D.list.map((s, si) => `<tr>
       <td style="position:sticky;left:0;background:#fff;padding:6px 10px;font-weight:700;color:var(--navy);z-index:1;border-right:1px solid var(--line)">🛵 ${esc(s.name)}</td>
-      ${days.map(d => { const c = s.daily[d]; return `<td style="padding:3px 2px;text-align:center;border-bottom:1px solid #F1F5F9">${c ? `<div style="font-weight:700;color:#15803D;font-size:12px">${c.o}</div><div style="font-size:9px;color:#94A3B8">${_q1(c.kg)}</div>` : '<span style="color:#E2E8F0">·</span>'}</td>`; }).join('')}
+      ${days.map(d => { const c = s.daily[d]; return `<td ${c ? `onclick="window.shipStatsDay(${si},${d})" title="Xem chi tiết đơn ngày ${d}" style="padding:3px 2px;text-align:center;border-bottom:1px solid #F1F5F9;cursor:pointer;transition:.1s" onmouseover="this.style.background='#ECFDF3'" onmouseout="this.style.background=''"` : 'style="padding:3px 2px;text-align:center;border-bottom:1px solid #F1F5F9"'}>${c ? `<div style="font-weight:700;color:#15803D;font-size:12px">${c.o}</div><div style="font-size:9px;color:#94A3B8">${_q1(c.kg)}</div>` : '<span style="color:#E2E8F0">·</span>'}</td>`; }).join('')}
       <td style="padding:6px 8px;text-align:center;font-weight:800;color:#15803D;background:#F0FDF4">${s.totO}</td>
       <td style="padding:6px 8px;text-align:center;font-weight:800;color:#B45309;background:#FFFBEB">${_q1(s.totKg)}</td></tr>`).join('')
       : `<tr><td colspan="${D.last + 3}" style="padding:34px;text-align:center;color:var(--muted)">Chưa có đơn giao nào gán shipper tháng này.<br><span style="font-size:12px">Gán shipper cho đơn ở Bảng giao hàng → giao xong → thống kê tự lên.</span></td></tr>`;
@@ -78,6 +83,40 @@
           <thead style="position:sticky;top:0;z-index:3">${head}</thead><tbody>${rows}</tbody>${foot ? `<tfoot>${foot}</tfoot>` : ''}
         </table></div>`;
   }
+
+  /* Bấm vào ô 1 ngày → popup chi tiết: shipper hôm đó giao những đơn nào + sản lượng từng đơn */
+  window.shipStatsDay = function (si, day) {
+    const D = _data(_month);
+    const s = D.list[si]; if (!s) return;
+    const c = s.daily[day]; if (!c || !c.orders || !c.orders.length) return;
+    const dLabel = day + '/' + String(D.m).padStart(2, '0') + '/' + D.y;
+    const rows = c.orders.map((o, i) => {
+      const items = (o.items && o.items.length)
+        ? `<div style="font-size:11.5px;color:#64748B;margin-top:3px">${o.items.map(it => esc(it.name) + ' ' + _q1(it.qty) + (it.unit || 'kg')).join(' · ')}</div>`
+        : '';
+      const addr = o.drop ? `<div style="font-size:11.5px;color:#94A3B8;margin-top:2px">📍 ${esc(String(o.drop).slice(0, 60))}</div>` : '';
+      return `<tr style="background:${i % 2 ? '#F6FBF4' : '#fff'}">
+        <td style="padding:9px 12px;border-bottom:1px solid #E5EFE1;vertical-align:top">
+          <div style="font-weight:800;color:#1B5E20">#${esc(o.code)}</div>
+          <div style="font-size:12.5px;color:#334155;margin-top:1px">${esc(o.cust || '')}</div>${addr}${items}
+        </td>
+        <td style="padding:9px 12px;border-bottom:1px solid #E5EFE1;text-align:right;vertical-align:top;white-space:nowrap;font-weight:800;color:#B45309">${_q1(o.kg)} kg</td>
+      </tr>`;
+    }).join('');
+    const body = `
+      <div style="font-size:13px;color:var(--muted);margin-bottom:12px">🛵 <b style="color:var(--navy)">${esc(s.name)}</b> · ngày <b>${dLabel}</b> — giao <b style="color:#15803D">${c.o} đơn</b> · tổng <b style="color:#B45309">${_q1(c.kg)} kg</b></div>
+      <div style="border:1px solid var(--line);border-radius:10px;overflow:hidden">
+        <table style="width:100%;border-collapse:collapse;font-size:13.5px">
+          <thead><tr style="background:#E8F5E2;color:#1B5E20;font-size:11.5px;text-transform:uppercase">
+            <th style="padding:8px 12px;text-align:left">Đơn / Khách / Mặt hàng</th>
+            <th style="padding:8px 12px;text-align:right">Sản lượng</th></tr></thead>
+          <tbody>${rows}</tbody>
+          <tfoot><tr style="background:#1B5E20;color:#fff;font-weight:800">
+            <td style="padding:9px 12px">TỔNG ${c.o} đơn</td>
+            <td style="padding:9px 12px;text-align:right">${_q1(c.kg)} kg</td></tr></tfoot>
+        </table></div>`;
+    window.openModal('📦 Chi tiết giao hàng · ' + dLabel, body, { width: '560px' });
+  };
 
   window.shipStatsExcel = function () {
     if (!window.XLSX) { window.toast && window.toast('Chưa tải thư viện Excel — reload trang', 'warn'); return; }
