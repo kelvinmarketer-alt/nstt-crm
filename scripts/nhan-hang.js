@@ -21,30 +21,42 @@
       const ordered = +it.qty || 0;
       const isSi = it.cases != null;
       const demand = it.demandQty != null ? +it.demandQty : ordered;
+      const sub = isSi
+        ? `<div style="font-size:10.5px;color:var(--muted)">${_q(it.cases)} ${esc(it.caseUnit || 'thùng')} · khách cần ${_q(demand)}${esc(it.unit || 'kg')}</div>`
+        : (it.demandQty != null ? `<div style="font-size:10.5px;color:var(--muted)">khách cần ${_q(demand)}${esc(it.unit || 'kg')}</div>` : '');
       return `<tr style="border-top:1px solid #F1F5F9">
-        <td style="padding:7px 9px"><b>${esc(it.name)}</b>${isSi ? `<div style="font-size:10.5px;color:var(--muted)">${_q(it.cases)} ${esc(it.caseUnit || 'thùng')} · khách cần ${_q(demand)}${esc(it.unit || 'kg')}</div>` : ''}</td>
+        <td style="padding:7px 9px"><b>${esc(it.name)}</b>${sub}</td>
         <td style="padding:7px 9px;text-align:right;color:var(--muted)">${_q(ordered)} ${esc(it.unit || 'kg')}</td>
         <td style="padding:7px 9px;text-align:right"><input type="number" data-money="0" class="nh-recv" data-p="${esc(p.id)}" data-i="${i}" value="${ordered}" min="0" step="0.1" style="width:78px;text-align:right;border:1px solid var(--line);border-radius:6px;padding:5px 7px;font-size:13px"></td>
         <td style="padding:7px 9px;text-align:right"><input type="number" data-money="0" class="nh-def" data-p="${esc(p.id)}" data-i="${i}" value="0" min="0" step="0.1" style="width:66px;text-align:right;border:1px solid #FCA5A5;border-radius:6px;padding:5px 7px;font-size:13px"></td>
+        <td style="padding:7px 9px;text-align:center;white-space:nowrap">
+          <button class="btn btn-ghost btn-sm" onclick="window.nhEditItem('${esc(p.id)}',${i})" title="Sửa tên / sản lượng mặt hàng" style="padding:4px 8px">✏️</button>
+          <button class="btn btn-ghost btn-sm" onclick="window.nhDelItem('${esc(p.id)}',${i})" title="Xoá mặt hàng khỏi phiếu" style="padding:4px 8px;color:#DC2626">🗑</button>
+        </td>
       </tr>`;
     }).join('');
   }
 
   function pendingCard(p) {
     const kg = (p.items || []).reduce((s, it) => s + (+it.qty || 0), 0);
+    const empty = !(p.items || []).length;
     return `<div class="card" style="background:#fff;border:1px solid var(--line);border-radius:12px;overflow:hidden;margin-bottom:14px">
       <div style="background:linear-gradient(135deg,#1B5E20,#15803D);color:#fff;padding:11px 14px;display:flex;align-items:center;gap:10px;flex-wrap:wrap">
         <span style="font-size:15px">🏭</span><b style="font-size:14.5px">${esc(supName(p.supplierId))}</b>
         <span style="opacity:.85;font-size:11.5px">${(p.items || []).length} mã · ${_q(kg)}kg đặt · phiếu ${esc(p.id)}</span>
+        <div style="flex:1"></div>
+        <button class="btn btn-sm" onclick="window.nhDelPhieu('${esc(p.id)}')" title="Xoá cả phiếu nhập này (gom sai / ấn nhầm)" style="background:rgba(255,255,255,.15);color:#fff;border:1px solid rgba(255,255,255,.35);padding:4px 10px">🗑 Xoá phiếu</button>
       </div>
       <table style="width:100%;border-collapse:collapse;font-size:12.5px">
         <thead><tr style="background:#F8FAF8;color:var(--muted);font-size:11px;text-transform:uppercase">
           <th style="padding:6px 9px;text-align:left">Mặt hàng</th><th style="padding:6px 9px;text-align:right">Đặt</th>
           <th style="padding:6px 9px;text-align:right">Thực nhận</th><th style="padding:6px 9px;text-align:right">Hàng lỗi</th>
-        </tr></thead><tbody>${itemRows(p)}</tbody>
+          <th style="padding:6px 9px;text-align:center;width:96px">Sửa / Xoá</th>
+        </tr></thead><tbody>${empty ? `<tr><td colspan="5" style="padding:16px;text-align:center;color:var(--muted)">Phiếu trống — bấm “➕ Thêm mặt hàng” hoặc “🗑 Xoá phiếu”.</td></tr>` : itemRows(p)}</tbody>
       </table>
-      <div style="padding:10px 14px;display:flex;justify-content:flex-end;gap:8px;background:#FAFBFC;border-top:1px solid var(--line)">
-        <button class="btn btn-primary" onclick="window.nhReceive('${esc(p.id)}')">✓ Xác nhận đã nhận kho</button>
+      <div style="padding:10px 14px;display:flex;justify-content:space-between;align-items:center;gap:8px;background:#FAFBFC;border-top:1px solid var(--line);flex-wrap:wrap">
+        <button class="btn btn-ghost btn-sm" onclick="window.nhAddItem('${esc(p.id)}')" title="Thêm mặt hàng còn thiếu vào phiếu">➕ Thêm mặt hàng</button>
+        <button class="btn btn-primary" ${empty ? 'disabled style="opacity:.5;cursor:not-allowed"' : ''} onclick="window.nhReceive('${esc(p.id)}')">✓ Xác nhận đã nhận kho</button>
       </div>
     </div>`;
   }
@@ -136,6 +148,85 @@
     S().set('purchases', list);
     if (window.audit) window.audit.log('purchase.wh_undo', 'Hoàn tác nhận kho ' + id);
     window.toast && window.toast('Đã hoàn tác nhận kho', 'info');
+  };
+
+  /* ===== SỬA / THÊM / XOÁ mặt hàng trong phiếu (gom sai sản lượng / thiếu / thừa mã) ===== */
+  const _prodDatalist = () => getProds().filter(x => x && x.name).map(x => `<option value="${esc(x.name)}"></option>`).join('');
+  function _openItemForm(pid, idx) {
+    const p = getPur().find(x => x.id === pid); if (!p) return;
+    const isNew = idx < 0;
+    const it = isNew ? { name: '', qty: 0, unit: 'kg' } : (p.items || [])[idx];
+    if (!it) return;
+    const isSi = it.cases != null;
+    const lbl = 'font-size:12px;color:var(--muted);display:block;margin-bottom:4px';
+    const inp = 'width:100%;box-sizing:border-box;padding:9px 10px;border:1px solid var(--line);border-radius:8px;font-size:14px';
+    window.openModal((isNew ? '➕ Thêm mặt hàng — ' : '✏️ Sửa mặt hàng — ') + esc(pid), `
+      <div style="display:flex;flex-direction:column;gap:13px;max-width:600px">
+        <div>
+          <label style="${lbl}">Tên mặt hàng <span style="color:#94A3B8">(gõ để chọn từ danh sách sản phẩm — link tồn kho đúng)</span></label>
+          <input id="nhfName" list="nhfProds" value="${esc(it.name || '')}" placeholder="VD: Cà chua đại" autocomplete="off" style="${inp}">
+          <datalist id="nhfProds">${_prodDatalist()}</datalist>
+        </div>
+        <div style="display:flex;gap:10px;flex-wrap:wrap">
+          <div style="flex:1;min-width:120px"><label style="${lbl}">Sản lượng đặt</label><input id="nhfQty" type="number" data-money="0" step="0.1" min="0" value="${_q(it.qty || 0)}" style="${inp};text-align:right"></div>
+          <div style="width:120px"><label style="${lbl}">Đơn vị</label><input id="nhfUnit" value="${esc(it.unit || 'kg')}" placeholder="kg" style="${inp}"></div>
+        </div>
+        <div style="display:flex;gap:10px;flex-wrap:wrap">
+          <div style="flex:1;min-width:120px"><label style="${lbl}">Khách cần <span style="color:#94A3B8">(để tính phần dư vào kho)</span></label><input id="nhfDemand" type="number" data-money="0" step="0.1" min="0" value="${_q(it.demandQty != null ? it.demandQty : (it.qty || 0))}" style="${inp};text-align:right"></div>
+          ${isSi ? `<div style="width:120px"><label style="${lbl}">Số ${esc(it.caseUnit || 'thùng')}</label><input id="nhfCases" type="number" data-money="0" step="0.1" min="0" value="${_q(it.cases || 0)}" style="${inp};text-align:right"></div>` : ''}
+        </div>
+        <div style="font-size:11.5px;color:var(--muted);background:#F8FAFC;border-radius:8px;padding:8px 11px">💡 Sửa <b>Sản lượng đặt</b> nếu bên gom hàng nhập nhầm. “Thực nhận” khi bấm nhận kho sẽ mặc định theo số đặt mới.</div>
+      </div>`, {
+      width: '600px',
+      footer: `<button class="btn btn-ghost" onclick="window.closeModal()">Huỷ</button>
+               <button class="btn btn-primary" onclick="window.nhSaveItem('${esc(pid)}',${idx})">${isNew ? '➕ Thêm vào phiếu' : '💾 Lưu'}</button>`
+    });
+  }
+  window.nhEditItem = (pid, idx) => _openItemForm(pid, idx);
+  window.nhAddItem = (pid) => _openItemForm(pid, -1);
+
+  window.nhSaveItem = function (pid, idx) {
+    const list = getPur(); const p = list.find(x => x.id === pid); if (!p) return;
+    if (p.status !== 'ordered') { window.toast && window.toast('Phiếu đã nhận kho — hoàn tác trước khi sửa', 'warn'); return; }
+    const g = id => document.getElementById(id);
+    const name = (g('nhfName') && g('nhfName').value || '').trim();
+    if (!name) { window.toast && window.toast('Nhập tên mặt hàng', 'warn'); return; }
+    const qty = +(g('nhfQty') && g('nhfQty').value) || 0;
+    const unit = ((g('nhfUnit') && g('nhfUnit').value) || 'kg').trim() || 'kg';
+    const demand = g('nhfDemand') ? (+g('nhfDemand').value || 0) : qty;
+    const prod = getProds().find(pp => String(pp.name || '').trim().toLowerCase() === name.toLowerCase());
+    p.items = p.items || [];
+    const it = idx < 0 ? {} : p.items[idx]; if (!it && idx >= 0) return;
+    it.name = name; it.qty = qty; it.unit = unit; it.demandQty = demand;
+    if (g('nhfCases')) it.cases = +g('nhfCases').value || 0;
+    if (prod) it.productId = prod.id;
+    if (it.price != null) it.total = Math.round(qty * (+it.price || 0));
+    if (idx < 0) p.items.push(it);
+    S().set('purchases', list);
+    if (window.audit) window.audit.log('purchase.item_edit', (idx < 0 ? 'Thêm' : 'Sửa') + ' mặt hàng "' + name + '" phiếu ' + pid);
+    window.closeModal && window.closeModal();
+    window.toast && window.toast(idx < 0 ? '✓ Đã thêm mặt hàng' : '✓ Đã sửa mặt hàng', 'success');
+  };
+
+  window.nhDelItem = async function (pid, idx) {
+    const list = getPur(); const p = list.find(x => x.id === pid); if (!p || !(p.items || [])[idx]) return;
+    if (p.status !== 'ordered') { window.toast && window.toast('Phiếu đã nhận kho — hoàn tác trước khi sửa', 'warn'); return; }
+    const nm = p.items[idx].name || 'mặt hàng';
+    if (!(await window.uiConfirm(`Xoá "${nm}" khỏi phiếu ${pid}?`, { title: '🗑 Xoá mặt hàng', okText: 'Xoá', danger: true }))) return;
+    p.items.splice(idx, 1);
+    S().set('purchases', list);
+    if (window.audit) window.audit.log('purchase.item_del', 'Xoá mặt hàng "' + nm + '" phiếu ' + pid);
+    window.toast && window.toast('Đã xoá mặt hàng', 'info');
+  };
+
+  window.nhDelPhieu = async function (pid) {
+    const list = getPur(); const i = list.findIndex(x => x.id === pid); if (i < 0) return;
+    if (list[i].status !== 'ordered') { window.toast && window.toast('Phiếu đã nhận kho — hoàn tác trước khi xoá', 'warn'); return; }
+    if (!(await window.uiConfirm(`Xoá HẲN phiếu nhập ${pid}?\nNCC: ${supName(list[i].supplierId)}\n\nDùng khi gom hàng ấn nhầm / sai NCC. Không ảnh hưởng đơn khách.`, { title: '🗑 Xoá phiếu nhập', okText: 'Xoá phiếu', danger: true }))) return;
+    list.splice(i, 1);
+    S().set('purchases', list);
+    if (window.audit) window.audit.log('purchase.delete', 'Xoá phiếu nhập ' + pid + ' (chưa nhận, từ Nhận hàng NCC)');
+    window.toast && window.toast('Đã xoá phiếu ' + pid, 'info');
   };
 
   window.renderAppShell && window.renderAppShell('nhan-hang', 'Nhận hàng NCC');
