@@ -25,12 +25,17 @@
       const sub = isSi
         ? `<div style="font-size:10.5px;color:var(--muted)">${_q(it.cases)} ${esc(it.caseUnit || 'thùng')} · khách cần ${_q(demand)}${esc(it.unit || 'kg')}</div>`
         : (it.demandQty != null ? `<div style="font-size:10.5px;color:var(--muted)">khách cần ${_q(demand)}${esc(it.unit || 'kg')}</div>` : '');
+      const pidA = esc(p.id);
+      const noteInit = it.defectNote ? esc(it.defectNote) : '';
       return `<tr style="border-top:1px solid #F1F5F9">
         <td style="padding:7px 9px"><b>${esc(it.name)}</b>${sub}</td>
         <td style="padding:7px 9px;text-align:right;color:var(--muted)">${_q(ordered)} ${esc(it.unit || 'kg')}</td>
-        <td style="padding:7px 9px;text-align:right"><input type="number" data-money="0" class="nh-recv" data-p="${esc(p.id)}" data-i="${i}" value="${ordered}" min="0" step="0.1" style="width:78px;text-align:right;border:1px solid var(--line);border-radius:6px;padding:5px 7px;font-size:13px"></td>
-        <td style="padding:7px 9px;text-align:right"><input type="number" data-money="0" class="nh-def" data-p="${esc(p.id)}" data-i="${i}" value="0" min="0" step="0.1" style="width:66px;text-align:right;border:1px solid #FCA5A5;border-radius:6px;padding:5px 7px;font-size:13px"></td>
-        <td style="padding:7px 9px;text-align:center;white-space:nowrap">
+        <td style="padding:7px 9px;text-align:right;vertical-align:top"><input type="number" data-money="0" inputmode="decimal" class="nh-recv" data-p="${pidA}" data-i="${i}" data-ord="${ordered}" value="${_q(ordered)}" min="0" step="0.1" oninput="window.nhRowCalc('${pidA}',${i},'recv')" title="Số hàng TỐT nhận được (Thực nhận + Lỗi = Đặt)" style="width:80px;text-align:right;border:1px solid var(--line);border-radius:6px;padding:6px 7px;font-size:16px"></td>
+        <td style="padding:7px 9px;text-align:right;vertical-align:top">
+          <input type="number" data-money="0" inputmode="decimal" class="nh-def" data-p="${pidA}" data-i="${i}" data-ord="${ordered}" value="" placeholder="0" min="0" step="0.1" oninput="window.nhRowCalc('${pidA}',${i},'def')" style="width:70px;text-align:right;border:1px solid #FCA5A5;border-radius:6px;padding:6px 7px;font-size:16px">
+          <input type="text" class="nh-defnote" data-p="${pidA}" data-i="${i}" value="${noteInit}" placeholder="Lý do lỗi…" style="display:${it.defectNote ? 'block' : 'none'};width:130px;margin-top:5px;border:1px solid #FCA5A5;border-radius:6px;padding:6px 7px;font-size:14px">
+        </td>
+        <td style="padding:7px 9px;text-align:center;white-space:nowrap;vertical-align:top">
           <button class="btn btn-ghost btn-sm" onclick="window.nhEditItem('${esc(p.id)}',${i})" title="Sửa tên / sản lượng mặt hàng" style="padding:4px 8px">✏️</button>
           <button class="btn btn-ghost btn-sm" onclick="window.nhDelItem('${esc(p.id)}',${i})" title="Xoá mặt hàng khỏi phiếu" style="padding:4px 8px;color:#DC2626">🗑</button>
         </td>
@@ -41,7 +46,8 @@
   function pendingCard(p) {
     const kg = (p.items || []).reduce((s, it) => s + (+it.qty || 0), 0);
     const empty = !(p.items || []).length;
-    return `<div class="card" style="background:#fff;border:1px solid var(--line);border-radius:12px;overflow:hidden;margin-bottom:14px">
+    const _srch = esc((supName(p.supplierId) + ' ' + (p.items || []).map(x => x.name || '').join(' ') + ' ' + p.id).toLowerCase());
+    return `<div class="card" data-nhsearch="${_srch}" style="background:#fff;border:1px solid var(--line);border-radius:12px;overflow:hidden;margin-bottom:14px">
       <div style="background:linear-gradient(135deg,#1B5E20,#15803D);color:#fff;padding:11px 14px;display:flex;align-items:center;gap:10px;flex-wrap:wrap">
         <input type="checkbox" class="nh-selphieu" data-pid="${esc(p.id)}" onclick="window.nhToggleSel('${esc(p.id)}',this.checked)" ${_sel.has(p.id) ? 'checked' : ''} title="Chọn phiếu để nhận / xoá hàng loạt" style="width:18px;height:18px;cursor:pointer;accent-color:#E8A33D">
         <span style="font-size:15px">🏭</span><b style="font-size:14.5px">${esc(supName(p.supplierId))}</b>
@@ -67,7 +73,8 @@
     const surplus = (p.items || []).reduce((s, it) => s + (+it.stockedQty || 0), 0);
     const defect = (p.items || []).reduce((s, it) => s + (+it.defectQty || 0), 0);
     const recv = (p.items || []).reduce((s, it) => s + (+it.recvQty || 0), 0);
-    return `<tr style="border-top:1px solid #F1F5F9">
+    const _srch = esc((supName(p.supplierId) + ' ' + (p.items || []).map(x => x.name || '').join(' ') + ' ' + p.id).toLowerCase());
+    return `<tr data-nhsearch="${_srch}" style="border-top:1px solid #F1F5F9">
       <td style="padding:8px 10px"><b>${esc(supName(p.supplierId))}</b><div style="font-size:10.5px;color:var(--muted)">${esc(p.id)}${p.whBy ? ' · ' + esc(p.whBy) : ''}${p.whReceivedAt ? ' · ' + esc(p.whReceivedAt) : ''}</div></td>
       <td style="padding:8px 10px;text-align:right">${_q(recv)}</td>
       <td style="padding:8px 10px;text-align:right;color:${defect ? '#B45309' : 'var(--muted)'}">${defect ? _q(defect) : '·'}</td>
@@ -88,6 +95,7 @@
     let html = '';
     html += `<div style="background:#EFF6FF;border:1px solid #BFDBFE;border-radius:10px;padding:11px 14px;font-size:12.5px;color:#1E40AF;margin-bottom:16px">
       📦 <b>Kho chỉ xác nhận số lượng thực nhận & hàng lỗi.</b> Phần dư tự vào tồn kho. Giá & công nợ do <b>Kế toán</b> chốt sau (Tài chính → Phiếu nhập).</div>`;
+    html += `<input id="nhSearchInp" value="${esc(_searchVal)}" oninput="window.nhSearch(this.value)" placeholder="🔍 Tìm nhà cung cấp hoặc mặt hàng để xác nhận…" style="width:100%;box-sizing:border-box;border:1px solid var(--line);border-radius:8px;padding:10px 12px;font-size:16px;margin-bottom:12px">`;
     html += `<div style="display:flex;align-items:center;gap:12px;flex-wrap:wrap;margin:0 0 10px;position:sticky;top:0;background:var(--bg,#F7F8F7);z-index:5;padding:4px 0">
         <div style="font-weight:800;color:#1B5E20;font-size:13px">⏳ Chờ nhận kho (${pending.length})</div>
         ${pending.length ? `<label style="font-size:12.5px;color:var(--muted);display:flex;align-items:center;gap:6px;cursor:pointer"><input type="checkbox" id="nhSelAll" onclick="window.nhToggleAll(this.checked)" ${selCount && selCount === pending.length ? 'checked' : ''} style="width:16px;height:16px;cursor:pointer;accent-color:#E8A33D">Chọn tất cả</label>` : ''}
@@ -111,6 +119,7 @@
         </table></div>`;
     }
     host.innerHTML = html;
+    _applyFilter();   /* giữ bộ lọc tìm kiếm sau mỗi lần vẽ lại */
   }
 
   /* ===== Kho xác nhận nhận hàng: cập nhật TỒN KHO (phần dư) + lưu SL/lỗi, KHÔNG chốt công nợ =====
@@ -122,15 +131,20 @@
     (p.items || []).forEach((it, idx) => {
       const recvEl = document.querySelector('.nh-recv[data-p="' + pid + '"][data-i="' + idx + '"]');
       const defEl = document.querySelector('.nh-def[data-p="' + pid + '"][data-i="' + idx + '"]');
+      const noteEl = document.querySelector('.nh-defnote[data-p="' + pid + '"][data-i="' + idx + '"]');
       const ordered = +it.qty || 0;
-      const recv = recvEl ? (+recvEl.value || 0) : ordered;
-      const defect = Math.min(Math.max(0, defEl ? (+defEl.value || 0) : 0), recv);
-      const good = Math.max(0, recv - defect);
+      /* Ô "Thực nhận" = hàng TỐT dùng được; "Lỗi" tách riêng. Lưu recvQty = TỔNG (tốt+lỗi) để giữ
+         nguyên math chốt công nợ (good = recvQty − defect). */
+      const recvGood = recvEl ? (+recvEl.value || 0) : ordered;
+      const defect = Math.max(0, defEl ? (+defEl.value || 0) : 0);
+      const good = recvGood;
+      const recvTotal = Math.round((recvGood + defect) * 100) / 100;
       const demand = it.demandQty != null ? +it.demandQty : ordered;
       /* Tồn kho cloud là numeric → giữ kg lẻ (2 số thập phân). stockedQty = số đã cộng kho (dùng để
          trừ lại khi hoàn tác) → khớp với cái đã invApply. */
       const surplus = Math.max(0, Math.round((good - demand) * 100) / 100);
-      it.recvQty = recv; it.defectQty = defect; it.goodQty = good; it.stockedQty = surplus;
+      it.recvQty = recvTotal; it.defectQty = defect; it.goodQty = good; it.stockedQty = surplus;
+      it.defectNote = (defect > 0 && noteEl) ? (noteEl.value || '').trim() : '';
       surplusTot += surplus; defTot += defect;
       /* phiếu gom = giao thẳng khách phần "demand"; chỉ phần DƯ vào kho */
       if (surplus > 0 && it.productId) {
@@ -166,6 +180,35 @@
     document.querySelectorAll('.nh-selphieu').forEach(cb => { cb.checked = on; const id = cb.dataset.pid; if (on) _sel.add(id); else _sel.delete(id); });
     _syncBulkBar();
   };
+
+  /* Auto-nhảy: Thực nhận (tốt) + Lỗi = Đặt. Sửa 1 ô → ô kia tự tính. Lỗi > 0 → hiện ô lý do. */
+  window.nhRowCalc = function (pid, i, src) {
+    const pe = String(pid).replace(/"/g, '\\"');
+    const recvEl = document.querySelector('.nh-recv[data-p="' + pe + '"][data-i="' + i + '"]');
+    const defEl = document.querySelector('.nh-def[data-p="' + pe + '"][data-i="' + i + '"]');
+    const noteEl = document.querySelector('.nh-defnote[data-p="' + pe + '"][data-i="' + i + '"]');
+    if (!recvEl || !defEl) return;
+    const ord = +recvEl.getAttribute('data-ord') || 0;
+    if (src === 'def') {
+      const d = Math.max(0, +defEl.value || 0);
+      recvEl.value = _q(Math.max(0, Math.round((ord - d) * 100) / 100));
+    } else {
+      const r = Math.max(0, +recvEl.value || 0);
+      defEl.value = r >= ord ? '' : _q(Math.round((ord - r) * 100) / 100);
+    }
+    if (noteEl) noteEl.style.display = (+defEl.value || 0) > 0 ? 'block' : 'none';
+  };
+
+  /* Tìm kiếm NCC / mặt hàng — ẩn/hiện thẻ & dòng theo data-nhsearch (KHÔNG render lại → không mất số đã gõ) */
+  let _searchVal = '';
+  window.nhSearch = function (v) { _searchVal = v || ''; _applyFilter(); };
+  function _applyFilter() {
+    const q = _searchVal.trim().toLowerCase();
+    document.querySelectorAll('[data-nhsearch]').forEach(el => {
+      const t = el.getAttribute('data-nhsearch') || '';
+      el.style.display = (!q || t.indexOf(q) >= 0) ? '' : 'none';
+    });
+  }
 
   const _selectedPendingIds = () => getPur().filter(p => _isGom(p) && p.status === 'ordered' && _sel.has(p.id)).map(p => p.id);
 
