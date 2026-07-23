@@ -59,6 +59,7 @@
   window.hubTab = function (which) {
     document.querySelectorAll('.t2').forEach(t => t.classList.toggle('active', t.dataset.h === which));
     document.getElementById('hubFrame').src = which + '.html?embed=1';
+    try { var u = new URL(location.href); u.searchParams.set('tab', which); history.replaceState(null, '', u.pathname + u.search); } catch (e) {}
   };
   /* badge đơn web */
   (function () {

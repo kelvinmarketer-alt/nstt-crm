@@ -273,11 +273,13 @@
       return `<tr><td class="c">${i + 1}</td><td class="c">${escH(p.date)}</td><td>${escH(p.id)}</td><td>${escH(inv[p.id] || '')}</td><td class="r">${f(nh)}</td><td class="r">${f(tr)}</td><td class="r">${f(nh - tr)}</td></tr>`;
     }).join('');
     const tT = Math.min(paidPeriod, tN);
-    /* Đối chiếu gửi NCC: KHÔNG trừ trả hàng (đó là hạch toán nội bộ mình xem). Còn nợ = nhập − đã chi. */
-    const conNo = _supRemainExt(id);
+    /* Đối chiếu: trừ trả hàng (việc NCC cho trả đã chốt ở phiếu trả hàng) → còn nợ = nhập − đã chi − trả hàng.
+       Hiện 1 dòng TỔNG trừ trả hàng (không liệt kê từng khoản — chi tiết ở popup ngày). */
+    const claimTot = _supClaims(id);
+    const conNo = _supRemainAll(id);
     const txt = `ĐỐI CHIẾU CÔNG NỢ NHÀ CUNG CẤP\n${s.name}\nKỳ: ${ddmm(fromISO)} → ${ddmm(toISO)}\n──────────\n`
       + (phieu.length ? phieu.map((p, i) => `${i + 1}. ${p.date} · ${p.id}: nhập ${f(p.total)}`).join('\n') : '(không có phiếu trong kỳ)')
-      + `\n──────────\nTổng nhập kỳ: ${f(tN)}đ · Đã trả (tiền mặt): ${f(tT)}đ · CÒN NỢ HIỆN TẠI: ${f(conNo)}đ\n— ${comp.name}`;
+      + `\n──────────\nTổng nhập kỳ: ${f(tN)}đ · Đã trả (tiền mặt): ${f(tT)}đ${claimTot ? ` · Trừ trả hàng: ${f(claimTot)}đ` : ''} · CÒN NỢ HIỆN TẠI: ${f(conNo)}đ\n— ${comp.name}`;
     const html = `<!doctype html><html lang="vi"><head><meta charset="utf-8"><title>Đối chiếu công nợ - ${escH(s.name)}</title><style>
       *{box-sizing:border-box}body{font-family:'Segoe UI',Arial,sans-serif;margin:0;padding:18px;color:#1a1a1a}.pg{max-width:820px;margin:0 auto}
       .hd{border-bottom:2px solid #1B5E20;padding-bottom:8px;margin-bottom:6px}.hd b{font-size:15px;color:#1B5E20}
@@ -293,6 +295,7 @@
         <table><thead><tr><th>STT</th><th>Ngày</th><th>Số phiếu</th><th>Số HĐ</th><th>Tiền nhập</th><th>Đã trả</th><th>Còn nợ</th></tr></thead>
           <tbody>${rowsHtml || '<tr><td colspan="7" class="c">Không có phiếu trong kỳ</td></tr>'}</tbody>
           <tfoot><tr class="grand"><td colspan="4" class="r">TỔNG NHẬP KỲ</td><td class="r">${f(tN)}</td><td class="r">${f(tT)}</td><td class="r">${f(tN - tT)}</td></tr>
+            ${claimTot ? `<tr class="grand"><td colspan="6" class="r">TRỪ TRẢ HÀNG (NCC nhận lại hàng lỗi)</td><td class="r" style="color:#B45309">−${f(claimTot)}</td></tr>` : ''}
             <tr class="grand"><td colspan="6" class="r">CÔNG NỢ PHẢI TRẢ HIỆN TẠI</td><td class="r">${f(conNo)}</td></tr></tfoot></table>
         <p style="font-size:12px;margin-top:10px">Kính đề nghị Quý nhà cung cấp đối chiếu &amp; xác nhận công nợ kỳ trên. Trân trọng cảm ơn!</p></div>
       <script>function cp(){navigator.clipboard.writeText(${JSON.stringify(txt).replace(/<\//g, '<\\/')}).then(function(){alert('Đã copy nội dung đối chiếu')}).catch(function(){})}<\/script></body></html>`;

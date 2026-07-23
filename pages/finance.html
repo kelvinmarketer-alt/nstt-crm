@@ -60,6 +60,8 @@
     var src = (FIN_FILE[which] || which) + '.html?embed=1';
     if (extraQS) src += '&' + extraQS;
     document.getElementById('finFrame').src = src;
+    /* Ghi tab vào URL để F5 / Ctrl+Shift+R giữ nguyên tab đang xem (không về mặc định) */
+    try { var u = new URL(location.href); u.searchParams.set('tab', which); history.replaceState(null, '', u.pathname + u.search); } catch (e) {}
   };
   /* tab mặc định (đọc ?tab= nếu có) + truyền createForSup sang Phiếu nhập */
   (function () {
