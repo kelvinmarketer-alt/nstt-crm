@@ -256,19 +256,42 @@
     const caseLab = { onsite: 'TH1 · Đồng kiểm tại chỗ', later: 'TH2 · Trả sau (trong ngày)' };
     const its = (Array.isArray(r.items) && r.items.length)
       ? r.items
-      : (r.item ? [{ name: r.item.name, unit: r.item.unit, qty: r.qtyReturn, total: r.refundTotal, cond: r.disposition === 'restock' ? 'good' : 'bad', supplierName: r.supplierName, buyTotal: r.supClaimAmount, note: r.note }] : []);
+      : (r.item ? [{ name: r.item.name, unit: r.item.unit, qty: r.qtyReturn, total: r.refundTotal, cond: r.disposition === 'restock' ? 'good' : 'bad', supplierName: r.supplierName, buyTotal: r.supClaimAmount, restock: r.disposition === 'restock', note: r.note }] : []);
     const pods = ((window.STORE.get('pod_photos', {}) || {})[r.orderCode]) || [];
+    /* Hàng hoàn TỪNG mặt đi về đâu: nhập lại kho / trả NCC / vứt bỏ */
+    const _dest = x => {
+      const good = (x.restock === true) || ((x.cond || 'bad') === 'good');
+      if (good) return '<span style="color:#15803D;font-weight:600">🏬 Nhập lại kho (bán tiếp)</span>';
+      if ((x.nccReturnable !== false) && x.supplierName && (+x.buyTotal > 0)) return '<span style="color:#B45309;font-weight:600">🏭 Trả về NCC</span>';
+      return '<span style="color:#B91C1C;font-weight:600">🗑 Vứt bỏ (hao hụt)</span>';
+    };
     const rowsHtml = its.length ? its.map(x => `<tr style="border-top:1px solid #F1F5F9">
         <td style="padding:6px 8px">${_esc0(x.name)}${x.note ? `<div style="font-size:10.5px;color:var(--muted)">📝 ${_esc0(x.note)}</div>` : ''}</td>
         <td style="padding:6px 8px;text-align:right;white-space:nowrap">${x.qty || 0}${x.unit || 'kg'}</td>
-        <td style="padding:6px 8px;white-space:nowrap">${(x.cond || 'bad') === 'good' ? '🏬 đẹp → nhập kho' : '🗑 xấu → trả NCC'}</td>
+        <td style="padding:6px 8px;white-space:nowrap">${_dest(x)}</td>
         <td style="padding:6px 8px;text-align:right;white-space:nowrap">${window.fmt(+x.total || 0)}₫</td>
-        <td style="padding:6px 8px;font-size:11.5px">${x.supplierName ? ('🏭 ' + _esc0(x.supplierName) + ((+x.buyTotal) ? ' · ' + window.fmt(+x.buyTotal) + '₫' : '')) : ''}</td>
+        <td style="padding:6px 8px;font-size:11.5px">${x.supplierName ? ('🏭 ' + _esc0(x.supplierName) + ((+x.buyTotal) ? ' · ' + window.fmt(+x.buyTotal) + '₫' : '')) : '<span style="color:var(--muted)">—</span>'}</td>
       </tr>`).join('') : '<tr><td colspan="5" style="padding:8px;color:var(--muted)">(toàn bộ đơn)</td></tr>';
-    const money = (r.resolution && r.resolution.startsWith('replace'))
-      ? `🔄 Bù hàng${r.replacementCode ? ' · đơn bù <b>' + _esc0(r.replacementCode) + '</b>' : ''}`
-      : `<b style="color:#DC2626">${window.fmt(r.refundTotal)}₫</b> · ${r.refundMode === 'cash' ? 'chi tiền mặt' : 'trừ công nợ'}`;
+    const isReplace = r.resolution && r.resolution.startsWith('replace');
+    const cash = r.refundMode === 'cash';
+    /* Ảnh hưởng công nợ — tách rõ KHÁCH (giá bán hàng trả) vs NCC (giá nhập hàng xấu NCC cho trả) */
+    const custReduce = its.reduce((s, x) => s + (+x.total || 0), 0) || (+r.refundTotal || 0);
+    const nccReduce = its.reduce((s, x) => s + (((x.cond || 'bad') === 'bad' && x.nccReturnable !== false && (+x.buyTotal > 0)) ? (+x.buyTotal || 0) : 0), 0) || (r.fault === 'supplier' ? (+r.supClaimAmount || 0) : 0);
     const info = (lb, v) => `<div style="display:flex;gap:8px;padding:4px 0;font-size:12.5px"><span style="color:var(--muted);min-width:120px">${lb}</span><span style="flex:1;color:var(--text)">${v}</span></div>`;
+    const debtBox = isReplace
+      ? `<div style="background:#EFF6FF;border:1px solid #BFDBFE;border-radius:8px;padding:10px 12px;margin:4px 0 6px;font-size:12.5px;color:#1E40AF">🔄 <b>Bù hàng</b> — KHÔNG trừ tiền khách, KHÔNG đổi công nợ${r.replacementCode ? ' · đơn bù <b>' + _esc0(r.replacementCode) + '</b>' : ''}</div>`
+      : `<div style="background:#F0FDF4;border:1px solid #BBF7D0;border-radius:8px;padding:10px 12px;margin:4px 0 6px">
+          <div style="font-size:11px;color:var(--muted);text-transform:uppercase;font-weight:700;margin-bottom:7px">💰 Ảnh hưởng công nợ — trừ của ai?</div>
+          <div style="display:flex;justify-content:space-between;align-items:center;font-size:13px;margin-bottom:4px">
+            <span>${cash ? '💵 Chi tiền mặt hoàn' : '➖ Giảm công nợ'} <b>KHÁCH</b> <span style="color:var(--muted);font-size:11.5px">· ${_esc0(r.custName || '')} · giá bán</span></span>
+            <b style="color:#DC2626;white-space:nowrap">${cash ? '' : '−'}${window.fmt(custReduce)}₫</b>
+          </div>
+          <div style="display:flex;justify-content:space-between;align-items:center;font-size:13px">
+            <span>🏭 Giảm công nợ <b>NCC</b> <span style="color:var(--muted);font-size:11.5px">· giá nhập</span></span>
+            <b style="color:${nccReduce > 0 ? '#B45309' : 'var(--muted)'};white-space:nowrap">${nccReduce > 0 ? '−' + window.fmt(nccReduce) + '₫' : '0₫ — không trừ'}</b>
+          </div>
+          ${nccReduce > 0 ? '' : '<div style="font-size:10.5px;color:var(--muted);margin-top:5px">Không trừ NCC vì: hàng đẹp/lưu kho bán tiếp · hoặc NCC không cho trả · hoặc chưa gán NCC lúc duyệt.</div>'}
+        </div>`;
     window.openModal('↩️ Chi tiết phiếu trả — ' + _esc0(r.id), `
       <div style="display:flex;align-items:center;gap:8px;margin-bottom:8px">
         <span style="background:${stClr[r.status]}1f;color:${stClr[r.status]};padding:3px 10px;border-radius:99px;font-size:12px;font-weight:700">${stLab[r.status] || r.status}</span>
@@ -276,18 +299,19 @@
       </div>
       ${info('Khách hàng', '<b>' + _esc0(r.custName || '') + '</b>')}
       ${info('Ngày lập', _esc0(r.date || ''))}
-      ${info('Trường hợp', caseLab[r.caseType] || '—')}
+      ${r.caseType ? info('Trường hợp', caseLab[r.caseType] || '—') : ''}
       ${info('Lý do', _esc0(r.reason || ''))}
       ${info('Cách xử lý', resLab[r.resolution] || '—')}
       ${info('Lỗi do', faultLab[r.fault] || '—')}
-      ${info('Giá trị', money)}
       ${r.note ? info('Ghi chú', _esc0(r.note)) : ''}
       ${r.handledBy ? info('Người lập', _esc0(r.handledBy)) : ''}
-      <table style="width:100%;border-collapse:collapse;font-size:12.5px;border:1px solid var(--line);border-radius:8px;overflow:hidden;margin:10px 0">
+      <div style="font-size:11px;color:var(--muted);text-transform:uppercase;font-weight:700;margin:12px 0 4px">📦 Hàng trả & nơi hoàn về</div>
+      <table style="width:100%;border-collapse:collapse;font-size:12.5px;border:1px solid var(--line);border-radius:8px;overflow:hidden;margin:0 0 4px">
         <thead><tr style="background:#F8FAF8;color:var(--muted);font-size:11px;text-transform:uppercase">
-          <th style="padding:6px 8px;text-align:left">Mặt hàng</th><th style="padding:6px 8px;text-align:right">SL trả</th><th style="padding:6px 8px;text-align:left">Xử lý</th><th style="padding:6px 8px;text-align:right">Tiền bán</th><th style="padding:6px 8px;text-align:left">NCC</th>
+          <th style="padding:6px 8px;text-align:left">Mặt hàng</th><th style="padding:6px 8px;text-align:right">SL trả</th><th style="padding:6px 8px;text-align:left">Hàng hoàn về</th><th style="padding:6px 8px;text-align:right">Tiền bán</th><th style="padding:6px 8px;text-align:left">NCC (giá nhập)</th>
         </tr></thead><tbody>${rowsHtml}</tbody>
       </table>
+      ${debtBox}
       ${pods.length ? `<div><div style="font-size:11px;color:var(--muted);text-transform:uppercase;margin-bottom:4px">📷 Ảnh giao hàng — đối chứng (${pods.length})</div><div style="display:flex;gap:6px;flex-wrap:wrap">${pods.map(p => `<img src="${p.dataURL}" style="width:64px;height:64px;object-fit:cover;border-radius:6px;border:1px solid var(--line);cursor:pointer" onclick="window.openImgPreview(this.src)">`).join('')}</div></div>` : ''}
     `, {
       width: '560px',
