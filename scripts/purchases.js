@@ -314,6 +314,17 @@
       : '✓ Đã nhận hàng' + (willStock ? ', cộng kho' : '') + ' + cập nhật giá nhập', 'success');
   };
 
+  /* Ngày phiếu (dd/mm/yyyy) → ISO, để tra giá vốn theo ĐÚNG ngày nhập. */
+  function _pnDateISO(p) { const m = String(p && p.date || '').match(/(\d{1,2})\/(\d{1,2})\/(\d{4})/); return m ? `${m[3]}-${String(m[2]).padStart(2, '0')}-${String(m[1]).padStart(2, '0')}` : window.todayISO(); }
+  /* Giá NHẬP có hiệu lực vào 1 ngày = mốc giá GẦN NHẤT ≤ ngày đó trong lịch sử giá SP (carry-forward).
+     → Chốt công nợ NCC lấy đúng giá của thời điểm nhập, dù hôm nay giá đã đổi. */
+  function _buyPriceOn(productId, dateISO) {
+    if (!productId) return 0;
+    const pr = getProds().find(x => x.id === productId); if (!pr || !Array.isArray(pr.priceHistory)) return 0;
+    let best = null; pr.priceHistory.forEach(h => { if (h && h.date && h.date <= dateISO && (!best || h.date > best.date)) best = h; });
+    return best ? (+best.buy || 0) : 0;
+  }
+
   /* ===== KẾ TOÁN — CHỐT CÔNG NỢ cho phiếu gom NCC =====
      Kế toán được chốt TRỰC TIẾP dù kho CHƯA nhận (status 'ordered') HAY kho đã nhận ('wh_received').
      - Từ 'ordered' (kho chưa nhập): kế toán tự nhập Thực nhận + Lỗi (sửa được) và HỆ cộng phần dư vào tồn kho.
@@ -326,6 +337,7 @@
     }
     const p = getPur().find(x => x.id === id); if (!p || (p.status !== 'wh_received' && p.status !== 'ordered')) return;
     const fromWh = p.status === 'wh_received';   /* kho đã nhập SL/lỗi + cộng tồn → khoá cột, không cộng lại kho */
+    const _dISO = _pnDateISO(p);   /* ngày nhập → tra giá vốn của ĐÚNG ngày đó */
     const sup = findSup(p.supplierId) || {};
     const canRetDefault = p.canReturn != null ? !!p.canReturn : _canReturnOf(p.supplierId);
     const inS = 'text-align:right;border:1px solid var(--line);border-radius:5px;padding:4px 6px';
@@ -350,7 +362,7 @@
           </select>
           <div class="stl-rethint" data-i="${i}" style="font-size:10px;color:var(--muted);margin-top:2px"></div>
         </td>
-        <td style="padding:7px 10px;text-align:right"><input type="number" data-money="0" class="stl-price" data-i="${i}" value="${+it.price || ''}" min="0" step="1000" placeholder="giá" oninput="window._settleRecalc('${id}')" style="width:110px;${inS};border-color:#F59E0B;background:#FFFBEB"></td>
+        <td style="padding:7px 10px;text-align:right"><input type="number" data-money="0" class="stl-price" data-i="${i}" value="${+it.price || _buyPriceOn(it.productId, _dISO) || ''}" min="0" step="1000" placeholder="giá" title="Tự lấy giá nhập của ngày ${_dISO.split('-').reverse().join('/')} từ lịch sử giá SP — sửa lại được" oninput="window._settleRecalc('${id}')" style="width:110px;${inS};border-color:#F59E0B;background:#FFFBEB"></td>
         <td class="stl-tot" data-i="${i}" style="padding:7px 10px;text-align:right;font-weight:700">0</td>
       </tr>`;
     }).join('');

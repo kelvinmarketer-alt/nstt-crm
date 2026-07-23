@@ -1009,7 +1009,7 @@
     const m = (cur.sell || 0) - (cur.buy || 0);
     const mc = document.querySelector(`.cat-margin[data-id="${id}"]`);
     if (mc) { mc.textContent = window.fmt(m); mc.style.color = m > 0 ? 'var(--ok)' : 'var(--muted)'; }
-    window.toast('✓ Đã lưu giá: ' + p.name, 'success');
+    window.toast('✓ Đã ghi ' + (field === 'buy' ? 'giá nhập' : 'giá bán') + ' ' + p.name + ' vào lịch sử ngày ' + fmtD(today), 'success');
   }
 
   /* ====== Cập nhật giá bán HÀNG LOẠT — CÓ DUYỆT (khớp → soi/sửa → áp) ======
