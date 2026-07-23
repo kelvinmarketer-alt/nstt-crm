@@ -1420,12 +1420,39 @@ tbody tr:nth-child(even){background:#F4FAF2}tfoot td{background:#E8F5E9;font-wei
   };
 
   /* ============ ③ XUẤT KHO → SHIP ============ */
+  const _relSel = new Set();   /* mã đơn đang chọn ở ③ Xuất kho để giao/ xoá hàng loạt */
+  function _syncRelBar() {
+    const bar = document.getElementById('pcRelBulk');
+    if (bar) { bar.style.display = _relSel.size ? 'flex' : 'none'; const c = bar.querySelector('[data-relcount]'); if (c) c.textContent = _relSel.size; }
+    const all = document.getElementById('pcRelSelAll');
+    const total = document.querySelectorAll('.pc-rel-sel').length;
+    if (all) all.checked = total > 0 && _relSel.size === total;
+  }
+  window.pcRelToggleSel = function (code, on) { if (on) _relSel.add(code); else _relSel.delete(code); _syncRelBar(); };
+  window.pcRelToggleAll = function (on) {
+    document.querySelectorAll('.pc-rel-sel').forEach(cb => { cb.checked = on; const c = cb.dataset.code; if (on) _relSel.add(c); else _relSel.delete(c); });
+    _syncRelBar();
+  };
+
   function renderRelease() {
     const host = document.getElementById('pcRelease');
     /* đơn đã chốt hàng (confirmed) chờ xuất kho */
     const orders = getOrders().filter(o => o.whStatus === 'confirmed' && o.status !== 'cancelled');
+    /* dọn selection: chỉ giữ mã còn trong danh sách */
+    const codeSet = new Set(orders.map(o => o.code));
+    Array.from(_relSel).forEach(c => { if (!codeSet.has(c)) _relSel.delete(c); });
     if (!orders.length) { host.innerHTML = `<div style="background:#fff;border:1px solid var(--line);border-radius:10px;padding:40px;text-align:center;color:var(--muted)">Chưa có đơn nào đã chốt hàng. Hoàn tất xác nhận NCC ở tab ② trước.</div>`; return; }
-    host.innerHTML = `<div style="font-size:12.5px;color:var(--muted);margin-bottom:10px">Đơn đã chốt sản lượng — tạo phiếu xuất kho (có ca/giờ giao) rồi giao shipper.</div>` +
+    const sel = _relSel.size;
+    host.innerHTML = `<div style="display:flex;align-items:center;gap:12px;flex-wrap:wrap;margin-bottom:10px;position:sticky;top:0;background:var(--bg,#F5F6F8);z-index:5;padding:4px 0">
+        <div style="font-size:12.5px;color:var(--muted)">Đơn đã chốt sản lượng — chọn để <b>giao shipper hàng loạt</b>, hoặc làm từng đơn.</div>
+        <label style="font-size:12.5px;color:var(--muted);display:flex;align-items:center;gap:6px;cursor:pointer"><input type="checkbox" id="pcRelSelAll" onclick="window.pcRelToggleAll(this.checked)" ${sel && sel === orders.length ? 'checked' : ''} style="width:16px;height:16px;cursor:pointer;accent-color:#E8A33D">Chọn tất cả</label>
+        <div style="flex:1"></div>
+        <div id="pcRelBulk" style="display:${sel ? 'flex' : 'none'};gap:8px;align-items:center;flex-wrap:wrap">
+          <span style="font-size:12.5px;color:var(--muted)">Đã chọn <b data-relcount>${sel}</b> đơn</span>
+          <button class="btn btn-primary btn-sm" onclick="window.pcDispatchBulk()">🛵 Giao shipper hàng loạt</button>
+          <button class="btn btn-ghost btn-sm" style="color:var(--danger)" onclick="window.pcDelBulk()">🗑 Xoá</button>
+        </div>
+      </div>` +
       orders.map(o => {
         /* Danh sách đơn không kéo items → kg từ `weight`, mã từ `goods` (đơn đã chốt) */
         const hasItems = Array.isArray(o.items) && o.items.length;
@@ -1434,6 +1461,7 @@ tbody tr:nth-child(even){background:#F4FAF2}tfoot td{background:#E8F5E9;font-wei
         const hasShort = o.shortages && o.shortages.length;
         return `<div class="run-card" style="cursor:default">
           <div style="display:flex;align-items:center;gap:10px;flex-wrap:wrap">
+            <input type="checkbox" class="pc-rel-sel" data-code="${esc(o.code)}" onclick="window.pcRelToggleSel('${esc(o.code)}',this.checked)" ${_relSel.has(o.code) ? 'checked' : ''} title="Chọn để giao/xoá hàng loạt" style="width:17px;height:17px;cursor:pointer;accent-color:#E8A33D">
             <div style="font-weight:800;color:var(--navy)">${o.code}</div>
             <span style="font-size:12.5px;color:var(--muted)">${esc(o.custName || '')}</span>
             ${o.shipShift ? `<span class="tag" style="background:#FEF3C7;color:#92400E">Ca ${esc(o.shipShift)}${o.shipTime ? ' · ' + esc(o.shipTime) : ''}</span>` : ''}
@@ -1455,11 +1483,20 @@ tbody tr:nth-child(even){background:#F4FAF2}tfoot td{background:#E8F5E9;font-wei
     window.location.href = 'orders.html?open=' + encodeURIComponent(code);
   };
   /* Xoá hẳn đơn nhập sai — gỡ khỏi mọi phiên gom + xoá khỏi store */
-  window.pcDeleteOrder = function (code) {
+  window.pcDeleteOrder = async function (code) {
     const o = getOrders().find(x => x.code === code); if (!o) return;
-    if (!confirm(`Xoá HẲN đơn ${code}${o.custName ? ' — ' + o.custName : ''}?\nKhông khôi phục được. Dùng khi đơn nhập sai.`)) return;
+    if (!(await window.uiConfirm(`Xoá HẲN đơn ${code}${o.custName ? ' — ' + o.custName : ''}?\nKhông khôi phục được. Dùng khi đơn nhập sai.`, { title: '🗑 Xoá đơn', okText: 'Xoá đơn', danger: true }))) return;
     /* gỡ đơn khỏi các phiên gom (orderCodes + breakdown + tính lại totalQty) */
-    const runs = getRuns(); let rch = false;
+    const runs = getRuns();
+    if (_detachOrderFromRuns(runs, code)) saveRuns(runs);
+    window.STORE.remove('orders', code);
+    window.toast?.('🗑 Đã xoá đơn ' + code, 'danger');
+    renderAll();
+  };
+
+  /* Gỡ 1 đơn khỏi các phiên gom (dùng chung cho xoá lẻ + xoá hàng loạt) */
+  function _detachOrderFromRuns(runs, code) {
+    let rch = false;
     runs.forEach(r => {
       if (Array.isArray(r.orderCodes) && r.orderCodes.includes(code)) {
         r.orderCodes = r.orderCodes.filter(c => c !== code);
@@ -1473,9 +1510,70 @@ tbody tr:nth-child(even){background:#F4FAF2}tfoot td{background:#E8F5E9;font-wei
         rch = true;
       }
     });
+    return rch;
+  }
+
+  /* ===== GIAO SHIPPER HÀNG LOẠT (③ Xuất kho) ===== */
+  window.pcDispatchBulk = function () {
+    const codes = Array.from(_relSel);
+    if (!codes.length) { window.toast?.('Chưa chọn đơn nào', 'warn'); return; }
+    const list = _shipperList();
+    const opts = list.map(s => `<option value="${esc(s.id)}">${esc(s.name)}${s.guest ? ' (ngoài)' : ''}</option>`).join('');
+    const noShip = list.length ? '' : '<div style="font-size:11.5px;color:#B45309;margin-top:6px">⚠ Chưa có shipper — thêm NV vị trí <b>Ship</b> ở Nhân sự.</div>';
+    window.openModal('🛵 Giao shipper hàng loạt — ' + codes.length + ' đơn', `
+      <div style="font-size:13px;color:#334155;margin-bottom:14px">Áp cho <b>${codes.length} đơn</b> đã chọn.</div>
+      <div style="display:flex;flex-direction:column;gap:12px">
+        <div style="border:1.5px solid var(--line);border-radius:11px;padding:13px">
+          <div style="font-weight:800;color:var(--navy);margin-bottom:9px">① Gán 1 shipper cho tất cả</div>
+          <select id="pcBulkShipSel" style="width:100%;box-sizing:border-box;padding:10px;border:1px solid var(--line);border-radius:8px;font-size:14px">
+            <option value="">— Chọn shipper —</option>${opts}
+          </select>${noShip}
+          <button class="btn btn-primary" style="margin-top:11px;width:100%" onclick="window._pcDispatchBulkTo()">🛵 Giao ${codes.length} đơn cho shipper đã chọn</button>
+        </div>
+        <div style="border:1.5px dashed var(--line);border-radius:11px;padding:13px;background:#FAFBFA">
+          <div style="font-weight:800;color:var(--navy);margin-bottom:6px">② Đưa tất cả lên bảng — shipper tự nhận</div>
+          <div style="font-size:12px;color:var(--muted);margin-bottom:11px">${codes.length} đơn hiện ở Bảng giao hàng cho mọi shipper tự nhận.</div>
+          <button class="btn btn-navy" style="width:100%" onclick="window._pcDispatchBulkOpen()">📋 Đưa ${codes.length} đơn lên bảng</button>
+        </div>
+      </div>
+    `, { width: '460px' });
+  };
+  function _pcDispatchMany(codes, driverId, driverName) {
+    const orders = getOrders();
+    const done = [];
+    codes.forEach(code => {
+      const o = orders.find(x => x.code === code);
+      if (!o || o.whStatus !== 'confirmed' || o.status === 'cancelled') return;
+      o.whStatus = 'released'; o.status = 'transit'; o.transitAt = new Date().toISOString();
+      o.driver = driverId || ''; o.driverName = driverName || '';
+      done.push(o);
+    });
+    _relSel.clear();
+    S().set('orders', orders);
+    window.closeModal && window.closeModal();
+    if (window.sendShipperDispatch) done.forEach(o => { try { window.sendShipperDispatch(o).catch(() => {}); } catch (e) {} });
+    window.toast?.(driverName ? `🛵 Đã giao ${done.length} đơn cho ${driverName}` : `📋 Đã đưa ${done.length} đơn lên bảng — chờ shipper nhận`, 'success');
+    renderRelease();
+  }
+  window._pcDispatchBulkTo = function () {
+    const sel = document.getElementById('pcBulkShipSel'); const id = sel ? sel.value : '';
+    if (!id) { window.toast?.('Chọn shipper trước, hoặc dùng cách ② đưa lên bảng', 'warn'); return; }
+    const sp = _shipperList().find(x => String(x.id) === String(id));
+    _pcDispatchMany(Array.from(_relSel), id, sp ? sp.name : '');
+  };
+  window._pcDispatchBulkOpen = function () { _pcDispatchMany(Array.from(_relSel), '', ''); };
+
+  /* ===== XOÁ HÀNG LOẠT (③ Xuất kho) ===== */
+  window.pcDelBulk = async function () {
+    const codes = Array.from(_relSel);
+    if (!codes.length) { window.toast?.('Chưa chọn đơn nào', 'warn'); return; }
+    if (!(await window.uiConfirm(`Xoá HẲN ${codes.length} đơn đã chọn?\nKhông khôi phục được. Dùng khi đơn nhập sai.`, { title: '🗑 Xoá đơn hàng loạt', okText: 'Xoá ' + codes.length + ' đơn', danger: true }))) return;
+    const runs = getRuns(); let rch = false;
+    codes.forEach(code => { if (_detachOrderFromRuns(runs, code)) rch = true; });
     if (rch) saveRuns(runs);
-    window.STORE.remove('orders', code);
-    window.toast?.('🗑 Đã xoá đơn ' + code, 'danger');
+    codes.forEach(code => window.STORE.remove('orders', code));
+    _relSel.clear();
+    window.toast?.('🗑 Đã xoá ' + codes.length + ' đơn', 'danger');
     renderAll();
   };
 
