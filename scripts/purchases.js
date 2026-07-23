@@ -61,29 +61,62 @@
     return no;
   }
 
-  function renderKpis() {
-    const list = getPur();
-    const today = window.todayVN();
-    const todayList = list.filter(p => p.date === today);
-    const ordered = list.filter(p => p.status === 'ordered');
+  /* Phiếu thu mua ngoài (tiền mặt) vs phiếu NCC (công nợ) */
+  const _isExt = p => p.supplierId === EXT_SUP_ID || (findSup(p.supplierId) || {}).system;
+  /* 'dd/mm/yyyy' → khóa sắp xếp 'yyyymmdd' */
+  function _dmyKey(d) { const m = String(d || '').match(/(\d{1,2})\/(\d{1,2})\/(\d{4})/); return m ? (m[3] + m[2].padStart(2, '0') + m[1].padStart(2, '0')) : '00000000'; }
+  /* Tab đang xem: 'ncc' | 'ext' */
+  window._purTab = window._purTab || 'ncc';
+
+  window.purSetTab = function (t) {
+    window._purTab = t;
+    document.querySelectorAll('#purTabs .pn-tab').forEach(el => el.classList.toggle('on', el.dataset.tab === t));
+    /* Lọc NCC chỉ có nghĩa ở tab NCC */
+    const supWrap = document.getElementById('purSup'); if (supWrap) supWrap.style.display = t === 'ext' ? 'none' : '';
+    render();
+  };
+
+  function renderKpis(rows, isExt) {
     const _now = window.todayDate ? window.todayDate() : new Date();
+    const today = window.todayVN();
     const _mmyyyy = `/${String(_now.getMonth()+1).padStart(2,'0')}/${_now.getFullYear()}`;
     const _monthLabel = `T${_now.getMonth()+1}/${_now.getFullYear()}`;
-    const monthSpend = list.filter(p => p.status === 'received' && (p.date||'').endsWith(_mmyyyy)).reduce((s,p) => s + (p.total||0), 0);
-    const unpaid = list.filter(p => p.status === 'received').reduce((s,p) => s + Math.max(0, (p.total||0) - (p.paid||0)), 0);
-    document.getElementById('purKpis').innerHTML = `
-      <div style="background:#fff;border:1px solid var(--line);border-radius:10px;padding:14px"><div style="font-size:11px;color:var(--muted);text-transform:uppercase;font-weight:700">Nhập hôm nay ${window.helpTip('Số phiếu + giá trị nhập hàng trong ngày hiện tại.')}</div><div style="font-size:22px;font-weight:800;color:var(--navy);margin-top:4px">${todayList.length} <span style="font-size:13px;color:var(--muted);font-weight:500">phiếu</span></div><div style="font-size:11.5px;color:var(--muted)">${window.fmtShort(todayList.reduce((s,p)=>s+(p.total||0),0))} ₫</div></div>
-      <div style="background:#fff;border:1px solid var(--line);border-radius:10px;padding:14px"><div style="font-size:11px;color:var(--muted);text-transform:uppercase;font-weight:700">⏳ Chờ nhận ${window.helpTip('Phiếu đã đặt nhưng NCC chưa giao. Khi nhận hàng → bấm "✓ Đã nhận" để cộng vào kho.')}</div><div style="font-size:22px;font-weight:800;color:#92400E;margin-top:4px">${ordered.length}</div><div style="font-size:11.5px;color:var(--muted)">${window.fmtShort(ordered.reduce((s,p)=>s+(p.total||0),0))} ₫</div></div>
-      <div style="background:#fff;border:1px solid var(--line);border-radius:10px;padding:14px"><div style="font-size:11px;color:var(--muted);text-transform:uppercase;font-weight:700">💸 Chi nhập ${_monthLabel} ${window.helpTip('Tổng chi nhập hàng trong tháng — = COGS (giá vốn).')}</div><div style="font-size:22px;font-weight:800;color:var(--ok);margin-top:4px">${window.fmtShort(monthSpend)}</div></div>
-      <div style="background:#fff;border:1px solid var(--line);border-radius:10px;padding:14px"><div style="font-size:11px;color:var(--muted);text-transform:uppercase;font-weight:700">🔴 Chưa thanh toán ${window.helpTip('Tổng tiền hàng đã nhận nhưng chưa trả NCC. Bằng Σ công nợ NCC.')}</div><div style="font-size:22px;font-weight:800;color:#DC2626;margin-top:4px">${window.fmtShort(unpaid)}</div></div>
-    `;
+    const box = (label, val, sub, color, tip) => `<div style="background:#fff;border:1px solid var(--line);border-radius:10px;padding:14px"><div style="font-size:11px;color:var(--muted);text-transform:uppercase;font-weight:700">${label} ${tip?window.helpTip(tip):''}</div><div style="font-size:22px;font-weight:800;color:${color};margin-top:4px">${val}</div><div style="font-size:11.5px;color:var(--muted)">${sub||''}</div></div>`;
+    const el = document.getElementById('purKpis');
+    if (isExt) {
+      /* Thu mua ngoài: kiểm soát tiền mặt bỏ ra mua chợ/vãng lai */
+      const todayL = rows.filter(p => p.date === today);
+      const monthL = rows.filter(p => (p.date||'').endsWith(_mmyyyy) && p.status !== 'cancelled');
+      const monthSpend = monthL.reduce((s,p)=>s+(p.total||0),0);
+      const days = new Set(monthL.map(p=>p.date)).size || 1;
+      el.innerHTML =
+        box('🛒 Mua ngoài hôm nay', window.fmtShort(todayL.reduce((s,p)=>s+(p.total||0),0)), todayL.length+' phiếu', '#B45309', 'Tiền mặt bỏ ra mua chợ/vãng lai trong ngày.') +
+        box('💵 Mua ngoài '+_monthLabel, window.fmtShort(monthSpend), monthL.length+' phiếu', '#B45309', 'Tổng tiền mặt mua ngoài cả tháng — kiểm soát lượng mua ngoài.') +
+        box('📅 Số ngày có mua', days+'', 'ngày trong tháng', 'var(--navy)') +
+        box('📊 TB / ngày', window.fmtShort(Math.round(monthSpend/days)), 'bình quân', 'var(--ok)', 'Trung bình tiền mua ngoài mỗi ngày trong tháng.');
+    } else {
+      const todayL = rows.filter(p => p.date === today);
+      const ordered = rows.filter(p => p.status === 'ordered');
+      const monthSpend = rows.filter(p => p.status === 'received' && (p.date||'').endsWith(_mmyyyy)).reduce((s,p)=>s+(p.total||0),0);
+      const unpaid = rows.filter(p => p.status === 'received').reduce((s,p)=>s+Math.max(0,(p.total||0)-(p.paid||0)),0);
+      el.innerHTML =
+        box('Nhập hôm nay', todayL.length+' <span style="font-size:13px;color:var(--muted);font-weight:500">phiếu</span>', window.fmtShort(todayL.reduce((s,p)=>s+(p.total||0),0))+' ₫', 'var(--navy)', 'Số phiếu + giá trị nhập NCC trong ngày.') +
+        box('⏳ Chờ nhận', ordered.length+'', window.fmtShort(ordered.reduce((s,p)=>s+(p.total||0),0))+' ₫', '#92400E', 'Phiếu đã đặt nhưng NCC chưa giao.') +
+        box('💸 Chi nhập '+_monthLabel, window.fmtShort(monthSpend), '', 'var(--ok)', 'Tổng chi nhập NCC trong tháng — = COGS (giá vốn).') +
+        box('🔴 Chưa thanh toán', window.fmtShort(unpaid), '', '#DC2626', 'Tiền đã nhận nhưng chưa trả NCC. = Σ công nợ NCC.');
+    }
   }
 
   function render() {
-    renderKpis();
     const list = getPur();
     const sups = getSup();
-    /* Build sup select */
+    const tab = window._purTab || 'ncc';
+    /* Badge đếm 2 tab */
+    const nccAll = list.filter(p => !_isExt(p)), extAll = list.filter(p => _isExt(p));
+    const cN = document.getElementById('cntNcc'), cE = document.getElementById('cntExt');
+    if (cN) cN.textContent = nccAll.length; if (cE) cE.textContent = extAll.length;
+
+    /* Build sup select (chỉ NCC thật) */
     const ss = document.getElementById('purSup');
     const cur = ss.value;
     ss.innerHTML = '<option value="">Tất cả NCC</option>' + sups.map(s => `<option value="${s.id}" ${cur===s.id?'selected':''}>${s.name}</option>`).join('');
@@ -91,26 +124,35 @@
     const q = (document.getElementById('purQ').value || '').toLowerCase();
     const st = document.getElementById('purSt').value;
     const sup = document.getElementById('purSup').value;
-    let rows = list.slice().reverse();
+    let rows = (tab === 'ext' ? extAll : nccAll).slice();
+    renderKpis(rows, tab === 'ext');
     if (q)   rows = rows.filter(p => (p.id + ' ' + (findSup(p.supplierId)?.name || '') + ' ' + (p.items || []).map(it => it.name || '').join(' ')).toLowerCase().includes(q));
     if (st)  rows = rows.filter(p => p.status === st);
-    if (sup) rows = rows.filter(p => p.supplierId === sup);
+    if (sup && tab !== 'ext') rows = rows.filter(p => p.supplierId === sup);
 
     const tb = document.getElementById('purBody');
-    if (!rows.length) { tb.innerHTML = `<tr><td colspan="9" style="padding:36px;text-align:center;color:var(--muted)">Không có phiếu nhập nào.</td></tr>`; return; }
+    if (!rows.length) {
+      tb.innerHTML = `<tr><td colspan="9" style="padding:36px;text-align:center;color:var(--muted)">${tab==='ext'?'Chưa có phiếu thu mua ngoài nào.':'Không có phiếu nhập nào.'}</td></tr>`;
+      return;
+    }
 
-    tb.innerHTML = rows.map(p => {
+    /* Gom theo NGÀY — accordion. Ngày mới nhất mở sẵn. */
+    const byDay = {};
+    rows.forEach(p => { const k = _dmyKey(p.date); (byDay[k] = byDay[k] || { date: p.date, items: [] }).items.push(p); });
+    const dayKeys = Object.keys(byDay).sort().reverse();
+
+    const rowHtml = p => {
       const s = findSup(p.supplierId);
       const due = (p.total||0) - (p.paid||0);
-      return `<tr data-id="${p.id}" onclick="window.openPurDrawer('${p.id}')" style="cursor:pointer" title="Bấm để xem/điền giá">
+      return `<tr class="pn-item pnd-${_dmyKey(p.date)}" data-id="${p.id}" onclick="window.openPurDrawer('${p.id}')" style="cursor:pointer" title="Bấm để xem/điền giá">
         <td class="hide-xs" onclick="event.stopPropagation()"><div class="checkbox" onclick="this.classList.toggle('on')"></div></td>
         <td data-field="sup"><b style="color:var(--navy)">${s ? s.name : p.supplierId}</b>${s?.paymentTerm ? `<div style="font-size:11px;color:var(--muted)">${s.paymentTerm}</div>` : ''}</td>
-        <td data-field="date">${p.date}</td>
+        <td data-field="code">${p.id}</td>
         <td class="hide-xs">${(p.items||[]).length} mặt hàng</td>
         <td class="num" data-field="total"><b>${window.fmt(p.total)}</b></td>
         <td class="num hide-xs">${window.fmt(p.paid||0)}</td>
         <td class="num hide-xs" style="color:${due>0?'#DC2626':'var(--ok)'}">${due>0?window.fmt(due):'—'}</td>
-        <td data-field="status"><span class="st-pill st-${p.status}">${p.status==='ordered'?'⏳ Đã đặt':p.status==='wh_received'?'📦 Kho đã nhận':p.status==='received'?'✓ Đã nhận':'✕ Hủy'}</span></td>
+        <td data-field="status"><span class="st-pill st-${p.status}">${p.status==='ordered'?'⏳ Đã đặt':p.status==='wh_received'?'📦 Kho đã nhận':p.status==='received'?(_isExt(p)?'✓ Đã mua':'✓ Đã nhận'):'✕ Hủy'}</span></td>
         <td class="hide-xs" onclick="event.stopPropagation()">
           <button class="btn btn-ghost btn-sm" onclick="window.openPurDrawer('${p.id}')" title="Xem chi tiết">👁</button>
           <button class="btn btn-ghost btn-sm" onclick="window.printPur('${p.id}')" title="In phiếu nhập">🖨</button>
@@ -119,25 +161,45 @@
             : p.status==='received' ? `<button class="btn btn-ghost btn-sm" style="color:#B45309" onclick="window.openSettleDialog('${p.id}')" title="Sửa lại giá / công nợ đã chốt">✏️ Sửa nợ</button>` : ''}
         </td>
       </tr>`;
+    };
+
+    tb.innerHTML = dayKeys.map((k, di) => {
+      const g = byDay[k];
+      const tot = g.items.reduce((s,p)=>s+(p.total||0),0);
+      const nSup = new Set(g.items.map(p=>p.supplierId)).size;
+      const open = di === 0;   /* ngày mới nhất mở sẵn */
+      const meta = tab === 'ext'
+        ? `${g.items.length} phiếu`
+        : `${g.items.length} phiếu · ${nSup} NCC`;
+      const dayRow = `<tr class="pn-day${open?' open':''}" onclick="window.purToggleDay('${k}')">
+        <td colspan="9"><div style="display:flex;align-items:center;gap:10px;flex-wrap:wrap">
+          <span class="cr">▶</span>
+          <b style="font-size:14px">📅 ${g.date}</b>
+          <span class="d-meta">${meta}</span>
+          <span style="flex:1"></span>
+          <span class="d-sum">${window.fmt(tot)} ₫</span>
+        </div></td></tr>`;
+      const items = g.items.map(p => rowHtml(p).replace('class="pn-item ', `class="pn-item ${open?'show ':''}`)).join('');
+      return dayRow + items;
     }).join('');
 
-    /* Bulk ops: chọn / đổi trạng thái / xóa hàng loạt */
+    /* Bulk ops: chọn / xóa hàng loạt (side-effect status vẫn phải qua nút riêng) */
     if (window.attachBulkOps) {
       const tbl = tb.closest('table');
       if (tbl) {
         if (!tbl.id) tbl.id = 'tblPur';
-        /* KHÔNG cho đổi trạng thái hàng loạt: 'Đã nhận'/'Hủy' có side-effect (cộng kho,
-           công nợ, priceHistory) — phải qua nút ✓ Nhận / ✕ Hủy để chạy đúng luồng.
-           Bulk chỉ Xóa + Export. */
-        window.attachBulkOps({
-          tableSelector: '#tblPur',
-          selectAllSelector: '#purSelectAll',
-          store: 'purchases',
-          label: 'phiếu',
-        });
+        window.attachBulkOps({ tableSelector: '#tblPur', selectAllSelector: '#purSelectAll', store: 'purchases', label: 'phiếu' });
       }
     }
   }
+
+  /* Xổ/gập 1 ngày */
+  window.purToggleDay = function (k) {
+    const hd = document.querySelector(`.pn-day[onclick*="'${k}'"]`);
+    if (hd) hd.classList.toggle('open');
+    const opened = hd && hd.classList.contains('open');
+    document.querySelectorAll('.pnd-' + k).forEach(r => r.classList.toggle('show', opened));
+  };
 
   window.openPurDrawer = function (id) {
     const p = getPur().find(x => x.id === id);
