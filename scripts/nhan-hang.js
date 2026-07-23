@@ -28,11 +28,14 @@
       const pidA = esc(p.id);
       const noteInit = it.defectNote ? esc(it.defectNote) : '';
       const conv = (window.prodUnitConv && it.productId) ? window.prodUnitConv(it.productId) : null;
+      /* Nhãn ô Thực nhận = ĐVT sản phẩm; chỉ ép "kg" khi SP có bảng quy đổi (đếm quả/thùng → tính kg).
+         Tránh dán "kg" nhầm cho SP tính theo bắp/bó/quả → kho gõ sai → lệch công nợ. */
+      const recvUnit = conv ? 'kg' : (it.unit || 'kg');
       const packHelper = conv ? `<div style="margin-top:5px;font-size:11px;color:#92400E;white-space:nowrap">hoặc <input type="number" data-money="0" inputmode="decimal" class="nh-pack" data-p="${pidA}" data-i="${i}" data-kgp="${conv.kgPerPack}" value="${it.packRecv != null ? _q(it.packRecv) : ''}" placeholder="0" oninput="window.nhPackCalc('${pidA}',${i})" style="width:54px;text-align:right;border:1px solid #FDE68A;border-radius:5px;padding:4px 6px;font-size:15px"> ${esc(conv.packUnit)} ×${conv.kgPerPack}kg</div>` : '';
       return `<tr style="border-top:1px solid #F1F5F9">
         <td style="padding:7px 9px"><b>${esc(it.name)}</b>${sub}</td>
         <td style="padding:7px 9px;text-align:right;color:var(--muted)">${_q(ordered)} ${esc(it.unit || 'kg')}</td>
-        <td style="padding:7px 9px;text-align:right;vertical-align:top"><input type="number" data-money="0" inputmode="decimal" class="nh-recv" data-p="${pidA}" data-i="${i}" data-ord="${ordered}" value="${_q(ordered)}" min="0" step="0.1" oninput="window.nhRowCalc('${pidA}',${i},'recv')" title="Số hàng TỐT nhận được, tính theo KG (Thực nhận + Lỗi = Đặt)" style="width:80px;text-align:right;border:1px solid var(--line);border-radius:6px;padding:6px 7px;font-size:16px"> kg${packHelper}</td>
+        <td style="padding:7px 9px;text-align:right;vertical-align:top"><input type="number" data-money="0" inputmode="decimal" class="nh-recv" data-p="${pidA}" data-i="${i}" data-ord="${ordered}" value="${_q(ordered)}" min="0" step="0.1" oninput="window.nhRowCalc('${pidA}',${i},'recv')" title="Số hàng TỐT nhận được${conv ? ' (quy ra kg)' : ''}, tính theo ${esc(recvUnit)} (Thực nhận + Lỗi = Đặt)" style="width:80px;text-align:right;border:1px solid var(--line);border-radius:6px;padding:6px 7px;font-size:16px"> ${esc(recvUnit)}${packHelper}</td>
         <td style="padding:7px 9px;text-align:right;vertical-align:top">
           <input type="number" data-money="0" inputmode="decimal" class="nh-def" data-p="${pidA}" data-i="${i}" data-ord="${ordered}" value="" placeholder="0" min="0" step="0.1" oninput="window.nhRowCalc('${pidA}',${i},'def')" style="width:70px;text-align:right;border:1px solid #FCA5A5;border-radius:6px;padding:6px 7px;font-size:16px">
           <input type="text" class="nh-defnote" data-p="${pidA}" data-i="${i}" value="${noteInit}" placeholder="Lý do lỗi…" style="display:${it.defectNote ? 'block' : 'none'};width:130px;margin-top:5px;border:1px solid #FCA5A5;border-radius:6px;padding:6px 7px;font-size:14px">

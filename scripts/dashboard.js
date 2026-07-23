@@ -127,8 +127,10 @@
     const netProfit = grossProfit - monthAds - totalSalary;
     const netMargin = monthRev ? netProfit / monthRev * 100 : 0;
 
-    const totalDebt = customers.reduce((s, c) => s + (c.debt || 0), 0);
-    const overdueDebt = customers.reduce((s, c) => s + (c.debtOverdue || 0), 0);
+    /* Công nợ = số DẪN XUẤT (đơn đã giao − đã thu), KHỚP trang Công nợ. KHÔNG đọc c.debt lưu cứng
+       (dễ trễ pha khi shipper giao đơn từ điện thoại mà chưa mở trang KH). */
+    const totalDebt = customers.reduce((s, c) => s + (window.custDebt ? window.custDebt(c.id) : (c.debt || 0)), 0);
+    const overdueDebt = customers.reduce((s, c) => s + (window.custDebtOverdue ? window.custDebtOverdue(c.id) : (c.debtOverdue || 0)), 0);
 
     /* === MARKETING === */
     const adsMonth = ads.filter(a => (a.date || '').startsWith(_ADS_PREFIX));

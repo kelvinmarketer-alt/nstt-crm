@@ -653,7 +653,12 @@
       }
       /* Hoàn tiền. TIỀN MẶT → chi đủ refundTotal. GIẢM NỢ → phần đã gỡ khỏi đơn thì freight tự giảm nợ;
          CHỈ ghi sổ phần CHƯA gỡ được (unremovedVal) để không trừ 2 lần, và chỉ khi đơn là CÔNG NỢ. */
-      if (r.refundMode === 'cash') {
+      /* Đơn công nợ? (payBy chứa "nợ"). Không thấy đơn → mặc định công nợ (app này bán công nợ). */
+      const isCredit = orderObj ? /nợ|cong no|credit/i.test(orderObj.payBy || orderObj.pay_by || '') : true;
+      /* Đơn CÔNG NỢ (khách chưa trả tiền) → CHỈ giảm nợ, KHÔNG chi tiền mặt (tránh mất tiền 2 lần:
+         freight đã giảm = nợ giảm; chi thêm tiền mặt = mất tiền cho hàng khách chưa từng trả).
+         Chỉ chi tiền mặt khi đơn KHÔNG phải công nợ (khách đã trả) và kế toán chọn hoàn tiền mặt. */
+      if (r.refundMode === 'cash' && !isCredit) {
         if (r.refundTotal > 0) {
           window.STORE.add('cashEntries', {
             no: 'PCTH-' + Math.floor(performance.now()).toString(36).toUpperCase(),
@@ -662,14 +667,11 @@
             account: 'Tiền mặt', amount: r.refundTotal,
             staff: window.CURRENT_USER?.name || '',
           });
-          const accs = window.STORE.get('paymentAccounts', []) || [];
-          const acc = accs.find(a => (a.name || '').toLowerCase().includes('tiền mặt'));
-          if (acc) window.STORE.update('paymentAccounts', acc.id, { balance: (+acc.balance || 0) - r.refundTotal });
+          /* KHÔNG tự trừ paymentAccounts.balance — phiếu chi tiền mặt đã tự giảm số dư quỹ (tránh trừ 2 lần) */
           msgs.push('tạo phiếu chi hoàn tiền');
         }
       } else {
-        /* Đơn công nợ? (payBy chứa "nợ"). Không thấy đơn → mặc định công nợ (app này bán công nợ). */
-        const isCredit = orderObj ? /nợ|cong no|credit/i.test(orderObj.payBy || orderObj.pay_by || '') : true;
+        if (r.refundMode === 'cash' && isCredit) msgs.push('đơn công nợ → giảm nợ (không chi tiền mặt vì khách chưa thanh toán)');
         if (unremovedVal > 0 && isCredit) {
           const custs = window.STORE.get('customers', []) || [];
           const c = custs.find(x => x.id === r.custId) || custs.find(x => x.name === r.custName);
@@ -695,35 +697,47 @@
     }
 
     /* 3) Hàng xấu → trả NCC theo GIÁ NHẬP, tự động theo NCC gán TỪNG SP (per-item, gộp theo NCC) */
+    /* Ghi khoản trả NCC (giảm nợ NCC = dẫn xuất qua supplierClaims). CHỐNG TRÙNG: mã khoản tất định
+       theo (returnId + supplierId) → duyệt lại / 2 máy cùng duyệt KHÔNG tạo khoản thứ 2. Dùng rmwKv
+       (không set) để 2 kế toán ghi đồng thời không đè mất nhau. KHÔNG ghi suppliers.debt (số dẫn xuất). */
+    const _pushClaims = (toAdd) => {
+      if (!toAdd.length) return;
+      if (window.STORE.rmwKv) {
+        window.STORE.rmwKv('supplierClaims', arr => {
+          arr = Array.isArray(arr) ? arr : [];
+          toAdd.forEach(nc => { if (!arr.some(c => c && (c.id === nc.id || (c.returnId === nc.returnId && c.supplierId === nc.supplierId && c.status !== 'cancelled')))) arr.unshift(nc); });
+          return arr;
+        }, []);
+      } else {
+        const arr = window.STORE.get('supplierClaims', []) || [];
+        toAdd.forEach(nc => { if (!arr.some(c => c && c.id === nc.id)) arr.unshift(nc); });
+        window.STORE.set('supplierClaims', arr);
+      }
+    };
     if (r.perItemNCC) {
       const badItems = rItems.filter(x => (x.cond || 'bad') === 'bad' && x.supplierId && (+x.buyTotal > 0));
       if (badItems.length) {
-        const sups = window.STORE.get('suppliers', []) || [];
-        const claims = window.STORE.get('supplierClaims', []) || [];
+        const existing = window.STORE.get('supplierClaims', []) || [];
         const bySup = {};
         badItems.forEach(x => { const g = bySup[x.supplierId] || (bySup[x.supplierId] = { name: x.supplierName || '', amt: 0, items: [] }); g.amt += (+x.buyTotal || 0); g.items.push(x); });
-        Object.keys(bySup).forEach((sid, k) => {
+        const toAdd = [];
+        Object.keys(bySup).forEach(sid => {
           const g = bySup[sid]; if (!(g.amt > 0)) return;
-          const s = sups.find(x => x.id === sid);
-          if (s) { window.STORE.update('suppliers', s.id, { debt: Math.max(0, (+s.debt || 0) - g.amt) }); msgs.push(`trừ nợ NCC ${s.name} ${window.fmt(g.amt)}₫ (giá nhập)`); }
-          claims.unshift({ id: 'CL' + Date.now().toString(36) + k, supplierId: sid, supplierName: g.name, orderCode: r.orderCode, returnId: r.id, item: g.items.map(i => i.name).join(', '), qty: g.items.reduce((s2, i) => s2 + (+i.qty || 0), 0), amount: g.amt, reason: r.reason, date: r.date, status: 'open' });
+          const cid = 'CL-' + r.id + '-' + sid;
+          if (existing.some(c => c && (c.id === cid || (c.returnId === r.id && c.supplierId === sid && c.status !== 'cancelled')))) return;
+          toAdd.push({ id: cid, supplierId: sid, supplierName: g.name, orderCode: r.orderCode, returnId: r.id, item: g.items.map(i => i.name).join(', '), qty: g.items.reduce((s2, i) => s2 + (+i.qty || 0), 0), amount: g.amt, reason: r.reason, date: r.date, status: 'open' });
+          msgs.push(`trừ nợ NCC ${g.name} ${window.fmt(g.amt)}₫ (giá nhập)`);
         });
-        window.STORE.set('supplierClaims', claims);
+        _pushClaims(toAdd);
       }
     } else if (r.fault === 'supplier' && r.supplierId) {
       /* Phiếu tay cũ (chưa qua popup mới) — 1 NCC/phiếu */
       const claimAmt = +r.supClaimAmount || badTotalR || +r.refundTotal || 0;
-      const claims = window.STORE.get('supplierClaims', []) || [];
-      claims.unshift({
-        id:'CL'+Date.now().toString(36), supplierId:r.supplierId, supplierName:r.supplierName,
-        orderCode:r.orderCode, returnId:r.id, item:r.item?r.item.name:'', qty:r.qtyReturn||0,
-        amount:claimAmt, reason:r.reason, date:r.date, status:'open'
-      });
-      window.STORE.set('supplierClaims', claims);
-      if (claimAmt > 0) {
-        const sups = window.STORE.get('suppliers', []) || [];
-        const s = sups.find(x => x.id === r.supplierId);
-        if (s) { window.STORE.update('suppliers', s.id, { debt: Math.max(0, (+s.debt || 0) - claimAmt) }); msgs.push(`trừ công nợ NCC ${r.supplierName} ${window.fmt(claimAmt)}₫`); }
+      const existing = window.STORE.get('supplierClaims', []) || [];
+      const cid = 'CL-' + r.id + '-' + r.supplierId;
+      if (claimAmt > 0 && !existing.some(c => c && (c.id === cid || (c.returnId === r.id && c.supplierId === r.supplierId && c.status !== 'cancelled')))) {
+        _pushClaims([{ id: cid, supplierId: r.supplierId, supplierName: r.supplierName, orderCode: r.orderCode, returnId: r.id, item: r.item ? r.item.name : '', qty: r.qtyReturn || 0, amount: claimAmt, reason: r.reason, date: r.date, status: 'open' }]);
+        msgs.push(`trừ công nợ NCC ${r.supplierName} ${window.fmt(claimAmt)}₫`);
       }
       msgs.push(`ghi khoản đòi NCC ${r.supplierName}`);
     }
@@ -875,7 +889,7 @@
     const supSel = document.getElementById('rt_sup');
     const list = getR();
     list.push({
-      id: 'RT' + String(list.length+1).padStart(3,'0'),
+      id: 'RT' + String(list.reduce((m,x)=>{const n=parseInt(String(x.id||'').replace(/\D/g,''),10)||0; return n>m?n:m;},0) + 1).padStart(3,'0'),
       orderCode: code,
       custId: o ? o.cust : '',
       custName: o ? o.custName : '',

@@ -231,6 +231,7 @@
     'whProcure',       /* Module KHO: NCC mặc định/SP · hệ số quy đổi kg · giờ chốt đơn · SP mua ngoài */
     'purchaseInvoices',/* Số hoá đơn ĐẦU VÀO của NCC theo phiếu {phiếuId: số HĐ} — cloud purchases KHÔNG có cột này */
     'supplierClaims',  /* Khoản đòi lại NCC khi hàng NCC giao hỏng (Trả hàng) */
+    'custDebtCycles',  /* Kỳ chốt công nợ theo từng KH — TRƯỚC ĐÂY THIẾU → máy khác không thấy kỳ đã đặt (gom/thu sai kỳ) */
     'supplierMeta',    /* Loại NCC (sỉ/lẻ/cả hai) — cloud suppliers không có cột này */
     'custPriceTiers',  /* Nhóm giá gán cho từng KH {custId:tierId} — cloud customers không có cột price_tier */
     'custCreditDays',  /* Hạn công nợ (số ngày) theo từng KH {custId:days} — chính sách 3/7/15 */
@@ -953,6 +954,9 @@
       /* Push to Supabase */
       if (isSupabaseMode() && TABLE_MAP[key]) {
         const idCol = ID_COLUMN[key] || 'id';
+        /* ⚠️ CHỐNG MẤT DỮ LIỆU: mã tuần tự có thể TÁI DÙNG mã vừa xoá → nếu bia mộ (tombstone) còn
+           thì merge/self-heal sẽ lọc bỏ luôn record MỚI này. Gỡ bia mộ ngay khi tạo lại mã đó. */
+        _clearTomb(key, item[idCol]);
         _markPending(key, item[idCol]);
         window.SB_DATA.insert(TABLE_MAP[key], item)
           .then(saved => {

@@ -204,15 +204,17 @@
        → danh sách KH + số liệu hiện NGAY khi customers về, không phải chờ tải hết 900 đơn. */
     const ordersReady = !window.STORE.isPreloaded || window.STORE.isPreloaded('orders');
     if (!ordersReady) return;
+    /* Sổ thu tiền (debtLedger, KV) đã tải chưa? Chưa → paid=0 → công nợ sẽ PHỒNG (đủ cả tiền hàng).
+       Khi đó GIỮ công nợ đang lưu (từ cloud), KHÔNG ghi đè + KHÔNG đẩy số phồng lên cloud. */
+    const ledgerReady = !window.STORE.kvReady || window.STORE.kvReady('debtLedger');
     rebuildCustStats();
     (customers || []).forEach(c => {
       const s = _cstats[c.id];
       c.orders = s ? s.orders : 0;
       c.revenue = s ? s.revenue : 0;
-      c.debt = s ? s.debt : 0;
-      c.debtOverdue = s ? s.debtOverdue : 0;
+      if (ledgerReady) { c.debt = s ? s.debt : 0; c.debtOverdue = s ? s.debtOverdue : 0; }
     });
-    persistCustStatsToCloud();
+    if (ledgerReady) persistCustStatsToCloud();
   }
 
   /* Ghi số đã tính (đơn/doanh thu/công nợ/quá hạn) NGƯỢC lại bảng customers trên cloud,

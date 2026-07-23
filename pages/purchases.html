@@ -35,9 +35,12 @@
   tr.pn-item{display:none}
   tr.pn-item.show{display:table-row}
   @media (max-width:560px){
-    .pn-day{display:block;border:1px solid var(--line);border-radius:12px;margin:0 0 10px;padding:11px 13px;position:relative}
+    .pn-day{display:block;border:1px solid var(--line);border-radius:12px;margin:0 0 10px;padding:11px 13px}
     .pn-day td{display:block;border:none!important;padding:0!important}
-    .pn-day .d-sum{position:absolute;top:11px;right:13px;font-size:15px}
+    .pn-day > td > div{flex-wrap:wrap}
+    .pn-day > td > div > span[style*="flex:1"]{display:none}   /* bỏ spacer để tổng xuống dòng gọn */
+    .pn-day .d-meta{font-size:11px}
+    .pn-day .d-sum{flex-basis:100%;text-align:right;font-size:15px;margin-top:4px}
     .pn-tab{flex:1;justify-content:center}
   }
   .pur-btn-create-m{display:none}   /* nút Tạo phiếu bản mobile — chỉ hiện ≤560 */

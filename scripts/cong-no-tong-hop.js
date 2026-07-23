@@ -215,7 +215,8 @@
         .filter(x => x.net !== 0).sort((a, b) => a.ky < b.ky ? -1 : 1);
       r.remain = r.opening + r.chargeP - r.paid;   /* CÒN PHẢI THU cuối kỳ = luỹ kế công nợ đã giao − đã thu */
       r.undelivered = Math.max(0, r.total - r.chargeP);   /* phần đơn trong kỳ CHƯA giao (chưa thành nợ) */
-      r.debtNow = (custById[r.key] && +custById[r.key].debt) || 0;
+      /* CÔNG NỢ HT = số DẪN XUẤT (khớp trang khác), không đọc c.debt lưu cứng */
+      r.debtNow = window.custDebt ? window.custDebt(r.key) : ((custById[r.key] && +custById[r.key].debt) || 0);
       r.profit = r.total - r.cost;
       r.margin = r.total ? (r.profit / r.total) : 0;
     });
