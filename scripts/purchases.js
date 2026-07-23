@@ -116,7 +116,7 @@
           <button class="btn btn-ghost btn-sm" onclick="window.openPurDrawer('${p.id}')" title="Xem chi tiết">👁</button>
           <button class="btn btn-ghost btn-sm" onclick="window.printPur('${p.id}')" title="In phiếu nhập">🖨</button>
           ${p.status==='wh_received' ? `<button class="btn btn-ghost btn-sm" style="color:#B91C1C" onclick="window.markReceived('${p.id}')" title="Kế toán chốt công nợ NCC">💰 Chốt công nợ</button>`
-            : p.status==='ordered' ? (_isGomNcc(p) ? `<span style="font-size:11px;color:var(--muted)" title="Chờ kho nhận ở trang 'Nhận hàng NCC'">⏳ Chờ kho nhận</span>` : `<button class="btn btn-ghost btn-sm" style="color:var(--ok)" onclick="window.markReceived('${p.id}')" title="Đánh dấu đã nhận → cộng kho">✓ Nhận</button>`)
+            : p.status==='ordered' ? (_isGomNcc(p) ? `<button class="btn btn-ghost btn-sm" style="color:#B91C1C" onclick="window.markReceived('${p.id}')" title="Kế toán chốt công nợ trực tiếp (kho chưa nhận cũng chốt được)">💰 Chốt công nợ</button>` : `<button class="btn btn-ghost btn-sm" style="color:var(--ok)" onclick="window.markReceived('${p.id}')" title="Đánh dấu đã nhận → cộng kho">✓ Nhận</button>`)
             : ''}
           ${due>0 && p.status==='received' ? `<button class="btn btn-ghost btn-sm" style="color:var(--ok)" onclick="window.payPur('${p.id}')" title="Ghi thanh toán">💰</button>` : ''}
         </td>
@@ -190,7 +190,7 @@
       <button class="btn btn-ghost" onclick="window.printPur('${p.id}')">🖨 In</button>
       ${p.status==='ordered' ? `<button class="btn btn-navy" onclick="window.pnSaveItemPrices('${p.id}')">💾 Lưu giá</button>` : ''}
       ${(p.status==='ordered' && !_isGomNcc(p)) ? `<button class="btn btn-primary" onclick="window.pnReceiveFromModal('${p.id}')">✓ Đã nhận</button>` : ''}
-      ${p.status==='wh_received' ? `<button class="btn btn-primary" onclick="window.openSettleDialog('${p.id}')">💰 Chốt công nợ</button>` : ''}
+      ${((p.status==='wh_received') || (p.status==='ordered' && _isGomNcc(p))) ? `<button class="btn btn-primary" onclick="window.openSettleDialog('${p.id}')">💰 Chốt công nợ</button>` : ''}
       ${p.status==='received' ? `<button class="btn btn-ghost" onclick="window.pnSaveInvoice('${p.id}')" title="Lưu số hoá đơn NCC (hoá đơn thường về sau khi nhận hàng)">💾 Lưu HĐ</button>` : ''}
       ${(due>0 && p.status==='received') ? `<button class="btn btn-ghost" style="color:var(--ok)" onclick="window.payPur('${p.id}');window.closeModal()">💰 Thanh toán</button>` : ''}
       ${p.status!=='cancelled' ? `<button class="btn btn-ghost" style="color:var(--danger)" onclick="window.cancelPur('${p.id}')">✕ Hủy phiếu</button>` : ''}`;
@@ -261,8 +261,8 @@
     const isExt = list[i].supplierId === EXT_SUP_ID || (findSup(list[i].supplierId) || {}).system;
     /* Phiếu NCC từ phiên gom → luồng 2 BƯỚC: KHO nhận (trang "Nhận hàng NCC", nhập SL+lỗi) → KẾ TOÁN chốt công nợ. */
     if (!isExt && _isGomNcc(list[i])) {
-      if (list[i].status === 'ordered') { window.toast && window.toast('⏳ Phiếu này chờ KHO nhận (nhập SL + hàng lỗi) ở trang "Nhận hàng NCC" trước — rồi kế toán mới chốt công nợ.', 'warn'); return; }
-      if (list[i].status === 'wh_received') { window.openSettleDialog(id); return; }
+      /* Kế toán chốt được cả khi kho CHƯA nhận ('ordered') lẫn kho đã nhận ('wh_received'). */
+      if (list[i].status === 'ordered' || list[i].status === 'wh_received') { window.openSettleDialog(id); return; }
       return;
     }
     if (list[i].status !== 'ordered') return;
@@ -315,96 +315,130 @@
       : '✓ Đã nhận hàng' + (willStock ? ', cộng kho' : '') + ' + cập nhật giá nhập', 'success');
   };
 
-  /* ===== KẾ TOÁN — CHỐT CÔNG NỢ (bước 2/2) cho phiếu gom KHO đã nhận (status 'wh_received') =====
-     Kho đã nhập SL thực nhận + lỗi + cộng tồn (ở trang Nhận hàng NCC). Kế toán chỉ khớp GIÁ + chọn
-     cho trả / hao hụt → sinh CÔNG NỢ NCC. KHÔNG đụng tồn kho (kho làm rồi). */
+  /* ===== KẾ TOÁN — CHỐT CÔNG NỢ cho phiếu gom NCC =====
+     Kế toán được chốt TRỰC TIẾP dù kho CHƯA nhận (status 'ordered') HAY kho đã nhận ('wh_received').
+     - Từ 'ordered' (kho chưa nhập): kế toán tự nhập Thực nhận + Lỗi (sửa được) và HỆ cộng phần dư vào tồn kho.
+     - Từ 'wh_received' (kho đã nhập): Thực nhận + Lỗi khoá theo số kho, tồn kho kho đã cộng → không cộng lại.
+     Xử lý hàng lỗi chọn theo TỪNG mặt hàng (cho trả → trừ nợ / không trả → hao hụt). KHÔNG đụng giá vốn tồn của SP khác. */
   window.openSettleDialog = function (id) {
     /* Chỉ KẾ TOÁN (hoặc thu mua / leader) được chốt công nợ — kho không. */
     if (window.AUTH && window.AUTH.hasPerm && !(window.AUTH.hasPerm('accounting.edit') || window.AUTH.hasPerm('purchases.create'))) {
       window.toast && window.toast('Chỉ Kế toán được chốt công nợ NCC.', 'warn'); return;
     }
-    const p = getPur().find(x => x.id === id); if (!p || p.status !== 'wh_received') return;
+    const p = getPur().find(x => x.id === id); if (!p || (p.status !== 'wh_received' && p.status !== 'ordered')) return;
+    const fromWh = p.status === 'wh_received';   /* kho đã nhập SL/lỗi + cộng tồn → khoá cột, không cộng lại kho */
     const sup = findSup(p.supplierId) || {};
-    const canRet = p.canReturn != null ? !!p.canReturn : _canReturnOf(p.supplierId);
+    const canRetDefault = p.canReturn != null ? !!p.canReturn : _canReturnOf(p.supplierId);
+    const inS = 'text-align:right;border:1px solid var(--line);border-radius:5px;padding:4px 6px';
     const rows = (p.items || []).map((it, i) => {
       const recv = it.recvQty != null ? +it.recvQty : (+it.qty || 0);
-      const defect = +it.defectQty || 0;
+      const defect = it.defectQty != null ? +it.defectQty : 0;
+      const unit = _escP(it.unit || 'kg');
+      const recvCell = fromWh
+        ? `${_q(recv)} ${unit}`
+        : `<input type="number" data-money="0" class="stl-recv" data-i="${i}" value="${_q(recv)}" min="0" step="0.1" oninput="window._settleRecalc('${id}')" style="width:82px;${inS}"> ${unit}`;
+      const defCell = fromWh
+        ? `<span style="color:${defect ? '#B45309' : 'var(--muted)'}">${defect ? _q(defect) : '·'}</span>`
+        : `<input type="number" data-money="0" class="stl-def" data-i="${i}" value="${_q(defect)}" min="0" step="0.1" oninput="window._settleRecalc('${id}')" style="width:72px;${inS};border-color:#FCA5A5">`;
       return `<tr style="border-top:1px solid #F1F5F9">
-        <td style="padding:6px 8px"><b>${_escP(it.name)}</b>${it.stockedQty ? `<div style="font-size:10.5px;color:#15803D">dư vào kho ${_q(it.stockedQty)}${_escP(it.unit || 'kg')}</div>` : ''}</td>
-        <td style="padding:6px 8px;text-align:right">${_q(recv)} ${_escP(it.unit || 'kg')}</td>
-        <td style="padding:6px 8px;text-align:right;color:${defect ? '#B45309' : 'var(--muted)'}">${defect ? _q(defect) : '·'}</td>
-        <td style="padding:6px 8px;text-align:right"><input type="number" data-money="0" class="stl-price" data-i="${i}" value="${+it.price || ''}" min="0" step="1000" placeholder="giá" oninput="window._settleRecalc('${id}')" style="width:98px;text-align:right;border:1px solid #F59E0B;border-radius:5px;padding:4px 6px;background:#FFFBEB"></td>
-        <td class="stl-tot" data-i="${i}" style="padding:6px 8px;text-align:right;font-weight:600">0</td>
+        <td style="padding:7px 10px"><b>${_escP(it.name)}</b>${it.stockedQty ? `<div style="font-size:10.5px;color:#15803D">dư vào kho ${_q(it.stockedQty)}${unit}</div>` : ''}</td>
+        <td style="padding:7px 10px;text-align:right">${recvCell}</td>
+        <td style="padding:7px 10px;text-align:right">${defCell}</td>
+        <td style="padding:7px 10px;text-align:center">
+          <select class="stl-ret" data-i="${i}" onchange="window._settleRecalc('${id}')" style="padding:5px 7px;border:1px solid var(--line);border-radius:6px;font-size:12px;max-width:230px">
+            <option value="1" ${canRetDefault ? 'selected' : ''}>↩ NCC cho trả — trừ nợ</option>
+            <option value="0" ${!canRetDefault ? 'selected' : ''}>🗑 Không trả — hao hụt</option>
+          </select>
+          <div class="stl-rethint" data-i="${i}" style="font-size:10px;color:var(--muted);margin-top:2px"></div>
+        </td>
+        <td style="padding:7px 10px;text-align:right"><input type="number" data-money="0" class="stl-price" data-i="${i}" value="${+it.price || ''}" min="0" step="1000" placeholder="giá" oninput="window._settleRecalc('${id}')" style="width:110px;${inS};border-color:#F59E0B;background:#FFFBEB"></td>
+        <td class="stl-tot" data-i="${i}" style="padding:7px 10px;text-align:right;font-weight:700">0</td>
       </tr>`;
     }).join('');
-    const body = `<div style="font-size:12px;color:var(--muted);margin-bottom:8px">Kho đã nhận ${p.whBy ? '(<b>' + _escP(p.whBy) + '</b>' + (p.whReceivedAt ? ' · ' + _escP(p.whReceivedAt) : '') + ') ' : ''}— kế toán khớp <b>giá nhập</b> + chọn cách xử lý hàng lỗi → chốt công nợ NCC.</div>
-      <table style="width:100%;border-collapse:collapse;font-size:12.5px;border:1px solid var(--line);border-radius:8px;overflow:hidden">
+    const body = `<div style="font-size:12.5px;color:var(--muted);margin-bottom:10px">${fromWh
+        ? 'Kho đã nhận ' + (p.whBy ? '(<b>' + _escP(p.whBy) + '</b>' + (p.whReceivedAt ? ' · ' + _escP(p.whReceivedAt) : '') + ') ' : '') + '— kế toán khớp <b>giá nhập</b> + xử lý hàng lỗi từng mặt hàng → chốt công nợ.'
+        : '⚡ Kế toán chốt <b>trực tiếp</b> (kho chưa nhận). Nhập <b>Thực nhận</b> + <b>Lỗi</b> từng mặt hàng, khớp <b>giá</b>, chọn xử lý lỗi → chốt công nợ (hệ tự cộng phần dư vào tồn kho).'}</div>
+      <div style="overflow:auto;border:1px solid var(--line);border-radius:8px">
+      <table style="width:100%;border-collapse:collapse;font-size:12.5px;min-width:720px">
         <thead><tr style="background:#F8FAF8;color:var(--muted);font-size:11px;text-transform:uppercase">
-          <th style="padding:6px 8px;text-align:left">Mặt hàng</th><th style="padding:6px 8px;text-align:right">Thực nhận</th><th style="padding:6px 8px;text-align:right">Lỗi</th><th style="padding:6px 8px;text-align:right">Giá nhập</th><th style="padding:6px 8px;text-align:right">Thành tiền</th>
-        </tr></thead><tbody>${rows}</tbody></table>
-      <div style="margin-top:12px;background:#F8FAFC;border:1px solid var(--line);border-radius:8px;padding:10px 12px;font-size:12.5px">
-        <div style="font-weight:700;margin-bottom:5px">Hàng lỗi xử lý thế nào?</div>
-        <label style="display:block;margin-bottom:4px;cursor:pointer"><input type="radio" name="stlRet" value="1" ${canRet ? 'checked' : ''} onchange="window._settleRecalc('${id}')"> <b>NCC CHO trả</b> → trừ thẳng công nợ NCC (mình không mất tiền)</label>
-        <label style="display:block;cursor:pointer"><input type="radio" name="stlRet" value="0" ${!canRet ? 'checked' : ''} onchange="window._settleRecalc('${id}')"> <b>NCC KHÔNG cho trả</b> → ghi HAO HỤT (mình chịu, vẫn nợ đủ)</label>
-      </div>
-      <div id="stl-summary" style="margin-top:10px;text-align:right;font-size:14px">—</div>`;
+          <th style="padding:7px 10px;text-align:left">Mặt hàng</th>
+          <th style="padding:7px 10px;text-align:right">Thực nhận</th>
+          <th style="padding:7px 10px;text-align:right">Lỗi</th>
+          <th style="padding:7px 10px;text-align:center;min-width:210px">Xử lý lỗi (từng SP)</th>
+          <th style="padding:7px 10px;text-align:right">Giá nhập</th>
+          <th style="padding:7px 10px;text-align:right">Thành tiền</th>
+        </tr></thead><tbody>${rows}</tbody></table></div>
+      <div id="stl-summary" style="margin-top:12px;text-align:right;font-size:15px">—</div>`;
     window.openModal('💰 Chốt công nợ — ' + _escP(sup.name || p.supplierId), body, {
-      width: '660px',
+      fullWide: true,
       footer: `<button class="btn btn-ghost" onclick="window.closeModal()">Huỷ</button><button class="btn btn-primary" onclick="window.confirmSettle('${id}')">💰 Chốt công nợ</button>`,
     });
     setTimeout(() => window._settleRecalc(id), 0);
   };
-  /* Tính lại thành tiền + công nợ + hao hụt (live) theo giá đang gõ + lựa chọn cho-trả. */
+  /* Đọc số Thực nhận / Lỗi / cho-trả của 1 dòng từ DOM (ưu tiên input; fallback số đã lưu). */
+  function _stlRow(it, i, fromWh) {
+    const recvEl = document.querySelector('.stl-recv[data-i="' + i + '"]');
+    const defEl = document.querySelector('.stl-def[data-i="' + i + '"]');
+    const retEl = document.querySelector('.stl-ret[data-i="' + i + '"]');
+    const priceEl = document.querySelector('.stl-price[data-i="' + i + '"]');
+    const recv = recvEl ? (+recvEl.value || 0) : (it.recvQty != null ? +it.recvQty : (+it.qty || 0));
+    let defect = defEl ? (+defEl.value || 0) : (it.defectQty != null ? +it.defectQty : 0);
+    defect = Math.min(Math.max(0, defect), recv);
+    const canReturn = retEl ? retEl.value === '1' : true;
+    const price = priceEl ? (+priceEl.value || 0) : (+it.price || 0);
+    return { recv, defect, good: Math.max(0, recv - defect), canReturn, price };
+  }
+  /* Tính lại thành tiền + công nợ + hao hụt (live) theo từng mặt hàng. */
   window._settleRecalc = function (id) {
     const p = getPur().find(x => x.id === id); if (!p) return;
-    const canReturn = ((document.querySelector('input[name=stlRet]:checked') || {}).value === '1');
+    const fromWh = p.status === 'wh_received';
     let payable = 0, loss = 0;
     (p.items || []).forEach((it, i) => {
-      const recv = it.recvQty != null ? +it.recvQty : (+it.qty || 0);
-      const defect = +it.defectQty || 0;
-      const good = Math.max(0, recv - defect);
-      const priceEl = document.querySelector('.stl-price[data-i="' + i + '"]');
-      const price = priceEl ? (+priceEl.value || 0) : (+it.price || 0);
-      const lineDebt = Math.round((canReturn ? good : recv) * price);
-      payable += lineDebt; if (!canReturn) loss += Math.round(defect * price);
+      const r = _stlRow(it, i, fromWh);
+      const lineDebt = Math.round((r.canReturn ? r.good : r.recv) * r.price);
+      payable += lineDebt; if (!r.canReturn) loss += Math.round(r.defect * r.price);
       const totEl = document.querySelector('.stl-tot[data-i="' + i + '"]');
       if (totEl) totEl.textContent = window.fmt(lineDebt);
+      const hintEl = document.querySelector('.stl-rethint[data-i="' + i + '"]');
+      if (hintEl) hintEl.textContent = r.defect ? (r.canReturn ? 'trả ' + _q(r.defect) + ' → không tính tiền' : 'chịu ' + window.fmt(Math.round(r.defect * r.price)) + '₫') : '';
     });
     const sum = document.getElementById('stl-summary');
     if (sum) sum.innerHTML = 'Công nợ NCC: <b style="color:#B91C1C">' + window.fmt(payable) + '₫</b>' + (loss ? ' &nbsp;·&nbsp; Hao hụt: <b style="color:#B45309">' + window.fmt(loss) + '₫</b>' : '');
   };
-  window.confirmSettle = function (id) {
-    const canReturn = ((document.querySelector('input[name=stlRet]:checked') || {}).value === '1');
-    const priceMap = {};
-    document.querySelectorAll('.stl-price').forEach(inp => { priceMap[inp.dataset.i] = +inp.value || 0; });
-    _ktSettle(id, priceMap, canReturn);
-  };
-  function _ktSettle(id, priceMap, canReturn) {
+  window.confirmSettle = function (id) { _ktSettle(id); };
+  function _ktSettle(id) {
     const list = getPur(); const i = list.findIndex(x => x.id === id);
-    if (i < 0 || list[i].status !== 'wh_received') return;
+    if (i < 0 || (list[i].status !== 'wh_received' && list[i].status !== 'ordered')) return;
     const p = list[i];
+    const fromWh = p.status === 'wh_received';
     const prods = getProds(); const today = window.todayISO();
-    let payable = 0, lossVal = 0;
+    let payable = 0, lossVal = 0, anyReturn = false;
     (p.items || []).forEach((it, idx) => {
-      const recv = it.recvQty != null ? +it.recvQty : (+it.qty || 0);
-      const defect = +it.defectQty || 0;
-      const good = Math.max(0, recv - defect);
-      const price = priceMap[idx] != null ? priceMap[idx] : (+it.price || 0);
-      it.price = price;
-      const lineDebt = Math.round((canReturn ? good : recv) * price);   /* cho trả → trả phần tốt; không → trả đủ đã nhận */
-      payable += lineDebt; if (!canReturn) lossVal += Math.round(defect * price);
-      it.total = lineDebt; it.canReturn = canReturn;
+      const r = _stlRow(it, idx, fromWh);
+      it.recvQty = r.recv; it.defectQty = r.defect; it.goodQty = r.good; it.price = r.price;
+      const lineDebt = Math.round((r.canReturn ? r.good : r.recv) * r.price);  /* cho trả → trả phần tốt; không → trả đủ đã nhận */
+      payable += lineDebt; if (!r.canReturn) lossVal += Math.round(r.defect * r.price);
+      it.total = lineDebt; it.canReturn = r.canReturn; if (r.canReturn) anyReturn = true;
+      /* Kế toán chốt TRỰC TIẾP từ 'ordered' → kho chưa cộng → hệ cộng phần DƯ (good - khách cần) vào tồn kho. */
+      if (!fromWh) {
+        const demand = it.demandQty != null ? +it.demandQty : (+it.qty || 0);
+        const surplus = Math.max(0, Math.round((r.good - demand) * 100) / 100);
+        it.stockedQty = surplus;
+        if (surplus > 0 && it.productId) {
+          if (window.invApply) window.invApply(it.productId, +surplus);
+          if (window.invRecordMovement) window.invRecordMovement(it.productId, +surplus, 'purchase', 'KT chốt trực tiếp (dư) · ' + p.id, p.id);
+        }
+      }
       const pr = prods.find(x => x.id === it.productId);
-      if (pr && price) { pr.priceHistory = pr.priceHistory || []; const last = pr.priceHistory[pr.priceHistory.length - 1]; if (!last || last.date !== today) pr.priceHistory.push({ date: today, buy: price, sell: Math.round(price * 1.55) }); else last.buy = price; }
+      if (pr && r.price) { pr.priceHistory = pr.priceHistory || []; const last = pr.priceHistory[pr.priceHistory.length - 1]; if (!last || last.date !== today) pr.priceHistory.push({ date: today, buy: r.price, sell: Math.round(r.price * 1.55) }); else last.buy = r.price; }
     });
     window.STORE.set('products', prods);
-    /* KHÔNG cộng kho ở đây — kho đã cộng phần dư ở bước Nhận hàng NCC. */
-    p.status = 'received'; p.total = payable; p.lossValue = lossVal; p.canReturn = canReturn;
+    p.status = 'received'; p.total = payable; p.lossValue = lossVal; p.canReturn = anyReturn;
+    if (!fromWh) { p.whReceivedAt = window.todayVN ? window.todayVN() : ''; p.whBy = (window.CURRENT_USER && window.CURRENT_USER.name) || ''; }
     window.STORE.set('purchases', list);
     const sup = getSup().find(s => s.id === p.supplierId);
     if (sup) window.STORE.update('suppliers', sup.id, { debt: (+sup.debt || 0) + payable, totalSpend: (+sup.totalSpend || 0) + payable });
-    if (window.STORE.rmwKv) window.STORE.rmwKv('supplierMeta', m => { m = m || {}; m[p.supplierId] = { ...(m[p.supplierId] || {}), canReturn }; return m; }, {});
-    if (window.audit) window.audit.log('purchase.settle', `Chốt công nợ ${id} · ${window.fmt(payable)}₫${lossVal ? ` · hao hụt ${window.fmt(lossVal)}₫` : ''}`);
+    if (window.audit) window.audit.log('purchase.settle', `Chốt công nợ ${id} · ${window.fmt(payable)}₫${lossVal ? ` · hao hụt ${window.fmt(lossVal)}₫` : ''}${fromWh ? '' : ' [KT chốt trực tiếp]'}`);
     window.closeModal && window.closeModal();
     window.toast(`✓ Đã chốt công nợ NCC ${window.fmt(payable)}₫` + (lossVal ? ` · ⚠ hao hụt ${window.fmt(lossVal)}₫` : ''), 'success');
   }
