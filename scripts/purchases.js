@@ -574,35 +574,8 @@
     (window.closeModal || window.closeDrawer || function(){})();   /* phiếu giờ là popup (openModal) */
   };
 
-  window.payPur = function (id) {
-    const p = getPur().find(x => x.id === id);
-    if (!p) return;
-    const due = p.total - (p.paid || 0);
-    const amt = parseFloat(prompt(`Số tiền thanh toán (còn nợ ${window.fmt(due)} ₫):`, due));
-    if (!amt || amt <= 0) return;
-    const list = getPur();
-    const i = list.findIndex(x => x.id === id);
-    list[i].paid = (list[i].paid || 0) + amt;
-    window.STORE.set('purchases', list);
-    /* Giảm công nợ NCC */
-    const sups = getSup();
-    const si = sups.findIndex(s => s.id === p.supplierId);
-    if (si >= 0) {
-      sups[si].debt = Math.max(0, (sups[si].debt || 0) - amt);
-      window.STORE.set('suppliers', sups);
-    }
-    /* Ghi phiếu chi */
-    const cash = window.STORE.get('cashEntries', []) || [];
-    cash.unshift({
-      no: _nextCashNo(cash, 'PC'), date:window.todayVN(),
-      type:'out', amount: amt, account:'Tiền mặt',
-      party: findSup(p.supplierId)?.name || p.supplierId,
-      desc:'Thanh toán phiếu ' + id,
-    });
-    window.STORE.set('cashEntries', cash);
-    if (window.audit) window.audit.log('purchase.pay', `${id}: ${window.fmt(amt)} ₫`);
-    window.toast('✓ Đã ghi thanh toán + phiếu chi', 'success');
-  };
+  /* (Đã gỡ payPur — code chết: dùng prompt() + ghi 3 nơi (p.paid + suppliers.debt + phiếu chi) gây
+     trừ nợ 2 lần. Không nút nào gọi. Thanh toán NCC nay ở Công nợ NCC / Nhà cung cấp — chỉ ghi phiếu chi. */
 
   /* ====== Tạo phiếu mới ======
      forSup: id NCC chọn sẵn (vd 'EXT-MARKET' cho thu mua ngoài)

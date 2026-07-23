@@ -177,20 +177,7 @@
     if (q.status === 'draft') window.qtChangeStatus(id, 'sent');
   };
 
-  /* Legacy wrappers — vẫn giữ để drawer cũ tương thích nhưng đều redirect qua qtChangeStatus */
-  window.qtSend = function (id) {
-    window.qtChangeStatus(id, 'sent');
-    window.closeDrawer && window.closeDrawer();
-  };
-
-  window.qtAccept = function (id) {
-    window.qtChangeStatus(id, 'accepted');
-    window.closeDrawer && window.closeDrawer();
-  };
-  window.qtReject = function (id) {
-    window.qtChangeStatus(id, 'rejected');
-    window.closeDrawer && window.closeDrawer();
-  };
+  /* (Đã gỡ qtSend/qtAccept/qtReject — legacy wrappers của drawer cũ, không nút nào gọi. Dùng qtChangeStatus.) */
 
   /* ============================================================
      PDF Báo giá — chuẩn nhận diện thương hiệu TUẤN TÚ FARM

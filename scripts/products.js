@@ -36,12 +36,7 @@
   }
   window.PriceTiers = { getTiers, tierById, tierPriceOf, tierIcon };
 
-  /* Ô nhập giá hiển thị định dạng tiền (16.000) — gõ tới đâu format tới đó.
-     Đọc lại bằng _pmoney() (bỏ dấu chấm). */
-  window.fmtMoneyInput = function (el) {
-    const d = String(el.value).replace(/\D/g, '');
-    el.value = d ? (+d).toLocaleString('vi-VN') : '';
-  };
+  /* (Đã gỡ fmtMoneyInput — trùng với _fmtMoneyInput dùng thật ở orders.js; bản này không ai gọi.) */
   const _pmoney = v => parseInt(String(v).replace(/\D/g, ''), 10) || 0;
   const _mfmt = n => (+n || 0).toLocaleString('vi-VN');
 
@@ -108,15 +103,7 @@
     renderBoard();
     window.toast(`✓ Đã đặt giá gốc = giá nhập +${x}% cho ${n} SP`, 'success');
   };
-  window.tierApplyMarkup = function () {
-    if (!boardTier) return;
-    const v = parseFloat(document.getElementById('tierMarkup').value);
-    if (isNaN(v)) { window.toast('Nhập % hợp lệ', 'warn'); return; }
-    const t = getTiers().find(x => x.id === boardTier); if (!t) return;
-    window.STORE.rmwKv('priceTiers', arr => { const tt = arr.find(x => x.id === boardTier); if (tt) tt.markup = v; return arr; });
-    window.toast(`✓ ${t.name}: giá gốc ${v >= 0 ? '+' : ''}${v}%`, 'success');
-    renderBoard();
-  };
+  /* (Đã gỡ tierApplyMarkup — không nút nào gọi; nút "Áp dụng %" dùng baseApplyMarkup.) */
   window.tierResetOverride = function (pid) {
     if (!boardTier) return;
     if (!getTiers().find(x => x.id === boardTier)) return;
