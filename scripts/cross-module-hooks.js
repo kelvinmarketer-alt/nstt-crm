@@ -165,8 +165,7 @@
         const list = S.get('purchases', []) || [];
         const prods = S.get('products', []) || [];
         const meta = S.get('supplierMeta', {}) || {};
-        const sups = S.get('suppliers', []) || [];
-        let changed = false;
+        let changed = false; const affected = new Set();
         list.forEach(p => {
           if (p.status !== 'wh_received' || !/^PN-GOM-/.test(p.id || '')) return;
           const dISO = _pDateISO(p);
@@ -184,12 +183,13 @@
             payable += lineDebt; if (canReturn) anyReturn = true;
           });
           p.status = 'received'; p.total = payable; p.canReturn = anyReturn; p.priceWarn = priceWarn; p.autoSettled = true;
-          const sup = sups.find(s => s.id === p.supplierId);
-          if (sup) S.update('suppliers', sup.id, { debt: (+sup.debt || 0) + payable, totalSpend: (+sup.totalSpend || 0) + payable });
+          affected.add(p.supplierId);
           if (window.audit) window.audit.log('purchase.autosettle', `Tự chốt công nợ ${p.id} · ${payable}₫${priceWarn ? ' · ⚠ thiếu giá' : ''}`);
           changed = true;
         });
         if (changed) S.set('purchases', list);
+        /* KHÔNG ghi suppliers.debt: bảng suppliers KHÔNG có cột debt (bị strip, luôn 0 sau reload).
+           Công nợ NCC = DẪN XUẤT Σ(received total − paid) ở module Công nợ NCC (nguồn tin cậy duy nhất). */
       } finally { _autoStlRunning = false; }
     }
     S.subscribe('purchases', autoSettleWhReceived);

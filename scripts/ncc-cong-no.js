@@ -7,6 +7,11 @@
   const getPur = () => (S().get('purchases', window.PURCHASES || []) || []);
   const escH = v => String(v == null ? '' : v).replace(/[&<>"]/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]));
   const typeOf = id => ((S().get('supplierMeta', {}) || {})[id] || {}).type || '';
+  /* Công nợ CÒN NỢ = DẪN XUẤT từ phiếu nhập đã nhận (Σ total − paid) — luôn đúng, không lệ thuộc suppliers.debt (dễ drift) */
+  function _supRemainAll(id) {
+    return getPur().filter(p => p.status === 'received' && p.supplierId === id && p.supplierId !== 'EXT-MARKET')
+      .reduce((s, p) => s + Math.max(0, (+p.total || 0) - (+p.paid || 0)), 0);
+  }
   const _nk = s => String(s || '').toLowerCase().normalize('NFD').replace(/[̀-ͯ]/g, '').replace(/đ/g, 'd');
   let _last = null, _q = '';
 
@@ -40,7 +45,7 @@
     Object.values(rows).forEach(r => {
       r.paid = cash.filter(e => daySet.has(dmyToISO(e.date)) && cashForSup(e, r)).reduce((s, e) => s + (+e.amount || 0), 0);
       r.remain = r.total - r.paid;
-      r.debtNow = (byId[r.key] && +byId[r.key].debt) || 0;
+      r.debtNow = _supRemainAll(r.key);   /* DẪN XUẤT từ phiếu nhập (không lệ thuộc suppliers.debt hay drift) */
     });
     return { days, list: Object.values(rows).sort((a, b) => b.total - a.total) };
   }
@@ -81,7 +86,7 @@
       <td class="num"><b>${fmtU(r.total)}</b></td>
       <td class="num cn-paid">${r.paid ? fmtU(r.paid) : '·'}</td>
       <td class="num cn-owe">${r.remain ? fmtU(r.remain) : '·'}</td>
-      <td class="num" style="font-weight:800;color:#DC2626">${r.debtNow ? `<a href="javascript:void(0)" onclick="window.ncdPay('${r.key}')" title="Bấm để ghi thanh toán công nợ NCC" style="color:#DC2626;text-decoration:none;border-bottom:1px dotted #DC2626">${fmtU(r.debtNow)}</a>` : '·'}</td>
+      <td class="num" style="font-weight:800;color:#DC2626;white-space:nowrap">${r.debtNow ? `${fmtU(r.debtNow)} <button onclick="window.ncdPay('${r.key}')" title="Thanh toán công nợ NCC" style="background:#DC2626;color:#fff;border:none;border-radius:6px;padding:3px 9px;font-size:11px;font-weight:800;cursor:pointer;margin-left:2px">💵 Trả</button>` : '·'}</td>
     </tr>`).join('')}</tbody>`;
     const foot = `<tfoot><tr>
       <td class="par">TỔNG CỘNG</td>
@@ -131,9 +136,9 @@
 
   /* ===== Thanh toán công nợ NCC — popup nhập số tiền (trả 1 phần / trả hết) ===== */
   window.ncdPay = function (id) {
-    const s = getSup().find(x => x.id === id);
-    if (!s || !(+s.debt > 0)) { window.toast && window.toast('NCC này không còn nợ', 'info'); return; }
-    const debt = +s.debt || 0;
+    const s = getSup().find(x => x.id === id) || { name: id };
+    const debt = _supRemainAll(id);
+    if (!(debt > 0)) { window.toast && window.toast('NCC này không còn nợ', 'info'); return; }
     const _i = 'width:100%;box-sizing:border-box;border:1px solid var(--line);border-radius:8px;padding:10px;font-size:16px;margin-top:4px';
     window.openModal('💵 Thanh toán công nợ — ' + escH(s.name), `
       <div style="font-size:13px;margin-bottom:10px">Đang nợ: <b style="color:#DC2626">${window.fmt(debt)}₫</b></div>
@@ -147,28 +152,27 @@
     `, { width: '420px', footer: `<button class="btn btn-ghost" onclick="window.closeModal()">Huỷ</button><button class="btn btn-primary" onclick="window._ncdDoPay('${id}')">💵 Ghi thanh toán</button>` });
   };
   window._ncdDoPay = function (id) {
-    const list = getSup(); const s = list.find(x => x.id === id); if (!s) return;
-    const debt = +s.debt || 0;
+    const debt = _supRemainAll(id);
     let amt = parseFloat(String((document.getElementById('ncdPayAmt') || {}).value || '').replace(/[^\d.]/g, '')) || 0;
     amt = Math.min(Math.max(0, Math.round(amt)), debt);
     if (!(amt > 0)) { window.toast && window.toast('Nhập số tiền > 0', 'warn'); return; }
-    s.debt = Math.max(0, debt - amt);
-    S().set('suppliers', list);
     /* FIFO: trừ dần vào phiếu received cũ nhất */
     const pur = getPur(); let rem = amt, purCh = false;
     pur.filter(p => p.supplierId === id && p.status === 'received').sort((a, b) => (dmyToISO(a.date) < dmyToISO(b.date) ? -1 : 1))
       .forEach(p => { const due = (+p.total || 0) - (+p.paid || 0); if (due > 0.5 && rem > 0.5) { const pay = Math.min(due, rem); p.paid = (+p.paid || 0) + pay; rem -= pay; purCh = true; } });
-    if (purCh) S().set('purchases', pur);
+    if (purCh) S().set('purchases', pur);   /* paid trên phiếu = nguồn thật (suppliers KHÔNG có cột debt) */
+    const s = getSup().find(x => x.id === id);
     const cash = S().get('cashEntries', []) || [];
     const pcMax = cash.reduce((m, e) => { const n = parseInt(String(e.no || '').replace(/^PC/, ''), 10); return isNaN(n) ? m : Math.max(m, n); }, 0);
     cash.unshift({
       no: 'PC' + String(pcMax + 1).padStart(4, '0'),
       date: (window.todayVN ? window.todayVN() : new Date().toLocaleDateString('vi-VN')),
-      type: 'out', amount: amt, account: 'Tiền mặt', party: s.name, desc: 'Thanh toán công nợ NCC ' + s.id,
+      type: 'out', amount: amt, account: 'Tiền mặt', party: (s && s.name) || id, desc: 'Thanh toán công nợ NCC ' + id,
     });
     S().set('cashEntries', cash);
-    if (window.audit) window.audit.log('supplier.pay', `Trả ${window.fmt(amt)} ₫ cho ${s.name}`);
-    window.toast && window.toast('✓ Đã ghi phiếu chi ' + window.fmt(amt) + ' ₫' + (s.debt > 0 ? ' · còn nợ ' + window.fmt(s.debt) : ' · hết nợ'), 'success');
+    const remainAfter = _supRemainAll(id);
+    if (window.audit) window.audit.log('supplier.pay', `Trả ${window.fmt(amt)} ₫ cho ${(s && s.name) || id}`);
+    window.toast && window.toast('✓ Đã ghi phiếu chi ' + window.fmt(amt) + ' ₫' + (remainAfter > 0 ? ' · còn nợ ' + window.fmt(remainAfter) : ' · hết nợ'), 'success');
     window.closeModal && window.closeModal();
     window.ncdRender();
   };
