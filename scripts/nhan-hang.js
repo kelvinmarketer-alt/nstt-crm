@@ -96,7 +96,7 @@
     const selCount = _sel.size;
     let html = '';
     html += `<div style="background:#EFF6FF;border:1px solid #BFDBFE;border-radius:10px;padding:11px 14px;font-size:12.5px;color:#1E40AF;margin-bottom:16px">
-      📦 <b>Kho chỉ xác nhận số lượng thực nhận & hàng lỗi.</b> Phần dư tự vào tồn kho. Giá & công nợ do <b>Kế toán</b> chốt sau (Tài chính → Phiếu nhập).</div>`;
+      📦 <b>Kho xác nhận thực nhận & hàng lỗi</b> → hệ <b>TỰ CHỐT công nợ NCC</b> theo giá nhập danh mục (ngày nhập). Phần dư tự vào tồn kho. Kế toán <b>sửa lại giá/công nợ</b> ở Tài chính → Phiếu nhập.</div>`;
     html += `<input id="nhSearchInp" value="${esc(_searchVal)}" oninput="window.nhSearch(this.value)" placeholder="🔍 Tìm nhà cung cấp hoặc mặt hàng để xác nhận…" style="width:100%;box-sizing:border-box;border:1px solid var(--line);border-radius:8px;padding:10px 12px;font-size:16px;margin-bottom:12px">`;
     html += `<div style="display:flex;align-items:center;gap:12px;flex-wrap:wrap;margin:0 0 10px;position:sticky;top:0;background:var(--bg,#F7F8F7);z-index:5;padding:4px 0">
         <div style="font-weight:800;color:#1B5E20;font-size:13px">⏳ Chờ nhận kho (${pending.length})</div>
@@ -169,7 +169,7 @@
     _sel.delete(id);
     S().set('purchases', list);
     if (window.audit) window.audit.log('purchase.wh_receive', 'Kho nhận ' + id + (surplusTot ? ' · tồn +' + _q(surplusTot) : '') + (defTot ? ' · lỗi ' + _q(defTot) : ''));
-    window.toast && window.toast('✓ Đã nhận kho' + (surplusTot ? ' · tồn +' + _q(surplusTot) + 'kg' : '') + ' · chờ kế toán chốt công nợ', 'success');
+    window.toast && window.toast('✓ Đã nhận kho + tự chốt công nợ NCC' + (surplusTot ? ' · tồn +' + _q(surplusTot) + 'kg' : '') + ' (kế toán sửa được ở Phiếu nhập)', 'success');
   };
 
   /* ===== Chọn phiếu để thao tác hàng loạt (cập nhật thanh công cụ, KHÔNG render lại kẻo mất số đã gõ) ===== */
@@ -239,7 +239,7 @@
     _sel.clear();
     S().set('purchases', list);
     if (window.audit) window.audit.log('purchase.wh_receive_bulk', 'Kho nhận hàng loạt ' + ids.length + ' phiếu' + (ns ? ' · tồn +' + _q(ns) : ''));
-    window.toast && window.toast('✓ Đã nhận kho ' + ids.length + ' phiếu' + (ns ? ' · tồn +' + _q(ns) + 'kg' : ''), 'success');
+    window.toast && window.toast('✓ Đã nhận kho + tự chốt công nợ ' + ids.length + ' phiếu' + (ns ? ' · tồn +' + _q(ns) + 'kg' : ''), 'success');
   };
 
   window.nhDelBulk = async function () {

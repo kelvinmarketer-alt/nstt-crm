@@ -82,7 +82,7 @@
     const mvHas = (refId, type) => (S.get('inv_movements', []) || []).some(m => m.refId === refId && m.type === type);
     const dlHas = (ref, type) => (S.get('debtLedger', []) || []).some(e => e.ref === ref && e.type === type);
     /* Kick preload sớm các sổ cái idempotency (get → tự preload từ cloud) */
-    S.get('inv_movements', []); S.get('debtLedger', []); S.get('cashEntries', []);
+    S.get('inv_movements', []); S.get('debtLedger', []); S.get('cashEntries', []); S.get('products', []); S.get('purchases', []);
 
     /* ============================================================
        1. Orders delivered → trừ kho (idempotent qua inv_movements ref=code)
@@ -123,7 +123,9 @@
         const list = S.get('purchases', []) || [];
         let changed = false;
         list.forEach(p => {
-          if (p.status === 'received' && !p._invApplied && !p.noStock) {
+          /* Phiếu GOM (PN-GOM-) tự lo tồn kho phần DƯ ở "Nhận hàng NCC" (nhReceive → invApply surplus).
+             KHÔNG cộng full qty ở đây — no_stock không có cột DB (mất sau reload) nên loại theo tiền tố id. */
+          if (p.status === 'received' && !p._invApplied && !p.noStock && !/^PN-GOM-/.test(p.id || '')) {
             if (!mvHas(p.id, 'purchase')) {
               (p.items || []).forEach(it => {
                 if (it.productId) {
@@ -141,6 +143,57 @@
     }
     S.subscribe('purchases', applyPurchaseInv);
     S.subscribe('__preloaded__', k => { if (k === 'purchases' || k === 'inv_movements') applyPurchaseInv(); });
+
+    /* ============================================================
+       2b. KHO nhận (wh_received) → TỰ CHỐT công nợ NCC.
+           Giá = giá nhập DANH MỤC tại ngày nhập × hàng TỐT (good = recv − lỗi), theo cho-trả.
+           Thiếu giá ngày đó → chốt giá 0 + cờ priceWarn (kế toán vào Phiếu nhập sửa sau).
+           KHÔNG cộng kho ở đây (nhận-hàng-NCC đã cộng phần dư — applyPurchaseInv thấy movement → bỏ qua).
+       ============================================================ */
+    let _autoStlRunning = false;
+    function _catBuyOn(prods, pid, dISO) {
+      if (!pid) return 0;
+      const pr = prods.find(x => x.id === pid); if (!pr || !Array.isArray(pr.priceHistory)) return 0;
+      let best = null; pr.priceHistory.forEach(h => { if (h && h.date && h.date <= dISO && (+h.buy || 0) > 0 && (!best || h.date > best.date)) best = h; });
+      return best ? (+best.buy || 0) : 0;
+    }
+    function _pDateISO(p) { const m = String(p && p.date || '').match(/(\d{1,2})\/(\d{1,2})\/(\d{4})/); return m ? `${m[3]}-${String(m[2]).padStart(2, '0')}-${String(m[1]).padStart(2, '0')}` : (window.todayISO ? window.todayISO() : ''); }
+    function autoSettleWhReceived() {
+      if (_autoStlRunning || !ready('purchases', 'products')) return;
+      _autoStlRunning = true;
+      try {
+        const list = S.get('purchases', []) || [];
+        const prods = S.get('products', []) || [];
+        const meta = S.get('supplierMeta', {}) || {};
+        const sups = S.get('suppliers', []) || [];
+        let changed = false;
+        list.forEach(p => {
+          if (p.status !== 'wh_received' || !/^PN-GOM-/.test(p.id || '')) return;
+          const dISO = _pDateISO(p);
+          const canRetDefault = p.canReturn != null ? !!p.canReturn : !!((meta[p.supplierId] || {}).canReturn);
+          let payable = 0, priceWarn = false, anyReturn = false;
+          (p.items || []).forEach(it => {
+            const recv = it.recvQty != null ? +it.recvQty : (+it.qty || 0);
+            const defect = it.defectQty != null ? +it.defectQty : 0;
+            const good = Math.max(0, recv - defect);
+            const canReturn = it.canReturn != null ? !!it.canReturn : canRetDefault;
+            let price = +it.price || _catBuyOn(prods, it.productId, dISO);
+            if (!(price > 0)) { priceWarn = true; price = 0; }
+            const lineDebt = Math.round((canReturn ? good : recv) * price);
+            it.price = price; it.goodQty = good; it.total = lineDebt; it.canReturn = canReturn;
+            payable += lineDebt; if (canReturn) anyReturn = true;
+          });
+          p.status = 'received'; p.total = payable; p.canReturn = anyReturn; p.priceWarn = priceWarn; p.autoSettled = true;
+          const sup = sups.find(s => s.id === p.supplierId);
+          if (sup) S.update('suppliers', sup.id, { debt: (+sup.debt || 0) + payable, totalSpend: (+sup.totalSpend || 0) + payable });
+          if (window.audit) window.audit.log('purchase.autosettle', `Tự chốt công nợ ${p.id} · ${payable}₫${priceWarn ? ' · ⚠ thiếu giá' : ''}`);
+          changed = true;
+        });
+        if (changed) S.set('purchases', list);
+      } finally { _autoStlRunning = false; }
+    }
+    S.subscribe('purchases', autoSettleWhReceived);
+    S.subscribe('__preloaded__', k => { if (k === 'purchases' || k === 'products') autoSettleWhReceived(); });
 
     /* ============================================================
        3+4. Đơn KH chưa TT → cộng customer.debt (idempotent qua debtLedger ref=code)
