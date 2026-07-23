@@ -67,6 +67,8 @@
               priceTier: null, priceTierName: null,
               /* đơn giao bù (trả hàng) — metadata local, KHÔNG cột DB */
               isReplacement: null, replacementFor: null,
+              /* metadata local KHÔNG có cột DB → drop (nếu gửi lên = 400 "column not found" = báo đỏ lỗi cloud) */
+              transitAt: null, transitBy: null, pickupAt: null,
               /* drop legacy VTY fields */
               driver: null, external: null, partner: null },
       from: { order_date:'date', cust_name:'custName', customer_id:'cust', service_type:'serviceType',
@@ -146,7 +148,9 @@
               avg_daily:'avgDaily', last_in:'lastIn', last_out:'lastOut' },
     },
     purchases: {
-      to:   { supplierId:'supplier_id' },
+      /* whReceivedAt/whBy = metadata KHO nhận (bước 2) — KHÔNG có cột DB → drop (gửi lên = 400 báo đỏ lỗi cloud).
+         Trạng thái (ordered→wh_received→received) lưu ở cột `status`; SL nhận/lỗi/dư lưu trong `items` (jsonb) → vẫn bền. */
+      to:   { supplierId:'supplier_id', whReceivedAt: null, whBy: null, whStatus: null },
       from: { supplier_id:'supplierId' },
     },
     quotes: {
