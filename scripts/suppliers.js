@@ -8,6 +8,14 @@
   const tcName = v => String(v == null ? '' : v).trim().toLowerCase().replace(/(^|[\s(\/-])(\S)/g, (m, sp, ch) => sp + ch.toUpperCase());
   function getSup() { return window.STORE.get('suppliers', window.SUPPLIERS || []) || []; }
   function getPur() { return window.STORE.get('purchases', window.PURCHASES || []) || []; }
+  const getCash = () => window.STORE.get('cashEntries', []) || [];
+  const getClaims = () => window.STORE.get('supplierClaims', []) || [];
+  const _dmyToISO = dmy => { const m = String(dmy || '').match(/(\d{1,2})\/(\d{1,2})\/(\d{4})/); return m ? `${m[3]}-${String(m[2]).padStart(2, '0')}-${String(m[1]).padStart(2, '0')}` : ''; };
+  /* CÔNG NỢ NCC = DẪN XUẤT: Σ nhập(received) − Σ phiếu chi tiền mặt − Σ trả hàng. (suppliers KHÔNG có cột debt) */
+  function _supNhap(id) { return getPur().filter(p => p.status === 'received' && p.supplierId === id && p.supplierId !== 'EXT-MARKET').reduce((s, p) => s + (+p.total || 0), 0); }
+  function _supPaidCash(id) { const nm = (getSup().find(s => s.id === id) || {}).name || ''; return getCash().filter(e => e && e.type === 'out' && (e.party === nm || (e.desc && String(e.desc).includes(id)))).reduce((s, e) => s + (+e.amount || 0), 0); }
+  function _supClaims(id) { return getClaims().filter(c => c && c.supplierId === id && c.status !== 'settled' && c.status !== 'cancelled').reduce((s, c) => s + (+c.amount || 0), 0); }
+  function _supDebt(id) { return Math.max(0, _supNhap(id) - _supPaidCash(id) - _supClaims(id)); }
   /* Loại NCC (sỉ/lẻ/cả hai) — cloud suppliers không có cột → lưu kv 'supplierMeta' */
   const getSupMeta = () => window.STORE.get('supplierMeta', {}) || {};
   const supplyTypeOf = id => { const m = getSupMeta()[id]; return (m && m.type) || 'both'; };
@@ -39,8 +47,8 @@
     const list = getSup();
     const si = list.filter(s => groupOf(s) === 'si').length;
     const le = list.filter(s => groupOf(s) === 'le').length;
-    const totalDebt = list.reduce((s, x) => s + (x.debt || 0), 0);
-    const nDebt = list.filter(s => s.debt > 0).length;
+    const totalDebt = list.reduce((s, x) => s + _supDebt(x.id), 0);
+    const nDebt = list.filter(s => _supDebt(s.id) > 0).length;
     document.getElementById('supKpis').innerHTML = `
       <div class="ik-kpi" style="background:#fff;border:1px solid var(--line);border-radius:10px;padding:14px">
         <div style="font-size:11px;color:var(--muted);text-transform:uppercase;font-weight:700">📦 Nhà cung cấp SỈ ${window.helpTip('Giao cả lô theo tổng — kho tự chia cho từng khách.')}</div>
@@ -94,7 +102,7 @@
             <span style="display:inline-block;min-width:22px;padding:1px 7px;background:${prods.length ? '#EFF6FF' : '#F1F5F9'};color:${prods.length ? '#1E40AF' : '#94A3B8'};border-radius:20px;font-weight:700;font-size:12px;font-variant-numeric:tabular-nums">${prods.length}</span>
           </span>
           <span style="flex:0 0 128px;font-variant-numeric:tabular-nums;color:var(--muted);font-size:12.5px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${has(s.phone) ? escH(s.phone) : dash}</span>
-          <span style="flex:0 0 150px;text-align:right;font-variant-numeric:tabular-nums;white-space:nowrap;font-weight:${s.debt > 0 ? '700' : '400'};color:${s.debt > 0 ? '#DC2626' : 'var(--muted)'}">${money(s.debt)}</span>
+          <span style="flex:0 0 150px;text-align:right;font-variant-numeric:tabular-nums;white-space:nowrap;font-weight:${_supDebt(s.id) > 0 ? '700' : '400'};color:${_supDebt(s.id) > 0 ? '#DC2626' : 'var(--muted)'}">${money(_supDebt(s.id))} <button onclick="event.stopPropagation();event.preventDefault();window.supPayHistory('${s.id}')" title="Lịch sử thanh toán NCC — đã trả bao nhiêu, tuổi nợ" style="background:#fff;border:1px solid var(--line);border-radius:6px;padding:2px 6px;font-size:11px;cursor:pointer;vertical-align:middle">📜</button></span>
         </summary>
         <div style="padding:2px 14px 13px 38px;background:#FAFBFA">
           <div style="font-size:10.5px;color:var(--muted);text-transform:uppercase;font-weight:700;letter-spacing:.3px;margin-bottom:4px">Sản phẩm cung cấp (${prods.length})</div>
@@ -219,9 +227,12 @@
       </div>
 
       <div style="padding:18px 20px">
-        <div style="padding:12px 14px;border-radius:9px;background:${s.debt > 0 ? '#FEE2E2' : '#F0FDF4'};border:1px solid ${s.debt > 0 ? '#FECACA' : '#BBF7D0'};margin-bottom:16px">
-          <div style="font-size:11px;color:var(--muted);text-transform:uppercase;font-weight:700">Công nợ phải trả ${window.helpTip('Tiền bạn còn nợ NCC này (phiếu nhập NET chưa thanh toán).')}</div>
-          <div style="font-size:21px;font-weight:800;color:${s.debt > 0 ? '#DC2626' : 'var(--ok)'};margin-top:2px">${s.debt > 0 ? window.fmt(s.debt) + ' ₫' : '— Hết nợ'}</div>
+        <div style="padding:12px 14px;border-radius:9px;background:${_supDebt(s.id) > 0 ? '#FEE2E2' : '#F0FDF4'};border:1px solid ${_supDebt(s.id) > 0 ? '#FECACA' : '#BBF7D0'};margin-bottom:16px">
+          <div style="display:flex;justify-content:space-between;align-items:center;gap:8px;flex-wrap:wrap">
+            <div><div style="font-size:11px;color:var(--muted);text-transform:uppercase;font-weight:700">Công nợ phải trả ${window.helpTip('Σ nhập (đã nhận) − Σ phiếu chi tiền mặt − Σ trả hàng.')}</div>
+            <div style="font-size:21px;font-weight:800;color:${_supDebt(s.id) > 0 ? '#DC2626' : 'var(--ok)'};margin-top:2px">${_supDebt(s.id) > 0 ? window.fmt(_supDebt(s.id)) + ' ₫' : '— Hết nợ'}</div></div>
+            <button class="btn btn-ghost btn-sm" onclick="window.supPayHistory('${s.id}')" title="Lịch sử thanh toán — đã trả bao nhiêu, tuổi nợ">📜 Lịch sử trả nợ</button>
+          </div>
         </div>
 
         <h3 style="margin:0 0 8px;font-size:12px;color:var(--muted);text-transform:uppercase;letter-spacing:.5px">🥬 Sản phẩm cung cấp (${prods.length}) <span style="text-transform:none;font-weight:400;color:#94A3B8">— sửa tên/giá tại chỗ · ✕ để xoá</span></h3>
@@ -252,7 +263,7 @@
         </details>
 
         <button class="btn btn-primary" style="width:100%;margin-top:18px" onclick="window.openSupModal('${s.id}')">✏️ Sửa nhà cung cấp</button>
-        ${s.debt > 0 ? `<button class="btn btn-ghost" style="width:100%;margin-top:8px;color:var(--ok)" onclick="window.paySupplier('${s.id}')">💰 Ghi thanh toán NCC</button>` : ''}
+        ${_supDebt(s.id) > 0 ? `<button class="btn btn-ghost" style="width:100%;margin-top:8px;color:var(--ok)" onclick="window.paySupplier('${s.id}')">💰 Ghi thanh toán NCC</button>` : ''}
       </div>`;
     document.getElementById('drawer').classList.add('open');
     document.getElementById('drawerBg').classList.add('open');
@@ -463,41 +474,69 @@
     render();
   };
 
+  /* Thanh toán NCC — popup nhập số tiền (công nợ DẪN XUẤT, chỉ ghi phiếu chi) */
   window.paySupplier = function (id) {
-    const s = getSup().find(x => x.id === id);
-    if (!s || !s.debt) return;
-    if (!confirm(`Ghi thanh toán ${window.fmt(s.debt)} ₫ cho ${s.name}?`)) return;
-    const amt = +s.debt || 0;   /* CHỐT số tiền TRƯỚC khi zero (s và list[idx] cùng reference → nếu không phiếu chi = 0₫) */
-    const list = getSup();
-    const idx = list.findIndex(x => x.id === id);
-    list[idx].debt = 0;
-    window.STORE.set('suppliers', list);
-    /* Đồng bộ: phiếu nhập NET đã nhận của NCC → ĐÃ TRẢ (khớp công nợ ↔ phiếu) */
-    const pur = window.STORE.get('purchases', []) || []; let purCh = false;
-    pur.forEach(p => { if (p.supplierId === id && p.status === 'received' && (+p.total || 0) - (+p.paid || 0) > 0.5) { p.paid = p.total; purCh = true; } });
-    if (purCh) window.STORE.set('purchases', pur);
-    /* Ghi phiếu chi */
-    const cash = window.STORE.get('cashEntries', []) || [];
-    const _pcMax = cash.reduce((m, e) => {
-      const n = parseInt(String(e.no || '').replace(/^PC/, ''), 10);
-      return isNaN(n) ? m : Math.max(m, n);
-    }, 0);
-    cash.unshift({
-      no: 'PC' + String(_pcMax + 1).padStart(4,'0'),
-      date: window.todayVN(), type: 'out', amount: amt,
-      account: 'Tiền mặt', party: s.name,
-      desc: 'Thanh toán công nợ NCC ' + s.id,
-    });
+    const s = getSup().find(x => x.id === id) || { name: id };
+    const debt = _supDebt(id);
+    if (!(debt > 0)) { window.toast && window.toast('NCC này không còn nợ', 'info'); return; }
+    const _i = 'width:100%;box-sizing:border-box;border:1px solid var(--line);border-radius:8px;padding:10px;font-size:16px;margin-top:4px';
+    window.openModal('💵 Thanh toán công nợ — ' + escH(s.name), `
+      <div style="font-size:13px;margin-bottom:10px">Đang nợ: <b style="color:#DC2626">${window.fmt(debt)}₫</b></div>
+      <label style="font-size:12px;color:var(--muted)">Số tiền trả (₫)</label>
+      <input id="supPayAmt" type="number" inputmode="numeric" value="${debt}" style="${_i}">
+      <div style="display:flex;gap:8px;margin-top:8px">
+        <button class="btn btn-ghost btn-sm" onclick="document.getElementById('supPayAmt').value=${debt}">Trả hết</button>
+        <button class="btn btn-ghost btn-sm" onclick="document.getElementById('supPayAmt').value=${Math.round(debt / 2)}">Trả 50%</button>
+      </div>
+    `, { width: '420px', footer: `<button class="btn btn-ghost" onclick="window.closeModal()">Huỷ</button><button class="btn btn-primary" onclick="window._supDoPay('${id}')">💵 Ghi thanh toán</button>` });
+  };
+  window._supDoPay = function (id) {
+    const s = getSup().find(x => x.id === id) || { name: id };
+    const debt = _supDebt(id);
+    let amt = parseFloat(String((document.getElementById('supPayAmt') || {}).value || '').replace(/[^\d.]/g, '')) || 0;
+    amt = Math.min(Math.max(0, Math.round(amt)), debt);
+    if (!(amt > 0)) { window.toast && window.toast('Nhập số tiền > 0', 'warn'); return; }
+    const cash = getCash();
+    const _pcMax = cash.reduce((m, e) => { const n = parseInt(String(e.no || '').replace(/^PC/, ''), 10); return isNaN(n) ? m : Math.max(m, n); }, 0);
+    cash.unshift({ no: 'PC' + String(_pcMax + 1).padStart(4, '0'), date: window.todayVN(), type: 'out', amount: amt, account: 'Tiền mặt', party: s.name, desc: 'Thanh toán công nợ NCC ' + id });
     window.STORE.set('cashEntries', cash);
-    if (window.audit) window.audit.log('supplier.pay', `Trả ${window.fmt(s.debt)} ₫ cho ${s.name}`);
-    window.toast('✓ Đã ghi phiếu chi', 'success');
-    window.closeDrawer();
+    if (window.audit) window.audit.log('supplier.pay', `Trả ${window.fmt(amt)} ₫ cho ${s.name}`);
+    const remainAfter = _supDebt(id);
+    window.toast && window.toast('✓ Đã ghi phiếu chi ' + window.fmt(amt) + ' ₫' + (remainAfter > 0 ? ' · còn nợ ' + window.fmt(remainAfter) : ' · hết nợ'), 'success');
+    window.closeModal && window.closeModal();
+    render();
+  };
+
+  /* Lịch sử thanh toán 1 NCC — các lần trả (ngày/tiền) + đợt nhập (tuổi nợ 30–45 ngày) */
+  window.supPayHistory = function (id) {
+    const s = getSup().find(x => x.id === id) || { name: id };
+    const nm = s.name, f = v => (Math.round(+v || 0)).toLocaleString('vi-VN');
+    const cash = getCash().filter(e => e && e.type === 'out' && (e.party === nm || (e.desc && String(e.desc).includes(id)))).sort((a, b) => (_dmyToISO(a.date) < _dmyToISO(b.date) ? 1 : -1));
+    const nhap = _supNhap(id), paid = _supPaidCash(id), claims = _supClaims(id), remain = _supDebt(id);
+    const phieu = getPur().filter(p => p.status === 'received' && p.supplierId === id).sort((a, b) => (_dmyToISO(a.date) < _dmyToISO(b.date) ? -1 : 1));
+    const today = window.todayISO ? window.todayISO() : new Date().toISOString().slice(0, 10);
+    const ageOf = iso => iso ? Math.round((new Date(today + 'T00:00:00') - new Date(iso + 'T00:00:00')) / 86400000) : 0;
+    const payHtml = cash.length ? cash.map(e => `<tr style="border-top:1px solid #F1F5F9"><td style="padding:5px 8px">${escH(e.date)}</td><td style="padding:5px 8px">${escH(e.no || '')}</td><td style="padding:5px 8px;text-align:right;font-weight:700;color:#15803D">${f(e.amount)}₫</td></tr>`).join('') : '<tr><td colspan="3" style="padding:12px;text-align:center;color:var(--muted)">Chưa có lần thanh toán nào</td></tr>';
+    const nhapHtml = phieu.length ? phieu.map(p => { const dd = ageOf(_dmyToISO(p.date)); const c = dd >= 45 ? '#DC2626' : dd >= 30 ? '#B45309' : 'var(--muted)'; return `<tr style="border-top:1px solid #F1F5F9"><td style="padding:5px 8px">${escH(p.date)}</td><td style="padding:5px 8px"><a href="purchases.html?focus=${encodeURIComponent(p.id)}" target="_blank" style="color:var(--navy);text-decoration:none;border-bottom:1px dotted var(--navy)">${escH(p.id)} ↗</a></td><td style="padding:5px 8px;text-align:right">${f(p.total)}₫</td><td style="padding:5px 8px;text-align:right;color:${c};font-size:11.5px">${dd} ngày${dd >= 30 ? ' ⚠' : ''}</td></tr>`; }).join('') : '<tr><td colspan="4" style="padding:12px;text-align:center;color:var(--muted)">Chưa có đợt nhập</td></tr>';
+    window.openModal('📜 Lịch sử thanh toán — ' + escH(nm), `
+      <div style="display:flex;gap:8px;flex-wrap:wrap;margin-bottom:12px">
+        <div style="flex:1;min-width:100px;background:#F0FDF4;border:1px solid #BBF7D0;border-radius:8px;padding:8px 10px"><div style="font-size:10.5px;color:var(--muted)">Tổng nhập</div><div style="font-weight:800">${f(nhap)}₫</div></div>
+        <div style="flex:1;min-width:100px;background:#EFF6FF;border:1px solid #BFDBFE;border-radius:8px;padding:8px 10px"><div style="font-size:10.5px;color:var(--muted)">Đã trả</div><div style="font-weight:800;color:#15803D">${f(paid)}₫</div></div>
+        ${claims ? `<div style="flex:1;min-width:100px;background:#FFFBEB;border:1px solid #FDE68A;border-radius:8px;padding:8px 10px"><div style="font-size:10.5px;color:var(--muted)">Trừ trả hàng</div><div style="font-weight:800;color:#B45309">−${f(claims)}₫</div></div>` : ''}
+        <div style="flex:1;min-width:100px;background:#FEF2F2;border:1px solid #FECACA;border-radius:8px;padding:8px 10px"><div style="font-size:10.5px;color:var(--muted)">Còn nợ</div><div style="font-weight:800;color:#DC2626">${f(remain)}₫</div></div>
+      </div>
+      <div style="font-size:11px;color:var(--muted);text-transform:uppercase;font-weight:700;margin:2px 0 4px">💵 Lịch sử thanh toán (${cash.length} lần)</div>
+      <table style="width:100%;border-collapse:collapse;font-size:12.5px;border:1px solid var(--line);border-radius:8px;overflow:hidden;margin-bottom:14px"><thead><tr style="background:#F0FDF4;color:var(--muted);font-size:11px"><th style="padding:6px 8px;text-align:left">Ngày trả</th><th style="padding:6px 8px;text-align:left">Số PC</th><th style="padding:6px 8px;text-align:right">Số tiền</th></tr></thead><tbody>${payHtml}</tbody></table>
+      <div style="font-size:11px;color:var(--muted);text-transform:uppercase;font-weight:700;margin:2px 0 4px">📦 Các đợt nhập (cũ → mới) · tuổi nợ</div>
+      <table style="width:100%;border-collapse:collapse;font-size:12.5px;border:1px solid var(--line);border-radius:8px;overflow:hidden"><thead><tr style="background:#F8FAF8;color:var(--muted);font-size:11px"><th style="padding:6px 8px;text-align:left">Ngày nhập</th><th style="padding:6px 8px;text-align:left">Mã phiếu</th><th style="padding:6px 8px;text-align:right">Tiền nhập</th><th style="padding:6px 8px;text-align:right">Tuổi nợ</th></tr></thead><tbody>${nhapHtml}</tbody></table>
+      <div style="font-size:11px;color:var(--muted);margin-top:8px">⚠ Tuổi nợ ≥ 30 ngày (vàng), ≥ 45 ngày (đỏ) — NCC thường thanh toán ở 30–45 ngày.</div>
+    `, { width: '620px', footer: `<button class="btn btn-ghost" onclick="window.closeModal()">Đóng</button>${remain > 0 ? `<button class="btn btn-primary" onclick="window.closeModal();window.paySupplier('${id}')">💵 Thanh toán</button>` : ''}` });
   };
 
   window.exportSupCsv = function () {
     const list = getSup();
     const head = 'Mã,Tên,Liên hệ,SĐT,Địa chỉ,Nhóm hàng,Điều khoản,Nợ,Lifetime spend,Đánh giá,Ghi chú\n';
-    const rows = list.map(s => [s.id, `"${s.name}"`, `"${s.contact}"`, s.phone, `"${s.address}"`, `"${(s.category||[]).join(';')}"`, s.paymentTerm, s.debt, s.totalSpend, s.rating, `"${(s.note||'').replace(/"/g,'""')}"`].join(','));
+    const rows = list.map(s => [s.id, `"${s.name}"`, `"${s.contact}"`, s.phone, `"${s.address}"`, `"${(s.category||[]).join(';')}"`, s.paymentTerm, _supDebt(s.id), s.totalSpend, s.rating, `"${(s.note||'').replace(/"/g,'""')}"`].join(','));
     const blob = new Blob(['﻿'+head+rows.join('\n')], {type:'text/csv;charset=utf-8'});
     const a = document.createElement('a');
     a.href = URL.createObjectURL(blob); a.download = `nha-cung-cap-${new Date().toISOString().slice(0,10)}.csv`; a.click();
@@ -513,7 +552,8 @@
   document.getElementById('hbTitle').innerHTML = window.helpTip('NCC khác Khách hàng: NCC là người bán cho mình, KH là người mua từ mình. Mã NCC bắt đầu bằng NCC.', {size:'lg'});
 
   /* Tìm kiếm nay nằm TRONG từng nhóm (supFilterPanel), không còn ô tổng ở toolbar */
-  ['suppliers','purchases'].forEach(k => window.STORE.subscribe(k, render));
+  window.STORE.get('cashEntries', []); window.STORE.get('supplierClaims', []);   /* warm-load cho công nợ dẫn xuất */
+  ['suppliers','purchases','cashEntries','supplierClaims'].forEach(k => window.STORE.subscribe(k, render));
   /* Preload SẢN PHẨM (cho bộ chọn SP trong form NCC) — lấy từ module Sản phẩm & Giá.
      Gọi sớm để cloud sync xong trước khi user mở form. */
   window.STORE.get('products', window.PRODUCTS || []);
