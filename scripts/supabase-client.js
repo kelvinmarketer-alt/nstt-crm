@@ -40,7 +40,11 @@
          Nhóm giá của KH lưu ở KV 'custPriceTiers' (sync qua master_data, roaming đa máy). */
       to:   { group:'group_name', staffOwner:'staff_owner', lastContact:'last_contact', lastOrder:'last_order',
               orders:'orders_count', debtOverdue:'debt_overdue', orderFreq:'order_freq', mainCats:'main_cats',
-              priceTier: null },
+              priceTier: null,
+              /* field CLIENT-ONLY không có cột DB → drop (tránh retry-strip tốn request mỗi lần lưu KH).
+                 ordersList = danh sách đơn (tính từ orders); attachments = file base64 (nặng, giữ local);
+                 fb = link Facebook (bảng chưa chạy migration 22-add-customer-fb → chưa có cột). */
+              ordersList: null, attachments: null, fb: null },
       from: { group_name:'group', staff_owner:'staffOwner', last_contact:'lastContact', last_order:'lastOrder',
               orders_count:'orders', debt_overdue:'debtOverdue', order_freq:'orderFreq', main_cats:'mainCats' },
     },
@@ -168,8 +172,17 @@
               staff_owner:'staffOwner', created_at_vn:'createdAt' },
     },
     returns: {
+      /* DB returns CHỈ có: id, order_code, cust_name, date, reason, items(jsonb), refund_total,
+         status, pod_photo, handled_by, note, created_at, updated_at.
+         App gắn thêm nhiều field tóm tắt/hằng số ở CẤP GỐC (caseType, disposition, fault,
+         refundMode, supplierId...) → KHÔNG có cột → insert/update 400 = phiếu trả KHÔNG lên cloud.
+         → DROP hết: mọi dữ liệu quan trọng (điều kiện từng SP, NCC, buyTotal đòi nợ) đã nằm
+         TRONG `items` (jsonb, bền); disposition/fault chỉ là nhãn suy ra được từ items[].cond. */
       to:   { orderCode:'order_code', custName:'cust_name',
-              refundTotal:'refund_total', podPhoto:'pod_photo', handledBy:'handled_by' },
+              refundTotal:'refund_total', podPhoto:'pod_photo', handledBy:'handled_by',
+              custId: null, item: null, qtyReturn: null, caseType: null, resolution: null,
+              disposition: null, fault: null, refundMode: null, supplierId: null,
+              supplierName: null, supClaimAmount: null, fromShip: null, reportedAt: null },
       from: { order_code:'orderCode', cust_name:'custName',
               refund_total:'refundTotal', pod_photo:'podPhoto', handled_by:'handledBy' },
     },
