@@ -13,10 +13,11 @@
   table.cn-tbl thead th.par{background:#E7F6E7;z-index:3}
   table.cn-tbl td.num{text-align:right;font-variant-numeric:tabular-nums}
   table.cn-tbl td.z{color:#CBD5E1}
-  table.cn-tbl tr:hover td{background:#F8FAF8}
-  table.cn-tbl tr:hover td.par{background:#F3FAF3}
-  table.cn-tbl tfoot td{position:sticky;bottom:0;background:#1B5E20;color:#fff;font-weight:700;border-top:2px solid #15803D}
-  table.cn-tbl tfoot td.par{background:#1B5E20;color:#fff}
+  table.cn-tbl tbody tr:hover td{background:#F8FAF8}
+  table.cn-tbl tbody tr:hover td.par{background:#F3FAF3}
+  table.cn-tbl tfoot td{position:sticky;bottom:0;background:#1B5E20;color:#fff;font-weight:700;border-top:2px solid #15803D;z-index:2}
+  table.cn-tbl tfoot td.par{background:#1B5E20;color:#fff;z-index:4}
+  table.cn-tbl tfoot tr:hover td, table.cn-tbl tfoot tr:hover td.par{background:#22703A;color:#fff}
   .cn-paid{color:#16A34A;font-weight:700}.cn-owe{color:#B45309;font-weight:700}
   .cn-swipe-hint{display:none}
   @media (max-width:560px){
