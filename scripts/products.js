@@ -659,55 +659,82 @@
     renderBoard();
   };
 
-  /* ============ 📈 LỊCH SỬ GIÁ THEO NGÀY (giá nhập + giá bán) ============
-     Xem/sửa/thêm/xoá giá của từng ngày. Giá nhập ở đây = giá vốn dùng khi kế toán chốt công nợ NCC
-     theo NGÀY nhập (priceEntryOn(p, date).buy). */
+  /* ============ 📈 GIÁ NHẬP THEO NGÀY (chỉ giá nhập — giá vốn chốt công nợ NCC) ============
+     - Mặc định xem/đặt giá của HÔM NAY (sửa được).
+     - Bộ lọc NGÀY: xem giá đã áp vào 1 ngày bất kỳ trong quá khứ để rà soát.
+     - CHỈ lưu mốc khi giá THAY ĐỔI (ngày không đổi tự dùng mốc gần nhất trước đó = carry-forward). */
   const _phEsc = s => String(s == null ? '' : s).replace(/[&<>"]/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]));
-  function _phRowHtml(h) {
-    const inp = 'width:100%;box-sizing:border-box;padding:6px 8px;border:1px solid var(--line);border-radius:6px;font-size:13px';
-    return `<tr>
-      <td style="padding:5px 6px"><input type="date" class="ph-date" value="${_phEsc(h.date || '')}" style="${inp}"></td>
-      <td style="padding:5px 6px"><input type="number" data-money="0" class="ph-buy" value="${h.buy != null ? h.buy : ''}" placeholder="giá nhập" style="${inp};text-align:right;border-color:#F59E0B;background:#FFFBEB"></td>
-      <td style="padding:5px 6px"><input type="number" data-money="0" class="ph-sell" value="${h.sell != null ? h.sell : ''}" placeholder="giá bán" style="${inp};text-align:right"></td>
-      <td style="padding:5px 6px;text-align:center"><button class="icon-btn" title="Xoá mốc giá này" style="color:var(--danger)" onclick="this.closest('tr').remove()">🗑</button></td>
-    </tr>`;
+  function _phEffBuy(p, dateISO) { const e = window.priceEntryOn ? window.priceEntryOn(p, dateISO) : null; return e ? (+e.buy || 0) : 0; }
+  function _phPrevBuy(p, dateISO) { let best = null; (p.priceHistory || []).forEach(h => { if (h && h.date && h.date < dateISO && (!best || h.date > best.date)) best = h; }); return best ? (+best.buy || 0) : 0; }
+  function _phHistHtml(p) {
+    const hist = [...(p.priceHistory || [])].filter(h => h && h.date).sort((a, b) => (a.date < b.date ? 1 : -1));   /* mới → cũ */
+    if (!hist.length) return '<div style="color:var(--muted);font-size:12.5px;padding:14px;text-align:center">Chưa có mốc giá nhập nào. Đặt giá ở trên rồi bấm Lưu.</div>';
+    return `<table style="width:100%;border-collapse:collapse;font-size:12.5px">
+      <thead><tr style="background:#F8FAF8;color:var(--muted);font-size:11px;text-transform:uppercase"><th style="padding:7px 9px;text-align:left">Ngày đổi giá</th><th style="padding:7px 9px;text-align:right">Giá nhập</th><th style="width:44px"></th></tr></thead>
+      <tbody>${hist.map(h => `<tr style="border-top:1px solid #F1F5F9"><td style="padding:7px 9px">${_phEsc(fmtD(h.date))}</td><td style="padding:7px 9px;text-align:right;font-weight:700;color:#B45309">${window.fmt(+h.buy || 0)}</td><td style="padding:7px 9px;text-align:center"><button class="icon-btn" title="Xoá mốc giá này" style="color:var(--danger)" onclick="window.phDelMilestone('${_phEsc(p.id)}','${h.date}')">🗑</button></td></tr>`).join('')}</tbody></table>`;
   }
   window.openPriceHistory = function (id) {
     const p = window.productById(id); if (!p) return;
-    const hist = [...(p.priceHistory || [])].sort((a, b) => (a.date < b.date ? 1 : -1));   /* mới → cũ */
-    const rows = hist.length ? hist.map(_phRowHtml).join('') : _phRowHtml({ date: window.todayISO(), buy: '', sell: '' });
+    const today = window.todayISO();
+    const inp = 'padding:8px 10px;border:1px solid var(--line);border-radius:8px;font-size:14px';
     const body = `
-      <div style="font-size:12.5px;color:var(--muted);margin-bottom:10px">SP: <b style="color:var(--navy)">${_phEsc(p.name)}</b> /${_phEsc(p.unit || 'kg')}. Mỗi dòng = giá của <b>1 ngày</b>. <b style="color:#B45309">Giá nhập</b> (ô vàng) là giá vốn — kế toán chốt công nợ NCC theo giá của <b>ngày nhập</b>.</div>
-      <div style="overflow:auto;border:1px solid var(--line);border-radius:8px">
-      <table style="width:100%;border-collapse:collapse;font-size:12.5px;min-width:440px">
-        <thead><tr style="background:#F8FAF8;color:var(--muted);font-size:11px;text-transform:uppercase">
-          <th style="padding:7px 8px;text-align:left">Ngày</th><th style="padding:7px 8px;text-align:right">Giá nhập</th><th style="padding:7px 8px;text-align:right">Giá bán</th><th style="width:44px"></th>
-        </tr></thead><tbody id="phBody">${rows}</tbody></table></div>
-      <button class="btn btn-ghost btn-sm" style="margin-top:10px" onclick="window.addPriceHistRow()">➕ Thêm mốc giá (ngày khác)</button>`;
-    window.openModal('📈 Lịch sử giá — ' + _phEsc(p.name), body, {
-      footer: `<button class="btn btn-ghost" onclick="window.closeModal()">Đóng</button><button class="btn btn-primary" onclick="window.savePriceHistory('${_phEsc(id)}')">💾 Lưu lịch sử giá</button>`
-    });
+      <div style="font-size:12.5px;color:var(--muted);margin-bottom:12px">SP: <b style="color:var(--navy)">${_phEsc(p.name)}</b> /${_phEsc(p.unit || 'kg')}. <b style="color:#B45309">Giá nhập</b> = giá vốn để chốt công nợ NCC theo <b>ngày nhập</b>.</div>
+      <div style="display:flex;gap:12px;flex-wrap:wrap;align-items:flex-end;background:#FFFBEB;border:1px solid #FDE68A;border-radius:10px;padding:12px">
+        <div><label style="font-size:12px;color:var(--muted);display:block;margin-bottom:3px">Xem / đặt giá cho ngày</label>
+          <input type="date" id="phDate" value="${today}" onchange="window.phDateChanged('${_phEsc(id)}')" style="${inp}"></div>
+        <div style="flex:1;min-width:150px"><label style="font-size:12px;color:var(--muted);display:block;margin-bottom:3px">Giá nhập ngày này</label>
+          <input type="number" data-money="0" id="phBuy" placeholder="giá nhập" style="${inp};width:100%;box-sizing:border-box;text-align:right;font-weight:700;border-color:#F59E0B"></div>
+        <button class="btn btn-primary" onclick="window.phSaveDay('${_phEsc(id)}')">💾 Lưu giá ngày này</button>
+      </div>
+      <div id="phDateHint" style="font-size:11.5px;color:var(--muted);margin:7px 2px 0"></div>
+      <div style="font-weight:700;color:var(--navy);font-size:12px;text-transform:uppercase;letter-spacing:.3px;margin:16px 0 6px">Lịch sử thay đổi giá nhập</div>
+      <div style="border:1px solid var(--line);border-radius:8px;overflow:auto" id="phHist">${_phHistHtml(p)}</div>`;
+    window.openModal('📈 Giá nhập — ' + _phEsc(p.name), body, { footer: `<button class="btn btn-ghost" onclick="window.closeModal()">Đóng</button>` });
+    setTimeout(() => window.phDateChanged(id), 0);
   };
-  window.addPriceHistRow = function () {
-    const tb = document.getElementById('phBody'); if (!tb) return;
-    tb.insertAdjacentHTML('afterbegin', _phRowHtml({ date: window.todayISO(), buy: '', sell: '' }));
-  };
-  window.savePriceHistory = function (id) {
+  /* Đổi ngày lọc → hiện giá NHẬP đang áp vào ngày đó (mốc gần nhất ≤ ngày) + ghi chú có/không mốc riêng. */
+  window.phDateChanged = function (id) {
     const p = window.productById(id); if (!p) return;
-    const byDate = {};
-    document.querySelectorAll('#phBody tr').forEach(tr => {
-      const date = (tr.querySelector('.ph-date') || {}).value || '';
-      if (!/^\d{4}-\d{2}-\d{2}$/.test(date)) return;   /* bỏ dòng thiếu ngày */
-      const buyEl = tr.querySelector('.ph-buy'), sellEl = tr.querySelector('.ph-sell');
-      const buy = buyEl && String(buyEl.value).trim() !== '' ? (+buyEl.value || 0) : 0;
-      const sell = sellEl && String(sellEl.value).trim() !== '' ? (+sellEl.value || 0) : 0;
-      byDate[date] = { date, buy, sell };   /* trùng ngày → dòng sau ghi đè */
-    });
-    const hist = Object.values(byDate).sort((a, b) => (a.date < b.date ? -1 : 1));   /* cũ → mới (chuẩn priceHistory) */
+    const dEl = document.getElementById('phDate'), bEl = document.getElementById('phBuy'); if (!dEl || !bEl) return;
+    const date = dEl.value || window.todayISO();
+    const exact = (p.priceHistory || []).find(h => h.date === date);
+    bEl.value = _phEffBuy(p, date) || '';
+    const hint = document.getElementById('phDateHint');
+    if (hint) hint.innerHTML = exact
+      ? `✓ Ngày <b>${fmtD(date)}</b> có mốc giá riêng.`
+      : (_phEffBuy(p, date) ? `Ngày <b>${fmtD(date)}</b> chưa có mốc riêng → đang áp giá của mốc gần nhất trước đó. Sửa số + Lưu để tạo mốc cho ngày này.` : `Chưa có giá nhập nào trước ngày <b>${fmtD(date)}</b>.`);
+  };
+  /* Lưu giá cho ngày đang chọn — CHỈ tạo/cập nhật mốc khi giá KHÁC giá đang áp. */
+  window.phSaveDay = function (id) {
+    const p = window.productById(id); if (!p) return;
+    const date = (document.getElementById('phDate') || {}).value || '';
+    if (!/^\d{4}-\d{2}-\d{2}$/.test(date)) { window.toast && window.toast('Chọn ngày hợp lệ', 'warn'); return; }
+    const buy = +((document.getElementById('phBuy') || {}).value) || 0;
+    if (!buy) { window.toast && window.toast('Nhập giá nhập', 'warn'); return; }
+    const hist = [...(p.priceHistory || [])];
+    const exact = hist.find(h => h.date === date);
+    if (exact) {
+      if ((+exact.buy || 0) === buy) { window.toast && window.toast('Giá không đổi — không cần lưu', 'info'); return; }
+      exact.buy = buy;
+    } else {
+      if (buy === _phPrevBuy(p, date)) { window.toast && window.toast('Giá bằng giá đang áp — không tạo mốc mới (chỉ lưu khi đổi)', 'info'); return; }
+      hist.push({ date, buy, sell: (window.priceEntryOn && window.priceEntryOn(p, date)?.sell) || 0 });   /* giữ giá bán carry-forward */
+    }
+    hist.sort((a, b) => (a.date < b.date ? -1 : 1));
     window.STORE.update('products', id, { priceHistory: hist });
-    if (window.audit) window.audit.log('product.priceHistory', 'Sửa lịch sử giá ' + (p.name || id) + ' (' + hist.length + ' mốc)');
-    window.closeModal && window.closeModal();
-    window.toast && window.toast('✓ Đã lưu lịch sử giá ' + (p.name || ''), 'success');
+    if (window.audit) window.audit.log('product.buyPrice', 'Giá nhập ' + (p.name || id) + ' ngày ' + date + ' = ' + buy);
+    window.toast && window.toast('✓ Đã lưu giá nhập ' + (p.name || '') + ' ngày ' + fmtD(date), 'success');
+    const hEl = document.getElementById('phHist'); if (hEl) hEl.innerHTML = _phHistHtml(window.productById(id));
+    window.phDateChanged(id);
+    if (typeof renderCatalog === 'function') renderCatalog();
+  };
+  window.phDelMilestone = function (id, date) {
+    const p = window.productById(id); if (!p) return;
+    const hist = (p.priceHistory || []).filter(h => h.date !== date);
+    window.STORE.update('products', id, { priceHistory: hist });
+    window.toast && window.toast('🗑 Đã xoá mốc giá ' + fmtD(date), 'info');
+    const hEl = document.getElementById('phHist'); if (hEl) hEl.innerHTML = _phHistHtml(window.productById(id));
+    window.phDateChanged(id);
     if (typeof renderCatalog === 'function') renderCatalog();
   };
 
@@ -877,7 +904,7 @@
           <div style="font-size:10px;color:var(--muted);text-transform:uppercase;letter-spacing:.3px">Giá nhập</div>
           <input class="cat-price" data-id="${p.id}" data-field="buy" type="number" value="${buy}" style="width:110px;text-align:right;padding:5px 8px;border:1px solid var(--line);border-radius:6px;font-weight:700">
           <div style="display:flex;gap:2px">
-            <button class="icon-btn" title="Lịch sử giá nhập/bán theo ngày — điều chỉnh giá từng ngày" onclick="event.stopPropagation();window.openPriceHistory('${p.id}')">📈</button>
+            <button class="icon-btn" title="Giá nhập theo ngày — xem/điều chỉnh + lịch sử đổi giá" onclick="event.stopPropagation();window.openPriceHistory('${p.id}')">📈</button>
             <button class="icon-btn" title="Sửa chi tiết SP (tên/nhóm/đvt)" onclick="event.stopPropagation();window.editProduct('${p.id}')">✏️</button>
             <button class="icon-btn" title="Xóa sản phẩm" style="color:var(--danger)" onclick="event.stopPropagation();window.deleteProduct('${p.id}')">🗑</button>
           </div>
