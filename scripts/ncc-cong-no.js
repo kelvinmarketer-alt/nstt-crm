@@ -106,7 +106,7 @@
       <td class="num"><b>${fmtU(r.total)}</b></td>
       <td class="num cn-paid">${r.paid ? fmtU(r.paid) : '·'}</td>
       <td class="num cn-owe">${r.remain ? fmtU(r.remain) : '·'}</td>
-      <td class="num" style="font-weight:800;color:#DC2626;white-space:nowrap">${r.debtNow ? `${fmtU(r.debtNow)} <button onclick="window.ncdPay('${r.key}')" title="Thanh toán công nợ NCC" style="background:#DC2626;color:#fff;border:none;border-radius:6px;padding:3px 9px;font-size:11px;font-weight:800;cursor:pointer;margin-left:2px">💵 Trả</button>` : '·'}</td>
+      <td class="num" style="font-weight:800;color:#DC2626;white-space:nowrap">${r.debtNow ? fmtU(r.debtNow) : '<span style="color:#16A34A;font-weight:700">✓ hết</span>'} <button onclick="window.ncdPayHistory('${r.key}')" title="Lịch sử thanh toán — đã trả bao nhiêu, tuổi nợ" style="background:#fff;border:1px solid var(--line);border-radius:6px;padding:3px 7px;font-size:11px;cursor:pointer">📜</button>${r.debtNow ? ` <button onclick="window.ncdPay('${r.key}')" title="Thanh toán công nợ NCC" style="background:#DC2626;color:#fff;border:none;border-radius:6px;padding:3px 9px;font-size:11px;font-weight:800;cursor:pointer">💵 Trả</button>` : ''}</td>
     </tr>`).join('')}</tbody>`;
     const foot = `<tfoot><tr>
       <td class="par">TỔNG CỘNG</td>
@@ -191,6 +191,36 @@
     window.toast && window.toast('✓ Đã ghi phiếu chi ' + window.fmt(amt) + ' ₫' + (remainAfter > 0 ? ' · còn nợ ' + window.fmt(remainAfter) : ' · hết nợ'), 'success');
     window.closeModal && window.closeModal();
     window.ncdRender();
+  };
+
+  /* ===== LỊCH SỬ THANH TOÁN 1 NCC: các lần trả (ngày/số tiền) + các đợt nhập (tuổi nợ) ===== */
+  window.ncdPayHistory = function (id) {
+    const sup = getSup().find(s => s.id === id) || { name: id };
+    const nm = sup.name;
+    const f = v => (Math.round(+v || 0)).toLocaleString('vi-VN');
+    const cash = getCash().filter(e => e && e.type === 'out' && (e.party === nm || (e.desc && String(e.desc).includes(id))))
+      .sort((a, b) => (dmyToISO(a.date) < dmyToISO(b.date) ? 1 : -1));
+    const nhap = _supNhapAll(id), paid = _supPaidCashAll(id), claims = _supClaims(id), remain = _supRemainAll(id);
+    const phieu = getPur().filter(p => p.status === 'received' && p.supplierId === id).sort((a, b) => (dmyToISO(a.date) < dmyToISO(b.date) ? -1 : 1));
+    const today = window.todayISO ? window.todayISO() : isoOf(new Date());
+    const ageOf = iso => { if (!iso) return 0; return Math.round((new Date(today + 'T00:00:00') - new Date(iso + 'T00:00:00')) / 86400000); };
+    const payHtml = cash.length ? cash.map(e => `<tr style="border-top:1px solid #F1F5F9"><td style="padding:5px 8px">${escH(e.date)}</td><td style="padding:5px 8px">${escH(e.no || '')}</td><td style="padding:5px 8px;color:var(--muted);font-size:11px">${escH(e.desc || '')}</td><td style="padding:5px 8px;text-align:right;font-weight:700;color:#15803D">${f(e.amount)}₫</td></tr>`).join('')
+      : '<tr><td colspan="4" style="padding:12px;text-align:center;color:var(--muted)">Chưa có lần thanh toán nào</td></tr>';
+    const nhapHtml = phieu.length ? phieu.map(p => { const dd = ageOf(dmyToISO(p.date)); const c = dd >= 45 ? '#DC2626' : dd >= 30 ? '#B45309' : 'var(--muted)'; return `<tr style="border-top:1px solid #F1F5F9"><td style="padding:5px 8px">${escH(p.date)}</td><td style="padding:5px 8px"><a href="purchases.html?focus=${encodeURIComponent(p.id)}" target="_blank" style="color:var(--navy);text-decoration:none;border-bottom:1px dotted var(--navy)">${escH(p.id)} ↗</a></td><td style="padding:5px 8px;text-align:right">${f(p.total)}₫</td><td style="padding:5px 8px;text-align:right;color:${c};font-size:11.5px">${dd} ngày${dd >= 30 ? ' ⚠' : ''}</td></tr>`; }).join('')
+      : '<tr><td colspan="4" style="padding:12px;text-align:center;color:var(--muted)">Chưa có đợt nhập</td></tr>';
+    window.openModal('📜 Lịch sử thanh toán — ' + escH(nm), `
+      <div style="display:flex;gap:8px;flex-wrap:wrap;margin-bottom:12px">
+        <div style="flex:1;min-width:100px;background:#F0FDF4;border:1px solid #BBF7D0;border-radius:8px;padding:8px 10px"><div style="font-size:10.5px;color:var(--muted)">Tổng nhập</div><div style="font-weight:800">${f(nhap)}₫</div></div>
+        <div style="flex:1;min-width:100px;background:#EFF6FF;border:1px solid #BFDBFE;border-radius:8px;padding:8px 10px"><div style="font-size:10.5px;color:var(--muted)">Đã trả</div><div style="font-weight:800;color:#15803D">${f(paid)}₫</div></div>
+        ${claims ? `<div style="flex:1;min-width:100px;background:#FFFBEB;border:1px solid #FDE68A;border-radius:8px;padding:8px 10px"><div style="font-size:10.5px;color:var(--muted)">Trừ trả hàng</div><div style="font-weight:800;color:#B45309">−${f(claims)}₫</div></div>` : ''}
+        <div style="flex:1;min-width:100px;background:#FEF2F2;border:1px solid #FECACA;border-radius:8px;padding:8px 10px"><div style="font-size:10.5px;color:var(--muted)">Còn nợ</div><div style="font-weight:800;color:#DC2626">${f(remain)}₫</div></div>
+      </div>
+      <div style="font-size:11px;color:var(--muted);text-transform:uppercase;font-weight:700;margin:2px 0 4px">💵 Lịch sử thanh toán (${cash.length} lần)</div>
+      <table style="width:100%;border-collapse:collapse;font-size:12.5px;border:1px solid var(--line);border-radius:8px;overflow:hidden;margin-bottom:14px"><thead><tr style="background:#F0FDF4;color:var(--muted);font-size:11px"><th style="padding:6px 8px;text-align:left">Ngày trả</th><th style="padding:6px 8px;text-align:left">Số PC</th><th style="padding:6px 8px;text-align:left">Ghi chú</th><th style="padding:6px 8px;text-align:right">Số tiền</th></tr></thead><tbody>${payHtml}</tbody></table>
+      <div style="font-size:11px;color:var(--muted);text-transform:uppercase;font-weight:700;margin:2px 0 4px">📦 Các đợt nhập (cũ → mới) · tuổi nợ</div>
+      <table style="width:100%;border-collapse:collapse;font-size:12.5px;border:1px solid var(--line);border-radius:8px;overflow:hidden"><thead><tr style="background:#F8FAF8;color:var(--muted);font-size:11px"><th style="padding:6px 8px;text-align:left">Ngày nhập</th><th style="padding:6px 8px;text-align:left">Mã phiếu</th><th style="padding:6px 8px;text-align:right">Tiền nhập</th><th style="padding:6px 8px;text-align:right">Tuổi nợ</th></tr></thead><tbody>${nhapHtml}</tbody></table>
+      <div style="font-size:11px;color:var(--muted);margin-top:8px">⚠ Tuổi nợ ≥ 30 ngày (vàng), ≥ 45 ngày (đỏ) — NCC thường thanh toán ở 30–45 ngày.</div>
+    `, { width: '640px', footer: `<button class="btn btn-ghost" onclick="window.closeModal()">Đóng</button>${remain > 0 ? `<button class="btn btn-primary" onclick="window.closeModal();window.ncdPay('${id}')">💵 Thanh toán</button>` : ''}` });
   };
 
   /* ===== Chi tiết công nợ 1 NGÀY của 1 NCC: mã hàng + mã phiếu + mã đơn (bấm → mở module) ===== */
