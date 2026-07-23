@@ -235,6 +235,7 @@
     'custPriceTiers',  /* Nhóm giá gán cho từng KH {custId:tierId} — cloud customers không có cột price_tier */
     'custCreditDays',  /* Hạn công nợ (số ngày) theo từng KH {custId:days} — chính sách 3/7/15 */
     'prodNccReturnable',/* SP này NCC có CHO TRẢ lại không {productId:bool} — Trả hàng: false → không trừ nợ NCC, hàng lưu kho/vứt. Cloud products không có cột này */
+    'prodUnitConv',    /* Quy đổi đơn vị nhập→kg {productId:{packUnit,kgPerPack}} — nhập theo quả/bó nhưng tính tiền/công nợ theo kg. Cloud products không có cột này */
     'custBrands',      /* Nhãn THƯƠNG HIỆU gom nhiều cơ sở {custId:'BIA ƠI'} — cùng thương hiệu = gộp công nợ + in phiếu ma trận */
     'orderQtyLocks',   /* Chốt SẢN LƯỢNG đơn {code:{by,byId,at}} — KT1 khớp SL khách nhận với đơn sale lên (bước trước báo giá) */
     'orderQuoteLocks', /* Chốt báo giá đơn {code:{by,byId,at}} — KT2 chốt giá (sau khi SL đã chốt), 5 kế toán đồng bộ để không sửa nhầm */

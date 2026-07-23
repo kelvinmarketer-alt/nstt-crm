@@ -1193,8 +1193,17 @@
         <div><label>Ghi chú</label><input id="pNote" value="${p ? (p.note || '') : ''}" placeholder="VD: Mộc Châu"></div>
       </div>
       <div class="form-row">
-        <div><label>Giá nhập hôm nay (₫) *</label><input id="pBuy" type="number" value="${e ? e.buy : ''}" placeholder="0"></div>
+        <div><label>Giá nhập hôm nay (₫/kg) *</label><input id="pBuy" type="number" value="${e ? e.buy : ''}" placeholder="0"></div>
         <div></div>
+      </div>
+      <div class="form-row wide" style="background:#FFFBEB;border:1px solid #FDE68A;border-radius:8px;padding:8px 10px">
+        <label style="color:#92400E">⚖️ Quy đổi đơn vị nhập → kg <span style="font-weight:400;color:#94A3B8">(nếu nhập theo quả/bó… — để trống nếu nhập thẳng kg)</span></label>
+        <div style="display:flex;gap:10px;flex-wrap:wrap;align-items:flex-end">
+          <div style="flex:1;min-width:120px"><label style="font-size:11.5px">Đơn vị nhập</label><input id="pPackUnit" value="${p ? ((window.prodUnitConv && window.prodUnitConv(p.id)) || {}).packUnit || '' : ''}" placeholder="VD: quả, bó, túi"></div>
+          <div style="width:34px;text-align:center;padding-bottom:9px;color:var(--muted)">1 =</div>
+          <div style="flex:1;min-width:120px"><label style="font-size:11.5px">? kg / 1 đơn vị</label><input id="pKgPerPack" type="number" data-money="0" step="0.01" min="0" value="${p ? ((window.prodUnitConv && window.prodUnitConv(p.id)) || {}).kgPerPack || '' : ''}" placeholder="VD: 0.25"></div>
+        </div>
+        <div style="font-size:11px;color:var(--muted);margin-top:4px">Lúc nhận hàng gõ số theo đơn vị này → hệ tự ra kg (sửa lại kg thực cân được). Tiền khách + công nợ luôn tính theo kg.</div>
       </div>
       <div class="form-row wide">
         <label>🖼 Ảnh sản phẩm</label>
@@ -1335,6 +1344,8 @@
     const unit = (window.formVal('#pUnit') || 'kg').toLowerCase();
     const note = window.formVal('#pNote');
     const buy = parseInt(window.formVal('#pBuy'), 10) || 0;
+    const packUnit = (window.formVal('#pPackUnit') || '').trim();
+    const kgPerPack = parseFloat(String(window.formVal('#pKgPerPack') || '').replace(/[^\d.]/g, '')) || 0;
     const imgEl = document.getElementById('pImg');
     const img = imgEl ? imgEl.value : '';
     const today = window.todayISO();
@@ -1349,13 +1360,16 @@
         hist.push({ date: today, buy, sell: prevSell });
       }
       window.STORE.update('products', id, { name, cat, unit, note, priceHistory: hist, img });
+      if (window.setProdUnitConv) window.setProdUnitConv(id, packUnit, kgPerPack);
       window.toast('✓ Đã cập nhật ' + name, 'success');
     } else {
+      const newId = window.STORE.nextId('products', 'SP', 3);
       window.STORE.add('products', {
-        id: window.STORE.nextId('products', 'SP', 3),
+        id: newId,
         name, cat, unit, note, img,
         priceHistory: [{ date: today, buy, sell: 0 }],
       });
+      if (window.setProdUnitConv) window.setProdUnitConv(newId, packUnit, kgPerPack);
       window.toast('✓ Đã thêm ' + name, 'success');
     }
     window.closeModal();

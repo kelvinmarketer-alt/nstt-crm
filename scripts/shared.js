@@ -5,7 +5,7 @@
 
 /* Phiên bản app hiển thị (đối chiếu với CACHE_VERSION trong sw.js) — để user tự XÁC NHẬN
    đang chạy bản mới hay còn kẹt JS cũ (hiện ở góc sidebar + log console). */
-window.APP_VERSION = 'v520';
+window.APP_VERSION = 'v521';
 console.log('%c[NSTT] App ' + window.APP_VERSION, 'color:#339B21;font-weight:bold');
 
 /* Gom NGUỒN khách về 3 nhóm chuẩn: 'mkt' / 'sales' / 'sep-gioi-thieu'.
@@ -713,6 +713,24 @@ window.setCustDebtCycle = function (custId, v) {
   window.STORE.rmwKv('custDebtCycles', m => {
     m = (m && typeof m === 'object' && !Array.isArray(m)) ? m : {};
     if (v == null || v === '' || v === 'period') delete m[custId]; else m[custId] = String(v);
+    return m;
+  });
+};
+/* ===== Quy đổi đơn vị nhập → kg theo từng SP (KV 'prodUnitConv') =====
+   {packUnit:'quả', kgPerPack:0.25} → nhập theo quả nhưng tính tiền/công nợ theo kg. */
+window.prodUnitConv = function (productId) {
+  if (!productId || !window.STORE) return null;
+  const map = window.STORE.get('prodUnitConv', {}) || {};
+  const c = map[productId];
+  if (c && (+c.kgPerPack > 0) && c.packUnit) return { packUnit: String(c.packUnit), kgPerPack: +c.kgPerPack };
+  return null;
+};
+window.setProdUnitConv = function (productId, packUnit, kgPerPack) {
+  if (!productId || !window.STORE || !window.STORE.rmwKv) return;
+  window.STORE.rmwKv('prodUnitConv', m => {
+    m = (m && typeof m === 'object' && !Array.isArray(m)) ? m : {};
+    const u = String(packUnit || '').trim(); const k = +kgPerPack || 0;
+    if (!u || !(k > 0)) delete m[productId]; else m[productId] = { packUnit: u, kgPerPack: k };
     return m;
   });
 };
