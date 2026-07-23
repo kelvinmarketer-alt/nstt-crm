@@ -116,8 +116,7 @@
           <button class="btn btn-ghost btn-sm" onclick="window.printPur('${p.id}')" title="In phiếu nhập">🖨</button>
           ${p.status==='wh_received' ? `<button class="btn btn-ghost btn-sm" style="color:#B91C1C" onclick="window.markReceived('${p.id}')" title="Kế toán chốt công nợ NCC">💰 Chốt công nợ</button>`
             : p.status==='ordered' ? (_isGomNcc(p) ? `<button class="btn btn-ghost btn-sm" style="color:#B91C1C" onclick="window.markReceived('${p.id}')" title="Kế toán chốt công nợ trực tiếp (kho chưa nhận cũng chốt được)">💰 Chốt công nợ</button>` : `<button class="btn btn-ghost btn-sm" style="color:var(--ok)" onclick="window.markReceived('${p.id}')" title="Đánh dấu đã nhận → cộng kho">✓ Nhận</button>`)
-            : ''}
-          ${due>0 && p.status==='received' ? `<button class="btn btn-ghost btn-sm" style="color:var(--ok)" onclick="window.payPur('${p.id}')" title="Ghi thanh toán">💰</button>` : ''}
+            : p.status==='received' ? `<button class="btn btn-ghost btn-sm" style="color:#B45309" onclick="window.openSettleDialog('${p.id}')" title="Sửa lại giá / công nợ đã chốt">✏️ Sửa nợ</button>` : ''}
         </td>
       </tr>`;
     }).join('');
@@ -191,7 +190,8 @@
       ${(p.status==='ordered' && !_isGomNcc(p)) ? `<button class="btn btn-primary" onclick="window.pnReceiveFromModal('${p.id}')">✓ Đã nhận</button>` : ''}
       ${((p.status==='wh_received') || (p.status==='ordered' && _isGomNcc(p))) ? `<button class="btn btn-primary" onclick="window.openSettleDialog('${p.id}')">💰 Chốt công nợ</button>` : ''}
       ${p.status==='received' ? `<button class="btn btn-ghost" onclick="window.pnSaveInvoice('${p.id}')" title="Lưu số hoá đơn NCC (hoá đơn thường về sau khi nhận hàng)">💾 Lưu HĐ</button>` : ''}
-      ${(due>0 && p.status==='received') ? `<button class="btn btn-ghost" style="color:var(--ok)" onclick="window.payPur('${p.id}');window.closeModal()">💰 Thanh toán</button>` : ''}
+      ${p.status==='received' ? `<button class="btn btn-ghost" style="color:#B45309" onclick="window.openSettleDialog('${p.id}')" title="Sửa lại giá / công nợ đã chốt">✏️ Sửa nợ</button>` : ''}
+      ${(due>0 && p.status==='received') ? `<span style="font-size:11.5px;color:var(--muted);align-self:center">💡 Thanh toán ở <b>Công nợ NCC</b></span>` : ''}
       ${p.status!=='cancelled' ? `<button class="btn btn-ghost" style="color:var(--danger)" onclick="window.cancelPur('${p.id}')">✕ Hủy phiếu</button>` : ''}`;
     window.openModal(`📦 ${p.id}`, body, { footer, width: '660px' });
   };
@@ -336,7 +336,8 @@
     if (window.AUTH && window.AUTH.hasPerm && !(window.AUTH.hasPerm('accounting.edit') || window.AUTH.hasPerm('purchases.create'))) {
       window.toast && window.toast('Chỉ Kế toán được chốt công nợ NCC.', 'warn'); return;
     }
-    const p = getPur().find(x => x.id === id); if (!p || (p.status !== 'wh_received' && p.status !== 'ordered')) return;
+    const p = getPur().find(x => x.id === id); if (!p || (p.status !== 'wh_received' && p.status !== 'ordered' && p.status !== 'received')) return;
+    const reSettle = p.status === 'received';    /* SỬA lại công nợ đã chốt (auto/thủ công) → chỉnh delta nợ, KHÔNG cộng lại kho */
     const fromWh = p.status === 'wh_received';   /* kho đã nhập SL/lỗi + cộng tồn → khoá cột, không cộng lại kho */
     const _dISO = _pnDateISO(p);   /* ngày nhập → tra giá vốn của ĐÚNG ngày đó */
     const sup = findSup(p.supplierId) || {};
@@ -367,7 +368,9 @@
         <td class="stl-tot" data-i="${i}" style="padding:7px 10px;text-align:right;font-weight:700">0</td>
       </tr>`;
     }).join('');
-    const body = `<div style="font-size:12.5px;color:var(--muted);margin-bottom:10px">${fromWh
+    const body = `<div style="font-size:12.5px;color:var(--muted);margin-bottom:10px">${reSettle
+        ? '✏️ <b>Sửa lại công nợ đã chốt</b> — chỉnh giá / thực nhận / xử lý lỗi → công nợ NCC tự cập nhật theo chênh lệch. (Tồn kho không cộng lại.)'
+        : fromWh
         ? 'Kho đã nhận ' + (p.whBy ? '(<b>' + _escP(p.whBy) + '</b>' + (p.whReceivedAt ? ' · ' + _escP(p.whReceivedAt) : '') + ') ' : '') + '— kế toán khớp <b>giá nhập</b> + xử lý hàng lỗi từng mặt hàng → chốt công nợ.'
         : '⚡ Kế toán chốt <b>trực tiếp</b> (kho chưa nhận). Nhập <b>Thực nhận</b> + <b>Lỗi</b> từng mặt hàng, khớp <b>giá</b>, chọn xử lý lỗi → chốt công nợ (hệ tự cộng phần dư vào tồn kho).'}</div>
       <div style="overflow:auto;border:1px solid var(--line);border-radius:8px">
@@ -381,9 +384,9 @@
           <th style="padding:7px 10px;text-align:right">Thành tiền</th>
         </tr></thead><tbody>${rows}</tbody></table></div>
       <div id="stl-summary" style="margin-top:12px;text-align:right;font-size:15px">—</div>`;
-    window.openModal('💰 Chốt công nợ — ' + _escP(sup.name || p.supplierId), body, {
+    window.openModal((reSettle ? '✏️ Sửa công nợ — ' : '💰 Chốt công nợ — ') + _escP(sup.name || p.supplierId), body, {
       fullWide: true,
-      footer: `<button class="btn btn-ghost" onclick="window.closeModal()">Huỷ</button><button class="btn btn-primary" onclick="window.confirmSettle('${id}')">💰 Chốt công nợ</button>`,
+      footer: `<button class="btn btn-ghost" onclick="window.closeModal()">Huỷ</button><button class="btn btn-primary" onclick="window.confirmSettle('${id}')">${reSettle ? '💾 Lưu công nợ' : '💰 Chốt công nợ'}</button>`,
     });
     setTimeout(() => window._settleRecalc(id), 0);
   };
@@ -420,8 +423,10 @@
   window.confirmSettle = function (id) { _ktSettle(id); };
   function _ktSettle(id) {
     const list = getPur(); const i = list.findIndex(x => x.id === id);
-    if (i < 0 || (list[i].status !== 'wh_received' && list[i].status !== 'ordered')) return;
+    if (i < 0 || (list[i].status !== 'wh_received' && list[i].status !== 'ordered' && list[i].status !== 'received')) return;
     const p = list[i];
+    const reSettle = p.status === 'received';       /* SỬA nợ đã chốt → chỉnh delta, KHÔNG cộng kho lại */
+    const oldTotal = +p.total || 0;                 /* nợ cũ để tính delta khi sửa */
     const fromWh = p.status === 'wh_received';
     const prods = getProds(); const today = window.todayISO();
     let payable = 0, lossVal = 0, anyReturn = false;
@@ -431,8 +436,9 @@
       const lineDebt = Math.round((r.canReturn ? r.good : r.recv) * r.price);  /* cho trả → trả phần tốt; không → trả đủ đã nhận */
       payable += lineDebt; if (!r.canReturn) lossVal += Math.round(r.defect * r.price);
       it.total = lineDebt; it.canReturn = r.canReturn; if (r.canReturn) anyReturn = true;
-      /* Kế toán chốt TRỰC TIẾP từ 'ordered' → kho chưa cộng → hệ cộng phần DƯ (good - khách cần) vào tồn kho. */
-      if (!fromWh) {
+      /* Kế toán chốt TRỰC TIẾP từ 'ordered' → kho chưa cộng → hệ cộng phần DƯ (good - khách cần) vào tồn kho.
+         SỬA nợ (reSettle) → tồn kho đã cộng lúc chốt trước, KHÔNG cộng lại. */
+      if (!fromWh && !reSettle) {
         const demand = it.demandQty != null ? +it.demandQty : (+it.qty || 0);
         const surplus = Math.max(0, Math.round((r.good - demand) * 100) / 100);
         it.stockedQty = surplus;
@@ -445,14 +451,16 @@
       if (pr && r.price) { pr.priceHistory = pr.priceHistory || []; const last = pr.priceHistory[pr.priceHistory.length - 1]; if (!last || last.date !== today) pr.priceHistory.push({ date: today, buy: r.price, sell: Math.round(r.price * 1.55) }); else last.buy = r.price; }
     });
     window.STORE.set('products', prods);
-    p.status = 'received'; p.total = payable; p.lossValue = lossVal; p.canReturn = anyReturn;
-    if (!fromWh) { p.whReceivedAt = window.todayVN ? window.todayVN() : ''; p.whBy = (window.CURRENT_USER && window.CURRENT_USER.name) || ''; }
+    p.status = 'received'; p.total = payable; p.lossValue = lossVal; p.canReturn = anyReturn; p.priceWarn = (p.items || []).some(it => !(+it.price > 0) && (+it.goodQty > 0));
+    if (!fromWh && !reSettle) { p.whReceivedAt = window.todayVN ? window.todayVN() : ''; p.whBy = (window.CURRENT_USER && window.CURRENT_USER.name) || ''; }
     window.STORE.set('purchases', list);
     const sup = getSup().find(s => s.id === p.supplierId);
-    if (sup) window.STORE.update('suppliers', sup.id, { debt: (+sup.debt || 0) + payable, totalSpend: (+sup.totalSpend || 0) + payable });
-    if (window.audit) window.audit.log('purchase.settle', `Chốt công nợ ${id} · ${window.fmt(payable)}₫${lossVal ? ` · hao hụt ${window.fmt(lossVal)}₫` : ''}${fromWh ? '' : ' [KT chốt trực tiếp]'}`);
+    /* SỬA nợ → cộng DELTA (payable − nợ cũ); chốt lần đầu → cộng đủ payable. */
+    const debtDelta = reSettle ? (payable - oldTotal) : payable;
+    if (sup) window.STORE.update('suppliers', sup.id, { debt: Math.max(0, (+sup.debt || 0) + debtDelta), totalSpend: (+sup.totalSpend || 0) + (reSettle ? 0 : payable) });
+    if (window.audit) window.audit.log('purchase.settle', `${reSettle ? 'Sửa' : 'Chốt'} công nợ ${id} · ${window.fmt(payable)}₫${reSettle ? ` (Δ${debtDelta >= 0 ? '+' : ''}${window.fmt(debtDelta)})` : ''}${lossVal ? ` · hao hụt ${window.fmt(lossVal)}₫` : ''}`);
     window.closeModal && window.closeModal();
-    window.toast(`✓ Đã chốt công nợ NCC ${window.fmt(payable)}₫` + (lossVal ? ` · ⚠ hao hụt ${window.fmt(lossVal)}₫` : ''), 'success');
+    window.toast(`✓ Đã ${reSettle ? 'sửa' : 'chốt'} công nợ NCC ${window.fmt(payable)}₫` + (reSettle && debtDelta ? ` (${debtDelta >= 0 ? 'tăng' : 'giảm'} ${window.fmt(Math.abs(debtDelta))})` : '') + (lossVal ? ` · ⚠ hao hụt ${window.fmt(lossVal)}₫` : ''), 'success');
   }
 
   window.cancelPur = async function (id) {

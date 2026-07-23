@@ -77,7 +77,7 @@
     </tr></thead>`;
     const body = `<tbody>${data.list.map(r => `<tr>
       <td class="par" title="Bấm để xem bản đối chiếu công nợ — in / copy gửi NCC"><a href="javascript:void(0)" onclick="window.ncdStatement('${r.key}')" style="color:var(--navy);font-weight:700;text-decoration:none;border-bottom:1px dotted var(--navy)">${escH(r.name)}</a></td>
-      ${data.days.map(d => { const v = r.daily[d] || 0; return `<td class="num ${v ? '' : 'z'}">${v ? fmtU(v) : '·'}</td>`; }).join('')}
+      ${data.days.map(d => { const v = r.daily[d] || 0; return `<td class="num ${v ? '' : 'z'}">${v ? `<a href="javascript:void(0)" onclick="window.ncdDayDetail('${r.key}','${d}')" style="color:var(--navy);text-decoration:none;border-bottom:1px dotted #94A3B8" title="Xem chi tiết mã hàng / phiếu / đơn ngày này">${fmtU(v)}</a>` : '·'}</td>`; }).join('')}
       <td class="num"><b>${fmtU(r.total)}</b></td>
       <td class="num cn-paid">${r.paid ? fmtU(r.paid) : '·'}</td>
       <td class="num cn-owe">${r.remain ? fmtU(r.remain) : '·'}</td>
@@ -129,29 +129,85 @@
     window.XLSX.writeFile(wb, `cong-no-ncc-${fromISO}_${toISO}.xlsx`);
   };
 
-  /* Ghi thanh toán toàn bộ nợ 1 NCC → trừ nợ + đánh dấu phiếu đã nhận = đã trả + phiếu chi vào sổ quỹ */
+  /* ===== Thanh toán công nợ NCC — popup nhập số tiền (trả 1 phần / trả hết) ===== */
   window.ncdPay = function (id) {
-    const list = getSup(); const s = list.find(x => x.id === id);
+    const s = getSup().find(x => x.id === id);
     if (!s || !(+s.debt > 0)) { window.toast && window.toast('NCC này không còn nợ', 'info'); return; }
-    if (!confirm(`Ghi thanh toán ${window.fmt(s.debt)} ₫ cho ${s.name}?`)) return;
-    const amt = +s.debt || 0;
-    s.debt = 0;
+    const debt = +s.debt || 0;
+    const _i = 'width:100%;box-sizing:border-box;border:1px solid var(--line);border-radius:8px;padding:10px;font-size:16px;margin-top:4px';
+    window.openModal('💵 Thanh toán công nợ — ' + escH(s.name), `
+      <div style="font-size:13px;margin-bottom:10px">Đang nợ: <b style="color:#DC2626">${window.fmt(debt)}₫</b></div>
+      <label style="font-size:12px;color:var(--muted)">Số tiền trả (₫)</label>
+      <input id="ncdPayAmt" type="number" inputmode="numeric" value="${debt}" style="${_i}">
+      <div style="display:flex;gap:8px;margin-top:8px">
+        <button class="btn btn-ghost btn-sm" onclick="document.getElementById('ncdPayAmt').value=${debt}">Trả hết</button>
+        <button class="btn btn-ghost btn-sm" onclick="document.getElementById('ncdPayAmt').value=${Math.round(debt / 2)}">Trả 50%</button>
+      </div>
+      <div style="font-size:11.5px;color:var(--muted);margin-top:8px">Ghi phiếu chi (sổ quỹ tiền mặt) + trừ công nợ NCC. Trả 1 phần → trừ dần từ phiếu nhập cũ nhất.</div>
+    `, { width: '420px', footer: `<button class="btn btn-ghost" onclick="window.closeModal()">Huỷ</button><button class="btn btn-primary" onclick="window._ncdDoPay('${id}')">💵 Ghi thanh toán</button>` });
+  };
+  window._ncdDoPay = function (id) {
+    const list = getSup(); const s = list.find(x => x.id === id); if (!s) return;
+    const debt = +s.debt || 0;
+    let amt = parseFloat(String((document.getElementById('ncdPayAmt') || {}).value || '').replace(/[^\d.]/g, '')) || 0;
+    amt = Math.min(Math.max(0, Math.round(amt)), debt);
+    if (!(amt > 0)) { window.toast && window.toast('Nhập số tiền > 0', 'warn'); return; }
+    s.debt = Math.max(0, debt - amt);
     S().set('suppliers', list);
-    const pur = getPur(); let purCh = false;
-    pur.forEach(p => { if (p.supplierId === id && p.status === 'received' && (+p.total || 0) - (+p.paid || 0) > 0.5) { p.paid = p.total; purCh = true; } });
+    /* FIFO: trừ dần vào phiếu received cũ nhất */
+    const pur = getPur(); let rem = amt, purCh = false;
+    pur.filter(p => p.supplierId === id && p.status === 'received').sort((a, b) => (dmyToISO(a.date) < dmyToISO(b.date) ? -1 : 1))
+      .forEach(p => { const due = (+p.total || 0) - (+p.paid || 0); if (due > 0.5 && rem > 0.5) { const pay = Math.min(due, rem); p.paid = (+p.paid || 0) + pay; rem -= pay; purCh = true; } });
     if (purCh) S().set('purchases', pur);
     const cash = S().get('cashEntries', []) || [];
     const pcMax = cash.reduce((m, e) => { const n = parseInt(String(e.no || '').replace(/^PC/, ''), 10); return isNaN(n) ? m : Math.max(m, n); }, 0);
     cash.unshift({
       no: 'PC' + String(pcMax + 1).padStart(4, '0'),
       date: (window.todayVN ? window.todayVN() : new Date().toLocaleDateString('vi-VN')),
-      type: 'out', amount: amt, account: 'Tiền mặt', party: s.name,
-      desc: 'Thanh toán công nợ NCC ' + s.id,
+      type: 'out', amount: amt, account: 'Tiền mặt', party: s.name, desc: 'Thanh toán công nợ NCC ' + s.id,
     });
     S().set('cashEntries', cash);
     if (window.audit) window.audit.log('supplier.pay', `Trả ${window.fmt(amt)} ₫ cho ${s.name}`);
-    window.toast && window.toast('✓ Đã ghi phiếu chi ' + window.fmt(amt) + ' ₫', 'success');
+    window.toast && window.toast('✓ Đã ghi phiếu chi ' + window.fmt(amt) + ' ₫' + (s.debt > 0 ? ' · còn nợ ' + window.fmt(s.debt) : ' · hết nợ'), 'success');
+    window.closeModal && window.closeModal();
     window.ncdRender();
+  };
+
+  /* ===== Chi tiết công nợ 1 NGÀY của 1 NCC: mã hàng + mã phiếu + mã đơn (bấm → mở module) ===== */
+  window.ncdDayDetail = function (supId, iso) {
+    const sup = getSup().find(s => s.id === supId) || { name: supId };
+    const runs = S().get('procurementRuns', []) || [];
+    const phieu = getPur().filter(p => p.supplierId === supId && p.status === 'received' && dmyToISO(p.date) === iso).sort((a, b) => (a.id < b.id ? -1 : 1));
+    if (!phieu.length) { window.toast && window.toast('Không có phiếu nhập ngày này', 'info'); return; }
+    const f = v => (Math.round(+v || 0)).toLocaleString('vi-VN');
+    let dayTot = 0;
+    const cards = phieu.map(p => {
+      dayTot += +p.total || 0;
+      const run = p.gomRunId ? runs.find(r => r.id === p.gomRunId) : null;
+      const orderCodes = (run && Array.isArray(run.orderCodes)) ? run.orderCodes : [];
+      const warn = (p.items || []).some(it => !(+it.price > 0) && ((+it.goodQty || +it.qty) > 0));
+      const itemsHtml = (p.items || []).map(it => {
+        const q = it.goodQty != null ? +it.goodQty : (+it.qty || 0); const pw = !(+it.price > 0);
+        return `<tr style="border-top:1px solid #F1F5F9"><td style="padding:5px 8px">${escH(it.name)}</td><td style="padding:5px 8px;text-align:right">${q}${escH(it.unit || 'kg')}</td><td style="padding:5px 8px;text-align:right;${pw ? 'color:#B45309' : ''}">${pw ? '⚠ 0' : f(it.price)}</td><td style="padding:5px 8px;text-align:right;font-weight:600">${f(it.total)}</td></tr>`;
+      }).join('');
+      const ordHtml = orderCodes.length
+        ? '🧾 Đi đơn: ' + orderCodes.map(c => `<a href="orders.html?open=${encodeURIComponent(c)}" target="_blank" style="color:var(--navy);border-bottom:1px dotted var(--navy);text-decoration:none">${escH(c)} ↗</a>`).join(', ')
+        : '<span style="color:var(--muted)">(không gắn đơn — phiếu lẻ)</span>';
+      return `<div style="border:1px solid var(--line);border-radius:10px;margin-bottom:12px;overflow:hidden">
+        <div style="background:#F8FAF8;padding:8px 12px;display:flex;align-items:center;gap:8px;flex-wrap:wrap">
+          <a href="purchases.html?focus=${encodeURIComponent(p.id)}" target="_blank" style="font-weight:800;color:var(--navy);text-decoration:none;border-bottom:1px dotted var(--navy)">📦 ${escH(p.id)} ↗</a>
+          ${warn ? '<span style="background:#FEF3C7;color:#B45309;font-size:10.5px;font-weight:700;padding:1px 7px;border-radius:99px">⚠ thiếu giá</span>' : ''}
+          <div style="flex:1"></div><b style="color:#B91C1C">${f(p.total)}₫</b>
+        </div>
+        <table style="width:100%;border-collapse:collapse;font-size:12px"><thead><tr style="color:var(--muted);font-size:10.5px;text-transform:uppercase"><th style="padding:4px 8px;text-align:left">Mã hàng</th><th style="padding:4px 8px;text-align:right">SL tốt</th><th style="padding:4px 8px;text-align:right">Giá nhập</th><th style="padding:4px 8px;text-align:right">Thành tiền</th></tr></thead><tbody>${itemsHtml}</tbody></table>
+        <div style="padding:7px 12px;font-size:11.5px;border-top:1px solid #F1F5F9">${ordHtml}</div>
+      </div>`;
+    }).join('');
+    window.openModal('📅 Chi tiết nhập ' + ddmm(iso) + ' — ' + escH(sup.name), `
+      <div style="font-size:12.5px;color:var(--muted);margin-bottom:10px">Phiếu nhập <b>${escH(sup.name)}</b> ngày <b>${ddmm(iso)}</b>. Bấm <b>mã phiếu</b> / <b>mã đơn</b> để mở module tương ứng. Sửa công nợ: mở mã phiếu → <b>✏️ Sửa nợ</b>.</div>
+      ${cards}
+      <div style="text-align:right;font-size:14px;margin-top:6px">Tổng nhập ngày: <b style="color:#B91C1C">${f(dayTot)}₫</b></div>
+    `, { width: '720px', footer: `<button class="btn btn-ghost" onclick="window.closeModal()">Đóng</button>` });
   };
 
   /* ========== F1: ĐỐI CHIẾU CÔNG NỢ NCC (in / copy gửi NCC) ========== */
@@ -304,7 +360,7 @@
   if (window.renderAppShell) window.renderAppShell('ncc-debt', 'Công nợ NCC');
   S().get('products');   /* warm-load: khớp SP khi nhập Excel */
   if (window.STORE) {
-    S().get('purchases'); S().get('suppliers'); S().get('cashEntries');   /* warm-load */
+    S().get('purchases'); S().get('suppliers'); S().get('cashEntries'); S().get('procurementRuns');   /* warm-load */
     S().subscribe('suppliers', window.ncdRender);
     S().subscribe('purchases', window.ncdRender);
     S().subscribe('cashEntries', window.ncdRender);
