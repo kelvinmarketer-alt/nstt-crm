@@ -757,6 +757,8 @@
           <select id="addPriceTier">${window.priceTierOptions ? window.priceTierOptions('') : '<option value="">Mặc định</option>'}</select></div>
         <div><label>Hạn công nợ ${window.helpTip ? window.helpTip('Số ngày KH được nợ trước khi tính QUÁ HẠN. Chính sách Tuấn Tú: đơn ~50kg → 3 ngày · 50–100kg → 7 ngày · >200tr/tháng → 15 ngày.') : ''}</label>
           <select id="addCreditDays">${window.creditDaysOptions ? window.creditDaysOptions('') : '<option value="7">7 ngày</option>'}</select></div>
+        <div><label>Kỳ tính công nợ ${window.helpTip ? window.helpTip('Cách GOM nợ để thu: theo kỳ (1–15/16–cuối) hoặc gộp 3/7/10/30 ngày. Phiếu thu nợ hiện đúng kỳ đang nợ theo cách này.') : ''}</label>
+          <select id="addDebtCycle">${window.debtCycleOptions ? window.debtCycleOptions('') : '<option value="period">Theo kỳ</option>'}</select></div>
       </div>
       <div class="form-row">
         <div><label>NV phụ trách${isScoped() ? ' <span style="color:var(--muted);font-weight:400">(chính bạn)</span>' : ''}</label>
@@ -1062,7 +1064,7 @@
       zalo: window.formVal('#addZalo'), fb: window.formVal('#addFb'),
       address: window.formVal('#addAddress'), province: window.formVal('#addProvince'),
       orderFreq: window.formVal('#addFreq'), staff: window.formVal('#addStaff'),
-      source: window.formVal('#addSource'), creditDays: window.formVal('#addCreditDays'),
+      source: window.formVal('#addSource'), creditDays: window.formVal('#addCreditDays'), debtCycle: window.formVal('#addDebtCycle'),
     };
   }
   let _addCap = null;   /* dữ liệu form đã bắt trước khi modal cảnh báo THAY thế form */
@@ -1122,6 +1124,7 @@
     /* Nhóm giá KH → KV custPriceTiers (sync đa máy; cloud customers không có cột price_tier) */
     if (window.setCustPriceTier) window.setCustPriceTier(code, f.priceTier);
     if (window.setCustCreditDays) window.setCustCreditDays(code, f.creditDays);
+    if (window.setCustDebtCycle) window.setCustDebtCycle(code, f.debtCycle);
     window.closeModal();
     window.toast('✓ Đã thêm khách hàng ' + code, 'success');
 
@@ -1166,6 +1169,11 @@
           <select id="ePriceTier">${window.priceTierOptions ? window.priceTierOptions((window.custPriceTier ? window.custPriceTier(c.id) : c.priceTier) || '') : '<option value="">Mặc định</option>'}</select></div>
         <div><label>Hạn công nợ ${window.helpTip ? window.helpTip('Số ngày KH được nợ trước khi tính QUÁ HẠN. Chính sách: ~50kg→3 ngày · 50–100kg→7 ngày · >200tr/tháng→15 ngày.') : ''}</label>
           <select id="eCreditDays">${window.creditDaysOptions ? window.creditDaysOptions(window.custCreditDays ? window.custCreditDays(c.id) : '') : '<option value="7">7 ngày</option>'}</select></div>
+      </div>
+      <div class="form-row">
+        <div><label>Kỳ tính công nợ ${window.helpTip ? window.helpTip('Cách GOM nợ để thu: theo kỳ (1–15/16–cuối) hoặc gộp 3/7/10/30 ngày. Phiếu thu nợ sẽ hiện đúng các kỳ đang nợ theo cách này.') : ''}</label>
+          <select id="eDebtCycle">${window.debtCycleOptions ? window.debtCycleOptions(window.custDebtCycle ? window.custDebtCycle(c.id) : '') : '<option value="period">Theo kỳ</option>'}</select></div>
+        <div></div>
       </div>
       <div class="form-row wide"><label>Địa chỉ</label><input id="eAddress" value="${c.address}"></div>
       <div class="form-row">
@@ -1226,6 +1234,7 @@
     /* Nhóm giá KH → KV custPriceTiers (sync đa máy) */
     if (window.setCustPriceTier) window.setCustPriceTier(id, window.formVal('#ePriceTier'));
     if (window.setCustCreditDays) window.setCustCreditDays(id, window.formVal('#eCreditDays'));
+    if (window.setCustDebtCycle) window.setCustDebtCycle(id, window.formVal('#eDebtCycle'));
     window.closeModal();
     window.toast('✓ Đã cập nhật ' + id, 'success');
   };

@@ -5,7 +5,7 @@
 
 /* Phiên bản app hiển thị (đối chiếu với CACHE_VERSION trong sw.js) — để user tự XÁC NHẬN
    đang chạy bản mới hay còn kẹt JS cũ (hiện ở góc sidebar + log console). */
-window.APP_VERSION = 'v503';
+window.APP_VERSION = 'v504';
 console.log('%c[NSTT] App ' + window.APP_VERSION, 'color:#339B21;font-weight:bold');
 
 /* Gom NGUỒN khách về 3 nhóm chuẩn: 'mkt' / 'sales' / 'sep-gioi-thieu'.
@@ -682,6 +682,34 @@ window.setCustCreditDays = function (custId, days) {
   window.STORE.rmwKv('custCreditDays', m => {
     m = (m && typeof m === 'object' && !Array.isArray(m)) ? m : {};
     if (days == null || days === '') delete m[custId]; else m[custId] = +days;
+    return m;
+  });
+};
+
+/* KỲ TÍNH CÔNG NỢ mỗi KH — có KH tính theo kỳ (1–15/16–cuối), có KH gộp theo 3/7/10/30 ngày.
+   Lưu KV 'custDebtCycles' {custId: 'period'|'3'|'7'|'10'|'30'} (sync đa máy). Phiếu thu nợ gom nợ theo kỳ này. */
+window.DEBT_CYCLES = [
+  { v: 'period', label: 'Theo kỳ (1–15 / 16–cuối tháng)' },
+  { v: '3',  label: '3 ngày' },
+  { v: '7',  label: '7 ngày' },
+  { v: '10', label: '10 ngày' },
+  { v: '30', label: 'Theo tháng (30 ngày)' },
+];
+window.DEBT_CYCLE_DEFAULT = 'period';
+window.debtCycleOptions = function (sel) {
+  const cur = (sel == null || sel === '') ? window.DEBT_CYCLE_DEFAULT : String(sel);
+  return window.DEBT_CYCLES.map(c => `<option value="${c.v}" ${cur === c.v ? 'selected' : ''}>${c.label}</option>`).join('');
+};
+window.custDebtCycle = function (custId) {
+  const map = (window.STORE && window.STORE.get('custDebtCycles', {})) || {};
+  const v = map[custId];
+  return (v != null && v !== '') ? String(v) : window.DEBT_CYCLE_DEFAULT;
+};
+window.setCustDebtCycle = function (custId, v) {
+  if (!custId || !window.STORE) return;
+  window.STORE.rmwKv('custDebtCycles', m => {
+    m = (m && typeof m === 'object' && !Array.isArray(m)) ? m : {};
+    if (v == null || v === '' || v === 'period') delete m[custId]; else m[custId] = String(v);
     return m;
   });
 };

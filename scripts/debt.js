@@ -703,8 +703,28 @@ Mong quý khách thu xếp thanh toán sớm. Cảm ơn!
   /* ===== KỲ CÔNG NỢ cho phiếu thu (kỳ 1 = ngày 1–15, kỳ 2 = 16–cuối tháng). payPeriod = 'YYYY-MM-1|2' ===== */
   function _todayD() { return window.todayDate ? window.todayDate() : new Date(); }
   function _periodKeyOf(d) { const y = d.getFullYear(), mo = String(d.getMonth() + 1).padStart(2, '0'), h = d.getDate() <= 15 ? 1 : 2; return `${y}-${mo}-${h}`; }
-  function _periodLabel(k) { const m = String(k).match(/^(\d{4})-(\d{2})-([12])$/); return m ? `Kỳ ${m[3]} · Tháng ${+m[2]}/${m[1]} (${m[3] === '1' ? 'ngày 1–15' : 'ngày 16–cuối'})` : (k || '—'); }
-  function _periodShort(k) { const m = String(k).match(/^(\d{4})-(\d{2})-([12])$/); return m ? `Kỳ ${m[3]}/T${+m[2]}` : ''; }
+  /* Khoá KỲ theo chu kỳ của KH: 'period' = bán nguyệt ('YYYY-MM-1|2'); N ngày = 'DYYYY-MM-DD_N' (ngày đầu cửa sổ). */
+  function _cycleKeyOf(iso, cycle) {
+    const d = new Date(iso + 'T00:00:00');
+    if (!cycle || cycle === 'period') return _periodKeyOf(d);
+    const n = +cycle; if (!(n > 0)) return _periodKeyOf(d);
+    const DAY = 86400000, EPOCH = Date.UTC(2020, 0, 1);
+    const t = Date.UTC(d.getFullYear(), d.getMonth(), d.getDate());
+    const idx = Math.floor((t - EPOCH) / (n * DAY));
+    const s = new Date(EPOCH + idx * n * DAY);
+    return 'D' + s.getUTCFullYear() + '-' + String(s.getUTCMonth() + 1).padStart(2, '0') + '-' + String(s.getUTCDate()).padStart(2, '0') + '_' + n;
+  }
+  const _isCycleKey = k => /^D\d{4}-\d{2}-\d{2}_\d+$/.test(k) || /^\d{4}-\d{2}-[12]$/.test(k);
+  function _periodLabel(k) {
+    const dm = String(k).match(/^D(\d{4})-(\d{2})-(\d{2})_(\d+)$/);
+    if (dm) { const s = new Date(+dm[1], +dm[2] - 1, +dm[3]), n = +dm[4], e = new Date(s.getTime() + (n - 1) * 86400000); const dd = d => String(d.getDate()).padStart(2, '0') + '/' + String(d.getMonth() + 1).padStart(2, '0'); return `${dd(s)}–${dd(e)} (${n} ngày)`; }
+    const m = String(k).match(/^(\d{4})-(\d{2})-([12])$/); return m ? `Kỳ ${m[3]} · Tháng ${+m[2]}/${m[1]} (${m[3] === '1' ? 'ngày 1–15' : 'ngày 16–cuối'})` : (k || '—');
+  }
+  function _periodShort(k) {
+    const dm = String(k).match(/^D(\d{4})-(\d{2})-(\d{2})_(\d+)$/);
+    if (dm) { const s = new Date(+dm[1], +dm[2] - 1, +dm[3]); return String(s.getDate()).padStart(2, '0') + '/' + String(s.getMonth() + 1).padStart(2, '0'); }
+    const m = String(k).match(/^(\d{4})-(\d{2})-([12])$/); return m ? `Kỳ ${m[3]}/T${+m[2]}` : '';
+  }
   function _periodOptions(sel) {
     const t = _todayD(); let y = t.getFullYear(), mo = t.getMonth(); const list = [];
     for (let i = 0; i < 6; i++) { const mm = String(mo + 1).padStart(2, '0'); list.push(`${y}-${mm}-2`); list.push(`${y}-${mm}-1`); mo--; if (mo < 0) { mo = 11; y--; } }
@@ -714,6 +734,7 @@ Mong quý khách thu xếp thanh toán sớm. Cảm ơn!
   /* Nợ theo TỪNG KỲ của 1 KH: charge (đơn ĐÃ GIAO, theo kỳ ngày giao) − payment (theo kỳ áp vào).
      Trả mảng {key, amount} các kỳ CÒN NỢ (>0), cũ→mới → phiếu thu chỉ hiện kỳ đang nợ + auto số tiền. */
   function _custPeriodDebts(c) {
+    const cyc = window.custDebtCycle ? window.custDebtCycle(c.id) : 'period';
     const norm = s => String(s || '').trim().toLowerCase();
     const byP = {}; const add = (k, v) => { if (k) byP[k] = (byP[k] || 0) + v; };
     (window.STORE.get('orders', []) || []).forEach(o => {
@@ -722,14 +743,20 @@ Mong quý khách thu xếp thanh toán sớm. Cảm ơn!
       if (!(window.orderDelivered && window.orderDelivered(o))) return;
       const iso = window.orderDeliverISO ? window.orderDeliverISO(o) : '';
       if (!iso) return;
-      add(_periodKeyOf(new Date(iso + 'T00:00:00')), +o.freight || 0);
+      add(_cycleKeyOf(iso, cyc), +o.freight || 0);
     });
     ((window.getDebtLedger ? window.getDebtLedger(c.id) : []) || []).forEach(e => {
       if (e.type !== 'payment') return;
-      const k = /^\d{4}-\d{2}-[12]$/.test(e.payPeriod || '') ? e.payPeriod : _periodKeyOf(new Date(_payDateISO(e.date) + 'T00:00:00'));
+      /* Trừ vào KỲ kế toán đã chọn (payPeriod hợp lệ) — nếu chưa có thì gom theo NGÀY thu đúng chu kỳ KH. */
+      const k = _isCycleKey(e.payPeriod || '') ? e.payPeriod : _cycleKeyOf(_payDateISO(e.date), cyc);
       add(k, -(+e.amount || 0));
     });
-    return Object.keys(byP).filter(k => byP[k] > 0.5).sort().map(k => ({ key: k, amount: Math.round(byP[k]) }));
+    return Object.keys(byP).filter(k => byP[k] > 0.5).sort((a, b) => _perStartISO(a) < _perStartISO(b) ? -1 : 1).map(k => ({ key: k, amount: Math.round(byP[k]) }));
+  }
+  /* ISO ngày đầu kỳ (để sort chung cả bán-nguyệt lẫn N-ngày). */
+  function _perStartISO(k) {
+    const dm = String(k).match(/^D(\d{4}-\d{2}-\d{2})_\d+$/); if (dm) return dm[1];
+    const m = String(k).match(/^(\d{4})-(\d{2})-([12])$/); return m ? `${m[1]}-${m[2]}-${m[3] === '1' ? '01' : '16'}` : String(k);
   }
   function _periodOptionsForDebts(perDebts, sel) {
     return perDebts.map(p => `<option value="${p.key}" data-amt="${p.amount}" ${p.key === sel ? 'selected' : ''}>${_periodLabel(p.key)} — nợ ${window.fmt(p.amount)}₫</option>`).join('');
