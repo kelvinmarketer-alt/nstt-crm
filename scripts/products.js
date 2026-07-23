@@ -664,8 +664,9 @@
      - Bộ lọc NGÀY: xem giá đã áp vào 1 ngày bất kỳ trong quá khứ để rà soát.
      - CHỈ lưu mốc khi giá THAY ĐỔI (ngày không đổi tự dùng mốc gần nhất trước đó = carry-forward). */
   const _phEsc = s => String(s == null ? '' : s).replace(/[&<>"]/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]));
-  function _phEffBuy(p, dateISO) { const e = window.priceEntryOn ? window.priceEntryOn(p, dateISO) : null; return e ? (+e.buy || 0) : 0; }
-  function _phPrevBuy(p, dateISO) { let best = null; (p.priceHistory || []).forEach(h => { if (h && h.date && h.date < dateISO && (!best || h.date > best.date)) best = h; }); return best ? (+best.buy || 0) : 0; }
+  /* Giá NHẬP có hiệu lực ≤ ngày (bỏ mốc buy=0 = sell-only/seed) — khớp với cách tính công nợ NCC. */
+  function _phEffBuy(p, dateISO) { let best = null; (p.priceHistory || []).forEach(h => { if (h && h.date && h.date <= dateISO && (+h.buy || 0) > 0 && (!best || h.date > best.date)) best = h; }); return best ? (+best.buy || 0) : 0; }
+  function _phPrevBuy(p, dateISO) { let best = null; (p.priceHistory || []).forEach(h => { if (h && h.date && h.date < dateISO && (+h.buy || 0) > 0 && (!best || h.date > best.date)) best = h; }); return best ? (+best.buy || 0) : 0; }
   function _phHistHtml(p) {
     const hist = [...(p.priceHistory || [])].filter(h => h && h.date).sort((a, b) => (a.date < b.date ? 1 : -1));   /* mới → cũ */
     if (!hist.length) return '<div style="color:var(--muted);font-size:12.5px;padding:14px;text-align:center">Chưa có mốc giá nhập nào. Đặt giá ở trên rồi bấm Lưu.</div>';

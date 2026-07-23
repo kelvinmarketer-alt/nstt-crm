@@ -321,7 +321,8 @@
   function _buyPriceOn(productId, dateISO) {
     if (!productId) return 0;
     const pr = getProds().find(x => x.id === productId); if (!pr || !Array.isArray(pr.priceHistory)) return 0;
-    let best = null; pr.priceHistory.forEach(h => { if (h && h.date && h.date <= dateISO && (!best || h.date > best.date)) best = h; });
+    /* Mốc giá NHẬP gần nhất ≤ ngày & buy>0 (bỏ qua mốc buy=0 = mốc sell-only / seed cũ) → giá vốn khớp. */
+    let best = null; pr.priceHistory.forEach(h => { if (h && h.date && h.date <= dateISO && (+h.buy || 0) > 0 && (!best || h.date > best.date)) best = h; });
     return best ? (+best.buy || 0) : 0;
   }
 
