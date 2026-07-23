@@ -1196,15 +1196,24 @@
         <div><label>Giá nhập hôm nay (₫/kg) *</label><input id="pBuy" type="number" value="${e ? e.buy : ''}" placeholder="0"></div>
         <div></div>
       </div>
-      <div class="form-row wide" style="background:#FFFBEB;border:1px solid #FDE68A;border-radius:8px;padding:8px 10px">
-        <label style="color:#92400E">⚖️ Quy đổi đơn vị nhập → kg <span style="font-weight:400;color:#94A3B8">(nếu nhập theo quả/bó… — để trống nếu nhập thẳng kg)</span></label>
-        <div style="display:flex;gap:10px;flex-wrap:wrap;align-items:flex-end">
-          <div style="flex:1;min-width:120px"><label style="font-size:11.5px">Đơn vị nhập</label><input id="pPackUnit" value="${p ? ((window.prodUnitConv && window.prodUnitConv(p.id)) || {}).packUnit || '' : ''}" placeholder="VD: quả, bó, túi"></div>
-          <div style="width:34px;text-align:center;padding-bottom:9px;color:var(--muted)">1 =</div>
-          <div style="flex:1;min-width:120px"><label style="font-size:11.5px">? kg / 1 đơn vị</label><input id="pKgPerPack" type="number" data-money="0" step="0.01" min="0" value="${p ? ((window.prodUnitConv && window.prodUnitConv(p.id)) || {}).kgPerPack || '' : ''}" placeholder="VD: 0.25"></div>
+      ${(function(){ var c = (p && window.prodUnitConv && window.prodUnitConv(p.id)) || {}; var kgp = +c.kgPerPack || 0; var upk = kgp > 0 ? Math.round((1/kgp)*100)/100 : ''; var un = c.packUnit || ''; var _in='border:1px solid var(--line);border-radius:7px;padding:8px;font-size:15px'; return `
+      <div class="form-row wide" style="background:#FFFBEB;border:1px solid #FDE68A;border-radius:8px;padding:10px 12px">
+        <label style="color:#92400E;font-weight:700">⚖️ Nhập theo đơn vị khác kg? (quả · bó · thùng · can · lít…)</label>
+        <div style="font-size:11.5px;color:#92400E;margin:2px 0 8px">Để trống nếu nhập thẳng bằng kg. Nếu nhập theo đơn vị khác → khai báo để hệ <b>tự quy ra kg</b> (tiền khách & công nợ luôn theo kg).</div>
+        <div style="display:flex;gap:8px;align-items:flex-end;flex-wrap:wrap">
+          <div style="min-width:150px"><label style="font-size:11.5px;color:var(--muted)">Đơn vị nhập</label><input id="pPackUnit" value="${un.replace(/"/g,'&quot;')}" placeholder="VD: quả" oninput="window._pcvUnitLabel()" style="${_in};width:100%;box-sizing:border-box"></div>
         </div>
-        <div style="font-size:11px;color:var(--muted);margin-top:4px">Lúc nhận hàng gõ số theo đơn vị này → hệ tự ra kg (sửa lại kg thực cân được). Tiền khách + công nợ luôn tính theo kg.</div>
-      </div>
+        <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap;margin-top:10px;font-size:14px;background:#fff;border:1px dashed #FDE68A;border-radius:8px;padding:10px">
+          <span>1 kg =</span>
+          <input id="pUnitPerKg" type="number" data-money="0" step="0.1" min="0" value="${upk}" placeholder="?" oninput="window._pcvSync('u')" style="${_in};width:80px;text-align:right">
+          <b class="pcv-u" style="color:#B45309">${un || 'đơn vị'}</b>
+          <span style="color:var(--muted);margin:0 4px">— hoặc —</span>
+          <span>1 <b class="pcv-u" style="color:#B45309">${un || 'đơn vị'}</b> =</span>
+          <input id="pKgPerPack" type="number" data-money="0" step="0.001" min="0" value="${kgp || ''}" placeholder="?" oninput="window._pcvSync('kg')" style="${_in};width:80px;text-align:right">
+          <span>kg</span>
+        </div>
+        <div style="font-size:11.5px;color:var(--muted);margin-top:6px">💡 Chỉ điền <b>1 trong 2 ô</b>, cái nào dễ ước hơn — ô kia tự tính. VD: <b>trứng cút → 1 kg = 100 quả</b>; <b>dầu ăn → 1 can = 5 kg</b>. Lúc nhận hàng chỉ gõ số theo đơn vị nhập, hệ tự ra kg (vẫn sửa kg thực cân được).</div>
+      </div>`; })()}
       <div class="form-row wide">
         <label>🖼 Ảnh sản phẩm</label>
         <div style="display:flex;align-items:center;gap:12px">
@@ -1337,6 +1346,18 @@
     });
   };
 
+  /* Quy đổi 2 chiều: điền 1 kg=? đơn vị HOẶC 1 đơn vị=? kg → ô kia tự tính (nghịch đảo) */
+  window._pcvSync = function (from) {
+    const kg = document.getElementById('pKgPerPack'), u = document.getElementById('pUnitPerKg');
+    if (!kg || !u) return;
+    if (from === 'kg') { const v = parseFloat(kg.value) || 0; u.value = v > 0 ? (Math.round((1 / v) * 100) / 100) : ''; }
+    else { const v = parseFloat(u.value) || 0; kg.value = v > 0 ? (Math.round((1 / v) * 1000) / 1000) : ''; }
+  };
+  window._pcvUnitLabel = function () {
+    const nm = ((document.getElementById('pPackUnit') || {}).value || '').trim() || 'đơn vị';
+    document.querySelectorAll('.pcv-u').forEach(e => e.textContent = nm);
+  };
+
   window.submitProduct = function (id) {
     const name = window.formVal('#pName');
     if (!name) { window.toast('Nhập tên sản phẩm', 'warn'); return; }
@@ -1345,7 +1366,8 @@
     const note = window.formVal('#pNote');
     const buy = parseInt(window.formVal('#pBuy'), 10) || 0;
     const packUnit = (window.formVal('#pPackUnit') || '').trim();
-    const kgPerPack = parseFloat(String(window.formVal('#pKgPerPack') || '').replace(/[^\d.]/g, '')) || 0;
+    let kgPerPack = parseFloat(String(window.formVal('#pKgPerPack') || '').replace(/[^\d.]/g, '')) || 0;
+    if (!kgPerPack) { const upk = parseFloat(String(window.formVal('#pUnitPerKg') || '').replace(/[^\d.]/g, '')) || 0; if (upk > 0) kgPerPack = Math.round((1 / upk) * 10000) / 10000; }
     const imgEl = document.getElementById('pImg');
     const img = imgEl ? imgEl.value : '';
     const today = window.todayISO();
