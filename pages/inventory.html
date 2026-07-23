@@ -101,21 +101,11 @@
     <div id="hbHost"></div>
 
     <!-- KPI strip -->
-    <div style="display:grid;grid-template-columns:repeat(5,1fr);gap:10px;margin-bottom:14px" id="invKpis"></div>
+    <div style="display:grid;grid-template-columns:repeat(3,1fr);gap:10px;margin-bottom:14px" id="invKpis"></div>
 
-    <!-- Filter -->
-    <div style="display:flex;gap:10px;margin-bottom:10px;flex-wrap:wrap;align-items:center">
-      <input id="invQ" placeholder="🔍 Tìm SP..." style="flex:1;min-width:200px;border:1px solid var(--line);border-radius:7px;padding:7px 11px;font-size:13px">
-      <select id="invFilter" style="border:1px solid var(--line);border-radius:7px;padding:7px 11px;font-size:13px">
-        <option value="">Tất cả tình trạng</option>
-        <option value="out">⛔ Hết hàng</option>
-        <option value="low">🔴 Dưới ngưỡng (cần nhập)</option>
-        <option value="warn">🟠 Sắp hết (< 1.5 lần ngưỡng)</option>
-        <option value="ok">🟢 Đủ tồn</option>
-      </select>
-      <select id="invLoc" style="border:1px solid var(--line);border-radius:7px;padding:7px 11px;font-size:13px">
-        <option value="">Tất cả kho</option>
-      </select>
+    <!-- Filter — chỉ còn ô tìm kiếm full width -->
+    <div style="margin-bottom:10px">
+      <input id="invQ" placeholder="🔍 Tìm sản phẩm..." style="width:100%;box-sizing:border-box;border:1px solid var(--line);border-radius:7px;padding:9px 12px;font-size:13px">
     </div>
 
     <div id="invBody-host" style="background:#fff;border:1px solid var(--line);border-radius:10px;overflow:hidden">

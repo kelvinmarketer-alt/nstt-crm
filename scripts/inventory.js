@@ -98,8 +98,6 @@
     wrap.innerHTML = `
       <div class="ik-kpi"><div class="lab">Tổng SP đang quản lý ${window.helpTip('Số mã SP có hồ sơ tồn kho. SP chưa có hồ sơ sẽ tự tạo khi nhập hàng lần đầu.')}</div><div class="val">${total}</div><div class="sub">mã SP</div></div>
       <div class="ik-kpi"><div class="lab">⛔ Hết hàng ${window.helpTip('Tồn = 0kg. Cần nhập gấp — đơn mới có SP này sẽ bị từ chối.')}</div><div class="val" style="color:#7F1D1D">${out}</div><div class="sub">cần nhập gấp</div></div>
-      <div class="ik-kpi"><div class="lab">🔴 Dưới ngưỡng ${window.helpTip('Tồn < ngưỡng tối thiểu (minStock). Nên đặt phiếu nhập NCC trong 1-2 ngày tới.')}</div><div class="val" style="color:#DC2626">${low}</div><div class="sub">SP cần nhập sớm</div></div>
-      <div class="ik-kpi"><div class="lab">🟠 Sắp hết ${window.helpTip('Tồn < 1.5 lần ngưỡng. Cân nhắc lên kế hoạch nhập.')}</div><div class="val" style="color:#D97706">${warn}</div><div class="sub">SP cần theo dõi</div></div>
       <div class="ik-kpi"><div class="lab">💰 Giá trị tồn ${window.helpTip('Tổng = Σ(tồn × giá nhập gần nhất). Đây là vốn đang nằm ở kho — càng cao càng kẹt vốn.')}</div><div class="val" style="color:var(--ok)">${window.fmtShort(totalValue)}</div><div class="sub">₫ theo giá vốn</div></div>
     `;
   }
@@ -107,21 +105,20 @@
   function render() {
     renderKpis();
     const inv = getInv();
-    /* Build locations */
-    const locs = [...new Set(inv.map(i => i.location).filter(Boolean))];
+    /* Bộ lọc tình trạng + kho đã bỏ khỏi UI → guard nếu element không còn */
     const loSel = document.getElementById('invLoc');
-    const cur = loSel.value;
-    loSel.innerHTML = '<option value="">Tất cả kho</option>' + locs.map(l => `<option ${l===cur?'selected':''}>${l}</option>`).join('');
+    if (loSel) { const locs = [...new Set(inv.map(i => i.location).filter(Boolean))]; const cur = loSel.value; loSel.innerHTML = '<option value="">Tất cả kho</option>' + locs.map(l => `<option ${l === cur ? 'selected' : ''}>${l}</option>`).join(''); }
 
-    const q = (document.getElementById('invQ').value || '').toLowerCase();
-    const f = document.getElementById('invFilter').value;
-    const lo = document.getElementById('invLoc').value;
+    const q = ((document.getElementById('invQ') || {}).value || '').toLowerCase();
+    const f = (document.getElementById('invFilter') || {}).value || '';
+    const lo = (document.getElementById('invLoc') || {}).value || '';
     const tb = document.getElementById('invBody');
 
     let rows = inv.map(i => {
       const p = findProd(i.productId);
       return { ...i, prod: p, level: stockLevel(i), days: daysLeft(i) };
     });
+    rows = rows.filter(r => (+r.stock || 0) > 0);   /* CHỈ hiện SP đang còn tồn (ẩn tồn = 0) */
     if (q) rows = rows.filter(r => (r.prod?.name || '').toLowerCase().includes(q) || r.productId.toLowerCase().includes(q));
     if (f) rows = rows.filter(r => r.level === f);
     if (lo) rows = rows.filter(r => r.location === lo);
@@ -131,7 +128,7 @@
     rows.sort((a, b) => order[a.level] - order[b.level] || (a.prod?.name||'').localeCompare(b.prod?.name||''));
 
     if (!rows.length) {
-      tb.innerHTML = `<tr><td colspan="11" style="padding:36px;text-align:center;color:var(--muted)">Không có SP nào khớp bộ lọc.</td></tr>`;
+      tb.innerHTML = `<tr><td colspan="11" style="padding:36px;text-align:center;color:var(--muted)">${q ? 'Không tìm thấy SP đang tồn khớp "' + q + '".' : 'Chưa có sản phẩm nào đang còn tồn kho.'}</td></tr>`;
       return;
     }
 
@@ -332,7 +329,7 @@
   document.getElementById('hbTitle').innerHTML = window.helpTip('Module này hiển thị tồn kho real-time. Cảnh báo dựa trên ngưỡng minStock + tốc độ bán trung bình. Click "Kiểm kê" để điều chỉnh khi số thực tế ≠ số trên hệ thống.', {size:'lg'});
   document.getElementById('hbMv').innerHTML = window.helpTip('Mọi nhập/xuất/kiểm kê đều ghi log vào đây. Giữ 500 bản ghi gần nhất.');
 
-  ['invQ','invFilter','invLoc'].forEach(id => document.getElementById(id).oninput = render);
+  ['invQ','invFilter','invLoc'].forEach(id => { const el = document.getElementById(id); if (el) el.oninput = render; });
 
   ['inventory','products','orders','purchases','inv_movements'].forEach(k => window.STORE.subscribe(k, () => { render(); renderMoves(); }));
   render();
