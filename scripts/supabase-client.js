@@ -107,12 +107,14 @@
     },
     shippers: {
       to:   { ordersToday:'orders_today', kpiTotal:'kpi_total',
+              primaryPlate:'vehicle',   /* biển số → cột `vehicle` (trước đây gửi thô → retry-strip mỗi lần lưu) */
               /* DB không có các field này → drop */
+              email: null,
               status: null, joinDate: null, telegramChatId: null,
               canDrive: null, trips30d: null, revenue30d: null,
               rating: null, recentTrips: null, address: null,
               code: null /* shippers DB không có code, dùng id */ },
-      from: { orders_today:'ordersToday', kpi_total:'kpiTotal' },
+      from: { orders_today:'ordersToday', kpi_total:'kpiTotal', vehicle:'primaryPlate' },
     },
     leads: {
       /* DB columns: id, name, phone, email, address, source, stage, est_value,
@@ -247,6 +249,15 @@
     return m ? m[1] : null;
   }
 
+  /* Lỗi TẠM THỜI (mạng/timeout/CORS chớp nhoáng) — store.js có hàng đợi pending tự đẩy lại ở vòng
+     poll sau → KHÔNG dọa nhân viên bằng toast đỏ "lỗi cloud" (họ thấy đỏ nhưng vào lại là hết).
+     CHỈ lỗi DB THẬT (có error.code: 23xxx not-null/unique, 42xxx, PGRSTxxx) mới đáng báo. */
+  function _isTransientErr(error) {
+    if (!error) return true;
+    if (error.code) return false;
+    return /fetch|network|timeout|failed to fetch|load failed|econn|etimedout|aborted/i.test(error.message || '');
+  }
+
   /* Caller (store.js) truyền TÊN BẢNG DB (cash_entries), nhưng FIELD_MAP/DATE_FIELDS
      key theo TÊN JS (cashEntries). Resolver snake_case → camelCase để tra đúng. */
   function fmKey(table) {
@@ -284,11 +295,16 @@
       if (ne[k] && (v === '' || (typeof v === 'string' && v.trim() === ''))) v = null;
       result[newKey] = v;
     }
-    /* cash_entries.entry_date NOT NULL — phiếu quỹ tự tạo (hook đơn/ads/lương) thiếu ngày
-       → mặc định HÔM NAY để không bị chặn khi sync. Phiếu có ngày hợp lệ KHÔNG bị đụng. */
-    if (key === 'cashEntries' && !result.entry_date) {
-      result.entry_date = new Date().toISOString().slice(0, 10);
-    }
+    /* CỘT NGÀY NOT NULL — payload CÓ mang field ngày nhưng rỗng/null (do vnToIso không parse được
+       hoặc bỏ trống) → mặc định HÔM NAY để KHÔNG bị 400 "null value violates not-null" (= báo đỏ
+       lỗi cloud) hoặc mất patch âm thầm ở update→insert. CHỈ đụng khi field ngày CÓ trong payload
+       (hasOwnProperty) → KHÔNG ghi đè ngày thật của patch lẻ không chạm tới ngày. */
+    const _todayISO = new Date().toISOString().slice(0, 10);
+    const _fixDate = (col) => { if (Object.prototype.hasOwnProperty.call(result, col) && !result[col]) result[col] = _todayISO; };
+    if (key === 'cashEntries' && !result.entry_date) result.entry_date = _todayISO;   /* NOT NULL: luôn cần */
+    if (key === 'orders')   _fixDate('order_date');     /* TIMESTAMPTZ NOT NULL */
+    if (key === 'invoices') _fixDate('invoice_date');   /* DATE NOT NULL */
+    if (key === 'adspend')  _fixDate('date');           /* TEXT NOT NULL */
     return result;
   }
   function mapFrom(table, obj) {
@@ -540,7 +556,7 @@
           return null;
         }
         console.error('[SB insert]', table, error);
-        window.toast?.('⚠ Lưu cloud lỗi ' + table + ': ' + (error.message||'unknown'), 'warn');
+        if (!_isTransientErr(error)) window.toast?.('⚠ Lưu cloud lỗi ' + table + ': ' + (error.message||'unknown'), 'warn');
         return null;
       }
       return null;
@@ -575,7 +591,7 @@
           continue;
         }
         console.error('[SB update]', table, error);
-        window.toast?.('⚠ Update cloud lỗi ' + table + ': ' + (error.message||'unknown'), 'warn');
+        if (!_isTransientErr(error)) window.toast?.('⚠ Update cloud lỗi ' + table + ': ' + (error.message||'unknown'), 'warn');
         return null;
       }
       return null;
