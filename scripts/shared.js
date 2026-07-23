@@ -5,7 +5,7 @@
 
 /* Phiên bản app hiển thị (đối chiếu với CACHE_VERSION trong sw.js) — để user tự XÁC NHẬN
    đang chạy bản mới hay còn kẹt JS cũ (hiện ở góc sidebar + log console). */
-window.APP_VERSION = 'v534';
+window.APP_VERSION = 'v535';
 console.log('%c[NSTT] App ' + window.APP_VERSION, 'color:#339B21;font-weight:bold');
 
 /* Gom NGUỒN khách về 3 nhóm chuẩn: 'mkt' / 'sales' / 'sep-gioi-thieu'.
@@ -166,7 +166,8 @@ window.srcGroup = function (s) {
    (Chỉ tag nút KÍCH HOẠT in; cửa sổ in tự sinh là document riêng, không bị đụng.) */
 (function hidePrintBtnsOnMobile() {
   try {
-    if (!window.matchMedia || !window.matchMedia('(max-width:560px)').matches) return;
+    /* LUÔN gắn class (không phụ thuộc kích thước lúc load) — CSS @media ≤560 mới ẩn.
+       Nhờ vậy: xoay ngang/dọc, thay đổi cỡ đều đúng; máy tính không bị ảnh hưởng. */
     const tag = root => {
       if (!root || !root.querySelectorAll) return;
       root.querySelectorAll('button, a, .btn').forEach(el => {
