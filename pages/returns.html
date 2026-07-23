@@ -321,8 +321,26 @@
       ${pods.length ? `<div><div style="font-size:11px;color:var(--muted);text-transform:uppercase;margin-bottom:4px">📷 Ảnh giao hàng — đối chứng (${pods.length})</div><div style="display:flex;gap:6px;flex-wrap:wrap">${pods.map(p => `<img src="${p.dataURL}" style="width:64px;height:64px;object-fit:cover;border-radius:6px;border:1px solid var(--line);cursor:pointer" onclick="window.openImgPreview(this.src)">`).join('')}</div></div>` : ''}
     `, {
       width: '560px',
-      footer: `<button class="btn btn-ghost" onclick="window.closeModal()">Đóng</button>${r.status === 'pending' ? `<button class="btn btn-primary" onclick="window.closeModal();${(r.resolution && r.resolution.startsWith('replace')) ? `window.processReturn('${r.id}',true)` : `window.approveShipReturn('${r.id}')`}">✓ Duyệt &amp; xử lý</button>` : ''}`
+      footer: `<button class="btn btn-ghost" onclick="window.closeModal()">Đóng</button>${(_isAdmin() && r.status !== 'pending' && _retHasOpenClaim(r.id)) ? `<button class="btn btn-ghost" style="color:#B45309" onclick="window.retCancelClaim('${r.id}')" title="NCC không nhận trả nữa / ghi nhầm → hoàn lại công nợ NCC">↩ Hủy giảm nợ NCC</button>` : ''}${r.status === 'pending' ? `<button class="btn btn-primary" onclick="window.closeModal();${(r.resolution && r.resolution.startsWith('replace')) ? `window.processReturn('${r.id}',true)` : `window.approveShipReturn('${r.id}')`}">✓ Duyệt &amp; xử lý</button>` : ''}`
     });
+  };
+  /* Còn khoản trả NCC (chưa hủy) của phiếu này? */
+  function _retHasOpenClaim(rid) {
+    return (window.STORE.get('supplierClaims', []) || []).some(c => c && c.returnId === rid && c.status !== 'cancelled' && c.status !== 'settled');
+  }
+  /* Hủy khoản trả NCC của 1 phiếu (NCC không nhận trả / ghi nhầm) → công nợ NCC tự tăng lại (dẫn xuất). */
+  window.retCancelClaim = async function (rid) {
+    if (!_isAdmin()) { window.toast('Chỉ admin được hủy', 'warn'); return; }
+    const claims = (window.STORE.get('supplierClaims', []) || []).filter(c => c && c.returnId === rid && c.status !== 'cancelled' && c.status !== 'settled');
+    if (!claims.length) { window.toast('Phiếu này không có khoản trả NCC', 'info'); return; }
+    const tot = claims.reduce((s, c) => s + (+c.amount || 0), 0);
+    if (!(await window.uiConfirm('Hủy khoản giảm nợ NCC ' + window.fmt(tot) + '₫ của phiếu ' + rid + '?\nCông nợ NCC sẽ tăng lại đúng bằng số này.\n(Hàng đã về kho KHÔNG bị đảo — chỉ hoàn phần công nợ.)', { title: '↩ Hủy giảm nợ NCC', okText: 'Hủy khoản trả', danger: true }))) return;
+    if (window.STORE.rmwKv) window.STORE.rmwKv('supplierClaims', arr => { (arr || []).forEach(c => { if (c && c.returnId === rid && c.status !== 'cancelled' && c.status !== 'settled') c.status = 'cancelled'; }); return arr || []; }, []);
+    else { const arr = window.STORE.get('supplierClaims', []) || []; arr.forEach(c => { if (c && c.returnId === rid && c.status !== 'cancelled' && c.status !== 'settled') c.status = 'cancelled'; }); window.STORE.set('supplierClaims', arr); }
+    window.audit && window.audit.log('return.claim_cancel', rid + ' · hoàn nợ NCC ' + window.fmt(tot) + '₫');
+    window.toast('✓ Đã hủy khoản trả — công nợ NCC tăng lại ' + window.fmt(tot) + '₫', 'success');
+    window.closeModal && window.closeModal();
+    renderRet();
   };
 
   /* 🚩 Phiếu trả từ shipper (Bảng giao hàng) — chờ kế toán DUYỆT */
