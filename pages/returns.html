@@ -266,9 +266,10 @@
     /* Hàng hoàn TỪNG mặt đi về đâu: nhập lại kho / trả NCC / vứt bỏ */
     const _dest = x => {
       const good = (x.restock === true) || ((x.cond || 'bad') === 'good');
-      if (good) return '<span style="color:#15803D;font-weight:600">🏬 Nhập lại kho (bán tiếp)</span>';
+      const extTag = x.extMarket ? ' <span style="color:var(--muted);font-weight:400;font-size:10.5px">· 💵 mua ngoài</span>' : '';
+      if (good) return '<span style="color:#15803D;font-weight:600">🏬 Nhập lại kho (bán tiếp)</span>' + extTag;
       if ((x.nccReturnable !== false) && x.supplierName && (+x.buyTotal > 0)) return '<span style="color:#B45309;font-weight:600">🏭 Trả về NCC</span>';
-      return '<span style="color:#B91C1C;font-weight:600">🗑 Vứt bỏ (hao hụt)</span>';
+      return '<span style="color:#B91C1C;font-weight:600">🗑 Vứt bỏ (hao hụt)</span>' + extTag;
     };
     const rowsHtml = its.length ? its.map(x => `<tr style="border-top:1px solid #F1F5F9">
         <td style="padding:6px 8px">${_esc0(x.name)}${x.note ? `<div style="font-size:10.5px;color:var(--muted)">📝 ${_esc0(x.note)}</div>` : ''}</td>
@@ -295,7 +296,7 @@
             <span>🏭 Giảm công nợ <b>NCC</b> <span style="color:var(--muted);font-size:11.5px">· giá nhập</span></span>
             <b style="color:${nccReduce > 0 ? '#B45309' : 'var(--muted)'};white-space:nowrap">${nccReduce > 0 ? '−' + window.fmt(nccReduce) + '₫' : '0₫ — không trừ'}</b>
           </div>
-          ${nccReduce > 0 ? '' : '<div style="font-size:10.5px;color:var(--muted);margin-top:5px">Không trừ NCC vì: hàng đẹp/lưu kho bán tiếp · hoặc NCC không cho trả · hoặc chưa gán NCC lúc duyệt.</div>'}
+          ${nccReduce > 0 ? '' : '<div style="font-size:10.5px;color:var(--muted);margin-top:5px">Không trừ NCC vì: hàng đẹp/lưu kho bán tiếp · NCC không cho trả · 💵 hàng mua ngoài (không có NCC) · hoặc chưa gán NCC.</div>'}
         </div>`;
     window.openModal('↩️ Chi tiết phiếu trả — ' + _esc0(r.id), `
       <div style="display:flex;align-items:center;gap:8px;margin-bottom:8px">
@@ -355,41 +356,45 @@
     const its = (Array.isArray(r.items) && r.items.length) ? r.items : (r.item ? [{ id: r.item.id, name: r.item.name, unit: r.item.unit, qty: r.qtyReturn, total: r.refundTotal, cond: r.disposition === 'restock' ? 'good' : 'bad', note: r.note }] : []);
     const custReduce = its.reduce((s, x) => s + (+x.total || 0), 0) || (+r.refundTotal || 0);
     const pods = ((window.STORE.get('pod_photos', {}) || {})[r.orderCode]) || [];
-    /* Mỗi mặt hàng XẤU: tự dò NCC đã gán + giá nhập → ô nhập gợi ý theo tên, sửa được */
+    /* Mỗi mặt hàng XẤU: chọn NGUỒN & xử lý — NCC cho trả / NCC không cho trả / Mua ngoài (tiền mặt) */
     let nccTotal = 0;
     const badRows = its.map((x, i) => {
       if ((x.cond || 'bad') !== 'bad') return '';
       const info = _nccInfoFor(x);
-      const retYes = _prodReturnable(x.id, x.name) !== false;   /* mặc định CÓ cho trả, trừ khi SP đánh dấu không */
+      /* mặc định: CÓ NCC gán → theo cờ SP (yes/no); KHÔNG có NCC → coi là MUA NGOÀI (ext) */
+      const pref = _prodReturnable(x.id, x.name);
+      const mode = info.supplierName ? (pref === false ? 'no' : 'yes') : 'ext';
+      const isYes = mode === 'yes';
       const line = Math.round((+x.qty || 0) * (info.buyPrice || 0));
-      if (retYes) nccTotal += line;
+      if (isYes) nccTotal += line;
       return `<div style="border:1px solid #FDE68A;background:#FFFBEB;border-radius:7px;padding:8px 10px;margin-bottom:6px">
         <div style="display:flex;justify-content:space-between;align-items:center;gap:8px;flex-wrap:wrap">
           <div style="font-weight:700;font-size:12.5px">🗑 ${_esc0(x.name)} · ${x.qty}${_esc0(x.unit || '')}</div>
           <div style="font-size:11.5px;display:flex;align-items:center;gap:5px">
-            <span style="color:var(--muted)">NCC cho trả?</span>
+            <span style="color:var(--muted)">Nguồn / xử lý</span>
             <select class="ap-ret" data-i="${i}" onchange="window._apToggleRet(${i})" style="padding:4px 6px;border:1px solid var(--line);border-radius:6px">
-              <option value="yes" ${retYes ? 'selected' : ''}>✓ Có — trừ nợ NCC</option>
-              <option value="no" ${!retYes ? 'selected' : ''}>✗ Không — vẫn tính đủ nợ</option>
+              <option value="yes" ${mode === 'yes' ? 'selected' : ''}>🏭 NCC cho trả — trừ nợ NCC</option>
+              <option value="no" ${mode === 'no' ? 'selected' : ''}>🏭 NCC không cho trả — vẫn tính đủ nợ</option>
+              <option value="ext" ${mode === 'ext' ? 'selected' : ''}>💵 Mua ngoài — không có NCC</option>
             </select>
           </div>
         </div>
-        <div class="ap-yes" data-i="${i}" style="display:${retYes ? 'flex' : 'none'};gap:6px;align-items:center;flex-wrap:wrap;margin-top:6px;font-size:12px">
+        <div class="ap-yes" data-i="${i}" style="display:${isYes ? 'flex' : 'none'};gap:6px;align-items:center;flex-wrap:wrap;margin-top:6px;font-size:12px">
           <span style="color:var(--muted)">NCC</span>
           <input class="ap-sup" data-i="${i}" list="apSupDL" value="${_esc0(info.supplierName)}" placeholder="gõ tên NCC…" style="flex:1;min-width:120px;padding:6px 8px;border:1px solid var(--line);border-radius:6px">
           <span style="color:var(--muted)">giá nhập</span>
           <input class="ap-buy" data-i="${i}" data-q="${+x.qty || 0}" type="number" value="${info.buyPrice || ''}" oninput="window._apRecalc()" style="width:86px;padding:6px 8px;border:1px solid var(--line);border-radius:6px;text-align:right" placeholder="0">
           <span>= <b class="ap-line" data-i="${i}" style="color:#B45309">${window.fmt(line)}</b>đ</span>
         </div>
-        <div class="ap-no" data-i="${i}" style="display:${retYes ? 'none' : 'flex'};gap:6px;align-items:center;flex-wrap:wrap;margin-top:6px;font-size:12px">
-          <span style="color:var(--muted)">NCC không nhận → hàng để:</span>
+        <div class="ap-alt" data-i="${i}" style="display:${isYes ? 'none' : 'flex'};gap:6px;align-items:center;flex-wrap:wrap;margin-top:6px;font-size:12px">
+          <span style="color:var(--muted)">Hàng để:</span>
           <select class="ap-disp" data-i="${i}" style="padding:6px 8px;border:1px solid var(--line);border-radius:6px">
             <option value="restock">🏬 Lưu kho — bán tiếp (+tồn)</option>
             <option value="discard">🗑 Vứt bỏ — hao hụt</option>
           </select>
-          <span style="color:#B45309;font-size:11px">⚠ Vẫn tính đủ công nợ NCC</span>
+          <span class="ap-altnote" data-i="${i}" style="color:#B45309;font-size:11px">${mode === 'ext' ? '💵 Mua ngoài — công ty chịu chi phí, không có NCC' : '⚠ Vẫn tính đủ công nợ NCC'}</span>
         </div>
-        <div class="ap-nosup" data-i="${i}" style="display:${retYes && !info.supplierName ? '' : 'none'};font-size:10.5px;color:#B45309;margin-top:3px">⚠ SP chưa gán NCC — gõ tên NCC để trừ nợ</div>
+        <div class="ap-nosup" data-i="${i}" style="display:${isYes && !info.supplierName ? '' : 'none'};font-size:10.5px;color:#B45309;margin-top:3px">⚠ SP chưa gán NCC — gõ tên NCC để trừ nợ, hoặc chọn “Mua ngoài”</div>
       </div>`;
     }).join('');
     const itemRows = its.map(x => `<tr style="border-top:1px solid #F1F5F9">
@@ -412,7 +417,7 @@
         <div style="display:flex;justify-content:space-between;margin-bottom:4px"><span>➖ Giảm hoá đơn khách (giá BÁN)</span><b style="color:#B45309">${window.fmt(custReduce)}₫</b></div>
         <div style="display:flex;justify-content:space-between"><span>🏭 Trừ nợ NCC (giá NHẬP)</span><b style="color:#B45309">−<span id="apNccTotal">${window.fmt(nccTotal)}</span>₫</b></div>
       </div>
-      <div style="font-size:11.5px;color:var(--muted)">Duyệt → gỡ mặt hàng khỏi hoá đơn KH (giảm công nợ KH theo giá bán) + nhập kho hàng đẹp + <b>NCC cho trả</b> thì trừ nợ NCC theo giá nhập; <b>NCC không cho trả</b> → vẫn tính đủ nợ NCC, hàng lưu kho bán tiếp / vứt bỏ. Tất cả bằng <b>công nợ</b>.</div>
+      <div style="font-size:11.5px;color:var(--muted)">Duyệt → gỡ mặt hàng khỏi hoá đơn KH (giảm công nợ KH theo giá bán) + nhập kho hàng đẹp. Hàng xấu: <b>🏭 NCC cho trả</b> → trừ nợ NCC theo giá nhập; <b>🏭 NCC không cho trả</b> → vẫn tính đủ nợ NCC; <b>💵 Mua ngoài</b> → không có NCC, công ty chịu chi phí. Hàng không trả NCC thì lưu kho bán tiếp / vứt bỏ.</div>
     `, {
       width: '560px',
       footer: `<button class="btn btn-ghost" onclick="window.rejectShipReturn('${r.id}')">✕ Từ chối</button>
@@ -432,15 +437,18 @@
     });
     const t = document.getElementById('apNccTotal'); if (t) t.textContent = window.fmt(total);
   };
-  /* Đổi "NCC cho trả?" Có/Không → hiện ô trừ nợ NCC hay ô xử lý hàng (lưu kho / vứt) */
+  /* Đổi nguồn/xử lý (NCC cho trả / NCC không cho trả / Mua ngoài) → hiện ô trừ nợ NCC hay ô xử lý hàng */
   window._apToggleRet = function (i) {
     const ret = document.querySelector('.ap-ret[data-i="' + i + '"]');
-    const isYes = !ret || ret.value === 'yes';
+    const val = ret ? ret.value : 'yes';   /* yes | no | ext */
+    const isYes = val === 'yes';
     const yes = document.querySelector('.ap-yes[data-i="' + i + '"]');
-    const no = document.querySelector('.ap-no[data-i="' + i + '"]');
+    const alt = document.querySelector('.ap-alt[data-i="' + i + '"]');
+    const note = document.querySelector('.ap-altnote[data-i="' + i + '"]');
     const nosup = document.querySelector('.ap-nosup[data-i="' + i + '"]');
     if (yes) yes.style.display = isYes ? 'flex' : 'none';
-    if (no) no.style.display = isYes ? 'none' : 'flex';
+    if (alt) alt.style.display = isYes ? 'none' : 'flex';
+    if (note) note.textContent = val === 'ext' ? '💵 Mua ngoài — công ty chịu chi phí, không có NCC' : '⚠ Vẫn tính đủ công nợ NCC';
     if (nosup) { const supEl = document.querySelector('.ap-sup[data-i="' + i + '"]'); nosup.style.display = (isYes && !(supEl && supEl.value.trim())) ? '' : 'none'; }
     window._apRecalc();
   };
@@ -452,12 +460,15 @@
     /* Gán NCC + giá nhập cho từng SP xấu (từ ô type-ahead) → buyTotal = SL × giá nhập */
     let anyNcc = false;
     its.forEach((x, i) => {
-      if ((x.cond || 'bad') !== 'bad') { x.supplierId = ''; x.buyTotal = 0; x.restock = false; return; }
+      if ((x.cond || 'bad') !== 'bad') { x.supplierId = ''; x.buyTotal = 0; x.restock = false; x.extMarket = false; return; }
       const retEl = document.querySelector('.ap-ret[data-i="' + i + '"]');
-      const returnable = !retEl || retEl.value === 'yes';
+      const mode = retEl ? retEl.value : 'yes';   /* yes | no | ext */
+      const returnable = mode === 'yes';
       x.nccReturnable = returnable;
-      /* Nhớ lựa chọn (KV cloud) để lần sau tự mặc định */
-      if (x.id && _prodReturnable(x.id, x.name) !== returnable) { try { _setProdReturnable(x.id, returnable); } catch (e) {} }
+      x.extMarket = mode === 'ext';
+      x.source = mode === 'ext' ? 'ext' : 'ncc';
+      /* Nhớ cờ NCC-cho-trả (KV cloud) chỉ khi CÓ NCC (yes/no); mua ngoài không đụng tới */
+      if (mode !== 'ext' && x.id && _prodReturnable(x.id, x.name) !== returnable) { try { _setProdReturnable(x.id, returnable); } catch (e) {} }
       if (returnable) {
         const supEl = document.querySelector('.ap-sup[data-i="' + i + '"]');
         const buyEl = document.querySelector('.ap-buy[data-i="' + i + '"]');
@@ -471,7 +482,8 @@
         x.restock = false;   /* hàng trả về NCC — không nhập kho mình */
         if (x.supplierId && x.buyTotal > 0) anyNcc = true;
       } else {
-        /* NCC KHÔNG cho trả → KHÔNG trừ nợ NCC (vẫn tính đủ), hàng: lưu kho bán tiếp hoặc vứt bỏ */
+        /* NCC không cho trả HOẶC mua ngoài → KHÔNG trừ nợ NCC (mua ngoài: công ty chịu chi phí),
+           hàng: lưu kho bán tiếp hoặc vứt bỏ (hao hụt) */
         const dispEl = document.querySelector('.ap-disp[data-i="' + i + '"]');
         const disp = dispEl ? dispEl.value : 'discard';
         x.supplierId = ''; x.supplierName = ''; x.buyPrice = 0; x.buyTotal = 0;
