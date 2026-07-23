@@ -5,7 +5,7 @@
 
 /* Phiên bản app hiển thị (đối chiếu với CACHE_VERSION trong sw.js) — để user tự XÁC NHẬN
    đang chạy bản mới hay còn kẹt JS cũ (hiện ở góc sidebar + log console). */
-window.APP_VERSION = 'v535';
+window.APP_VERSION = 'v536';
 console.log('%c[NSTT] App ' + window.APP_VERSION, 'color:#339B21;font-weight:bold');
 
 /* Gom NGUỒN khách về 3 nhóm chuẩn: 'mkt' / 'sales' / 'sep-gioi-thieu'.
@@ -168,12 +168,15 @@ window.srcGroup = function (s) {
   try {
     /* LUÔN gắn class (không phụ thuộc kích thước lúc load) — CSS @media ≤560 mới ẩn.
        Nhờ vậy: xoay ngang/dọc, thay đổi cỡ đều đúng; máy tính không bị ảnh hưởng. */
+    const mark = el => {
+      if (!el || el.nodeType !== 1 || (el.dataset && el.dataset._noprint)) return;
+      if ((el.textContent || '').indexOf('🖨') !== -1) { el.classList.add('print-only'); el.dataset._noprint = '1'; }
+    };
     const tag = root => {
-      if (!root || !root.querySelectorAll) return;
-      root.querySelectorAll('button, a, .btn').forEach(el => {
-        if (el.dataset._noprint) return;
-        if ((el.textContent || '').indexOf('🖨') !== -1) { el.classList.add('print-only'); el.dataset._noprint = '1'; }
-      });
+      if (!root || root.nodeType !== 1 && root.nodeType !== 9) return;
+      /* xét chính node (nút thêm trực tiếp / top-level trong innerHTML popup) — CHỈ nếu nó là nút/link */
+      if (root.nodeType === 1 && root.matches && root.matches('button, a, .btn')) mark(root);
+      if (root.querySelectorAll) root.querySelectorAll('button, a, .btn').forEach(mark);
     };
     const run = () => tag(document);
     if (document.readyState !== 'loading') run(); else document.addEventListener('DOMContentLoaded', run);
