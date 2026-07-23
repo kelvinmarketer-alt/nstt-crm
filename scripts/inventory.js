@@ -134,7 +134,7 @@
     rows.sort((a, b) => order[a.level] - order[b.level] || (a.name||'').localeCompare(b.name||''));
 
     if (!rows.length) {
-      tb.innerHTML = `<tr><td colspan="11" style="padding:36px;text-align:center;color:var(--muted)">${q ? 'Không tìm thấy SP đang tồn khớp "' + q + '".' : 'Chưa có sản phẩm nào đang còn tồn kho.'}</td></tr>`;
+      tb.innerHTML = `<tr><td colspan="9" style="padding:36px;text-align:center;color:var(--muted)">${q ? 'Không tìm thấy SP đang tồn khớp "' + q + '".' : 'Chưa có sản phẩm nào đang còn tồn kho.'}</td></tr>`;
       return;
     }
 
@@ -156,8 +156,6 @@
           </div>
           <div style="font-size:10.5px;color:var(--muted);margin-top:2px">Min ${r.minStock} · Max ${r.maxStock}</div>
         </td>
-        <td class="num hide-xs">${fmtQty(r.avgDaily)} / ngày</td>
-        <td class="num hide-xs"><span class="${cls}">${r.days === '∞' ? '∞' : r.days + ' ngày'}</span></td>
         <td class="hide-xs" style="font-size:12px">${r.lastIn || '—'}</td>
         <td data-field="level" class="inv-lvl-cell"><span class="${cls}" style="font-size:12px">${lvlLabels[r.level] || ''}</span></td>
         <td class="hide-xs">
