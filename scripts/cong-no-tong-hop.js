@@ -49,9 +49,30 @@
   function paymentISO(e) { return kyRefISO(e.payPeriod) || ledgerISO(e); }
   /* Mã KỲ của 1 ngày ISO ('YYYY-MM-1|2' — kỳ 1 = 1–15, kỳ 2 = 16–cuối) + nhãn hiển thị. */
   function kyOf(iso) { const m = String(iso).match(/^(\d{4})-(\d{2})-(\d{2})/); return m ? `${m[1]}-${m[2]}-${(+m[3] <= 15) ? 1 : 2}` : ''; }
-  function kyLabel(k) { const m = String(k).match(/^(\d{4})-(\d{2})-([12])$/); return m ? `Kỳ ${m[3]} · T${+m[2]}/${m[1]}` : k; }
+  function kyLabel(k) {
+    const dm = String(k).match(/^D(\d{4})-(\d{2})-(\d{2})_(\d+)$/);
+    if (dm) { const s = new Date(+dm[1], +dm[2] - 1, +dm[3]), n = +dm[4], e = new Date(s.getTime() + (n - 1) * 86400000); const dd = d => String(d.getDate()).padStart(2, '0') + '/' + String(d.getMonth() + 1).padStart(2, '0'); return `${dd(s)}–${dd(e)}`; }
+    const m = String(k).match(/^(\d{4})-(\d{2})-([12])$/); return m ? `Kỳ ${m[3]} · T${+m[2]}/${m[1]}` : k;
+  }
   /* Kỳ mà phiếu thu áp vào: kỳ kế toán chọn (payPeriod) hoặc kỳ theo ngày thu (phiếu cũ). */
   function payKy(e) { return (/^\d{4}-\d{2}-[12]$/.test(e.payPeriod || '') ? e.payPeriod : '') || kyOf(paymentISO(e)); }
+  /* === KỲ THEO CHU KỲ TÍNH CÔNG NỢ CỦA KHÁCH (period bán nguyệt / N ngày) — cho phiếu báo công nợ === */
+  function custCyc(custId) { return (window.custDebtCycle ? window.custDebtCycle(custId) : 'period') || 'period'; }
+  function kyOfCust(iso, custId) {
+    const cyc = custCyc(custId);
+    if (cyc === 'period') return kyOf(iso);
+    const n = +cyc; if (!(n > 0)) return kyOf(iso);
+    const m = String(iso).match(/^(\d{4})-(\d{2})-(\d{2})/); if (!m) return '';
+    const DAY = 86400000, EPOCH = Date.UTC(2020, 0, 1);
+    const idx = Math.floor((Date.UTC(+m[1], +m[2] - 1, +m[3]) - EPOCH) / (n * DAY));
+    const s = new Date(EPOCH + idx * n * DAY);
+    return 'D' + s.getUTCFullYear() + '-' + String(s.getUTCMonth() + 1).padStart(2, '0') + '-' + String(s.getUTCDate()).padStart(2, '0') + '_' + n;
+  }
+  function payKyCust(e) {
+    const pp = e.payPeriod || '';
+    if (/^D\d{4}-\d{2}-\d{2}_\d+$/.test(pp) || /^\d{4}-\d{2}-[12]$/.test(pp)) return pp;
+    return kyOfCust(paymentISO(e), e.custId);
+  }
   function dayList(fromISO, toISO) {
     const out = [];
     let d = new Date(fromISO + 'T00:00:00'), end = new Date(toISO + 'T00:00:00');
@@ -174,13 +195,13 @@
       const iso = orderISO(o); if (!iso || iso >= fromISO) return;
       const key = o.cust || o.custName || '—';
       openCharge[key] = (openCharge[key] || 0) + amt;
-      _pnAdd(key, kyOf(iso), amt);        /* cộng nợ vào KỲ phát sinh */
+      _pnAdd(key, kyOfCust(iso, o.cust), amt);        /* cộng nợ vào KỲ phát sinh (theo chu kỳ tính công nợ của KH) */
     });
     ledger.forEach(e => {
       if (e.type !== 'payment') return;
       const iso = paymentISO(e); if (!iso || iso >= fromISO) return;   /* theo KỲ kế toán chọn */
       openPaid[e.custId] = (openPaid[e.custId] || 0) + (+e.amount || 0);
-      _pnAdd(e.custId, payKy(e), -(+e.amount || 0));   /* trừ vào ĐÚNG kỳ phiếu thu áp vào */
+      _pnAdd(e.custId, payKyCust(e), -(+e.amount || 0));   /* trừ vào ĐÚNG kỳ phiếu thu áp vào (theo chu kỳ KH) */
     });
     /* Đã thu trong kỳ (phiếu thu — theo kỳ kế toán chọn) + nợ đầu kỳ + còn phải thu + công nợ HT + lợi nhuận */
     Object.values(rows).forEach(r => {
