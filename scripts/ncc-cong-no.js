@@ -8,17 +8,26 @@
   const escH = v => String(v == null ? '' : v).replace(/[&<>"]/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]));
   const typeOf = id => ((S().get('supplierMeta', {}) || {})[id] || {}).type || '';
   const getClaims = () => (S().get('supplierClaims', []) || []);
-  /* Khoản TRỪ NCC do trả hàng (NCC nhận lại hàng lỗi) — giảm số mình nợ NCC. status !== 'settled' = còn hiệu lực. */
+  const getCash = () => (S().get('cashEntries', []) || []);
+  /* Khoản TRỪ NCC do trả hàng (NCC nhận lại hàng lỗi) — giảm số mình nợ NCC (CHỈ tính nội bộ/CFO). */
   function _supClaims(id) {
     return getClaims().filter(c => c && c.supplierId === id && c.status !== 'settled' && c.status !== 'cancelled')
       .reduce((s, c) => s + (+c.amount || 0), 0);
   }
-  /* Công nợ CÒN NỢ NCC = Σ(phiếu nhập received total − paid) − Σ(khoản trừ trả hàng). Dẫn xuất, không lệ thuộc suppliers.debt (không có cột). */
-  function _supRemainAll(id) {
-    const nhap = getPur().filter(p => p.status === 'received' && p.supplierId === id && p.supplierId !== 'EXT-MARKET')
-      .reduce((s, p) => s + Math.max(0, (+p.total || 0) - (+p.paid || 0)), 0);
-    return Math.max(0, nhap - _supClaims(id));
+  /* TỔNG NHẬP đã nhận (all-time) của 1 NCC */
+  function _supNhapAll(id) {
+    return getPur().filter(p => p.status === 'received' && p.supplierId === id && p.supplierId !== 'EXT-MARKET')
+      .reduce((s, p) => s + (+p.total || 0), 0);
   }
+  /* TỔNG ĐÃ TRẢ = phiếu chi TIỀN MẶT thật cho NCC (all-time) — nguồn DUY NHẤT (không dùng field paid trên phiếu, dễ lệch) */
+  function _supPaidCashAll(id) {
+    const nm = (getSup().find(s => s.id === id) || {}).name || '';
+    return getCash().filter(e => e && e.type === 'out' && (e.party === nm || (e.desc && String(e.desc).includes(id))))
+      .reduce((s, e) => s + (+e.amount || 0), 0);
+  }
+  /* CÔNG NỢ NCC nội bộ (CFO) = Σ nhập − Σ phiếu chi tiền mặt − Σ trả hàng. Đối chiếu gửi NCC thì KHÔNG trừ trả hàng. */
+  function _supRemainAll(id) { return Math.max(0, _supNhapAll(id) - _supPaidCashAll(id) - _supClaims(id)); }
+  function _supRemainExt(id) { return Math.max(0, _supNhapAll(id) - _supPaidCashAll(id)); }   /* đối chiếu NCC — không trừ trả hàng */
   const _nk = s => String(s || '').toLowerCase().normalize('NFD').replace(/[̀-ͯ]/g, '').replace(/đ/g, 'd');
   let _last = null, _q = '';
 
@@ -49,10 +58,14 @@
       const r = rows[p.supplierId] || (rows[p.supplierId] = { key: p.supplierId, name: s.name || p.supplierId, phone: s.phone || '', type: typeOf(p.supplierId), daily: {}, total: 0 });
       r.daily[iso] = (r.daily[iso] || 0) + amt; r.total += amt;
     });
+    const claims = getClaims();
     Object.values(rows).forEach(r => {
       r.paid = cash.filter(e => daySet.has(dmyToISO(e.date)) && cashForSup(e, r)).reduce((s, e) => s + (+e.amount || 0), 0);
-      r.remain = r.total - r.paid;
-      r.debtNow = _supRemainAll(r.key);   /* DẪN XUẤT từ phiếu nhập (không lệ thuộc suppliers.debt hay drift) */
+      r.claimsP = claims.filter(c => c && c.supplierId === r.key && c.status !== 'settled' && c.status !== 'cancelled' && daySet.has(dmyToISO(c.date))).reduce((s, c) => s + (+c.amount || 0), 0);
+      /* CHƯA TRẢ (kỳ) = nhập kỳ − phiếu chi kỳ − trả hàng kỳ (thống nhất công thức, nội bộ CFO) */
+      r.remain = r.total - r.paid - r.claimsP;
+      /* CÔNG NỢ HT (toàn bộ) = Σ nhập − Σ phiếu chi − Σ trả hàng */
+      r.debtNow = _supRemainAll(r.key);
     });
     return { days, list: Object.values(rows).sort((a, b) => b.total - a.total) };
   }
@@ -82,10 +95,10 @@
     const head = `<thead><tr>
       <th class="par">NHÀ CUNG CẤP (${data.list.length})</th>
       ${data.days.map(d => `<th class="num">${ddmm(d)}</th>`).join('')}
-      <th class="num" style="background:#DCFCE7">TỔNG NHẬP</th>
-      <th class="num" style="background:#DBEAFE">ĐÃ TRẢ</th>
-      <th class="num" style="background:#FEF3C7">CHƯA TRẢ</th>
-      <th class="num" style="background:#FEE2E2">CÔNG NỢ HT</th>
+      <th class="num" style="background:#DCFCE7" title="Tổng tiền nhập (đã nhận) trong kỳ">TỔNG NHẬP</th>
+      <th class="num" style="background:#DBEAFE" title="Đã chi TIỀN MẶT cho NCC trong kỳ (phiếu chi thật)">ĐÃ TRẢ</th>
+      <th class="num" style="background:#FEF3C7" title="Chưa trả (kỳ) = nhập − đã chi − trả hàng. Chênh so với (nhập − đã trả) chính là phần TRẢ HÀNG — xem chi tiết khi bấm số ngày.">CHƯA TRẢ</th>
+      <th class="num" style="background:#FEE2E2" title="Công nợ hiện tại (toàn bộ) = Σ nhập − Σ đã chi − Σ trả hàng. Bấm nút 💵 Trả để thanh toán.">CÔNG NỢ HT</th>
     </tr></thead>`;
     const body = `<tbody>${data.list.map(r => `<tr>
       <td class="par" title="Bấm để xem bản đối chiếu công nợ — in / copy gửi NCC"><a href="javascript:void(0)" onclick="window.ncdStatement('${r.key}')" style="color:var(--navy);font-weight:700;text-decoration:none;border-bottom:1px dotted var(--navy)">${escH(r.name)}</a></td>
@@ -163,11 +176,7 @@
     let amt = parseFloat(String((document.getElementById('ncdPayAmt') || {}).value || '').replace(/[^\d.]/g, '')) || 0;
     amt = Math.min(Math.max(0, Math.round(amt)), debt);
     if (!(amt > 0)) { window.toast && window.toast('Nhập số tiền > 0', 'warn'); return; }
-    /* FIFO: trừ dần vào phiếu received cũ nhất */
-    const pur = getPur(); let rem = amt, purCh = false;
-    pur.filter(p => p.supplierId === id && p.status === 'received').sort((a, b) => (dmyToISO(a.date) < dmyToISO(b.date) ? -1 : 1))
-      .forEach(p => { const due = (+p.total || 0) - (+p.paid || 0); if (due > 0.5 && rem > 0.5) { const pay = Math.min(due, rem); p.paid = (+p.paid || 0) + pay; rem -= pay; purCh = true; } });
-    if (purCh) S().set('purchases', pur);   /* paid trên phiếu = nguồn thật (suppliers KHÔNG có cột debt) */
+    /* Công nợ tính theo PHIẾU CHI tiền mặt → chỉ cần ghi phiếu chi, KHÔNG động field paid trên phiếu (tránh 2 nguồn lệch) */
     const s = getSup().find(x => x.id === id);
     const cash = S().get('cashEntries', []) || [];
     const pcMax = cash.reduce((m, e) => { const n = parseInt(String(e.no || '').replace(/^PC/, ''), 10); return isNaN(n) ? m : Math.max(m, n); }, 0);
@@ -224,11 +233,19 @@
           <b style="color:#B45309;white-space:nowrap">−${f(c.amount)}₫</b>
         </div>`; }).join('')}
       </div>` : '';
+    /* Phiếu chi tiền mặt cho NCC trong ngày → để tổng khớp: còn = nhập − đã chi − trả hàng */
+    const cashDay = getCash().filter(e => e && e.type === 'out' && dmyToISO(e.date) === iso && (e.party === sup.name || (e.desc && String(e.desc).includes(supId))));
+    let paidTot = 0;
+    const cashHtml = cashDay.length ? `<div style="border:1px solid #BBF7D0;background:#F0FDF4;border-radius:10px;padding:10px 12px;margin-bottom:12px">
+        <div style="font-size:11.5px;font-weight:800;color:#15803D;text-transform:uppercase;margin-bottom:6px">💵 Đã chi tiền mặt trong ngày</div>
+        ${cashDay.map(e => { paidTot += +e.amount || 0; return `<div style="display:flex;justify-content:space-between;gap:8px;font-size:12px;padding:4px 0;border-top:1px solid #BBF7D0"><span>${escH(e.no || '')} · ${escH(e.desc || '')}</span><b style="color:#15803D;white-space:nowrap">−${f(e.amount)}₫</b></div>`; }).join('')}
+      </div>` : '';
     window.openModal('📅 Chi tiết nhập ' + ddmm(iso) + ' — ' + escH(sup.name), `
       <div style="font-size:12.5px;color:var(--muted);margin-bottom:10px">Phiếu nhập <b>${escH(sup.name)}</b> ngày <b>${ddmm(iso)}</b>. Bấm <b>mã phiếu</b> / <b>mã đơn</b> / <b>phiếu trả</b> để mở module tương ứng. Sửa công nợ: mở mã phiếu → <b>✏️ Sửa nợ</b>.</div>
       ${cards}
+      ${cashHtml}
       ${claimsHtml}
-      <div style="text-align:right;font-size:13.5px;margin-top:6px">Tổng nhập: <b>${f(dayTot)}₫</b>${claimTot ? ` &nbsp;·&nbsp; trừ trả hàng: <b style="color:#B45309">−${f(claimTot)}₫</b> &nbsp;·&nbsp; <b style="color:#B91C1C">còn ${f(dayTot - claimTot)}₫</b>` : ''}</div>
+      <div style="text-align:right;font-size:13.5px;margin-top:6px;border-top:1px solid var(--line);padding-top:8px">Nhập: <b>${f(dayTot)}₫</b>${paidTot ? ` · đã chi: <b style="color:#15803D">−${f(paidTot)}₫</b>` : ''}${claimTot ? ` · trả hàng: <b style="color:#B45309">−${f(claimTot)}₫</b>` : ''} &nbsp;·&nbsp; <b style="color:#B91C1C">còn ${f(dayTot - paidTot - claimTot)}₫</b></div>
     `, { width: '720px', footer: `<button class="btn btn-ghost" onclick="window.closeModal()">Đóng</button>` });
   };
 
@@ -246,18 +263,21 @@
     const phieu = getPur().filter(p => p.supplierId === id && p.status === 'received' && _inPeriod(p.date, fromISO, toISO))
       .sort((a, b) => (dmyToISO(a.date) < dmyToISO(b.date) ? -1 : 1));
     const f = v => (Math.round(+v || 0)).toLocaleString('vi-VN');
-    let tN = 0, tT = 0;
-    const rowsHtml = phieu.map((p, i) => { const nh = +p.total || 0, tr = +p.paid || 0; tN += nh; tT += tr;
-      return `<tr><td class="c">${i + 1}</td><td class="c">${escH(p.date)}</td><td>${escH(p.id)}</td><td>${escH(inv[p.id] || '')}</td><td class="r">${f(nh)}</td><td class="r">${f(tr)}</td><td class="r">${f(nh - tr)}</td></tr>`; }).join('');
-    /* Khoản TRỪ do trả hàng (NCC nhận lại hàng lỗi) trong kỳ → hiện trên đối chiếu để NCC cũng biết */
-    const claimsP = getClaims().filter(c => c && c.supplierId === id && c.status !== 'settled' && c.status !== 'cancelled' && _inPeriod(c.date, fromISO, toISO));
-    let claimTot = 0;
-    const claimRows = claimsP.map((c, i) => { claimTot += +c.amount || 0; return `<tr><td class="c">T${i + 1}</td><td class="c">${escH(c.date)}</td><td colspan="2">↩ Trả hàng ${escH(c.returnId || '')}${c.item ? ' · ' + escH(c.item) : ''}${c.reason ? ' (' + escH(c.reason) + ')' : ''}</td><td class="r">—</td><td class="r">—</td><td class="r" style="color:#B45309">−${f(c.amount)}</td></tr>`; }).join('');
-    const conNo = r.debtNow != null ? r.debtNow : (tN - tT - claimTot);
+    /* Đã trả = phiếu chi TIỀN MẶT thật trong kỳ (không dùng field paid trên phiếu). Phân bổ FIFO vào từng phiếu để "còn" từng dòng cộng khớp. */
+    const nm = s.name;
+    const paidPeriod = getCash().filter(e => e && e.type === 'out' && _inPeriod(e.date, fromISO, toISO) && (e.party === nm || (e.desc && String(e.desc).includes(id)))).reduce((a, e) => a + (+e.amount || 0), 0);
+    let tN = 0, remCash = paidPeriod;
+    const rowsHtml = phieu.map((p, i) => {
+      const nh = +p.total || 0; tN += nh;
+      const tr = Math.min(nh, Math.max(0, remCash)); remCash -= tr;
+      return `<tr><td class="c">${i + 1}</td><td class="c">${escH(p.date)}</td><td>${escH(p.id)}</td><td>${escH(inv[p.id] || '')}</td><td class="r">${f(nh)}</td><td class="r">${f(tr)}</td><td class="r">${f(nh - tr)}</td></tr>`;
+    }).join('');
+    const tT = Math.min(paidPeriod, tN);
+    /* Đối chiếu gửi NCC: KHÔNG trừ trả hàng (đó là hạch toán nội bộ mình xem). Còn nợ = nhập − đã chi. */
+    const conNo = _supRemainExt(id);
     const txt = `ĐỐI CHIẾU CÔNG NỢ NHÀ CUNG CẤP\n${s.name}\nKỳ: ${ddmm(fromISO)} → ${ddmm(toISO)}\n──────────\n`
-      + (phieu.length ? phieu.map((p, i) => `${i + 1}. ${p.date} · ${p.id}: nhập ${f(p.total)} · đã trả ${f(p.paid || 0)} · còn ${f((+p.total || 0) - (+p.paid || 0))}`).join('\n') : '(không có phiếu trong kỳ)')
-      + (claimsP.length ? '\n' + claimsP.map(c => `↩ ${c.date} · trả hàng ${c.returnId || ''}${c.item ? ' · ' + c.item : ''}: −${f(c.amount)}`).join('\n') : '')
-      + `\n──────────\nTổng nhập: ${f(tN)}đ · Đã trả: ${f(tT)}đ${claimTot ? ` · Trừ trả hàng: ${f(claimTot)}đ` : ''} · CÒN NỢ: ${f(conNo)}đ\n— ${comp.name}`;
+      + (phieu.length ? phieu.map((p, i) => `${i + 1}. ${p.date} · ${p.id}: nhập ${f(p.total)}`).join('\n') : '(không có phiếu trong kỳ)')
+      + `\n──────────\nTổng nhập kỳ: ${f(tN)}đ · Đã trả (tiền mặt): ${f(tT)}đ · CÒN NỢ HIỆN TẠI: ${f(conNo)}đ\n— ${comp.name}`;
     const html = `<!doctype html><html lang="vi"><head><meta charset="utf-8"><title>Đối chiếu công nợ - ${escH(s.name)}</title><style>
       *{box-sizing:border-box}body{font-family:'Segoe UI',Arial,sans-serif;margin:0;padding:18px;color:#1a1a1a}.pg{max-width:820px;margin:0 auto}
       .hd{border-bottom:2px solid #1B5E20;padding-bottom:8px;margin-bottom:6px}.hd b{font-size:15px;color:#1B5E20}
@@ -271,9 +291,8 @@
       <div class="pg"><div class="hd"><b>${escH(comp.name)}</b><br>${escH(comp.address)} · ĐT: ${escH(comp.phone)}</div>
         <h1>ĐỐI CHIẾU CÔNG NỢ NHÀ CUNG CẤP</h1><div class="sub"><b>${escH(s.name)}</b> · Kỳ: <b>${ddmm(fromISO)} → ${ddmm(toISO)}</b></div>
         <table><thead><tr><th>STT</th><th>Ngày</th><th>Số phiếu</th><th>Số HĐ</th><th>Tiền nhập</th><th>Đã trả</th><th>Còn nợ</th></tr></thead>
-          <tbody>${(rowsHtml + claimRows) || '<tr><td colspan="7" class="c">Không có phiếu trong kỳ</td></tr>'}</tbody>
+          <tbody>${rowsHtml || '<tr><td colspan="7" class="c">Không có phiếu trong kỳ</td></tr>'}</tbody>
           <tfoot><tr class="grand"><td colspan="4" class="r">TỔNG NHẬP KỲ</td><td class="r">${f(tN)}</td><td class="r">${f(tT)}</td><td class="r">${f(tN - tT)}</td></tr>
-            ${claimTot ? `<tr class="grand"><td colspan="6" class="r">TRỪ TRẢ HÀNG (NCC nhận lại)</td><td class="r" style="color:#B45309">−${f(claimTot)}</td></tr>` : ''}
             <tr class="grand"><td colspan="6" class="r">CÔNG NỢ PHẢI TRẢ HIỆN TẠI</td><td class="r">${f(conNo)}</td></tr></tfoot></table>
         <p style="font-size:12px;margin-top:10px">Kính đề nghị Quý nhà cung cấp đối chiếu &amp; xác nhận công nợ kỳ trên. Trân trọng cảm ơn!</p></div>
       <script>function cp(){navigator.clipboard.writeText(${JSON.stringify(txt).replace(/<\//g, '<\\/')}).then(function(){alert('Đã copy nội dung đối chiếu')}).catch(function(){})}<\/script></body></html>`;
