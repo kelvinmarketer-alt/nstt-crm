@@ -182,7 +182,7 @@
     if (type === 'commission') {
       return `<div class="form-row">
         <div><label>% Doanh thu được hưởng</label>
-          <input type="number" id="${prefix}CommPct" step="0.1" min="0" max="100" value="${cfg.commissionPct || 0}" placeholder="VD: 1.5 (= 1.5% doanh thu)">
+          <input type="number" id="${prefix}CommPct" step="0.1" min="0" max="100" value="${cfg.commissionPct || ''}" placeholder="VD: 1.5 (= 1.5% doanh thu)">
         </div>
         <div><label>Áp dụng cho</label>
           <select id="${prefix}CommScope">

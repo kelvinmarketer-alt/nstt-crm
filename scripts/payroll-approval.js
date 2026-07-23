@@ -340,7 +340,7 @@
             <option value="parttime"  ${seg.contractType==='parttime'?'selected':''}>Part-time 100%</option>
           </select>
           <input class="ps-seg-basic ps-money" data-idx="${i}" type="text" inputmode="numeric" value="${fmtMoney(seg.basicSalary||0)}" data-raw="${parseMoney(seg.basicSalary||0)}" placeholder="LCB" ${editable?'':'readonly'} style="border:1px solid #BFDBFE;border-radius:5px;padding:5px 7px;font-size:12px;text-align:right;font-weight:700;background:#fff" title="Lương cơ bản đoạn này">
-          <input class="ps-seg-work" data-idx="${i}" type="number" step="0.05" value="${seg.workActual||0}" placeholder="Công" ${editable?'':'readonly'} style="border:1px solid #BFDBFE;border-radius:5px;padding:5px 7px;font-size:12px;text-align:right;font-weight:700;background:#fff" title="Số công đoạn này">
+          <input class="ps-seg-work" data-idx="${i}" type="number" step="0.05" value="${seg.workActual||''}" placeholder="Công" ${editable?'':'readonly'} style="border:1px solid #BFDBFE;border-radius:5px;padding:5px 7px;font-size:12px;text-align:right;font-weight:700;background:#fff" title="Số công đoạn này">
           <input class="ps-seg-std" data-idx="${i}" type="number" value="${seg.workStandardOverride||''}" placeholder="NC chuẩn (auto)" ${editable?'':'readonly'} style="border:1px solid #BFDBFE;border-radius:5px;padding:5px 7px;font-size:12px;text-align:right;background:#fff" title="Bỏ trống = dùng mặc định theo dept">
           ${editable ? `<button onclick="window._psRemoveSegment(${i})" style="background:transparent;border:none;color:#DC2626;cursor:pointer;font-size:16px">×</button>` : '<span></span>'}
         </div>
@@ -352,7 +352,7 @@
       return (arr || []).map((b, i) => `
         <div class="ps-line ps-bonus" data-idx="${i}" style="display:grid;grid-template-columns:1fr 160px 32px;gap:8px;padding:6px 0;border-bottom:1px dashed var(--line)">
           <input class="ps-bonus-name" data-idx="${i}" value="${(b.name||'').replace(/"/g,'&quot;')}" placeholder="VD: Doanh số 3% nhà X" ${canEdit?'':'readonly'} style="border:1px solid var(--line);border-radius:6px;padding:5px 8px;font-size:12.5px">
-          <input class="ps-bonus-amount ps-money" data-idx="${i}" type="text" inputmode="numeric" value="${fmtMoney(b.amount||0)}" data-raw="${parseMoney(b.amount||0)}" placeholder="0" ${canEdit?'':'readonly'} style="border:1px solid var(--line);border-radius:6px;padding:5px 8px;text-align:right;font-size:12.5px;font-weight:700;color:#15803D">
+          <input class="ps-bonus-amount ps-money" data-idx="${i}" type="text" inputmode="numeric" value="${b.amount ? fmtMoney(b.amount) : ''}" data-raw="${parseMoney(b.amount||0)}" placeholder="0" ${canEdit?'':'readonly'} style="border:1px solid var(--line);border-radius:6px;padding:5px 8px;text-align:right;font-size:12.5px;font-weight:700;color:#15803D">
           ${canEdit ? `<button onclick="window._psRemoveBonus(${i})" style="background:transparent;border:none;color:#DC2626;cursor:pointer;font-size:16px">×</button>` : '<span></span>'}
         </div>
       `).join('') || `<div style="padding:8px;color:var(--muted);text-align:center;font-size:12px">Chưa có khoản thưởng</div>`;
@@ -540,7 +540,7 @@
           </div>
           <div>
             <label style="font-size:11px;color:var(--muted);text-transform:uppercase;font-weight:600">% hoa hồng</label>
-            <input id="psCommPct" type="number" step="0.1" min="0" max="100" value="${p.commissionPct||0}" ${(canEdit && p.commMode==='auto')?'':'readonly'} style="width:100%;padding:8px 10px;font-size:13px;border:1px solid var(--line);border-radius:6px;text-align:right;box-sizing:border-box">
+            <input id="psCommPct" type="number" step="0.1" min="0" max="100" value="${p.commissionPct||''}" ${(canEdit && p.commMode==='auto')?'':'readonly'} style="width:100%;padding:8px 10px;font-size:13px;border:1px solid var(--line);border-radius:6px;text-align:right;box-sizing:border-box">
           </div>
           <div>
             <label style="font-size:11px;color:var(--muted);text-transform:uppercase;font-weight:600">Số tiền hoa hồng (₫)</label>

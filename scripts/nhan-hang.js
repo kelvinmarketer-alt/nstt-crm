@@ -297,7 +297,7 @@
         </div>
         <div style="display:flex;gap:10px;flex-wrap:wrap">
           <div style="flex:1;min-width:120px"><label style="${lbl}">Khách cần <span style="color:#94A3B8">(để tính phần dư vào kho)</span></label><input id="nhfDemand" type="number" data-money="0" step="0.1" min="0" value="${_q(it.demandQty != null ? it.demandQty : (it.qty || 0))}" style="${inp};text-align:right"></div>
-          ${isSi ? `<div style="width:120px"><label style="${lbl}">Số ${esc(it.caseUnit || 'thùng')}</label><input id="nhfCases" type="number" data-money="0" step="0.1" min="0" value="${_q(it.cases || 0)}" style="${inp};text-align:right"></div>` : ''}
+          ${isSi ? `<div style="width:120px"><label style="${lbl}">Số ${esc(it.caseUnit || 'thùng')}</label><input id="nhfCases" type="number" data-money="0" step="0.1" min="0" value="${it.cases ? _q(it.cases) : ''}" placeholder="0" style="${inp};text-align:right"></div>` : ''}
         </div>
         <div style="font-size:11.5px;color:var(--muted);background:#F8FAFC;border-radius:8px;padding:8px 11px">💡 Sửa <b>Sản lượng đặt</b> nếu bên gom hàng nhập nhầm. “Thực nhận” khi bấm nhận kho sẽ mặc định theo số đặt mới.</div>
       </div>`, {

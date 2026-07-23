@@ -414,7 +414,7 @@
         : `<input type="number" data-money="0" class="stl-recv" data-i="${i}" value="${_q(recv)}" min="0" step="0.1" oninput="window._settleRecalc('${id}')" style="width:82px;${inS}"> ${unit}`;
       const defCell = fromWh
         ? `<span style="color:${defect ? '#B45309' : 'var(--muted)'}">${defect ? _q(defect) : '·'}</span>`
-        : `<input type="number" data-money="0" class="stl-def" data-i="${i}" value="${_q(defect)}" min="0" step="0.1" oninput="window._settleRecalc('${id}')" style="width:72px;${inS};border-color:#FCA5A5">`;
+        : `<input type="number" data-money="0" class="stl-def" data-i="${i}" value="${defect ? _q(defect) : ''}" placeholder="0" min="0" step="0.1" oninput="window._settleRecalc('${id}')" style="width:72px;${inS};border-color:#FCA5A5">`;
       return `<tr style="border-top:1px solid #F1F5F9">
         <td style="padding:7px 10px"><b>${_escP(it.name)}</b>${it.stockedQty ? `<div style="font-size:10.5px;color:#15803D">dư vào kho ${_q(it.stockedQty)}${unit}</div>` : ''}</td>
         <td style="padding:7px 10px;text-align:right">${recvCell}</td>

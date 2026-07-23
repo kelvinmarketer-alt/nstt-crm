@@ -771,6 +771,18 @@ td.num, td.hide-md {
    để bảng vừa khít màn, KHÔNG phải kéo ngang. (Web vẫn hiện đầy đủ.) */
 @media (max-width: 560px) { .hide-xs { display: none !important; } }
 
+/* === ĐIỆN THOẠI: mọi ô nhập ≥16px để iOS KHÔNG tự phóng to (auto-zoom) khi bấm vào ô ===
+   Phần lớn ô đặt font-size inline 11–15px → cần !important để đè. */
+@media (max-width: 560px) {
+  input, select, textarea, .cell-input,
+  input[type="text"], input[type="number"], input[type="date"], input[type="tel"], input[type="search"] {
+    font-size: 16px !important;
+  }
+}
+/* .print-only = nút/hành động CHỈ để IN (phải dùng máy tính mới in) → ẩn trên điện thoại.
+   shared.js tự gắn class này cho mọi nút chứa 🖨 (kể cả nút sinh động trong popup). */
+@media (max-width: 560px) { .print-only { display: none !important; } }
+
 /* === FIX cuộn ngang ở DANH SÁCH DẠNG THẺ (card) trên điện thoại ===
    scripts/ux-improvements.js ép MỌI bảng trong .table-wrap = min-width:600px + overflow-x:auto
    (chiến lược bảng-cuộn-ngang CŨ). Với danh sách đã chuyển sang THẺ (.table-card) thì điều này

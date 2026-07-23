@@ -355,7 +355,7 @@
           <div class="bt-spacer" style="flex:1"></div>
           <button class="btn btn-ghost btn-sm bt-g1" onclick="window.aiFillPrices()">📷 Cập nhật giá bằng ảnh (AI)</button>
           <button class="btn btn-ghost btn-sm bt-g1" onclick="window.copyYesterday()">📋 Sao chép giá hôm qua</button>
-          <button class="btn btn-ghost btn-sm hide-xs" onclick="window.copyPriceText()" title="Copy text gọn dán Zalo">📋 Copy text</button>
+          <button class="btn btn-ghost btn-sm" onclick="window.copyPriceText()" title="Copy text gọn dán Zalo">📋 Copy text</button>
           <button class="btn btn-ghost btn-sm bt-g2 hide-xs" onclick="window.PriceAutoSend && window.PriceAutoSend.previewDiff()" title="Xem nhanh SP nào đổi giá so hôm qua">🔍 So sánh giá</button>
           <button class="btn btn-ghost btn-sm bt-g2" onclick="window.openExportTierPicker('pdf')" title="Mở popup print → Save as PDF">🖨 Xuất PDF</button>
           <button class="btn btn-ghost btn-sm hide-xs" onclick="window.openExportTierPicker('html')" title="Tải HTML có ảnh embed + auto gửi Telegram">📥 Xuất HTML</button>
