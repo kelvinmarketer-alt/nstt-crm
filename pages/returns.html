@@ -293,7 +293,7 @@
             <b style="color:#DC2626;white-space:nowrap">${cash ? '' : '−'}${window.fmt(custReduce)}₫</b>
           </div>
           <div style="display:flex;justify-content:space-between;align-items:center;font-size:13px">
-            <span>🏭 Giảm công nợ <b>NCC</b> <span style="color:var(--muted);font-size:11.5px">· giá nhập</span></span>
+            <span>🏭 Giảm công nợ <b>NCC</b> <span style="color:var(--muted);font-size:11.5px">· giá nhập${nccReduce > 0 && r.date ? ' · đã trừ ngày ' + _esc0(r.date) : ''}</span></span>
             <b style="color:${nccReduce > 0 ? '#B45309' : 'var(--muted)'};white-space:nowrap">${nccReduce > 0 ? '−' + window.fmt(nccReduce) + '₫' : '0₫ — không trừ'}</b>
           </div>
           ${nccReduce > 0 ? '' : '<div style="font-size:10.5px;color:var(--muted);margin-top:5px">Không trừ NCC vì: hàng đẹp/lưu kho bán tiếp · NCC không cho trả · 💵 hàng mua ngoài (không có NCC) · hoặc chưa gán NCC.</div>'}
@@ -911,6 +911,17 @@
   renderShipReports();
   populatePODSelect();
   renderPodGallery();
+
+  /* Link từ Công nợ NCC (?view=TH0007) → tự mở chi tiết phiếu trả */
+  (function autoViewReturn() {
+    const vid = new URLSearchParams(location.search).get('view');
+    if (!vid) return;
+    const tryOpen = (n) => {
+      if (getR().some(x => x.id === vid)) { window.viewReturn(vid); return; }
+      if (n > 0) setTimeout(() => tryOpen(n - 1), 400);   /* chờ dữ liệu tải từ cloud */
+    };
+    setTimeout(() => tryOpen(12), 300);
+  })();
 
   /* Đến từ cổng "Xác nhận giao" (trả/thiếu) → tự mở phiếu trả + chọn sẵn đơn */
   (function autoOpenReturn() {

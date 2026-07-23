@@ -7,10 +7,17 @@
   const getPur = () => (S().get('purchases', window.PURCHASES || []) || []);
   const escH = v => String(v == null ? '' : v).replace(/[&<>"]/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]));
   const typeOf = id => ((S().get('supplierMeta', {}) || {})[id] || {}).type || '';
-  /* Công nợ CÒN NỢ = DẪN XUẤT từ phiếu nhập đã nhận (Σ total − paid) — luôn đúng, không lệ thuộc suppliers.debt (dễ drift) */
+  const getClaims = () => (S().get('supplierClaims', []) || []);
+  /* Khoản TRỪ NCC do trả hàng (NCC nhận lại hàng lỗi) — giảm số mình nợ NCC. status !== 'settled' = còn hiệu lực. */
+  function _supClaims(id) {
+    return getClaims().filter(c => c && c.supplierId === id && c.status !== 'settled' && c.status !== 'cancelled')
+      .reduce((s, c) => s + (+c.amount || 0), 0);
+  }
+  /* Công nợ CÒN NỢ NCC = Σ(phiếu nhập received total − paid) − Σ(khoản trừ trả hàng). Dẫn xuất, không lệ thuộc suppliers.debt (không có cột). */
   function _supRemainAll(id) {
-    return getPur().filter(p => p.status === 'received' && p.supplierId === id && p.supplierId !== 'EXT-MARKET')
+    const nhap = getPur().filter(p => p.status === 'received' && p.supplierId === id && p.supplierId !== 'EXT-MARKET')
       .reduce((s, p) => s + Math.max(0, (+p.total || 0) - (+p.paid || 0)), 0);
+    return Math.max(0, nhap - _supClaims(id));
   }
   const _nk = s => String(s || '').toLowerCase().normalize('NFD').replace(/[̀-ͯ]/g, '').replace(/đ/g, 'd');
   let _last = null, _q = '';
@@ -207,10 +214,21 @@
         <div style="padding:7px 12px;font-size:11.5px;border-top:1px solid #F1F5F9">${ordHtml}</div>
       </div>`;
     }).join('');
+    /* Khoản TRỪ NCC do trả hàng trong ngày này (NCC nhận lại hàng lỗi) — hiện rõ trừ ở đâu / khi nào / phiếu trả nào */
+    const claims = getClaims().filter(c => c && c.supplierId === supId && c.status !== 'settled' && c.status !== 'cancelled' && dmyToISO(c.date) === iso);
+    let claimTot = 0;
+    const claimsHtml = claims.length ? `<div style="border:1px solid #FDE68A;background:#FFFBEB;border-radius:10px;padding:10px 12px;margin-bottom:12px">
+        <div style="font-size:11.5px;font-weight:800;color:#B45309;text-transform:uppercase;margin-bottom:6px">➖ Trừ công nợ do trả hàng (NCC nhận lại hàng lỗi)</div>
+        ${claims.map(c => { claimTot += +c.amount || 0; return `<div style="display:flex;justify-content:space-between;gap:8px;font-size:12px;padding:4px 0;flex-wrap:wrap;border-top:1px solid #FDE68A">
+          <span>🗑 <b>${escH(c.item || '')}</b>${c.qty ? ' · ' + escH(String(c.qty)) : ''} · phiếu trả <a href="returns.html?view=${encodeURIComponent(c.returnId || '')}" target="_blank" style="color:var(--navy);border-bottom:1px dotted var(--navy);text-decoration:none">${escH(c.returnId || '')} ↗</a>${c.orderCode ? ` · đơn <a href="orders.html?open=${encodeURIComponent(c.orderCode)}" target="_blank" style="color:var(--navy);border-bottom:1px dotted var(--navy);text-decoration:none">${escH(c.orderCode)} ↗</a>` : ''}${c.reason ? ` · <span style="color:var(--muted)">${escH(c.reason)}</span>` : ''}</span>
+          <b style="color:#B45309;white-space:nowrap">−${f(c.amount)}₫</b>
+        </div>`; }).join('')}
+      </div>` : '';
     window.openModal('📅 Chi tiết nhập ' + ddmm(iso) + ' — ' + escH(sup.name), `
-      <div style="font-size:12.5px;color:var(--muted);margin-bottom:10px">Phiếu nhập <b>${escH(sup.name)}</b> ngày <b>${ddmm(iso)}</b>. Bấm <b>mã phiếu</b> / <b>mã đơn</b> để mở module tương ứng. Sửa công nợ: mở mã phiếu → <b>✏️ Sửa nợ</b>.</div>
+      <div style="font-size:12.5px;color:var(--muted);margin-bottom:10px">Phiếu nhập <b>${escH(sup.name)}</b> ngày <b>${ddmm(iso)}</b>. Bấm <b>mã phiếu</b> / <b>mã đơn</b> / <b>phiếu trả</b> để mở module tương ứng. Sửa công nợ: mở mã phiếu → <b>✏️ Sửa nợ</b>.</div>
       ${cards}
-      <div style="text-align:right;font-size:14px;margin-top:6px">Tổng nhập ngày: <b style="color:#B91C1C">${f(dayTot)}₫</b></div>
+      ${claimsHtml}
+      <div style="text-align:right;font-size:13.5px;margin-top:6px">Tổng nhập: <b>${f(dayTot)}₫</b>${claimTot ? ` &nbsp;·&nbsp; trừ trả hàng: <b style="color:#B45309">−${f(claimTot)}₫</b> &nbsp;·&nbsp; <b style="color:#B91C1C">còn ${f(dayTot - claimTot)}₫</b>` : ''}</div>
     `, { width: '720px', footer: `<button class="btn btn-ghost" onclick="window.closeModal()">Đóng</button>` });
   };
 
@@ -231,10 +249,15 @@
     let tN = 0, tT = 0;
     const rowsHtml = phieu.map((p, i) => { const nh = +p.total || 0, tr = +p.paid || 0; tN += nh; tT += tr;
       return `<tr><td class="c">${i + 1}</td><td class="c">${escH(p.date)}</td><td>${escH(p.id)}</td><td>${escH(inv[p.id] || '')}</td><td class="r">${f(nh)}</td><td class="r">${f(tr)}</td><td class="r">${f(nh - tr)}</td></tr>`; }).join('');
-    const conNo = r.debtNow || (tN - tT);
+    /* Khoản TRỪ do trả hàng (NCC nhận lại hàng lỗi) trong kỳ → hiện trên đối chiếu để NCC cũng biết */
+    const claimsP = getClaims().filter(c => c && c.supplierId === id && c.status !== 'settled' && c.status !== 'cancelled' && _inPeriod(c.date, fromISO, toISO));
+    let claimTot = 0;
+    const claimRows = claimsP.map((c, i) => { claimTot += +c.amount || 0; return `<tr><td class="c">T${i + 1}</td><td class="c">${escH(c.date)}</td><td colspan="2">↩ Trả hàng ${escH(c.returnId || '')}${c.item ? ' · ' + escH(c.item) : ''}${c.reason ? ' (' + escH(c.reason) + ')' : ''}</td><td class="r">—</td><td class="r">—</td><td class="r" style="color:#B45309">−${f(c.amount)}</td></tr>`; }).join('');
+    const conNo = r.debtNow != null ? r.debtNow : (tN - tT - claimTot);
     const txt = `ĐỐI CHIẾU CÔNG NỢ NHÀ CUNG CẤP\n${s.name}\nKỳ: ${ddmm(fromISO)} → ${ddmm(toISO)}\n──────────\n`
       + (phieu.length ? phieu.map((p, i) => `${i + 1}. ${p.date} · ${p.id}: nhập ${f(p.total)} · đã trả ${f(p.paid || 0)} · còn ${f((+p.total || 0) - (+p.paid || 0))}`).join('\n') : '(không có phiếu trong kỳ)')
-      + `\n──────────\nTổng nhập: ${f(tN)}đ · Đã trả: ${f(tT)}đ · CÒN NỢ: ${f(conNo)}đ\n— ${comp.name}`;
+      + (claimsP.length ? '\n' + claimsP.map(c => `↩ ${c.date} · trả hàng ${c.returnId || ''}${c.item ? ' · ' + c.item : ''}: −${f(c.amount)}`).join('\n') : '')
+      + `\n──────────\nTổng nhập: ${f(tN)}đ · Đã trả: ${f(tT)}đ${claimTot ? ` · Trừ trả hàng: ${f(claimTot)}đ` : ''} · CÒN NỢ: ${f(conNo)}đ\n— ${comp.name}`;
     const html = `<!doctype html><html lang="vi"><head><meta charset="utf-8"><title>Đối chiếu công nợ - ${escH(s.name)}</title><style>
       *{box-sizing:border-box}body{font-family:'Segoe UI',Arial,sans-serif;margin:0;padding:18px;color:#1a1a1a}.pg{max-width:820px;margin:0 auto}
       .hd{border-bottom:2px solid #1B5E20;padding-bottom:8px;margin-bottom:6px}.hd b{font-size:15px;color:#1B5E20}
@@ -248,8 +271,9 @@
       <div class="pg"><div class="hd"><b>${escH(comp.name)}</b><br>${escH(comp.address)} · ĐT: ${escH(comp.phone)}</div>
         <h1>ĐỐI CHIẾU CÔNG NỢ NHÀ CUNG CẤP</h1><div class="sub"><b>${escH(s.name)}</b> · Kỳ: <b>${ddmm(fromISO)} → ${ddmm(toISO)}</b></div>
         <table><thead><tr><th>STT</th><th>Ngày</th><th>Số phiếu</th><th>Số HĐ</th><th>Tiền nhập</th><th>Đã trả</th><th>Còn nợ</th></tr></thead>
-          <tbody>${rowsHtml || '<tr><td colspan="7" class="c">Không có phiếu trong kỳ</td></tr>'}</tbody>
+          <tbody>${(rowsHtml + claimRows) || '<tr><td colspan="7" class="c">Không có phiếu trong kỳ</td></tr>'}</tbody>
           <tfoot><tr class="grand"><td colspan="4" class="r">TỔNG NHẬP KỲ</td><td class="r">${f(tN)}</td><td class="r">${f(tT)}</td><td class="r">${f(tN - tT)}</td></tr>
+            ${claimTot ? `<tr class="grand"><td colspan="6" class="r">TRỪ TRẢ HÀNG (NCC nhận lại)</td><td class="r" style="color:#B45309">−${f(claimTot)}</td></tr>` : ''}
             <tr class="grand"><td colspan="6" class="r">CÔNG NỢ PHẢI TRẢ HIỆN TẠI</td><td class="r">${f(conNo)}</td></tr></tfoot></table>
         <p style="font-size:12px;margin-top:10px">Kính đề nghị Quý nhà cung cấp đối chiếu &amp; xác nhận công nợ kỳ trên. Trân trọng cảm ơn!</p></div>
       <script>function cp(){navigator.clipboard.writeText(${JSON.stringify(txt).replace(/<\//g, '<\\/')}).then(function(){alert('Đã copy nội dung đối chiếu')}).catch(function(){})}<\/script></body></html>`;
@@ -364,10 +388,11 @@
   if (window.renderAppShell) window.renderAppShell('ncc-debt', 'Công nợ NCC');
   S().get('products');   /* warm-load: khớp SP khi nhập Excel */
   if (window.STORE) {
-    S().get('purchases'); S().get('suppliers'); S().get('cashEntries'); S().get('procurementRuns');   /* warm-load */
+    S().get('purchases'); S().get('suppliers'); S().get('cashEntries'); S().get('procurementRuns'); S().get('supplierClaims');   /* warm-load */
     S().subscribe('suppliers', window.ncdRender);
     S().subscribe('purchases', window.ncdRender);
     S().subscribe('cashEntries', window.ncdRender);
+    S().subscribe('supplierClaims', window.ncdRender);
   }
   window.ncdPreset('month');   /* mặc định: tháng này + tự render */
 })();
