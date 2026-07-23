@@ -92,20 +92,19 @@
     const st = document.getElementById('purSt').value;
     const sup = document.getElementById('purSup').value;
     let rows = list.slice().reverse();
-    if (q)   rows = rows.filter(p => (p.id+' '+(findSup(p.supplierId)?.name||'')).toLowerCase().includes(q));
+    if (q)   rows = rows.filter(p => (p.id + ' ' + (findSup(p.supplierId)?.name || '') + ' ' + (p.items || []).map(it => it.name || '').join(' ')).toLowerCase().includes(q));
     if (st)  rows = rows.filter(p => p.status === st);
     if (sup) rows = rows.filter(p => p.supplierId === sup);
 
     const tb = document.getElementById('purBody');
-    if (!rows.length) { tb.innerHTML = `<tr><td colspan="10" style="padding:36px;text-align:center;color:var(--muted)">Không có phiếu nhập nào.</td></tr>`; return; }
+    if (!rows.length) { tb.innerHTML = `<tr><td colspan="9" style="padding:36px;text-align:center;color:var(--muted)">Không có phiếu nhập nào.</td></tr>`; return; }
 
     tb.innerHTML = rows.map(p => {
       const s = findSup(p.supplierId);
       const due = (p.total||0) - (p.paid||0);
       return `<tr data-id="${p.id}" onclick="window.openPurDrawer('${p.id}')" style="cursor:pointer" title="Bấm để xem/điền giá">
         <td class="hide-xs" onclick="event.stopPropagation()"><div class="checkbox" onclick="this.classList.toggle('on')"></div></td>
-        <td data-field="code"><b style="font-family:monospace">${p.id}</b></td>
-        <td data-field="sup">${s ? s.name : p.supplierId}<div style="font-size:11px;color:var(--muted)">${s?.paymentTerm || ''}</div></td>
+        <td data-field="sup"><b style="color:var(--navy)">${s ? s.name : p.supplierId}</b>${s?.paymentTerm ? `<div style="font-size:11px;color:var(--muted)">${s.paymentTerm}</div>` : ''}</td>
         <td data-field="date">${p.date}</td>
         <td class="hide-xs">${(p.items||[]).length} mặt hàng</td>
         <td class="num" data-field="total"><b>${window.fmt(p.total)}</b></td>
