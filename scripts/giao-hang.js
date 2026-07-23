@@ -347,7 +347,7 @@
     const thumbs = list.length ? list.map((p, idx) => `
       <div style="position:relative;width:98px;height:98px">
         <img src="${p.dataURL}" onclick="window.openImgPreview(this.src,'Đơn ${esc(code)}${p.by ? ' · ' + esc(p.by) : ''}')" title="Bấm xem ảnh to" style="width:98px;height:98px;object-fit:cover;border-radius:9px;border:1px solid var(--line);cursor:pointer">
-        <button onclick="window.ghDelPhoto('${esc(code)}',${idx})" title="Xoá ảnh này (up nhầm)" style="position:absolute;top:-7px;right:-7px;width:23px;height:23px;border-radius:50%;background:#DC2626;color:#fff;border:2px solid #fff;font-size:12px;font-weight:700;cursor:pointer;line-height:1;padding:0">✕</button>
+        <button onclick="window.ghDelPhoto('${esc(code)}',${idx})" title="Xoá ảnh này (up nhầm)" style="position:absolute;top:-9px;right:-9px;width:32px;height:32px;border-radius:50%;background:#DC2626;color:#fff;border:2px solid #fff;font-size:14px;font-weight:700;cursor:pointer;line-height:1;padding:0">✕</button>
         ${p.by ? `<div style="position:absolute;left:0;right:0;bottom:0;background:rgba(0,0,0,.5);color:#fff;font-size:8.5px;padding:1px 4px;border-radius:0 0 9px 9px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${esc(p.by)}</div>` : ''}
       </div>`).join('') : '<div style="color:var(--muted);font-size:13px;padding:18px 4px;width:100%;text-align:center">Chưa có ảnh nào. Bấm <b>📷 Chụp / Chọn ảnh</b> để thêm bằng chứng giao hàng.</div>';
     window.openModal('📷 Ảnh giao hàng — ' + esc(code), `

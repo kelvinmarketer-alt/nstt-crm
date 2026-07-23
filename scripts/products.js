@@ -1189,11 +1189,11 @@
         <div><label>Nhóm hàng *</label><select id="pCat">${catOpts}</select></div>
       </div>
       <div class="form-row">
-        <div><label>Đơn vị tính</label><select id="pUnit">${unitOpts}</select></div>
+        <div><label>Đơn vị tính</label><select id="pUnit" onchange="window._pBuyUnitLbl&&window._pBuyUnitLbl()">${unitOpts}</select></div>
         <div><label>Ghi chú</label><input id="pNote" value="${p ? (p.note || '') : ''}" placeholder="VD: Mộc Châu"></div>
       </div>
       <div class="form-row">
-        <div><label>Giá nhập hôm nay (₫/kg) *</label><input id="pBuy" type="number" value="${e ? e.buy : ''}" placeholder="0"></div>
+        <div><label>Giá nhập hôm nay (₫/<span id="pBuyUnit">${(p && p.unit) || 'kg'}</span>) *</label><input id="pBuy" type="number" value="${e ? e.buy : ''}" placeholder="0"></div>
         <div></div>
       </div>
       ${(function(){ var c = (p && window.prodUnitConv && window.prodUnitConv(p.id)) || {}; var kgp = +c.kgPerPack || 0; var upk = kgp > 0 ? Math.round((1/kgp)*100)/100 : ''; var un = c.packUnit || ''; var _in='border:1px solid var(--line);border-radius:7px;padding:8px;font-size:15px'; return `
@@ -1352,6 +1352,13 @@
     if (!kg || !u) return;
     if (from === 'kg') { const v = parseFloat(kg.value) || 0; u.value = v > 0 ? (Math.round((1 / v) * 100) / 100) : ''; }
     else { const v = parseFloat(u.value) || 0; kg.value = v > 0 ? (Math.round((1 / v) * 1000) / 1000) : ''; }
+    window._pBuyUnitLbl && window._pBuyUnitLbl();
+  };
+  /* Nhãn "Giá nhập (₫/…)" động: có bảng quy đổi → /kg; không thì theo ĐVT đang chọn. */
+  window._pBuyUnitLbl = function () {
+    const el = document.getElementById('pBuyUnit'); if (!el) return;
+    const kg = parseFloat((document.getElementById('pKgPerPack') || {}).value || '') || parseFloat((document.getElementById('pUnitPerKg') || {}).value || '');
+    el.textContent = kg > 0 ? 'kg' : (((document.getElementById('pUnit') || {}).value || 'kg'));
   };
   window._pcvUnitLabel = function () {
     const nm = ((document.getElementById('pPackUnit') || {}).value || '').trim() || 'đơn vị';
@@ -1368,6 +1375,9 @@
     const packUnit = (window.formVal('#pPackUnit') || '').trim();
     let kgPerPack = parseFloat(String(window.formVal('#pKgPerPack') || '').replace(/[^\d.]/g, '')) || 0;
     if (!kgPerPack) { const upk = parseFloat(String(window.formVal('#pUnitPerKg') || '').replace(/[^\d.]/g, '')) || 0; if (upk > 0) kgPerPack = Math.round((1 / upk) * 10000) / 10000; }
+    /* Có bảng quy đổi (đếm quả/thùng → kg) → ÉP ĐVT = 'kg' để tiền khách & công nợ luôn tính theo kg.
+       Một SP chỉ theo MỘT mô hình → tránh máy nhân nhầm quả × giá-kg (sai tiền, không cảnh báo). */
+    const unitFinal = kgPerPack > 0 ? 'kg' : unit;
     const imgEl = document.getElementById('pImg');
     const img = imgEl ? imgEl.value : '';
     const today = window.todayISO();
@@ -1381,14 +1391,14 @@
         const prevSell = (window.priceEntryOn(p, today) || {}).sell || 0;
         hist.push({ date: today, buy, sell: prevSell });
       }
-      window.STORE.update('products', id, { name, cat, unit, note, priceHistory: hist, img });
+      window.STORE.update('products', id, { name, cat, unit: unitFinal, note, priceHistory: hist, img });
       if (window.setProdUnitConv) window.setProdUnitConv(id, packUnit, kgPerPack);
       window.toast('✓ Đã cập nhật ' + name, 'success');
     } else {
       const newId = window.STORE.nextId('products', 'SP', 3);
       window.STORE.add('products', {
         id: newId,
-        name, cat, unit, note, img,
+        name, cat, unit: unitFinal, note, img,
         priceHistory: [{ date: today, buy, sell: 0 }],
       });
       if (window.setProdUnitConv) window.setProdUnitConv(newId, packUnit, kgPerPack);

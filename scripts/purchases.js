@@ -98,7 +98,15 @@
       const todayL = rows.filter(p => p.date === today);
       const ordered = rows.filter(p => p.status === 'ordered');
       const monthSpend = rows.filter(p => p.status === 'received' && (p.date||'').endsWith(_mmyyyy)).reduce((s,p)=>s+(p.total||0),0);
-      const unpaid = rows.filter(p => p.status === 'received').reduce((s,p)=>s+Math.max(0,(p.total||0)-(p.paid||0)),0);
+      /* Chưa thanh toán = Σ công nợ NCC DẪN XUẤT (nhập received − phiếu chi tiền mặt − trả hàng),
+         KHỚP trang Công nợ NCC. KHÔNG dùng p.paid (thanh toán nay chỉ ghi phiếu chi, p.paid luôn 0). */
+      const _cashOut = window.STORE.get('cashEntries', []) || [];
+      const _claims = window.STORE.get('supplierClaims', []) || [];
+      const _sups = getSup();
+      const _nhap = rows.filter(p => p.status === 'received').reduce((s,p)=>s+(+p.total||0),0);
+      const _paidCash = _cashOut.filter(e => e && e.type === 'out' && _sups.some(s => e.party === s.name || (e.desc && String(e.desc).includes(s.id)))).reduce((s,e)=>s+(+e.amount||0),0);
+      const _openClaims = _claims.filter(c => c && c.status !== 'settled' && c.status !== 'cancelled').reduce((s,c)=>s+(+c.amount||0),0);
+      const unpaid = Math.max(0, _nhap - _paidCash - _openClaims);
       el.innerHTML =
         box('Nhập hôm nay', todayL.length+' <span style="font-size:13px;color:var(--muted);font-weight:500">phiếu</span>', window.fmtShort(todayL.reduce((s,p)=>s+(p.total||0),0))+' ₫', 'var(--navy)', 'Số phiếu + giá trị nhập NCC trong ngày.') +
         box('⏳ Chờ nhận', ordered.length+'', window.fmtShort(ordered.reduce((s,p)=>s+(p.total||0),0))+' ₫', '#92400E', 'Phiếu đã đặt nhưng NCC chưa giao.') +

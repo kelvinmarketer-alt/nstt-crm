@@ -157,7 +157,7 @@
     const _isCongNo = o => _isNo(o) && (window.orderDelivered ? window.orderDelivered(o) : (o.status === 'delivered' || o.status === 'reconciled'));
     const rows = {};
     orders.forEach(o => {
-      if (o.status === 'draft' || o.status === 'cancelled') return;   /* bỏ nháp/huỷ */
+      if (o.status === 'draft' || o.status === 'cancelled' || o.status === 'returned') return;   /* bỏ nháp/huỷ/đã trả (khỏi thổi doanh thu) */
       const iso = orderISO(o);
       if (!daySet.has(iso)) return;
       const key = o.cust || o.custName || '—';
