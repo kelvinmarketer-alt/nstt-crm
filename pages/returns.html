@@ -614,7 +614,8 @@
         let pid = ri.id;
         if (!pid && ri.name) { const p = _prods.find(x => (x.name || '').trim().toLowerCase() === (ri.name || '').trim().toLowerCase()); pid = p ? p.id : null; }
         if (pid) msgs.push(`+${ri.qty}${ri.unit || 'kg'} ${ri.name} về kho`);
-        else msgs.push(`⚠ "${ri.name}" chưa gán SP danh mục → KHÔNG cộng được tồn`);
+        else if (ri.name) msgs.push(`+${ri.qty}${ri.unit || 'kg'} ${ri.name} về kho (hàng mua ngoài)`);
+        else msgs.push(`⚠ mặt hàng chưa rõ tên → không cộng được tồn`);
       });
     }
 

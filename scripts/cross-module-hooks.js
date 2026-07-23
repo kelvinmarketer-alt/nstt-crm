@@ -220,6 +220,8 @@
                   const p = products.find(x => (x.name||'').trim().toLowerCase() === (it.name||'').trim().toLowerCase());
                   pid = p ? p.id : null;
                 }
+                /* Không khớp danh mục → HÀNG MUA NGOÀI: lưu tồn dạng 'EXT·<tên>' (KHÔNG đụng danh mục SP) */
+                if (!pid && it.name) pid = 'EXT·' + String(it.name).trim();
                 if (pid) {
                   window.invApply(pid, +(it.qty || 0));
                   window.invRecordMovement(pid, +(it.qty || 0), 'return', `KH trả hàng ${r.custName||''}`, ref);

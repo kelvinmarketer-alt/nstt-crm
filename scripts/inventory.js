@@ -14,6 +14,11 @@
   function setMoves(m)  { window.STORE.set('inv_movements', m); }
   function findProd(id) { return getProds().find(p => p.id === id); }
   function findInv(productId) { return getInv().find(i => i.productId === productId); }
+  /* Hàng MUA NGOÀI danh mục: lưu bằng productId = 'EXT·<tên>' (dùng cột product_id có sẵn → persistent,
+     KHÔNG đụng Danh mục SP). Tên hiển thị = phần sau tiền tố. */
+  const EXT_PFX = 'EXT·';
+  function isExt(pid) { return typeof pid === 'string' && pid.indexOf(EXT_PFX) === 0; }
+  function invNameOf(pid) { if (isExt(pid)) return pid.slice(EXT_PFX.length); const p = findProd(pid); return p ? p.name : pid; }
 
   function stockLevel(item) {
     if (item.stock <= 0) return 'out';
@@ -116,16 +121,17 @@
 
     let rows = inv.map(i => {
       const p = findProd(i.productId);
-      return { ...i, prod: p, level: stockLevel(i), days: daysLeft(i) };
+      const ext = isExt(i.productId);
+      return { ...i, prod: p, ext, name: ext ? i.productId.slice(EXT_PFX.length) : (p ? p.name : i.productId), unit: ext ? 'kg' : (p?.unit || ''), level: stockLevel(i), days: daysLeft(i) };
     });
     rows = rows.filter(r => (+r.stock || 0) > 0);   /* CHỈ hiện SP đang còn tồn (ẩn tồn = 0) */
-    if (q) rows = rows.filter(r => (r.prod?.name || '').toLowerCase().includes(q) || r.productId.toLowerCase().includes(q));
+    if (q) rows = rows.filter(r => (r.name || '').toLowerCase().includes(q) || r.productId.toLowerCase().includes(q));
     if (f) rows = rows.filter(r => r.level === f);
     if (lo) rows = rows.filter(r => r.location === lo);
 
     /* Sắp xếp: low/out lên đầu */
     const order = { out:0, low:1, warn:2, ok:3 };
-    rows.sort((a, b) => order[a.level] - order[b.level] || (a.prod?.name||'').localeCompare(b.prod?.name||''));
+    rows.sort((a, b) => order[a.level] - order[b.level] || (a.name||'').localeCompare(b.name||''));
 
     if (!rows.length) {
       tb.innerHTML = `<tr><td colspan="11" style="padding:36px;text-align:center;color:var(--muted)">${q ? 'Không tìm thấy SP đang tồn khớp "' + q + '".' : 'Chưa có sản phẩm nào đang còn tồn kho.'}</td></tr>`;
@@ -139,10 +145,10 @@
       const cls = 'lvl-' + r.level;
       return `<tr data-id="${r.id}">
         <td class="hide-xs"><div class="checkbox" onclick="this.classList.toggle('on')"></div></td>
-        <td data-field="title"><b>${r.prod?.name || r.productId}</b><div style="font-size:11px;color:var(--muted)">${r.prod?.cat || ''}</div></td>
-        <td data-field="code"><code style="font-size:11.5px;color:var(--muted)">${r.productId}</code></td>
+        <td data-field="title"><b>${r.name}</b>${r.ext ? ' <span class="tag" style="background:#FEF3C7;color:#92400E;font-size:10px">💵 mua ngoài</span>' : ''}<div style="font-size:11px;color:var(--muted)">${r.prod?.cat || ''}</div></td>
+        <td data-field="code">${r.ext ? '<span style="font-size:11px;color:var(--muted)">— ngoài danh mục</span>' : `<code style="font-size:11.5px;color:var(--muted)">${r.productId}</code>`}</td>
         <td class="hide-xs"><span class="tag" style="background:#F1F5F9;color:#475569">${r.location}</span></td>
-        <td class="num" data-field="stock"><b class="${cls}">${fmtQty(r.stock)} ${r.prod?.unit || ''}</b></td>
+        <td class="num" data-field="stock"><b class="${cls}">${fmtQty(r.stock)} ${r.unit || ''}</b></td>
         <td class="hide-xs">
           <div class="stock-bar">
             <div class="bar"><div class="fill" style="width:${pct}%;background:${colors[r.level]}"></div></div>
@@ -155,8 +161,8 @@
         <td class="hide-xs" style="font-size:12px">${r.lastIn || '—'}</td>
         <td data-field="level" class="inv-lvl-cell"><span class="${cls}" style="font-size:12px">${lvlLabels[r.level] || ''}</span></td>
         <td class="hide-xs">
-          <button class="btn btn-ghost btn-sm" onclick="window.openInvAdjust('${r.productId}')" title="Điều chỉnh thủ công">⚖️ KK</button>
-          <button class="btn btn-ghost btn-sm" onclick="window.location.href='purchases.html?createFor=${r.productId}'" title="Tạo phiếu nhập">+ Nhập</button>
+          <button class="btn btn-ghost btn-sm" onclick="window.openInvAdjust('${r.productId.replace(/'/g, "\\'")}')" title="Điều chỉnh thủ công">⚖️ KK</button>
+          ${r.ext ? '' : `<button class="btn btn-ghost btn-sm" onclick="window.location.href='purchases.html?createFor=${r.productId}'" title="Tạo phiếu nhập">+ Nhập</button>`}
         </td>
       </tr>`;
     }).join('');
@@ -213,7 +219,6 @@
     const typeIc = { purchase:'📥', sale:'📤', adjust:'⚖️', return:'↩️' };
     const typeLab = { purchase:'Nhập', sale:'Xuất', adjust:'Kiểm kê', return:'Trả hàng' };
     host.innerHTML = moves.slice(0, 60).map(m => {
-      const p = findProd(m.productId);
       const ts = new Date(m.ts);
       const pad = n => String(n).padStart(2,'0');
       const t = `${pad(ts.getDate())}/${pad(ts.getMonth()+1)} ${pad(ts.getHours())}:${pad(ts.getMinutes())}`;
@@ -221,7 +226,7 @@
       return `<div style="display:flex;align-items:center;gap:12px;padding:9px 16px;border-bottom:1px solid #F8FAFC;font-size:13px">
         <span style="font-size:18px">${typeIc[m.type] || '•'}</span>
         <div style="flex:1;min-width:0">
-          <div><b>${p?.name || m.productId}</b> · <span style="color:var(--muted)">${typeLab[m.type] || m.type}</span></div>
+          <div><b>${invNameOf(m.productId)}</b> · <span style="color:var(--muted)">${typeLab[m.type] || m.type}</span></div>
           <div style="font-size:11.5px;color:var(--muted)">${m.note}${m.refId ? ' · #'+m.refId : ''} · ${m.user}</div>
         </div>
         <div style="font-weight:700;color:${isIn ? 'var(--ok)' : 'var(--danger)'};font-variant-numeric:tabular-nums">${isIn?'+':''}${m.qty}</div>
@@ -281,12 +286,56 @@
   function _adResolvePid() {
     const v = (document.getElementById('adProd').value || '').trim();
     if (!v) return '';
+    if (v.indexOf(EXT_PFX) === 0) return v.split(' · ')[0].trim();   /* hàng mua ngoài: productId = 'EXT·<tên>' */
     const idPart = v.split('·')[0].trim();
     let p = getProds().find(x => x.id === idPart);
     if (!p) p = getProds().find(x => (x.id + ' · ' + x.name) === v);
     if (!p) p = getProds().find(x => (x.name || '').toLowerCase() === v.toLowerCase());
     return p ? p.id : '';
   }
+
+  /* ====== Nhập tồn HÀNG MUA NGOÀI (ngoài danh mục SP) ====== */
+  window.openExtStock = function () {
+    const _l = 'display:block;font-size:12px;color:var(--muted);margin-bottom:4px';
+    const _i = 'width:100%;border:1px solid var(--line);border-radius:7px;padding:9px;font-size:16px;margin-bottom:10px;box-sizing:border-box';
+    window.openModal('➕ Nhập tồn hàng mua ngoài', `
+      <div style="background:#FEF3C7;border:1px solid #FCD34D;color:#92400E;padding:10px 12px;border-radius:8px;font-size:12.5px;margin-bottom:12px">
+        💵 Hàng <b>mua ngoài</b> chưa có trong Danh mục SP — nhập thẳng tồn ở kho để bán tiếp. <b>KHÔNG</b> thêm vào Danh mục sản phẩm.
+      </div>
+      <label style="${_l}">Tên hàng *</label>
+      <input id="exName" placeholder="VD: Cải xanh" autocomplete="off" style="${_i}">
+      <label style="${_l}">Số tồn nhập vào (kg) *</label>
+      <input id="exQty" type="number" min="0" step="0.1" placeholder="VD: 1" data-money="0" inputmode="decimal" style="${_i}">
+      <label style="${_l}">Kho</label>
+      <input id="exLoc" value="Kho A1" style="${_i}">
+      <label style="${_l}">Ghi chú</label>
+      <input id="exNote" placeholder="VD: mua chợ đầu mối sáng nay" style="${_i}">
+    `, {
+      footer: `<button class="btn btn-ghost" onclick="window.closeModal()">Hủy</button>
+               <button class="btn btn-primary" onclick="window.saveExtStock()">Lưu tồn</button>`,
+      width: '440px',
+    });
+    setTimeout(() => { const el = document.getElementById('exName'); if (el) el.focus(); }, 40);
+  };
+  window.saveExtStock = function () {
+    const name = (document.getElementById('exName').value || '').trim();
+    const qty = parseFloat(String((document.getElementById('exQty') || {}).value || '').replace(/[^\d.]/g, '')) || 0;
+    const loc = (document.getElementById('exLoc').value || 'Kho A1').trim();
+    const note = (document.getElementById('exNote').value || '').trim();
+    if (!name) { window.toast && window.toast('Nhập tên hàng', 'warn'); return; }
+    if (!(qty > 0)) { window.toast && window.toast('Nhập số tồn > 0', 'warn'); return; }
+    /* Trùng tên SP danh mục? → nhắc dùng nhập kho SP chuẩn thay vì tạo hàng ngoài danh mục */
+    const dup = getProds().find(p => (p.name || '').trim().toLowerCase() === name.toLowerCase());
+    if (dup) { window.toast && window.toast(`"${name}" đã có trong danh mục (${dup.id}) — dùng ⚖️ KK / + Nhập cho SP đó`, 'warn'); }
+    const pid = EXT_PFX + name;
+    window.invApply(pid, qty);                       /* tạo/cộng dòng tồn (product_id = 'EXT·<tên>') */
+    const row = getInv().find(i => i.productId === pid);
+    if (row) { const patch = {}; if (row.location !== loc) patch.location = loc; if ((+row.minStock || 0) !== 0) patch.minStock = 0; if (Object.keys(patch).length) window.STORE.update('inventory', row.id, patch); }
+    window.invRecordMovement(pid, qty, 'adjust', 'Nhập tồn hàng mua ngoài' + (note ? ' · ' + note : ''));
+    window.closeModal && window.closeModal();
+    window.toast && window.toast(`✓ Đã nhập +${qty}kg "${name}" (hàng mua ngoài) vào ${loc}`, 'success');
+    render();
+  };
 
   window._invAdjustSave = function () {
     const pid = _adResolvePid();

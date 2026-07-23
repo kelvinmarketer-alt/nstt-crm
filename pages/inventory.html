@@ -85,13 +85,15 @@
       <!-- Desktop: 2 nút phụ phẳng -->
       <span class="inv-acts-flat">
         <button class="btn btn-ghost" onclick="window.exportInvCsv()">⬇ Xuất Excel</button>
+        <button class="btn btn-ghost" onclick="window.openExtStock()" title="Nhập tồn cho hàng mua ngoài, chưa có trong danh mục">💵 Nhập tồn mua ngoài</button>
         <button class="btn btn-ghost" onclick="window.openInvAdjust()">⚖️ Kiểm kê / Điều chỉnh</button>
       </span>
-      <!-- Mobile: gộp 2 nút phụ vào dropdown -->
+      <!-- Mobile: gộp nút phụ vào dropdown -->
       <details class="inv-acts-dd">
         <summary class="btn btn-ghost">⋯</summary>
         <div class="inv-acts-dd-menu">
           <button class="btn btn-ghost" onclick="this.closest('details').open=false;window.exportInvCsv()">⬇ Xuất Excel</button>
+          <button class="btn btn-ghost" onclick="this.closest('details').open=false;window.openExtStock()">💵 Nhập tồn mua ngoài</button>
           <button class="btn btn-ghost" onclick="this.closest('details').open=false;window.openInvAdjust()">⚖️ Kiểm kê / Điều chỉnh</button>
         </div>
       </details>
