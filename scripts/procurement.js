@@ -753,72 +753,10 @@
   }
   const _line = (run, key) => run.lines.find(x => x.key === key);
 
-  /* ===== Thao tác phân bổ NCC cho 1 mã ===== */
-  /* Tự chọn NCC sao cao nhất nhận toàn bộ */
-  window.pcAutoStar = function (runId, key) {
-    const runs = getRuns(); const run = runs.find(r => r.id === runId); if (!run) return;
-    readConfirmInputs(run);
-    const l = _line(run, key); if (!l) return;
-    autoStarAllocate(l);
-    saveRuns(runs); renderRuns(); window.pcOpenRun(runId);
-  };
+  /* (Đã gỡ cụm "gán NCC hàng loạt theo dòng tick": pcAutoStar / pcUpdateSelCount / pcToggleAllLines /
+     _selectedLineKeys / pcBulkAssign / pcAutoStarSelected — UI checkbox .pc-linechk/pcBulkSup không còn
+     render ở template nào (đã thay bằng phân bổ alloc: pcAddAlloc/pcSetAllocSup/pcApplyAlloc). Không caller.) */
 
-  /* ===== CHỌN NHIỀU MÃ + GÁN HÀNG LOẠT ===== */
-  window.pcUpdateSelCount = function () {
-    const all = document.querySelectorAll('.pc-linechk');
-    const n = document.querySelectorAll('.pc-linechk:checked').length;
-    const el = document.getElementById('pcSelCount'); if (el) el.textContent = n + ' mã chọn';
-    const chkAll = document.getElementById('pcChkAll'); if (chkAll) chkAll.checked = n > 0 && n === all.length;
-  };
-  window.pcToggleAllLines = function (on) {
-    document.querySelectorAll('.pc-linechk').forEach(c => { c.checked = on; });
-    window.pcUpdateSelCount();
-  };
-  function _selectedLineKeys() {
-    return Array.from(document.querySelectorAll('.pc-linechk:checked')).map(c => c.dataset.key);
-  }
-  /* Gán 1 NCC (chọn từ dropdown) cho TẤT CẢ mã đã tick — qty = nhu cầu mỗi mã, giá lấy theo NCC nếu có khai */
-  window.pcBulkAssign = function (runId) {
-    const sel = document.getElementById('pcBulkSup'); const supId = sel && sel.value;
-    if (!supId) { window.toast?.('Chọn NCC ở ô bên cạnh để gán', 'warn'); return; }
-    const keys = _selectedLineKeys();
-    if (!keys.length) { window.toast?.('Chưa tick mã nào — tick các mã cần gán trước', 'warn'); return; }
-    const runs = getRuns(); const run = runs.find(r => r.id === runId); if (!run) return;
-    readConfirmInputs(run);
-    const sup = getSuppliers().find(s => s.id === supId); if (!sup) return;
-    const remember = !!(document.getElementById('pcBulkRemember') || {}).checked;
-    const newProds = Array.isArray(sup.products) ? sup.products.slice() : [];
-    let n = 0, learned = 0;
-    keys.forEach(k => {
-      const l = _line(run, k); if (!l) return;
-      const p = (sup.products || []).find(pp => (l.productId && pp.id === l.productId) || norm(pp.name) === norm(l.name));
-      l.allocations = [{ supplierId: sup.id, supplierName: sup.name, qty: l.totalQty, unitCost: p ? (+p.price || 0) : 0, confirmedQty: null }];
-      n++;
-      /* Ghi nhớ mapping NCC↔mã (chỉ khi NCC chưa khai mã này + có productId) → lần sau tự gán theo sao */
-      if (remember && l.productId && !newProds.some(pp => pp.id === l.productId)) {
-        newProds.push({ id: l.productId, name: l.name, price: 0 });
-        learned++;
-      }
-    });
-    if (remember && learned) window.STORE.update('suppliers', sup.id, { products: newProds });
-    saveRuns(runs); renderRuns(); window.pcOpenRun(runId);
-    window.toast?.(`✓ Đã gán NCC "${sup.name}" cho ${n} mã${learned ? ` · 🧠 ghi nhớ ${learned} mã mới` : ''}`, 'success');
-  };
-  /* Tự gán NCC sao cao nhất cho mã đã tick (không tick → áp dụng cho TẤT CẢ mã) */
-  window.pcAutoStarSelected = function (runId) {
-    const runs = getRuns(); const run = runs.find(r => r.id === runId); if (!run) return;
-    readConfirmInputs(run);
-    let keys = _selectedLineKeys();
-    const applyAll = !keys.length;
-    if (applyAll) keys = run.lines.map(l => l.key);
-    let n = 0, miss = 0;
-    keys.forEach(k => {
-      const l = _line(run, k); if (!l) return;
-      if (suppliersForProduct(l.productId, l.name).length) { autoStarAllocate(l); n++; } else miss++;
-    });
-    saveRuns(runs); renderRuns(); window.pcOpenRun(runId);
-    window.toast?.(`Tự gán ${n} mã${applyAll ? ' (tất cả)' : ''}${miss ? ` · ${miss} mã chưa có NCC → thu mua ngoài` : ''}`, n ? 'success' : 'warn');
-  };
   /* Thêm 1 dòng NCC chia phần (qty = phần còn thiếu) */
   window.pcAddAlloc = function (runId, key) {
     const runs = getRuns(); const run = runs.find(r => r.id === runId); if (!run) return;
@@ -945,34 +883,8 @@
     return s;
   }
 
-  /* Gán NCC cho 1 dòng SP — nhập tên (autocomplete), tạo mới nếu chưa có */
-  window.pcSetLineSupByName = function (runId, key, name) {
-    const runs = getRuns(); const run = runs.find(r => r.id === runId); if (!run) return;
-    readConfirmInputs(run);
-    const l = run.lines.find(x => x.key === key); if (!l) return;
-    const s = resolveOrCreateSupplier(name);
-    l.supplierId = s ? s.id : ''; l.supplierName = s ? s.name : '';
-    saveRuns(runs);
-    renderRuns(); window.pcOpenRun(runId);
-  };
-  /* Giữ tương thích cũ (gán theo id) */
-  window.pcSetLineSup = function (runId, key, supId) {
-    const sup = getSuppliers().find(s => s.id === supId);
-    window.pcSetLineSupByName(runId, key, sup ? sup.name : '');
-  };
-  /* Gán NCC hàng loạt cho SP chưa gán */
-  window.pcBulkAssignSup = function (runId) {
-    const inp = document.getElementById('pcBulkSup');
-    const s = resolveOrCreateSupplier(inp ? inp.value : '');
-    if (!s) { window.toast?.('Nhập tên NCC để gán', 'warn'); return; }
-    const runs = getRuns(); const run = runs.find(r => r.id === runId); if (!run) return;
-    readConfirmInputs(run);
-    let n = 0;
-    run.lines.forEach(l => { if (!l.supplierId) { l.supplierId = s.id; l.supplierName = s.name; n++; } });
-    saveRuns(runs);
-    window.toast?.('✓ Đã gán ' + n + ' SP cho ' + s.name, 'success');
-    renderRuns(); window.pcOpenRun(runId);
-  };
+  /* (Đã gỡ pcSetLineSupByName / pcSetLineSup / pcBulkAssignSup — gán NCC theo dòng/hàng loạt kiểu cũ,
+     không caller; nay dùng phân bổ alloc.) */
 
   window.pcSaveConfirm = function (runId) {
     const runs = getRuns(); const run = runs.find(r => r.id === runId); if (!run) return;

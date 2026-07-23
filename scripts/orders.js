@@ -981,8 +981,6 @@
   window.openCreateOrder = function(prefillCustId) {
     const customers = window.STORE.get('customers', []);
     const drivers = window.STORE.get('shippers', window.DRIVERS || []);
-    const vehicles = window.STORE.get('vehicles', window.VEHICLES || []);
-    const partners = window.STORE.get('partners', window.PARTNERS || []).filter(p => p.active);
     const svcItems = (window.MD.get && window.MD.get('services')) || window.SERVICE_TYPES || [];
     const svcChecks = svcItems.map(s => `<label class="oSvc-chip" style="display:inline-flex;align-items:center;gap:5px;padding:5px 10px;border:1px solid var(--line);border-radius:16px;cursor:pointer;font-size:12.5px;user-select:none;background:#fff;white-space:nowrap">
         <input type="checkbox" class="oSvcChk" value="${s.id}" style="margin:0;cursor:pointer" onchange="window._oSvcToggle(this)">${s.icon || ''} ${s.label}</label>`).join('');
@@ -994,10 +992,7 @@
       customers.map(c => `<option value="${c.id}" ${c.id===prefillCustId?'selected':''}>${c.code} · ${c.name}</option>`).join('');
     const drvOpts = `<option value="">-- Chọn shipper --</option>` +
       drivers.map(d => `<option value="${d.id}">${d.name} · ${d.primaryPlate}</option>`).join('');
-    const vehOpts = `<option value="">-- Chọn xe --</option>` +
-      vehicles.map(v => `<option value="${v.id}">${v.plate} · ${v.type}</option>`).join('');
-    const partnerOpts = `<option value="">-- Chọn đối tác --</option>` +
-      partners.map(p => `<option value="${p.id}">${p.code} · ${p.name}${p.vehiclePlate?' · '+p.vehiclePlate:''}</option>`).join('');
+    /* (Đã gỡ vehOpts/partnerOpts — di sản logistics, không nội suy vào template nào.) */
     const prodList = window.STORE.get('products', window.PRODUCTS || []);
     orderItems = [];
     orderTier = '';
@@ -1147,10 +1142,7 @@
         window._addOffItemFromForm(nm, parseFloat(oQtyEl.value) || 1);
       });
     }
-    /* Auto-tính lợi nhuận khi thay đổi giá */
-    ['oFreight','oPartnerCost'].forEach(id => {
-      document.getElementById(id)?.addEventListener('input', updateProfit);
-    });
+    /* (Đã gỡ listener updateProfit — di sản logistics "lãi cước", DOM oProfit/oPartnerCost không tồn tại.) */
   };
 
   /* === Mặt hàng trong đơn (sản phẩm + giá ngày) === */
@@ -1345,7 +1337,6 @@
     /* Trọng lượng tự đồng bộ = tổng kg (trừ khi user tự sửa tay → data-auto=0) */
     const w = document.getElementById('oWeight');
     if (w && w.dataset.auto !== '0') w.value = totalKg > 0 ? totalKg.toFixed(2) : '';
-    if (typeof updateProfit === 'function') updateProfit();
     /* Khoá theo NẤC KẾ TOÁN:
        'view' (đã báo giá) → khoá hết · 'priceOnly' (SL đã chốt) → khoá SL/đơn vị/xoá, chỉ sửa GIÁ · 'edit' → mở hết */
     if (_itemsMode === 'view') {
@@ -2020,91 +2011,9 @@ CHỈ TRẢ JSON, không giải thích gì thêm.`;
     window.toast('⬇ Đã tải file mẫu', 'success');
   };
 
-  window.onCarrierChange = function(mode) {
-    document.getElementById('carrierInternal').style.display = mode === 'internal' ? '' : 'none';
-    document.getElementById('carrierExternal').style.display = mode === 'external' ? '' : 'none';
-  };
-
-  window.onPartnerChange = function(pid) {
-    const preview = document.getElementById('partnerPreview');
-    if (!pid) { preview.style.display = 'none'; return; }
-    const partners = window.STORE.get('partners', []);
-    const p = partners.find(x => x.id === pid);
-    if (!p) return;
-    preview.style.display = 'block';
-    preview.innerHTML = `
-      <div><b>${p.name}</b> · ${p.contact} · ${p.phone}</div>
-      <div style="margin-top:4px;color:var(--muted)">🚛 ${p.vehicleType} ${p.vehiclePlate ? '· ' + p.vehiclePlate : ''}</div>
-      ${p.specialty ? `<div style="color:var(--muted)">🎯 ${p.specialty}</div>` : ''}
-      ${p.pricing ? `<div style="color:var(--warn);margin-top:4px"><b>💰 Tham khảo giá:</b> ${p.pricing}</div>` : ''}
-    `;
-  };
-
-  function updateProfit() {
-    const freight = _moneyVal('#oFreight');
-    const cost = parseInt(String(window.formVal('#oPartnerCost') || '').replace(/\D/g, ''), 10) || 0;
-    const profit = freight - cost;
-    const profitEl = document.getElementById('oProfit');
-    if (profitEl) {
-      profitEl.value = profit > 0 ? '+' + window.fmt(profit) + ' ₫' : window.fmt(profit) + ' ₫';
-      profitEl.style.color = profit > 0 ? 'var(--ok)' : profit < 0 ? 'var(--danger)' : 'var(--muted)';
-    }
-  }
-
-  /* === Inline add partner trong order modal === */
-  window.openInlineAddPartner = function() {
-    window.openModal('+ Thêm nhanh đối tác', `
-      <div style="font-size:12px;color:var(--muted);margin-bottom:12px">
-        Thêm nhanh — chỉ điền thông tin cần thiết. Có thể bổ sung chi tiết sau.
-      </div>
-      <div class="form-row">
-        <div><label>Loại</label>
-          <select id="qpKind">
-            <option value="company">🏢 Nhà xe</option>
-            <option value="freelance">👤 Tự do</option>
-          </select></div>
-        <div><label>Tên *</label><input id="qpName" placeholder="VD: Cty Đại Phong / A. Tuấn"></div>
-      </div>
-      <div class="form-row">
-        <div><label>SĐT *</label><input id="qpPhone" placeholder="09xx xxx xxx"></div>
-        <div><label>Biển số xe</label><input id="qpPlate" placeholder="VD: 29C-77001"></div>
-      </div>
-      <div class="form-row wide"><label>Loại xe</label>
-        <input id="qpVehType" placeholder="VD: Xe tải 5T"></div>
-    `, {
-      footer: `<button class="btn btn-ghost" onclick="window.openCreateOrder()">← Quay lại đơn</button>
-               <button class="btn btn-primary" onclick="window.submitQuickPartner()">💾 Thêm & chọn vào đơn</button>`
-    });
-  };
-
-  window.submitQuickPartner = function() {
-    const name = window.formVal('#qpName');
-    const phone = window.formVal('#qpPhone');
-    if (!name) { window.toast('Nhập tên đối tác', 'warn'); return; }
-    if (!phone) { window.toast('Nhập SĐT', 'warn'); return; }
-    const allP = window.STORE.get('partners', []);
-    const newP = {
-      id: 'P' + String(allP.length + 1).padStart(2, '0'),
-      code: window.STORE.nextId('partners', 'DT'),
-      kind: window.formVal('#qpKind'),
-      name, contact: name, phone,
-      vehiclePlate: window.formVal('#qpPlate') || null,
-      vehicleType: window.formVal('#qpVehType') || '',
-      capacity: 0, capUnit: 'tấn',
-      specialty: '', pricing: '', rating: 5.0,
-      trips30d: 0, totalSpent30d: 0, active: true, note: '(thêm nhanh từ tạo đơn)',
-    };
-    window.STORE.add('partners', newP);
-    window.closeModal();
-    /* Mở lại order modal + chọn partner mới */
-    window.openCreateOrder();
-    setTimeout(() => {
-      document.querySelector('input[name="oCarrier"][value="external"]').click();
-      const sel = document.getElementById('oPartner');
-      if (sel) { sel.value = newP.id; window.onPartnerChange(newP.id); }
-      window.toast('✓ Đã thêm ' + name + ' & chọn vào đơn', 'success');
-    }, 100);
-  };
+  /* (Đã gỡ cụm logistics chết: onCarrierChange / onPartnerChange / updateProfit / openInlineAddPartner /
+     submitQuickPartner — "carrier nội-ngoại + đối tác vận tải + lãi cước". DOM không render, chuỗi tự khép
+     kín không nút nào gọi. Đơn nông sản dùng shipper (oDriver), không dùng đối tác vận tải.) */
   window.onOrderCustChange = function(custId) {
     const c = window.STORE.get('customers', []).find(x => x.id === custId);
     const drop = document.getElementById('oDrop');
@@ -2256,11 +2165,7 @@ CHỈ TRẢ JSON, không giải thích gì thêm.`;
     window.location.href = 'recurring.html?fromOrder=1';
   };
 
-  window.onChangeService = function(svcId) {
-    const isLienTinh = svcId === 'lien-tinh';
-    const modeWrap = document.getElementById('modeWrap');
-    if (modeWrap) modeWrap.style.display = isLienTinh ? '' : 'none';
-  };
+  /* (Đã gỡ onChangeService — di sản "liên tỉnh", thay bằng multi-checkbox nhóm hàng _oSvcToggle.) */
 
   /* Nhóm hàng chính = MULTI-SELECT (checkbox). Tô màu chip khi tích. */
   window._oSvcToggle = function (chk) {
