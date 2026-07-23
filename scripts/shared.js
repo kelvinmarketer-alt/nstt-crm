@@ -5,7 +5,7 @@
 
 /* Phiên bản app hiển thị (đối chiếu với CACHE_VERSION trong sw.js) — để user tự XÁC NHẬN
    đang chạy bản mới hay còn kẹt JS cũ (hiện ở góc sidebar + log console). */
-window.APP_VERSION = 'v532';
+window.APP_VERSION = 'v533';
 console.log('%c[NSTT] App ' + window.APP_VERSION, 'color:#339B21;font-weight:bold');
 
 /* Gom NGUỒN khách về 3 nhóm chuẩn: 'mkt' / 'sales' / 'sep-gioi-thieu'.
@@ -32,18 +32,11 @@ window.srcGroup = function (s) {
   /* ============ FAVICON =============
      Inject favicon SVG inline (logo Tuấn Tú Farm) cho mọi tab —
      thay icon globe mặc định của browser bằng logo thương hiệu. */
-  const FAVICON_SVG = `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 140 90">
-    <circle cx="70" cy="45" r="38" fill="#E8F5E2"/>
-    <circle cx="70" cy="45" r="38" fill="none" stroke="#339B21" stroke-width="3.5"/>
-    <circle cx="61" cy="49" r="19" fill="#4EB83C"/>
-    <path d="M61 30 C 50 37 47 52 55 64" fill="none" stroke="#2A7D1A" stroke-width="2" stroke-linecap="round"/>
-    <path d="M61 30 C 72 37 75 52 67 64" fill="none" stroke="#2A7D1A" stroke-width="2" stroke-linecap="round"/>
-    <path d="M43 49 C 54 47 68 47 79 49" fill="none" stroke="#2A7D1A" stroke-width="2" stroke-linecap="round"/>
-    <circle cx="61" cy="49" r="5.5" fill="#2A7D1A"/>
-    <g transform="rotate(30 86 52)">
-      <path d="M82 47 L90 47 L86 70 Z" fill="#E8862E"/>
-      <path d="M82 47 C 79 39 85 37 86 43 C 87 37 93 39 90 47 Z" fill="#2A7D1A"/>
-    </g>
+  /* Logo mới: emblem "TT" (Tuấn Tú) trong vòng tròn xanh — khớp icon PWA */
+  const FAVICON_SVG = `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 100">
+    <rect width="100" height="100" rx="14" fill="#fff"/>
+    <circle cx="50" cy="50" r="40" fill="none" stroke="#1B7A34" stroke-width="6.5" stroke-linecap="round" stroke-dasharray="228 24" transform="rotate(-18 50 50)"/>
+    <text x="50" y="70" font-family="Georgia,'Times New Roman',serif" font-size="56" font-weight="700" fill="#1B7A34" text-anchor="middle" letter-spacing="-6">TT</text>
   </svg>`;
   const faviconDataUrl = 'data:image/svg+xml;utf8,' + encodeURIComponent(FAVICON_SVG);
   /* Xóa các favicon mặc định cũ (nếu có) để tránh trùng */
@@ -59,7 +52,7 @@ window.srcGroup = function (s) {
   /* apple-touch-icon (icon màn hình chính iOS) = LOGO THẬT (PNG) — iOS KHÔNG nhận SVG → trước đây hiện icon đơn giản */
   const _appleIcon = document.createElement('link');
   _appleIcon.rel = 'apple-touch-icon';
-  _appleIcon.href = '/assets/apple-touch-icon.png';
+  _appleIcon.href = '/assets/apple-touch-icon.png?v=2';
   document.head.appendChild(_appleIcon);
   /* Phơi ra global để các popup PDF (delivery-note, price-catalogue, pdf-templates, accounting print)
      có thể tái sử dụng cùng 1 favicon */
