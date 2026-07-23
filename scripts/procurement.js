@@ -269,9 +269,14 @@
     }
     const noSup = lines.filter(l => remainOf(l) > 0.001);  /* chưa phân bổ đủ NCC */
     const runs = getRuns();
-    const seq = String(runs.length + 1).padStart(3, '0');
+    /* ID theo SỐ LỚN NHẤT đang có +1, và bump tới khi CHƯA TRÙNG.
+       (KHÔNG dùng runs.length: xoá 1 phiên giữa chừng → length < số max → trùng id →
+        saveRun upsert-theo-id ĐÈ mất phiên cũ, phiên mới biến mất, đơn kẹt 'gathering' không ra ③.) */
+    let _seqN = runs.reduce((m, r) => { const n = parseInt(String(r.id || '').replace(/\D/g, ''), 10) || 0; return n > m ? n : m; }, 0);
+    let _rid;
+    do { _seqN++; _rid = 'GOM-' + String(_seqN).padStart(3, '0'); } while (runs.some(r => r.id === _rid));
     const run = {
-      id: 'GOM-' + seq,
+      id: _rid,
       createdAt: new Date().toISOString(),
       createdBy: (window.AUTH?.currentUser?.()?.name) || 'Kho',
       orderCodes: codes,
