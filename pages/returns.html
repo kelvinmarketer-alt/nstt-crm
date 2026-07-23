@@ -139,15 +139,20 @@
     cands.sort((a, b) => (b.buyPrice > 0) - (a.buyPrice > 0) || (a.buyPrice - b.buyPrice));
     return cands[0];
   }
-  /* Giá nhập (buyPrice) từ danh mục Sản phẩm & Giá — fallback khi NCC chưa đặt giá riêng */
+  /* Giá nhập từ DANH MỤC SẢN PHẨM — ưu tiên LỊCH SỬ GIÁ (bản ghi buy>0 gần nhất ≤ hôm nay),
+     fallback product.buyPrice. Tự nhảy vào phiếu, vẫn sửa tay được. */
   function _buyPriceOf(pid, pname) {
     const p = (window.STORE.get('products', []) || []).find(x => x.id === pid || (pname && _rnorm(x.name) === _rnorm(pname)));
-    return p ? (+p.buyPrice || 0) : 0;
+    if (!p) return 0;
+    const today = new Date().toISOString().slice(0, 10);
+    let best = null;
+    (Array.isArray(p.priceHistory) ? p.priceHistory : []).forEach(h => { if (h && h.date && h.date <= today && (+h.buy || 0) > 0 && (!best || h.date > best.date)) best = h; });
+    return best ? (+best.buy || 0) : (+p.buyPrice || 0);
   }
-  /* NCC + giá nhập gợi ý cho 1 mặt hàng trả (dùng ở popup Duyệt) */
+  /* NCC + giá nhập gợi ý cho 1 mặt hàng trả (dùng ở popup Duyệt). Giá nhập ưu tiên DANH MỤC (lịch sử giá). */
   function _nccInfoFor(it) {
     const sup = _supForProduct(it.id, it.name);
-    const buyPrice = (sup && sup.buyPrice) || _buyPriceOf(it.id, it.name) || 0;
+    const buyPrice = _buyPriceOf(it.id, it.name) || (sup && sup.buyPrice) || 0;
     return { supplierId: sup ? sup.supplierId : '', supplierName: sup ? sup.supplierName : '', buyPrice };
   }
   /* SP này NCC có CHO TRẢ lại không? Lưu KV 'prodNccReturnable' {productId:bool} (sync cloud). null = chưa đặt → mặc định CÓ */
@@ -176,10 +181,10 @@
     if (!list.length) { tb.innerHTML = `<tr><td colspan="${nCols}" style="padding:30px;text-align:center;color:var(--muted)">Chưa có đơn trả nào — tốt!</td></tr>`; _retRefreshBar(); return; }
     const stLab = {pending:'⏳ Chờ xử lý', refunded:'✓ Đã hoàn', replaced:'🔄 Đổi hàng', rejected:'✕ Từ chối'};
     const stClr = {pending:'#92400E', refunded:'#15803D', replaced:'#1E40AF', rejected:'#B91C1C'};
-    tb.innerHTML = list.slice().reverse().map(r => `<tr style="border-top:1px solid #F1F5F9">
+    tb.innerHTML = list.slice().reverse().map(r => `<tr onclick="window.viewReturn('${r.id}')" style="border-top:1px solid #F1F5F9;cursor:pointer" title="Bấm để xem chi tiết phiếu trả">
       ${admin ? `<td class="ret-adm-col hide-xs" style="text-align:center;padding:10px 6px;width:34px"><input type="checkbox" class="ret-chk" ${_retSel.has(r.id) ? 'checked' : ''} onclick="event.stopPropagation();window.retToggle('${r.id}',this.checked)"></td>` : ''}
-      <td data-field="title" style="padding:10px"><a onclick="window.viewReturn('${r.id}')" style="color:var(--navy);font-weight:700;cursor:pointer;text-decoration:underline" title="Xem chi tiết phiếu trả">${r.id}</a></td>
-      <td class="hide-xs" style="padding:10px"><a href="orders.html?open=${encodeURIComponent(r.orderCode)}" style="color:var(--navy)" title="Mở chi tiết đơn">${r.orderCode} ↗</a></td>
+      <td data-field="title" style="padding:10px"><span style="color:var(--navy);font-weight:700">${r.id}</span></td>
+      <td class="hide-xs" style="padding:10px"><a href="orders.html?open=${encodeURIComponent(r.orderCode)}" onclick="event.stopPropagation()" style="color:var(--navy)" title="Mở chi tiết đơn">${r.orderCode} ↗</a></td>
       <td data-field="cust" style="padding:10px">${r.custName}</td>
       <td class="hide-xs" style="padding:10px">${r.date}</td>
       <td data-field="meta" style="padding:10px;font-size:12px">
@@ -198,7 +203,7 @@
           : `<span style="font-weight:700;color:#DC2626">${window.fmt(r.refundTotal)} ₫</span><div style="font-size:9px;color:var(--muted);font-weight:400">${r.refundMode==='cash'?'chi tiền mặt':'trừ công nợ'}</div>`
       }</td>
       <td class="hide-xs" style="padding:10px"><span style="background:${stClr[r.status]}1f;color:${stClr[r.status]};padding:2px 8px;border-radius:99px;font-size:11px;font-weight:700">${stLab[r.status]}</span></td>
-      <td class="hide-xs" style="padding:10px">${r.status==='pending' ? ((r.resolution && r.resolution.startsWith('replace')) ? `<button class="btn btn-ghost btn-sm" onclick="window.processReturn('${r.id}', true)" title="Bù hàng — tạo đơn giao bù">✓ Xử lý</button>` : `<button class="btn btn-ghost btn-sm" onclick="window.approveShipReturn('${r.id}')" title="Duyệt: xem chi tiết + trừ hoá đơn KH + nợ NCC">✓ Duyệt</button>`) : ''}</td>
+      <td class="hide-xs" style="padding:10px">${r.status==='pending' ? ((r.resolution && r.resolution.startsWith('replace')) ? `<button class="btn btn-ghost btn-sm" onclick="event.stopPropagation();window.processReturn('${r.id}', true)" title="Bù hàng — tạo đơn giao bù">✓ Xử lý</button>` : `<button class="btn btn-ghost btn-sm" onclick="event.stopPropagation();window.approveShipReturn('${r.id}')" title="Duyệt: xem chi tiết + trừ hoá đơn KH + nợ NCC">✓ Duyệt</button>`) : ''}</td>
     </tr>`).join('');
   }
 

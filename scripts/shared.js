@@ -5,7 +5,7 @@
 
 /* Phiên bản app hiển thị (đối chiếu với CACHE_VERSION trong sw.js) — để user tự XÁC NHẬN
    đang chạy bản mới hay còn kẹt JS cũ (hiện ở góc sidebar + log console). */
-window.APP_VERSION = 'v514';
+window.APP_VERSION = 'v515';
 console.log('%c[NSTT] App ' + window.APP_VERSION, 'color:#339B21;font-weight:bold');
 
 /* Gom NGUỒN khách về 3 nhóm chuẩn: 'mkt' / 'sales' / 'sep-gioi-thieu'.
@@ -408,6 +408,9 @@ window.buyPriceOn = function(productId, dateStr) {
     if (t === 'number') el.setAttribute('type', 'text');
     el.setAttribute('inputmode', 'numeric');
     NATIVE.set.call(el, grp(raw(NATIVE.get.call(el))));   /* format giá trị ban đầu */
+    /* Ô tiền có sẵn "0" → coi như CHƯA điền: để TRỐNG + placeholder mờ "0"
+       (click là gõ số ngay, khỏi phải xoá số 0 trước). Đọc .value vẫn ra 0. */
+    if (raw(NATIVE.get.call(el)) === '0') { if (!el.getAttribute('placeholder')) el.setAttribute('placeholder', '0'); NATIVE.set.call(el, ''); }
     /* getter trả SỐ SẠCH cho mọi nơi đọc; setter format khi gán (nếu đang gõ thì để RAW, format lúc blur). */
     try {
       Object.defineProperty(el, 'value', {
