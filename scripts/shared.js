@@ -5,7 +5,7 @@
 
 /* Phiên bản app hiển thị (đối chiếu với CACHE_VERSION trong sw.js) — để user tự XÁC NHẬN
    đang chạy bản mới hay còn kẹt JS cũ (hiện ở góc sidebar + log console). */
-window.APP_VERSION = 'v501';
+window.APP_VERSION = 'v502';
 console.log('%c[NSTT] App ' + window.APP_VERSION, 'color:#339B21;font-weight:bold');
 
 /* Gom NGUỒN khách về 3 nhóm chuẩn: 'mkt' / 'sales' / 'sep-gioi-thieu'.
@@ -1952,6 +1952,25 @@ window.openModal = function(title, bodyHTML, opts = {}) {
     };
     document.addEventListener('keydown', window._modalEscHandler);
   }
+};
+/* ============ XEM ẢNH TO (preview) — dùng cho ảnh POD giao hàng, ảnh phiếu trả... ============
+   window.openImgPreview(src, title?) — mở ảnh full trên nền tối, bấm nền / ✕ / Esc để đóng. */
+window.openImgPreview = function (src, title) {
+  if (!src) return;
+  const old = document.getElementById('img-preview-bg'); if (old) old.remove();
+  const t = title ? String(title).replace(/[&<>"]/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c])) : '';
+  const el = document.createElement('div');
+  el.id = 'img-preview-bg';
+  el.style.cssText = 'position:fixed;inset:0;z-index:5000;background:rgba(0,0,0,.82);display:flex;align-items:center;justify-content:center;padding:24px';
+  el.innerHTML = `<div style="display:flex;flex-direction:column;align-items:center;gap:12px;max-width:94vw;max-height:94vh">
+      <img src="${src}" style="max-width:94vw;max-height:82vh;object-fit:contain;border-radius:10px;box-shadow:0 12px 48px rgba(0,0,0,.6);background:#fff">
+      ${t ? `<div style="color:#fff;font-size:13px;opacity:.9">${t}</div>` : ''}
+      <button class="btn" onclick="document.getElementById('img-preview-bg').remove()" style="background:#fff;color:#111;font-weight:700">✕ Đóng</button>
+    </div>`;
+  el.onclick = e => { if (e.target === el) el.remove(); };
+  const onKey = e => { if (e.key === 'Escape') { const b = document.getElementById('img-preview-bg'); if (b) b.remove(); document.removeEventListener('keydown', onKey); } };
+  document.addEventListener('keydown', onKey);
+  document.body.appendChild(el);
 };
 window.closeModal = function() {
   const layers = Array.from(document.querySelectorAll('.modal-bg'));

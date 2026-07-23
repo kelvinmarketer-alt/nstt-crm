@@ -549,6 +549,11 @@ Mong quý khách thu xếp thanh toán sớm. Cảm ơn!
     );
     const accounts = window.STORE.get('paymentAccounts', []).filter(a => a.active);
     const accOpts = accounts.map(a => `<option>${a.name}</option>`).join('') || '<option>Tiền mặt</option>';
+    /* Nợ theo kỳ → chỉ hiện kỳ đang nợ, chọn kỳ tự điền số tiền. Fallback (không tách được kỳ) = kỳ hôm nay + tổng nợ. */
+    const perDebts = _custPeriodDebts(c);
+    const hasPer = perDebts.length > 0;
+    const defPeriod = hasPer ? perDebts[0].key : _periodKeyOf(_todayD());
+    const defAmt = hasPer ? perDebts[0].amount : (+c.debt || 0);
 
     const invHtml = custInvoices.length ? custInvoices.map(i => {
       const total = (i.net || 0) + (i.vat || 0);
@@ -579,7 +584,7 @@ Mong quý khách thu xếp thanh toán sớm. Cảm ơn!
         <div><label>Ngày thu</label><input id="rDate" type="date" value="${new Date().toISOString().slice(0,10)}"></div>
       </div>
       <div class="form-row">
-        <div><label>Số tiền thu *</label><input id="rAmount" type="number" value="${c.debt}" oninput="window.checkOverpay(${c.debt})"></div>
+        <div><label>Số tiền thu *</label><input id="rAmount" type="number" value="${defAmt}" oninput="window.checkOverpay(${c.debt})"></div>
         <div><label>TK nhận</label>
           <select id="rAccount">${accOpts}</select></div>
       </div>
@@ -588,8 +593,10 @@ Mong quý khách thu xếp thanh toán sớm. Cảm ơn!
       </div>
       <div class="form-row wide">
         <label>Thanh toán cho kỳ công nợ nào? *</label>
-        <select id="rPeriod">${_periodOptions(_periodKeyOf(_todayD()))}</select>
-        <div style="font-size:11.5px;color:var(--muted);margin-top:3px">Phiếu sẽ ghi nhận vào ĐÚNG kỳ này ở bảng công nợ (dù ngày thu thực nằm kỳ khác). VD thu ngày 20 nhưng trả cho Kỳ 1 → chọn Kỳ 1.</div>
+        <select id="rPeriod" onchange="window.rPeriodChanged()">${hasPer ? _periodOptionsForDebts(perDebts, defPeriod) : _periodOptions(defPeriod)}</select>
+        <div style="font-size:11.5px;color:var(--muted);margin-top:3px">${hasPer
+          ? 'Chỉ hiện <b>kỳ đang nợ</b>. Chọn kỳ → tự điền đúng <b>số tiền nợ của kỳ đó</b> (sửa lại được nếu thu một phần).'
+          : 'Không tách được nợ theo kỳ (nợ cũ / chưa gắn đơn) — chọn kỳ áp vào rồi nhập số tiền thủ công.'}</div>
       </div>
       <div class="form-row wide">
         <label>Diễn giải</label>
@@ -704,6 +711,37 @@ Mong quý khách thu xếp thanh toán sớm. Cảm ơn!
     if (sel && !list.includes(sel)) list.unshift(sel);
     return list.map(k => `<option value="${k}" ${k === sel ? 'selected' : ''}>${_periodLabel(k)}</option>`).join('');
   }
+  /* Nợ theo TỪNG KỲ của 1 KH: charge (đơn ĐÃ GIAO, theo kỳ ngày giao) − payment (theo kỳ áp vào).
+     Trả mảng {key, amount} các kỳ CÒN NỢ (>0), cũ→mới → phiếu thu chỉ hiện kỳ đang nợ + auto số tiền. */
+  function _custPeriodDebts(c) {
+    const norm = s => String(s || '').trim().toLowerCase();
+    const byP = {}; const add = (k, v) => { if (k) byP[k] = (byP[k] || 0) + v; };
+    (window.STORE.get('orders', []) || []).forEach(o => {
+      const mine = (o.cust != null && String(o.cust) === String(c.id)) || (o.custName && norm(o.custName) === norm(c.name));
+      if (!mine) return;
+      if (!(window.orderDelivered && window.orderDelivered(o))) return;
+      const iso = window.orderDeliverISO ? window.orderDeliverISO(o) : '';
+      if (!iso) return;
+      add(_periodKeyOf(new Date(iso + 'T00:00:00')), +o.freight || 0);
+    });
+    ((window.getDebtLedger ? window.getDebtLedger(c.id) : []) || []).forEach(e => {
+      if (e.type !== 'payment') return;
+      const k = /^\d{4}-\d{2}-[12]$/.test(e.payPeriod || '') ? e.payPeriod : _periodKeyOf(new Date(_payDateISO(e.date) + 'T00:00:00'));
+      add(k, -(+e.amount || 0));
+    });
+    return Object.keys(byP).filter(k => byP[k] > 0.5).sort().map(k => ({ key: k, amount: Math.round(byP[k]) }));
+  }
+  function _periodOptionsForDebts(perDebts, sel) {
+    return perDebts.map(p => `<option value="${p.key}" data-amt="${p.amount}" ${p.key === sel ? 'selected' : ''}>${_periodLabel(p.key)} — nợ ${window.fmt(p.amount)}₫</option>`).join('');
+  }
+  /* Chọn kỳ → tự điền số tiền = nợ của kỳ đó. */
+  window.rPeriodChanged = function () {
+    const sel = document.getElementById('rPeriod'); if (!sel) return;
+    const opt = sel.options[sel.selectedIndex]; if (!opt) return;
+    const amt = +opt.getAttribute('data-amt') || 0;
+    const aEl = document.getElementById('rAmount');
+    if (aEl && amt > 0) { aEl.value = amt; if (window.checkOverpay) window.checkOverpay(amt); }
+  };
   function _payDateISO(ddmmyyyy) {
     const m = String(ddmmyyyy || '').match(/(\d{1,2})\/(\d{1,2})\/(\d{4})/);
     if (m) return `${m[3]}-${String(m[2]).padStart(2, '0')}-${String(m[1]).padStart(2, '0')}`;
