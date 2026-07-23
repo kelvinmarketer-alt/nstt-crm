@@ -197,7 +197,7 @@
       return `<div class="ght-item">
         <div class="ght-row">
           <div class="ght-info"><b>${esc(it.name || it.id)}</b><div class="ght-sub">đã giao ${fmt(it.qty || 0)} ${unit}${it.price ? ` · ${fmt(it.price)}₫/${unit}` : ''}</div></div>
-          <input type="number" class="ght-q" data-i="${i}" min="0" max="${it.qty || 0}" step="0.1" value="0" placeholder="0" oninput="window._ghToggleDetail(${i})">
+          <input type="number" class="ght-q" data-i="${i}" min="0" max="${it.qty || 0}" step="0.1" value="" placeholder="0" inputmode="decimal" oninput="window._ghToggleDetail(${i})">
           <span class="ght-unit">${unit}</span>
         </div>
         <div class="ght-detail" id="ghtD${i}" style="display:none">

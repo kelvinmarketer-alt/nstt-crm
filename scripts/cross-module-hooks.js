@@ -210,9 +210,14 @@
             const ref = r.id || r.orderCode;
             if (!mvHas(ref, 'return')) {
               (r.items || []).forEach(it => {
+                /* CHỈ cộng lại kho hàng THỰC SỰ về kho: đánh dấu restock, hoặc hàng đẹp (cond='good').
+                   Bỏ qua hàng TRẢ NCC / VỨT BỎ. Phiếu cũ (không có cond & restock) → theo r.disposition. */
+                const toWarehouse = (it.restock === true) || (it.cond === 'good')
+                  || (it.cond == null && it.restock == null && r.disposition === 'restock');
+                if (!toWarehouse) return;
                 let pid = it.productId || it.id;
                 if (!pid && it.name) {
-                  const p = products.find(x => (x.name||'').toLowerCase() === (it.name||'').toLowerCase());
+                  const p = products.find(x => (x.name||'').trim().toLowerCase() === (it.name||'').trim().toLowerCase());
                   pid = p ? p.id : null;
                 }
                 if (pid) {

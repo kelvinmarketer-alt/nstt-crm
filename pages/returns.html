@@ -603,26 +603,19 @@
 
     const msgs = [];
 
-    /* 1) Nhập lại kho theo TÌNH TRẠNG từng SP: hàng ĐẸP (cond='good') → +kho; hàng XẤU → bỏ (trả NCC).
-       Phiếu tay cũ không có cond → theo r.disposition chung. */
+    /* 1) Nhập lại kho: NGUỒN DUY NHẤT là hook applyReturnInv (cross-module-hooks) — idempotent + ghi sổ
+       biến động, và CHỈ cộng hàng đẹp/lưu-kho (restock). Ở ĐÂY KHÔNG mutate kho (tránh cộng ĐÔI),
+       chỉ báo cho người dùng + CẢNH BÁO mặt hàng chưa gán SP danh mục (không cộng được tồn). */
     if (rItems.length) {
-      const inv = window.STORE.get('inventory', []) || [];
-      let anyRestock = false;
-      rItems.forEach((ri, k) => {
-        /* Nhập lại kho khi: hàng ĐẸP, HOẶC NCC không cho trả nhưng chọn "lưu kho bán tiếp" (restock=true) */
-        const isGood = (ri.restock === true) || (ri.cond ? ri.cond === 'good' : (r.disposition === 'restock'));
-        if (!isGood || !ri.id || !(ri.qty > 0)) return;
-        let item = inv.find(x => x.productId === ri.id);
-        if (!item) {
-          item = { id:'INV'+Math.floor(performance.now()).toString(36)+k, productId:ri.id, stock:0, minStock:10, maxStock:100, avgDaily:5, lastIn:'', lastOut:'', location:'Kho A1' };
-          inv.push(item);
-        }
-        item.stock = Math.max(0, (item.stock||0) + ri.qty);
-        item.lastIn = r.date;
-        anyRestock = true;
-        msgs.push(`+${ri.qty}${ri.unit||'kg'} ${ri.name} vào kho`);
+      const _prods = window.STORE.get('products', []) || [];
+      rItems.forEach(ri => {
+        const toWh = (ri.restock === true) || (ri.cond ? ri.cond === 'good' : (r.disposition === 'restock'));
+        if (!toWh || !(ri.qty > 0)) return;
+        let pid = ri.id;
+        if (!pid && ri.name) { const p = _prods.find(x => (x.name || '').trim().toLowerCase() === (ri.name || '').trim().toLowerCase()); pid = p ? p.id : null; }
+        if (pid) msgs.push(`+${ri.qty}${ri.unit || 'kg'} ${ri.name} về kho`);
+        else msgs.push(`⚠ "${ri.name}" chưa gán SP danh mục → KHÔNG cộng được tồn`);
       });
-      if (anyRestock) window.STORE.set('inventory', inv);
     }
 
     /* 2) Giải quyết theo CÁCH XỬ LÝ */
