@@ -178,8 +178,9 @@
     });
 
     /* Update KPI strip với số liệu sản lượng ngày */
+    const _okg = o => (o.items || []).reduce((ss, it) => ss + (window.kgOfItem ? (window.kgOfItem(it) || 0) : (String(it.unit || 'kg').toLowerCase() === 'kg' ? (+it.qty || 0) : 0)), 0);
     const totalKgToday = todayOrders.filter(o => o.status === 'delivered' || o.status === 'reconciled')
-      .reduce((s,o) => s + (o.items||[]).reduce((ss,it) => ss + (+it.qty||0), 0), 0);
+      .reduce((s,o) => s + _okg(o), 0);
     const totalRevToday = todayOrders.filter(o => o.status === 'delivered' || o.status === 'reconciled')
       .reduce((s,o) => s + (o.freight||0), 0);
     /* Update kpi cuối với sản lượng kg */
@@ -216,7 +217,7 @@
       /* Sản lượng kg hôm nay của shipper này */
       const myKgToday = todayOrders
         .filter(o => o.driver === s.id && (o.status === 'delivered' || o.status === 'reconciled'))
-        .reduce((sum, o) => sum + (o.items||[]).reduce((ss, it) => ss + (+it.qty||0), 0), 0);
+        .reduce((sum, o) => sum + _okg(o), 0);
       const myRevToday = todayOrders
         .filter(o => o.driver === s.id && (o.status === 'delivered' || o.status === 'reconciled'))
         .reduce((sum, o) => sum + (o.freight||0), 0);
@@ -362,7 +363,11 @@
       (o.date || '').startsWith(TODAY_VI) &&
       o.status !== 'cancelled'
     );
-    const totalQty = myOrders.reduce((sum, o) => sum + (o.qty || 0), 0);
+    const _okg2 = o => (+o.weight > 0) ? +o.weight
+      : (Array.isArray(o.items) && o.items.length
+          ? o.items.reduce((ss, it) => ss + (window.kgOfItem ? (window.kgOfItem(it) || 0) : (String(it.unit || 'kg').toLowerCase() === 'kg' ? (+it.qty || 0) : 0)), 0)
+          : (+o.qty || 0));
+    const totalQty = myOrders.reduce((sum, o) => sum + _okg2(o), 0);
     const totalRev = myOrders.reduce((sum, o) => sum + (o.freight || 0), 0);
     const totalCod = myOrders.reduce((sum, o) => sum + (o.cod || 0), 0);
     const rowsHtml = myOrders.length ? myOrders.map((o, i) => {

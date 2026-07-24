@@ -145,7 +145,7 @@
     const byProd = {};
     monthOrders.forEach(o => (o.items || []).forEach(it => {
       const k = it.id || it.name;
-      const b = byProd[k] || (byProd[k] = { name: it.name, qty: 0, rev: 0 });
+      const b = byProd[k] || (byProd[k] = { name: it.name, qty: 0, rev: 0, unit: it.unit || 'kg' });
       b.qty += (it.qty || 0);
       b.rev += (it.total || 0);
     }));
@@ -239,7 +239,7 @@
       tp.innerHTML = k.topProducts.map((p, i) => `<div class="mini-row" onclick="window.location.href='products.html'">
         <div style="font-weight:800;color:var(--muted);width:18px;text-align:center;font-size:12px">${i + 1}</div>
         <div style="font-size:18px">${i === 0 ? '🥇' : i === 1 ? '🥈' : i === 2 ? '🥉' : '🥬'}</div>
-        <div class="lbl"><div class="n1">${p.name}</div><div class="n2">${window.fmt(p.qty)}kg đã bán</div></div>
+        <div class="lbl"><div class="n1">${p.name}</div><div class="n2">${window.fmt(p.qty)} ${p.unit || 'kg'} đã bán</div></div>
         <div class="v">${window.fmt(p.rev)} ₫</div>
       </div>`).join('') || `<div style="padding:20px;text-align:center;color:var(--muted)">Chưa có dữ liệu.</div>`;
     }

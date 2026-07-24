@@ -60,7 +60,7 @@
   }
 
   function pendingCard(p) {
-    const kg = (p.items || []).reduce((s, it) => s + (+it.qty || 0), 0);
+    const kg = (p.items || []).reduce((s, it) => s + (window.kgOfItem ? (window.kgOfItem(it) || 0) : (String(it.unit || 'kg').toLowerCase() === 'kg' ? (+it.qty || 0) : 0)), 0);
     const empty = !(p.items || []).length;
     const _srch = esc((supName(p.supplierId) + ' ' + (p.items || []).map(x => x.name || '').join(' ') + ' ' + p.id).toLowerCase());
     const open = empty || _nhOpen.has(p.id);   /* phiếu trống mở sẵn (để thấy nút thêm); còn lại gập cho gọn */

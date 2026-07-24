@@ -223,7 +223,7 @@
              giống trang Đơn hàng. Đơn vừa tạo (còn items trong RAM) thì dùng items. */
           const hasItems = Array.isArray(o.items) && o.items.length;
           const nItems = hasItems ? o.items.length : (o.goods || '').split(',').filter(s => s.trim()).length;
-          const kg = hasItems ? o.items.reduce((s, it) => s + (+it.qty || 0), 0) : (+o.weight || 0);
+          const kg = hasItems ? o.items.reduce((s, it) => s + (window.kgOfItem ? (window.kgOfItem(it) || 0) : (String(it.unit || 'kg').toLowerCase() === 'kg' ? (+it.qty || 0) : 0)), 0) : (+o.weight || 0);
           html += `<div class="ord-pick ${picked.has(o.code) ? 'sel' : ''}" data-code="${o.code}" onclick="window.pcTogglePick('${o.code}')">
             <input type="checkbox" ${picked.has(o.code) ? 'checked' : ''} style="width:16px;height:16px;pointer-events:none">
             <div style="flex:1;min-width:0">
@@ -1373,7 +1373,7 @@ tbody tr:nth-child(even){background:#F4FAF2}tfoot td{background:#E8F5E9;font-wei
       orders.map(o => {
         /* Danh sách đơn không kéo items → kg từ `weight`, mã từ `goods` (đơn đã chốt) */
         const hasItems = Array.isArray(o.items) && o.items.length;
-        const kg = hasItems ? o.items.reduce((s, it) => s + (+it.qty || 0), 0) : (+o.weight || 0);
+        const kg = hasItems ? o.items.reduce((s, it) => s + (window.kgOfItem ? (window.kgOfItem(it) || 0) : (String(it.unit || 'kg').toLowerCase() === 'kg' ? (+it.qty || 0) : 0)), 0) : (+o.weight || 0);
         const nMa = hasItems ? o.items.length : (o.goods || '').split(',').filter(s => s.trim()).length;
         const hasShort = o.shortages && o.shortages.length;
         return `<div class="run-card" style="cursor:default">
