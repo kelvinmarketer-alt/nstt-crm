@@ -89,7 +89,7 @@ window.PRODUCT_CATEGORIES = [
   },
   {
     "id": "do-kho",
-    "label": "Đồ khô",
+    "label": "Đồ Khô",
     "icon": "🥫",
     "color": "#B45309"
   }
