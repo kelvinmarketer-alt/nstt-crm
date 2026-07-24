@@ -38,6 +38,19 @@
     .pod-search-btn{flex:1 1 100%!important;width:100%!important;white-space:nowrap;text-align:center}
   }
   .ret-xs{display:none}
+  /* Accordion gom theo ngày */
+  .ret-item{display:none}
+  .ret-item.show{display:table-row}
+  .ret-day{background:#F8FAF8;cursor:pointer}
+  .ret-day:hover{background:#F1F5F9}
+  .ret-day td{padding:11px 14px!important;font-weight:700;color:var(--navy);border-top:2px solid var(--line)}
+  .ret-day .cr{display:inline-block;width:14px;color:var(--muted)}
+  @media (max-width:560px){
+    .ret-card .ret-item{display:none}
+    .ret-card .ret-item.show{display:block}
+    .ret-card .ret-day{display:block;background:#EAF5EA;border:none!important;border-radius:8px;margin:8px 0 6px;padding:0;cursor:pointer}
+    .ret-card .ret-day td{display:block;padding:10px 12px!important;border-top:none}
+  }
 </style>
 </head>
 <body>
@@ -181,7 +194,8 @@
     if (!list.length) { tb.innerHTML = `<tr><td colspan="${nCols}" style="padding:30px;text-align:center;color:var(--muted)">Chưa có đơn trả nào — tốt!</td></tr>`; _retRefreshBar(); return; }
     const stLab = {pending:'⏳ Chờ xử lý', refunded:'✓ Đã hoàn', replaced:'🔄 Đổi hàng', rejected:'✕ Từ chối'};
     const stClr = {pending:'#92400E', refunded:'#15803D', replaced:'#1E40AF', rejected:'#B91C1C'};
-    tb.innerHTML = list.slice().reverse().map(r => `<tr onclick="window.viewReturn('${r.id}')" style="border-top:1px solid #F1F5F9;cursor:pointer" title="Bấm để xem chi tiết phiếu trả">
+    const _dk = d => { const m = String(d || '').match(/(\d{1,2})\/(\d{1,2})\/(\d{4})/); return m ? (m[3] + m[2].padStart(2, '0') + m[1].padStart(2, '0')) : '00000000'; };
+    const rowHtml = r => `<tr class="ret-item ret-d${_dk(r.date)}" onclick="window.viewReturn('${r.id}')" style="border-top:1px solid #F1F5F9;cursor:pointer" title="Bấm để xem chi tiết phiếu trả">
       ${admin ? `<td class="ret-adm-col hide-xs" style="text-align:center;padding:10px 6px;width:34px"><input type="checkbox" class="ret-chk" ${_retSel.has(r.id) ? 'checked' : ''} onclick="event.stopPropagation();window.retToggle('${r.id}',this.checked)"></td>` : ''}
       <td data-field="title" style="padding:10px"><span style="color:var(--navy);font-weight:700">${r.id}</span></td>
       <td class="hide-xs" style="padding:10px"><a href="orders.html?open=${encodeURIComponent(r.orderCode)}" onclick="event.stopPropagation()" style="color:var(--navy)" title="Mở chi tiết đơn">${r.orderCode} ↗</a></td>
@@ -204,8 +218,28 @@
       }</td>
       <td class="hide-xs" style="padding:10px"><span style="background:${stClr[r.status]}1f;color:${stClr[r.status]};padding:2px 8px;border-radius:99px;font-size:11px;font-weight:700">${stLab[r.status]}</span></td>
       <td class="hide-xs" style="padding:10px">${r.status==='pending' ? ((r.resolution && r.resolution.startsWith('replace')) ? `<button class="btn btn-ghost btn-sm" onclick="event.stopPropagation();window.processReturn('${r.id}', true)" title="Bù hàng — tạo đơn giao bù">✓ Xử lý</button>` : `<button class="btn btn-ghost btn-sm" onclick="event.stopPropagation();window.approveShipReturn('${r.id}')" title="Duyệt: xem chi tiết + trừ hoá đơn KH + nợ NCC">✓ Duyệt</button>`) : ''}</td>
-    </tr>`).join('');
+    </tr>`;
+    /* Gom theo NGÀY — accordion (ngày mới nhất mở sẵn); bấm header ngày để xổ/gập cho gọn. */
+    const _byDay = {};
+    list.slice().reverse().forEach(r => { const k = _dk(r.date); (_byDay[k] = _byDay[k] || { date: r.date, items: [] }).items.push(r); });
+    const _keys = Object.keys(_byDay).sort().reverse();
+    tb.innerHTML = _keys.map((k, di) => {
+      const g = _byDay[k], open = di === 0;
+      const tot = g.items.reduce((s, r) => s + ((r.resolution && r.resolution.startsWith('replace')) ? 0 : (+r.refundTotal || 0)), 0);
+      const dayRow = `<tr class="ret-day${open ? ' open' : ''}" onclick="window.retToggleDay('${k}')"><td colspan="${nCols}"><span class="cr">${open ? '▾' : '▸'}</span> 📅 ${_esc0(g.date)} <span style="font-weight:600;color:var(--muted);font-size:12px">· ${g.items.length} phiếu · hoàn ${window.fmt(tot)}₫</span></td></tr>`;
+      const items = g.items.map(r => rowHtml(r).replace('class="ret-item ', `class="ret-item ${open ? 'show ' : ''}`)).join('');
+      return dayRow + items;
+    }).join('');
+    _retRefreshBar();
   }
+  /* Xổ/gập 1 ngày trong danh sách trả hàng */
+  window.retToggleDay = function (k) {
+    const hd = document.querySelector(`.ret-day[onclick*="'${k}'"]`);
+    if (hd) hd.classList.toggle('open');
+    const opened = hd && hd.classList.contains('open');
+    const cr = hd && hd.querySelector('.cr'); if (cr) cr.textContent = opened ? '▾' : '▸';
+    document.querySelectorAll('.ret-d' + k).forEach(r => r.classList.toggle('show', opened));
+  };
 
   const _esc0 = s => String(s == null ? '' : s).replace(/</g, '&lt;');
 
