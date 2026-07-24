@@ -522,7 +522,7 @@
         <div style="opacity:.9;font-size:12px;margin-top:3px">${run.orderCodes.length} đơn · ${run.lines.length} mã hàng · ${fmtQty(totalKg)} kg · ${nSup} NCC</div>
       </div>
       <div class="pc-dtabs" style="display:flex;gap:0;background:#F1F5F9;position:sticky;top:0;z-index:8">
-        <button class="pc-dtab${_pcDetailTab === 'assign' ? ' on' : ''}" data-dtab="assign" onclick="window.pcDetailTab('assign')">🧮 Gán NCC theo mã${nIncomplete ? `<span class="b" style="background:#FEF3C7;color:#B45309">${nIncomplete} thiếu</span>` : ''}</button>
+        <button class="pc-dtab${_pcDetailTab === 'assign' ? ' on' : ''}" data-dtab="assign" onclick="window.pcDetailTab('assign')">🧮 Chọn NCC cho các mã hàng${nIncomplete ? `<span class="b" style="background:#FEF3C7;color:#B45309">${nIncomplete} thiếu</span>` : ''}</button>
         <button class="pc-dtab${_pcDetailTab === 'order' ? ' on' : ''}" data-dtab="order" onclick="window.pcDetailTab('order')">📞 Gọi hàng<span class="b" style="background:#DCFCE7;color:#15803D">${nSup}</span>${nExt ? `<span class="b" style="background:#FEF3C7;color:#B45309">🛒${nExt}</span>` : ''}</button>
       </div>
       <div style="padding:14px 18px">
@@ -704,7 +704,7 @@
     }
 
     /* Pane Đặt hàng rỗng (chưa gán NCC + không có mã mua ngoài) → nhắc sang tab Gán NCC */
-    if (!nSup && !extData.lines.length) body += `<div style="padding:24px;text-align:center;color:var(--muted);font-size:12.5px">Chưa gán NCC cho mã nào.<br>Sang tab <b>🧮 Gán NCC theo mã</b> để chọn NCC → phần đặt hàng sẽ hiện ở đây.</div>`;
+    if (!nSup && !extData.lines.length) body += `<div style="padding:24px;text-align:center;color:var(--muted);font-size:12.5px">Chưa gán NCC cho mã nào.<br>Sang tab <b>🧮 Chọn NCC cho các mã hàng</b> để chọn NCC → phần đặt hàng sẽ hiện ở đây.</div>`;
     body += `</div>`;   /* đóng pane "Đặt hàng NCC" */
 
     if (_isDoneRun(run)) {
@@ -1205,8 +1205,8 @@
     const top = window.top || window;
     try { top.sessionStorage.setItem('pn_prefill_items', JSON.stringify(items)); }
     catch (e) { try { sessionStorage.setItem('pn_prefill_items', JSON.stringify(items)); } catch (e2) {} }
-    try { top.location.href = 'finance.html?tab=pur&createForSup=EXT-MARKET'; }
-    catch (e) { location.href = 'finance.html?tab=pur&createForSup=EXT-MARKET'; }
+    try { top.location.href = 'purchases.html?createForSup=EXT-MARKET'; }
+    catch (e) { location.href = 'purchases.html?createForSup=EXT-MARKET'; }
   };
   window.pcPrintExtReq = function (runId) {
     const run = getRuns().find(r => r.id === runId); if (!run) return;

@@ -34,8 +34,7 @@
       <div class="tabs2">
         <div class="t2 active" data-fin="accounting" onclick="window.finTab('accounting')">💰 Kế toán</div>
         <div class="t2" data-fin="debt" onclick="window.finTab('debt')" title="Công cụ THU HỒI nợ (tuổi nợ, gọi/Zalo nhắc, NV phụ trách). Báo cáo tổng hợp xem ở 'Công nợ tổng hợp (CFO)'.">📞 Đòi nợ</div>
-        <div class="t2" data-fin="invoices" onclick="window.finTab('invoices')">🧾 Hóa đơn</div>
-        <div class="t2" data-fin="pur" onclick="window.finTab('pur')">📦 Phiếu nhập</div>
+        <div class="t2" data-fin="invoices" onclick="window.finTab('invoices')">🧾 Hóa đơn VAT</div>
       </div>
     </div>
     <div class="fin-body">
@@ -53,8 +52,8 @@
 <script>if(window.AUTH) window.AUTH.requireAuth();</script>
 <script>
   if (window.renderAppShell) window.renderAppShell('finance', 'Tài chính');
-  /* Phiếu nhập (kế toán) = tab 'pur' → nhúng purchases.html. extraQS: truyền createForSup từ "Phiếu về" của Gom hàng. */
-  var FIN_FILE = { accounting: 'accounting', debt: 'debt', invoices: 'invoices', pur: 'purchases' };
+  /* Phiếu nhập nay là MENU riêng (purchases.html), không còn là tab trong Tài chính. */
+  var FIN_FILE = { accounting: 'accounting', debt: 'debt', invoices: 'invoices' };
   window.finTab = function (which, extraQS) {
     document.querySelectorAll('.t2').forEach(t => t.classList.toggle('active', t.dataset.fin === which));
     var src = (FIN_FILE[which] || which) + '.html?embed=1';
@@ -67,8 +66,10 @@
   (function () {
     var p = new URLSearchParams(location.search);
     var t = p.get('tab') || 'accounting';
-    if (!['accounting', 'debt', 'invoices', 'pur'].includes(t)) t = 'accounting';
     var cfs = p.get('createForSup');
+    /* Link cũ ?tab=pur (từ "Phiếu về" của Gom hàng) → Phiếu nhập nay là trang riêng */
+    if (t === 'pur') { location.replace('purchases.html' + (cfs ? '?createForSup=' + encodeURIComponent(cfs) : '')); return; }
+    if (!['accounting', 'debt', 'invoices'].includes(t)) t = 'accounting';
     window.finTab(t, cfs ? ('createForSup=' + encodeURIComponent(cfs)) : '');
   })();
 </script>
