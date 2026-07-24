@@ -5,7 +5,7 @@
 
 /* Phiên bản app hiển thị (đối chiếu với CACHE_VERSION trong sw.js) — để user tự XÁC NHẬN
    đang chạy bản mới hay còn kẹt JS cũ (hiện ở góc sidebar + log console). */
-window.APP_VERSION = 'v548';
+window.APP_VERSION = 'v549';
 console.log('%c[NSTT] App ' + window.APP_VERSION, 'color:#339B21;font-weight:bold');
 
 /* Gom NGUỒN khách về 3 nhóm chuẩn: 'mkt' / 'sales' / 'sep-gioi-thieu'.
@@ -1319,7 +1319,7 @@ window.NAV = [
     { id: 'debt-summary', label: 'Công nợ tổng hợp (CFO)', icon: '🧮', href: 'cong-no-tong-hop.html' },
     { id: 'ncc-debt',   label: 'Công nợ NCC',  icon: '🏭', href: 'ncc-cong-no.html' },
     { id: 'finance',    label: 'Tài chính',   icon: '💰', href: 'finance.html', badgeKey: 'debt' },
-    { id: 'purchases',  label: 'Phiếu nhập',  icon: '📦', href: 'purchases.html' },
+    { id: 'purchases',  label: 'Phiếu nhập hàng', icon: '📦', href: 'purchases.html' },
     { id: 'san-luong',  label: 'Sản lượng & doanh thu', icon: '📦', href: 'san-luong.html' },
     /* Ẩn: Loyalty — { id:'loyalty', label:'Loyalty (tích điểm)', icon:'⭐', href:'loyalty.html' }, */
   ]},
