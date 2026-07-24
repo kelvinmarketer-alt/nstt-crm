@@ -54,6 +54,12 @@
     const r = Math.round(n * 100) / 100;
     return r.toLocaleString('vi-VN', { maximumFractionDigits: 2 }) + ' kg';
   }
+  /* Thành tiền 1 dòng — TÍNH THEO THỰC NHẬN nếu ship đã chốt số thực giao,
+     nếu không thì dùng it.total đã lưu (giá×số đặt). Đảm bảo hoá đơn khớp cột "Thực nhận". */
+  function lineAmt(it) {
+    if (it.received != null && it.received !== '') return Math.round((+it.price || 0) * (+it.received || 0));
+    return +it.total || (+it.price || 0) * (+it.qty || 0);
+  }
   function fmtDate(s) {
     if (!s) return new Date().toLocaleDateString('vi-VN').replace(/\//g, '.');
     /* Hỗ trợ dd/mm/yyyy hoặc yyyy-mm-dd hoặc dd-mm-yyyy → dd.mm.yyyy */
@@ -77,7 +83,7 @@
     const comp = getCompany();
     const items = o.items || [];
     const totalRecv = items.reduce((s, it) => s + ((it.received != null && it.received !== '' ? +it.received : +it.qty) || 0), 0);
-    const totalAmt = items.reduce((s, it) => s + (+it.total || (+it.price||0) * (+it.qty||0) || 0), 0);
+    const totalAmt = items.reduce((s, it) => s + lineAmt(it), 0);
     let totalKg = 0, hasKg = false;
     items.forEach(it => { const k = kgConv(it); if (k != null) { totalKg += k; hasKg = true; } });
 
@@ -217,7 +223,7 @@ ${FAV ? `<link rel="icon" type="image/svg+xml" href="${FAV}">` : ''}
         <td class="c">${it.received != null && it.received !== '' ? it.received : (it.qty || '')}</td>
         <td class="c">${fmtKg(kgConv(it))}</td>
         <td class="r">${fmt(it.price)}</td>
-        <td class="r">${fmt(it.total || (+it.price||0)*(+it.qty||0))}</td>
+        <td class="r">${fmt(lineAmt(it))}</td>
         <td class="l" style="font-size:10.5px">${it.note || ''}</td>
       </tr>`).join('') : `<tr><td colspan="8" class="c" style="padding:30px;color:#999">Đơn này chưa có chi tiết sản phẩm.</td></tr>`}
     </tbody>

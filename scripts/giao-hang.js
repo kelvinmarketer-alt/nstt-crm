@@ -91,7 +91,8 @@
         <div class="gh-act-row">
           <button class="gh-btn gh-done" onclick="ghGiaoXong('${esc(o.code)}')">✅ Giao xong</button>
           <button class="gh-btn gh-ret" onclick="ghBaoTra('${esc(o.code)}')">↩️ Trả</button>
-        </div>`;
+        </div>
+        <button class="gh-btn gh-lech" onclick="ghBaoLech('${esc(o.code)}')" title="Giao thừa/thiếu số, hoặc giao nhầm sản phẩm — điều chỉnh hoá đơn theo thực giao">⚠️ Lệch (thừa / nhầm)</button>`;
     return `<div class="gh-row${claimable ? ' gh-unclaimed' : ''}">
       <div class="gh-main">
         <div class="gh-title"><span class="gh-code">#${esc(o.code)}</span><b class="gh-cust">${cust}</b>${claimable ? '<span class="gh-flag">chưa ai nhận</span>' : ''}</div>
@@ -269,6 +270,150 @@
     if (window.sendTgMessage) {
       const lines = picked.length ? picked.map(x => `• ${x.name}: ${x.qty}${x.unit} (${x.cond === 'good' ? 'đẹp' : 'xấu'})${x.note ? ' — ' + x.note : ''}`).join('\n') : '• (toàn bộ đơn)';
       window.sendTgMessage('alert', `↩️ PHIẾU TRẢ HÀNG (chờ duyệt)\n📦 ${T.code} · ${T.custName}\n${lines}\n👉 Kế toán duyệt ở module Trả hàng.`);
+    }
+    render();
+  };
+
+  /* ===== SHIP: Báo LỆCH → giao thừa/thiếu (sửa thực giao) + giao nhầm SP (thu hồi) + SP giao bù =====
+     Tính tiền THEO THỰC GIAO: cập nhật it.received + it.total = giá×thực_giao → hoá đơn & công nợ tự đúng. */
+  window.ghBaoLech = async function (code) {
+    const o = ordByCode(code); if (!o) return;
+    let items = Array.isArray(o.items) ? o.items.slice() : [];
+    if (!items.length && window.SB_DATA && window.SB_DATA.getOrderItems) {
+      try { const its = await window.SB_DATA.getOrderItems(code); if (Array.isArray(its)) items = its; } catch (e) {}
+    }
+    window._ghLech = { code, items, custName: o.custName || '', cust: o.cust || o.custId || '' };
+    const rows = items.length ? items.map((it, i) => {
+      const unit = esc(it.unit || 'kg');
+      const q = +it.qty || 0;
+      const cur = (it.received != null && it.received !== '') ? it.received : q;
+      return `<div class="ghl-item" id="ghlIt${i}">
+        <div class="ghl-top">
+          <div class="ghl-info"><b>${esc(it.name || it.id)}</b>
+            <div class="ghl-sub">đặt ${fmt(q)} ${unit}${it.price ? ` · ${fmt(it.price)}₫/${unit}` : ''}</div>
+          </div>
+          <input type="number" class="ghl-q" data-i="${i}" data-order="${q}" data-price="${+it.price || 0}" min="0" step="0.1" value="${cur}" inputmode="decimal" oninput="window._ghLechDiff(${i})">
+          <span class="ghl-unit">${unit}</span>
+          <label class="ghl-wrongwrap"><input type="checkbox" class="ghl-wrong" data-i="${i}" onchange="window._ghLechWrong(${i})">nhầm</label>
+        </div>
+        <div class="ghl-diff" id="ghlDf${i}"></div>
+        <select class="ghl-disp" data-i="${i}" id="ghlDp${i}" style="display:none">
+          <option value="restock">🏬 SP giao nhầm → thu về NHẬP LẠI KHO</option>
+          <option value="supplier">↩️ SP giao nhầm → TRẢ NCC (hàng lỗi)</option>
+        </select>
+      </div>`;
+    }).join('') : `<div style="color:#B45309;font-size:12.5px;padding:8px 0">Đơn chưa tải chi tiết mặt hàng — không sửa lệch được. Thử lại sau.</div>`;
+    window.openModal('⚠️ Báo lệch giao — #' + esc(code), `
+      <div style="font-size:12.5px;color:var(--muted);margin-bottom:10px">Khách: <b>${esc(o.custName || '')}</b>. Sửa ô <b>số thực giao</b> cho khách (thừa/thiếu) → hoá đơn tự tính lại theo số này. Tick <b style="color:#B91C1C">nhầm</b> nếu giao <b>sai sản phẩm</b> (thu hồi về, không tính tiền).</div>
+      <div id="ghLechList">${rows}</div>
+      <div class="ghl-addhead">➕ SP giao bù / phát sinh (khách lấy thêm SP ngoài đơn)</div>
+      <div id="ghLechAdd"></div>
+      <button class="btn btn-ghost btn-sm" onclick="window._ghLechAddRow()" style="margin-top:6px">➕ Thêm 1 dòng SP</button>
+    `, {
+      width: '540px',
+      footer: `<button class="btn btn-ghost" onclick="window.closeModal()">Huỷ</button>
+               <button class="btn" style="background:#7C3AED;color:#fff;border-color:#7C3AED" onclick="window._ghConfirmLech()">💾 Lưu lệch → cập nhật hoá đơn</button>`
+    });
+    items.forEach((_, i) => window._ghLechDiff(i));
+  };
+  window._ghLechDiff = function (i) {
+    const inp = document.querySelector(`.ghl-q[data-i="${i}"]`); if (!inp) return;
+    const df = document.getElementById('ghlDf' + i); if (!df) return;
+    const ordered = +inp.getAttribute('data-order') || 0;
+    const v = parseFloat(inp.value);
+    if (isNaN(v) || v === ordered) { df.textContent = ''; return; }
+    const d = Math.round((v - ordered) * 100) / 100;
+    df.innerHTML = d > 0
+      ? `<span style="color:#15803D">▲ Giao THỪA +${fmt(d)} → cộng tiền vào hoá đơn</span>`
+      : `<span style="color:#EA580C">▼ Giao THIẾU ${fmt(d)} → trừ tiền hoá đơn</span>`;
+  };
+  window._ghLechWrong = function (i) {
+    const chk = document.querySelector(`.ghl-wrong[data-i="${i}"]`);
+    const inp = document.querySelector(`.ghl-q[data-i="${i}"]`);
+    const dp = document.getElementById('ghlDp' + i);
+    const item = document.getElementById('ghlIt' + i);
+    const df = document.getElementById('ghlDf' + i);
+    const on = chk && chk.checked;
+    if (dp) dp.style.display = on ? 'block' : 'none';
+    if (inp) { inp.disabled = on; if (on) inp.value = 0; else inp.value = inp.getAttribute('data-order') || 0; }
+    if (item) item.classList.toggle('wrong', !!on);
+    if (df) df.innerHTML = on ? '<span style="color:#B91C1C">✖ Giao NHẦM — thu hồi về, không tính tiền khách</span>' : '';
+  };
+  window._ghLechAddRow = function () {
+    const host = document.getElementById('ghLechAdd'); if (!host) return;
+    const div = document.createElement('div');
+    div.className = 'ghl-addrow';
+    div.innerHTML = `<input class="ghl-add-name" placeholder="Tên SP giao thêm" style="flex:2">
+      <input class="ghl-add-q" type="number" min="0" step="0.1" placeholder="SL" inputmode="decimal" style="flex:0 0 62px;text-align:right">
+      <input class="ghl-add-u" placeholder="đvt" value="kg" style="flex:0 0 52px">
+      <input class="ghl-add-p" type="number" min="0" step="100" placeholder="giá" inputmode="numeric" style="flex:0 0 82px;text-align:right">
+      <button class="btn btn-ghost btn-sm" onclick="this.parentNode.remove()" title="Xoá dòng" style="flex:0 0 auto;color:#DC2626">✕</button>`;
+    host.appendChild(div);
+  };
+  window._ghConfirmLech = function () {
+    const T = window._ghLech; if (!T) return;
+    const items = T.items.map(it => Object.assign({}, it));
+    const recovered = [];
+    let changed = false;
+    items.forEach((it, i) => {
+      const price = +it.price || 0;
+      const ordered = +it.qty || 0;
+      const wrong = (document.querySelector(`.ghl-wrong[data-i="${i}"]`) || {}).checked;
+      if (wrong) {
+        const disp = (document.getElementById('ghlDp' + i) || {}).value || 'restock';
+        it.received = 0; it.total = 0;
+        it.note = ((it.note || '') + ` [giao nhầm — thu về ${disp === 'supplier' ? 'NCC' : 'kho'}]`).trim();
+        recovered.push({ id: it.id, name: it.name, unit: it.unit || 'kg', qty: ordered, price, cond: disp === 'supplier' ? 'bad' : 'good', note: 'giao nhầm SP' });
+        changed = true;
+      } else {
+        const inp = document.querySelector(`.ghl-q[data-i="${i}"]`);
+        const v = inp ? parseFloat(inp.value) : NaN;
+        const recv = isNaN(v) ? ordered : Math.max(0, v);
+        it.received = recv;
+        it.total = Math.round(recv * price);
+        if (recv !== ordered) { it.note = ((it.note || '') + ` [lệch: đặt ${ordered}→giao ${recv}]`).trim(); changed = true; }
+      }
+    });
+    const added = [];
+    document.querySelectorAll('#ghLechAdd .ghl-addrow').forEach(r => {
+      const nm = (r.querySelector('.ghl-add-name') || {}).value;
+      const q = parseFloat((r.querySelector('.ghl-add-q') || {}).value) || 0;
+      if (!nm || !nm.trim() || q <= 0) return;
+      const u = ((r.querySelector('.ghl-add-u') || {}).value || 'kg').trim() || 'kg';
+      const p = parseFloat((r.querySelector('.ghl-add-p') || {}).value) || 0;
+      const it = { id: '', name: nm.trim(), unit: u, qty: q, received: q, price: p, total: Math.round(q * p), addedByShip: true, note: '[SP giao bù/phát sinh]' };
+      if (p <= 0) it.priceConfirmed = false;   /* kế toán xác nhận giá sau */
+      items.push(it); added.push(it); changed = true;
+    });
+    if (!changed) { window.toast && window.toast('Chưa có thay đổi nào để lưu', 'info'); return; }
+    const freight = items.reduce((s, x) => s + (+x.total || 0), 0);
+    S().update('orders', T.code, { items, freight });
+    /* SP giao nhầm → tạo phiếu thu hồi (như Báo trả) cho kế toán/kho xử lý, KHÔNG hoàn tiền khách (refundTotal=0) */
+    if (recovered.length) {
+      const anyBad = recovered.some(x => x.cond === 'bad');
+      const rec = {
+        id: (function () { const rs = window.STORE.get('returns', []) || []; let mx = 0; rs.forEach(r => { const m = String(r.id || '').match(/^TH0*(\d+)$/); if (m) mx = Math.max(mx, +m[1]); }); return 'TH' + String(mx + 1).padStart(4, '0'); })(),
+        orderCode: T.code, custId: T.cust, custName: T.custName,
+        date: (window.viToday ? window.viToday() : new Date().toLocaleDateString('vi-VN')),
+        items: recovered,
+        item: recovered[0] ? { id: recovered[0].id, name: recovered[0].name, unit: recovered[0].unit, price: recovered[0].price } : null,
+        qtyReturn: recovered[0] ? recovered[0].qty : 0,
+        reason: 'Giao nhầm SP — thu hồi', caseType: 'onsite', resolution: 'refund',
+        disposition: recovered.every(x => x.cond === 'good') ? 'restock' : 'discard',
+        fault: 'shop', refundMode: 'debt', supplierId: '', supplierName: '', supClaimAmount: 0,
+        refundTotal: 0, note: 'Giao nhầm SP (báo từ shipper)', status: 'pending', fromShip: true, wrongDeliver: true,
+        handledBy: (window.CURRENT_USER && window.CURRENT_USER.name) || 'shipper', reportedAt: nowISO(),
+      };
+      window.STORE.add('returns', rec);
+    }
+    window.closeModal && window.closeModal();
+    window.toast && window.toast('💾 Đã lưu lệch — hoá đơn cập nhật theo thực giao' + (recovered.length ? ' · SP nhầm chờ kế toán duyệt' : ''), 'success');
+    if (window.sendTgMessage) {
+      const parts = [];
+      items.forEach(it => { if (it.received != null && +it.received !== (+it.qty || 0) && !recovered.find(r => r.id === it.id && r.name === it.name)) parts.push(`• ${it.name}: đặt ${it.qty}→giao ${it.received} ${it.unit || ''}`); });
+      recovered.forEach(r => parts.push(`• ⚠ NHẦM ${r.name} ${r.qty}${r.unit} → thu về ${r.cond === 'bad' ? 'NCC' : 'kho'}`));
+      added.forEach(a => parts.push(`• ➕ giao bù ${a.name}: ${a.qty}${a.unit}${a.price ? ' @' + fmt(a.price) : ' (giá chờ KT)'}`));
+      if (parts.length) window.sendTgMessage('alert', `⚠️ BÁO LỆCH GIAO\n📦 ${T.code} · ${T.custName}\n${parts.join('\n')}\n💰 Hoá đơn mới: ${fmt(freight)}₫`);
     }
     render();
   };
