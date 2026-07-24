@@ -1508,8 +1508,12 @@ tbody tr:nth-child(even){background:#F4FAF2}tfoot td{background:#E8F5E9;font-wei
       items = Array.isArray(its) ? its : [];
     }
     items = items || [];
-    const totalKg = items.reduce((s, it) => s + (+it.qty || 0), 0);
-    const rows = items.map((it, i) => `<tr><td class="stt">${i + 1}</td><td><b>${esc(it.name)}</b></td><td class="num">${fmtQty(it.qty)} ${it.unit || 'kg'}</td></tr>`).join('');
+    let totalKg = 0, _hasKg = false;
+    items.forEach(it => { const k = window.kgOfItem ? window.kgOfItem(it) : (String(it.unit || 'kg').toLowerCase() === 'kg' ? (+it.qty || 0) : null); if (k != null) { totalKg += k; _hasKg = true; } });
+    const rows = items.map((it, i) => {
+      const k = window.kgOfItem ? window.kgOfItem(it) : (String(it.unit || 'kg').toLowerCase() === 'kg' ? (+it.qty || 0) : null);
+      return `<tr><td class="stt">${i + 1}</td><td><b>${esc(it.name)}</b></td><td class="num">${fmtQty(it.qty)} ${it.unit || 'kg'}</td><td class="num">${k == null ? '—' : fmtQty(k) + ' kg'}</td></tr>`;
+    }).join('');
     const html = `<!doctype html><html lang="vi"><head><meta charset="utf-8"><title>PHIẾU XUẤT KHO</title>
 <style>@page{size:A4;margin:14mm 12mm}*{box-sizing:border-box;margin:0;padding:0;font-family:'Segoe UI',Arial,sans-serif}
 body{color:#1a1a1a;font-size:13px}.wrap{max-width:780px;margin:0 auto}
@@ -1528,8 +1532,8 @@ tbody tr:nth-child(even){background:#F4FAF2}tfoot td{background:#E8F5E9;font-wei
 <div class="metabox"><div class="meta"><div><b>Khách hàng:</b> ${esc(o.custName || '')}</div><div><b>Mã đơn:</b> ${o.code}</div></div>
 <div class="meta"><div><b>Giao đến:</b> ${esc(o.drop || '')}</div><div><b>SĐT:</b> ${esc(o.custPhone || '')}</div></div></div>
 <div class="ship">🚚 Giao: ${esc(o.deliverDate || '...')} · Ca ${esc(o.shipShift || '...')}${o.shipTime ? ' · ' + esc(o.shipTime) : ''} · Shipper: ${esc(o.driverName || '............')}</div>
-<table><thead><tr><th style="width:46px">STT</th><th>Sản phẩm</th><th style="width:120px">Số lượng</th></tr></thead><tbody>${rows}</tbody>
-<tfoot><tr><td colspan="2" style="text-align:right">TỔNG SẢN LƯỢNG</td><td class="num">${fmtQty(totalKg)} kg</td></tr></tfoot></table>
+<table><thead><tr><th style="width:46px">STT</th><th>Sản phẩm</th><th style="width:110px">Số lượng</th><th style="width:110px">Quy đổi (kg)</th></tr></thead><tbody>${rows}</tbody>
+<tfoot><tr><td colspan="3" style="text-align:right">TỔNG SẢN LƯỢNG</td><td class="num">${_hasKg ? fmtQty(totalKg) + ' kg' : '—'}</td></tr></tfoot></table>
 ${o.shortages && o.shortages.length ? `<div style="margin-top:10px;font-size:11.5px;color:#B91C1C"><b>⚠ Lưu ý thiếu:</b> ${o.shortages.map(s => esc(s.name) + ' -' + fmtQty(s.short) + s.unit + ' (' + esc(s.reason) + ')').join('; ')}</div>` : ''}
 <div class="sig"><div><div class="role">Thủ kho xuất</div><div class="l"></div></div><div><div class="role">Shipper nhận</div><div class="l"></div></div><div><div class="role">Khách nhận</div><div class="l"></div></div></div>
 </div></body></html>`;

@@ -353,7 +353,7 @@
   window._ghConfirmLech = function () {
     const T = window._ghLech; if (!T) return;
     const items = T.items.map(it => Object.assign({}, it));
-    const recovered = [];
+    const recovered = [], lechChanges = [];
     let changed = false;
     items.forEach((it, i) => {
       const price = +it.price || 0;
@@ -361,7 +361,8 @@
       const wrong = (document.querySelector(`.ghl-wrong[data-i="${i}"]`) || {}).checked;
       if (wrong) {
         const disp = (document.getElementById('ghlDp' + i) || {}).value || 'restock';
-        it.received = 0; it.total = 0;
+        /* Giao nhầm → SL về 0 (không tính tiền khách); ghi thẳng qty như KT chốt sản lượng */
+        it.qty = 0; it.total = 0;
         it.note = ((it.note || '') + ` [giao nhầm — thu về ${disp === 'supplier' ? 'NCC' : 'kho'}]`).trim();
         recovered.push({ id: it.id, name: it.name, unit: it.unit || 'kg', qty: ordered, price, cond: disp === 'supplier' ? 'bad' : 'good', note: 'giao nhầm SP' });
         changed = true;
@@ -369,9 +370,15 @@
         const inp = document.querySelector(`.ghl-q[data-i="${i}"]`);
         const v = inp ? parseFloat(inp.value) : NaN;
         const recv = isNaN(v) ? ordered : Math.max(0, v);
-        it.received = recv;
-        it.total = Math.round(recv * price);
-        if (recv !== ordered) { it.note = ((it.note || '') + ` [lệch: đặt ${ordered}→giao ${recv}]`).trim(); changed = true; }
+        if (recv !== ordered) {
+          /* GHI THẲNG it.qty = số thực giao (mô hình 1-số-lượng của app, khớp KT chốt sản lượng)
+             → it.total, o.freight, công nợ, sản lượng đều tự đúng, KHÔNG bị recompute-theo-qty xoá mất. */
+          it.qty = recv;
+          it.total = Math.round(recv * price);
+          it.note = ((it.note || '') + ` [lệch: đặt ${ordered}→giao ${recv}]`).trim();
+          lechChanges.push({ name: it.name, unit: it.unit || '', from: ordered, to: recv });
+          changed = true;
+        }
       }
     });
     const added = [];
@@ -381,7 +388,7 @@
       if (!nm || !nm.trim() || q <= 0) return;
       const u = ((r.querySelector('.ghl-add-u') || {}).value || 'kg').trim() || 'kg';
       const p = parseFloat((r.querySelector('.ghl-add-p') || {}).value) || 0;
-      const it = { id: '', name: nm.trim(), unit: u, qty: q, received: q, price: p, total: Math.round(q * p), addedByShip: true, note: '[SP giao bù/phát sinh]' };
+      const it = { id: '', name: nm.trim(), unit: u, qty: q, price: p, total: Math.round(q * p), addedByShip: true, note: '[SP giao bù/phát sinh]' };
       if (p <= 0) it.priceConfirmed = false;   /* kế toán xác nhận giá sau */
       items.push(it); added.push(it); changed = true;
     });
@@ -410,7 +417,7 @@
     window.toast && window.toast('💾 Đã lưu lệch — hoá đơn cập nhật theo thực giao' + (recovered.length ? ' · SP nhầm chờ kế toán duyệt' : ''), 'success');
     if (window.sendTgMessage) {
       const parts = [];
-      items.forEach(it => { if (it.received != null && +it.received !== (+it.qty || 0) && !recovered.find(r => r.id === it.id && r.name === it.name)) parts.push(`• ${it.name}: đặt ${it.qty}→giao ${it.received} ${it.unit || ''}`); });
+      lechChanges.forEach(ch => parts.push(`• ${ch.name}: đặt ${ch.from}→giao ${ch.to} ${ch.unit}`));
       recovered.forEach(r => parts.push(`• ⚠ NHẦM ${r.name} ${r.qty}${r.unit} → thu về ${r.cond === 'bad' ? 'NCC' : 'kho'}`));
       added.forEach(a => parts.push(`• ➕ giao bù ${a.name}: ${a.qty}${a.unit}${a.price ? ' @' + fmt(a.price) : ' (giá chờ KT)'}`));
       if (parts.length) window.sendTgMessage('alert', `⚠️ BÁO LỆCH GIAO\n📦 ${T.code} · ${T.custName}\n${parts.join('\n')}\n💰 Hoá đơn mới: ${fmt(freight)}₫`);

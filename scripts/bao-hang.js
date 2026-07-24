@@ -18,7 +18,7 @@
     };
   }
 
-  /* Gộp items cùng tên → tổng số lượng */
+  /* Gộp items cùng tên → tổng số lượng (giữ đơn vị + id để quy đổi kg) */
   function groupItems(o) {
     const items = Array.isArray(o.items) ? o.items : [];
     const norm = s => (s || '').toString().trim().toLowerCase();
@@ -26,26 +26,35 @@
     items.forEach(it => {
       const k = norm(it.name);
       if (!k) return;
-      if (!map.has(k)) map.set(k, { name: it.name, qty: 0, unit: it.unit || 'kg' });
-      map.get(k).qty += (+it.qty || 0);
+      if (!map.has(k)) map.set(k, { id: it.id || it.productId || '', name: it.name, qty: 0, unit: it.unit || 'kg' });
+      const g = map.get(k);
+      g.qty += (+it.qty || 0);
+      if (!g.id && (it.id || it.productId)) g.id = it.id || it.productId;
     });
     return [...map.values()];
   }
   const fmtQty = q => (+q || 0).toFixed(2).replace(/\.00$/, '').replace(/(\.\d)0$/, '$1');
+  /* kg quy đổi 1 nhóm — dùng helper chung window.kgOfItem (null nếu không quy được) */
+  const kgOf = g => (window.kgOfItem ? window.kgOfItem({ id: g.id, unit: g.unit, qty: g.qty }) : (String(g.unit || 'kg').toLowerCase() === 'kg' ? g.qty : null));
 
   /* ====== HTML branded để in / lưu PDF ====== */
   window.buildBaoHangHTML = function (o) {
     const c = company();
     const groups = groupItems(o);
-    const totalQty = groups.reduce((s, g) => s + g.qty, 0);
+    let totalKg = 0, hasKg = false;
+    groups.forEach(g => { const k = kgOf(g); if (k != null) { totalKg += k; hasKg = true; } });
     const d = (o.date || '').match(/(\d{1,2})\/(\d{1,2})\/(\d{2,4})/);
     const dd = d ? d[1] : '......', mm = d ? d[2] : '......', yy = d ? d[3] : '2026';
-    /* Chia 2 cột cho gọn nếu nhiều mã */
-    const rowsHtml = groups.map((g, i) => `<tr>
+    /* Cột "Số lượng" hiện số + ĐƠN VỊ GỐC; cột "Quy đổi (kg)" tự quy sản lượng để chuẩn bị/giao */
+    const rowsHtml = groups.map((g, i) => {
+      const k = kgOf(g);
+      return `<tr>
         <td class="stt">${i + 1}</td>
         <td class="sp">${g.name}</td>
-        <td class="sl">${fmtQty(g.qty)}</td>
-      </tr>`).join('');
+        <td class="sl">${fmtQty(g.qty)} ${g.unit || 'kg'}</td>
+        <td class="slkg">${k == null ? '—' : fmtQty(k) + ' kg'}</td>
+      </tr>`;
+    }).join('');
     return `<!doctype html><html lang="vi"><head><meta charset="utf-8">
 <title>DANH SÁCH BÁO HÀNG</title>
 <style>
@@ -68,7 +77,8 @@
   th,td{border:1px solid #B6C9B0;padding:7px 10px}
   th{background:#1B5E20;color:#fff;font-weight:700;font-size:12px;text-transform:uppercase;letter-spacing:.4px}
   td.stt{text-align:center;width:48px;color:#777;font-weight:600}
-  td.sl{text-align:center;width:120px;font-weight:700;color:#1B5E20}
+  td.sl{text-align:center;width:96px;font-weight:700;color:#333}
+  td.slkg{text-align:center;width:104px;font-weight:800;color:#1B5E20}
   td.sp{font-weight:600}
   tbody tr:nth-child(even){background:#F4FAF2}
   tfoot td{background:#E8F5E9;font-weight:800;color:#1B5E20;border-top:2px solid #1B5E20}
@@ -96,11 +106,11 @@
       <div><b>SĐT:</b> ${o.custPhone || '............'}</div>
     </div>
   </div>
-  <div class="note">TẤT CẢ CÁC MÃ HÀNG ĐỀU ĐƯỢC TÍNH ĐƠN VỊ LÀ KG (KILOGRAM)</div>
+  <div class="note">SỐ LƯỢNG theo đơn vị đặt · CỘT "QUY ĐỔI (KG)" là sản lượng thực để chuẩn bị &amp; giao (đơn vị khác kg đã tự quy đổi)</div>
   <table>
-    <thead><tr><th style="width:48px">STT</th><th>Sản phẩm</th><th style="width:120px">Số lượng</th></tr></thead>
-    <tbody>${rowsHtml || '<tr><td colspan="3" style="text-align:center;color:#999;padding:18px">Đơn chưa có mặt hàng</td></tr>'}</tbody>
-    <tfoot><tr><td colspan="2" style="text-align:right">TỔNG SẢN LƯỢNG</td><td style="text-align:center">${fmtQty(totalQty)} kg</td></tr></tfoot>
+    <thead><tr><th style="width:48px">STT</th><th>Sản phẩm</th><th style="width:96px">Số lượng</th><th style="width:104px">Quy đổi (kg)</th></tr></thead>
+    <tbody>${rowsHtml || '<tr><td colspan="4" style="text-align:center;color:#999;padding:18px">Đơn chưa có mặt hàng</td></tr>'}</tbody>
+    <tfoot><tr><td colspan="3" style="text-align:right">TỔNG SẢN LƯỢNG</td><td style="text-align:center">${hasKg ? fmtQty(totalKg) + ' kg' : '—'}</td></tr></tfoot>
   </table>
 </div>
 </body></html>`;
@@ -134,8 +144,13 @@
   /* ====== Nội dung Telegram ====== */
   window.buildBaoHangTgMsg = function (o) {
     const groups = groupItems(o);
-    const totalQty = groups.reduce((s, g) => s + g.qty, 0);
-    const lines = groups.map((g, i) => `${String(i + 1).padStart(2, ' ')}. ${g.name} — ${fmtQty(g.qty)} kg`).join('\n');
+    let totalKg = 0, hasKg = false;
+    groups.forEach(g => { const k = kgOf(g); if (k != null) { totalKg += k; hasKg = true; } });
+    const lines = groups.map((g, i) => {
+      const k = kgOf(g);
+      const kgTxt = k == null ? '' : (String(g.unit || 'kg').toLowerCase() === 'kg' ? '' : ` (=${fmtQty(k)} kg)`);
+      return `${String(i + 1).padStart(2, ' ')}. ${g.name} — ${fmtQty(g.qty)} ${g.unit || 'kg'}${kgTxt}`;
+    }).join('\n');
     return `📋 DANH SÁCH BÁO HÀNG — ${o.code}
 🍽 Nhà hàng: ${o.custName || '—'}
 📍 Giao đến: ${o.drop || '—'}
@@ -144,8 +159,7 @@
 ─────────────
 ${lines || '(chưa có mặt hàng)'}
 ─────────────
-📦 Tổng: ${groups.length} mã · ${fmtQty(totalQty)} kg
-⚖️ Đơn vị: KILOGRAM (KG)
+📦 Tổng: ${groups.length} mã · ⚖️ Sản lượng: ${hasKg ? fmtQty(totalKg) + ' kg' : '—'}
 
 — CRM Nông Sản Tuấn Tú`;
   };

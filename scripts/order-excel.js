@@ -81,8 +81,11 @@
 
     const c = getCust(o), comp = getCompany();
     const items = o.items || [];
-    const totalQty = items.reduce((s, it) => s + (+it.qty || 0), 0);
-    const totalAmt = items.reduce((s, it) => s + (+it.total || (+it.price || 0) * (+it.qty || 0) || 0), 0);
+    const _recvOf = it => (it.received != null && it.received !== '' ? +it.received : (+it.qty || 0));
+    const _lineOf = it => (it.received != null && it.received !== '') ? Math.round((+it.price || 0) * (+it.received || 0)) : (+it.total || (+it.price || 0) * (+it.qty || 0) || 0);
+    let totalKg = 0, _hasKg = false;
+    items.forEach(it => { const k = window.kgOfItem ? window.kgOfItem(it, true) : (String(it.unit || 'kg').toLowerCase() === 'kg' ? _recvOf(it) : null); if (k != null) { totalKg += k; _hasKg = true; } });
+    const totalAmt = items.reduce((s, it) => s + _lineOf(it), 0);
     const words = window.numberToWords ? window.numberToWords(totalAmt) : ((totalAmt || 0).toLocaleString('vi-VN') + ' đồng');
 
     const wb = new ExcelJS.Workbook();
@@ -93,10 +96,10 @@
       views: [{ showGridLines: false }],
     });
 
-    /* 8 cột: STT | Tên SP | ĐVT | SL xuất | Thực nhận | Giá bán | Thành tiền | Ghi chú */
+    /* 8 cột: STT | Tên SP | ĐVT | Thực nhận | Quy đổi kg | Giá bán | Thành tiền | Ghi chú */
     ws.columns = [
-      { width: 6 }, { width: 36 }, { width: 8 }, { width: 12 },
-      { width: 11 }, { width: 14 }, { width: 16 }, { width: 20 },
+      { width: 6 }, { width: 36 }, { width: 8 }, { width: 11 },
+      { width: 12 }, { width: 14 }, { width: 16 }, { width: 20 },
     ];
 
     /* ===== HEADER công ty (logo A + thông tin B:H) ===== */
@@ -160,7 +163,7 @@
 
     /* ===== BẢNG MẶT HÀNG ===== */
     const HEAD_ROW = 11;
-    const heads = ['STT', 'Tên sản phẩm', 'ĐVT', 'Số lượng\nxuất kho', 'Thực\nnhận', 'Giá bán', 'Thành tiền', 'Ghi chú'];
+    const heads = ['STT', 'Tên sản phẩm', 'ĐVT', 'Thực\nnhận', 'Quy đổi\n(kg)', 'Giá bán', 'Thành tiền', 'Ghi chú'];
     const hr = ws.getRow(HEAD_ROW);
     heads.forEach((h, i) => {
       const cell = hr.getCell(i + 1);
@@ -177,14 +180,15 @@
       items.forEach((it, i) => {
         r++;
         const row = ws.getRow(r);
-        const received = it.received != null ? it.received : it.qty;
-        const line = +it.total || (+it.price || 0) * (+it.qty || 0);
+        const received = _recvOf(it);
+        const line = _lineOf(it);
+        const kg = window.kgOfItem ? window.kgOfItem(it, true) : (String(it.unit || 'kg').toLowerCase() === 'kg' ? received : null);
         const cells = [
           { v: i + 1, a: 'center' },
           { v: it.name || '', a: 'left' },
           { v: it.unit || 'kg', a: 'center' },
-          { v: (+it.qty || 0), a: 'center', z: '#,##0.###' },
           { v: (+received || 0), a: 'center', z: '#,##0.###' },
+          { v: (kg == null ? '—' : +kg), a: 'center', z: '#,##0.## "kg"' },
           { v: (+it.price || 0), a: 'right', z: '#,##0' },
           { v: line, a: 'right', z: '#,##0' },
           { v: it.note || '', a: 'left' },
@@ -223,7 +227,8 @@
       cell.border = boxAll;
       cell.alignment = { horizontal: ci === 1 ? 'left' : (ci === 7 ? 'right' : 'center'), vertical: 'middle' };
     });
-    const qCell = ws.getRow(r).getCell(4); qCell.value = totalQty || null; qCell.numFmt = '#,##0.###';
+    const qCell = ws.getRow(r).getCell(4); qCell.value = null;   /* cột Thực nhận: KHÔNG điền tổng */
+    const kCell = ws.getRow(r).getCell(5); kCell.value = _hasKg ? Math.round(totalKg * 100) / 100 : null; kCell.numFmt = '#,##0.## "kg"';
     const aCell = ws.getRow(r).getCell(7); aCell.value = totalAmt || 0; aCell.numFmt = '#,##0';
     ws.getRow(r).height = 20;
 

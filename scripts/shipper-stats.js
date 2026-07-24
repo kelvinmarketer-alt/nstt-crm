@@ -13,7 +13,13 @@
   const _q1 = n => { n = +n || 0; return (n % 1 ? Math.round(n * 10) / 10 : n).toLocaleString('vi-VN'); };
 
   const _orders = () => (S().get('orders', window.ORDERS || []) || []);
-  const _kg = o => +o.weight || (Array.isArray(o.items) ? o.items.reduce((s, it) => s + (+it.qty || 0), 0) : 0);
+  /* Sản lượng kg/đơn: ưu tiên cân nặng nhập tay (#oWeight) nếu có; else quy đổi từng SP → kg
+     (kg/g quy thẳng; đơn vị khác chỉ tính khi có bảng quy đổi; KHÔNG cộng thô qty mọi đơn vị). */
+  const _kg = o => {
+    if (+o.weight > 0) return +o.weight;
+    if (!Array.isArray(o.items)) return 0;
+    return o.items.reduce((s, it) => s + (window.kgOfItem ? (window.kgOfItem(it, true) || 0) : (String(it.unit || 'kg').toLowerCase() === 'kg' ? (+it.qty || 0) : 0)), 0);
+  };
   const _realDriver = o => { const n = String(o.driverName || o.driver_name || '').trim(); return (n && n !== '—') ? n : ''; };
 
   let _host = 'payView';   /* id phần tử để render vào (mặc định tab Nhân sự) */

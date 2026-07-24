@@ -5,7 +5,7 @@
 
 /* Phiên bản app hiển thị (đối chiếu với CACHE_VERSION trong sw.js) — để user tự XÁC NHẬN
    đang chạy bản mới hay còn kẹt JS cũ (hiện ở góc sidebar + log console). */
-window.APP_VERSION = 'v552';
+window.APP_VERSION = 'v553';
 console.log('%c[NSTT] App ' + window.APP_VERSION, 'color:#339B21;font-weight:bold');
 
 /* Gom NGUỒN khách về 3 nhóm chuẩn: 'mkt' / 'sales' / 'sep-gioi-thieu'.
@@ -737,6 +737,26 @@ window.prodUnitConv = function (productId) {
   const c = map[productId];
   if (c && (+c.kgPerPack > 0) && c.packUnit) return { packUnit: String(c.packUnit), kgPerPack: +c.kgPerPack };
   return null;
+};
+/* ===== Quy đổi 1 dòng hàng → KG (dùng CHUNG mọi phiếu/hoá đơn/thống kê sản lượng) =====
+   kg/g quy thẳng; đơn vị khác (quả/bó/thùng…) chỉ quy khi SP có khai bảng quy đổi (prodUnitConv).
+   Trả null nếu KHÔNG quy đổi được (đơn vị lạ, chưa khai) → nơi hiển thị nên ghi "—", nơi cộng tổng bỏ qua.
+   useReceived=true → ưu tiên số THỰC NHẬN (it.received) nếu đã có (dùng cho phiếu sau khi giao). */
+window.kgOfItem = function (it, useReceived) {
+  if (!it) return null;
+  const u = String(it.unit || 'kg').toLowerCase().trim();
+  const q = (useReceived && it.received != null && it.received !== '') ? (+it.received || 0) : (+it.qty || 0);
+  if (u === 'kg') return q;
+  if (u === 'g' || u === 'gram') return q * 0.001;
+  const c = window.prodUnitConv ? window.prodUnitConv(it.id || it.productId) : null;
+  if (c && +c.kgPerPack > 0) return q * (+c.kgPerPack);
+  return null;
+};
+/* Format kg gọn: 6 / 1,5 / "—" nếu null */
+window.fmtKgShort = function (n) {
+  if (n == null) return '—';
+  const r = Math.round(n * 100) / 100;
+  return r.toLocaleString('vi-VN', { maximumFractionDigits: 2 });
 };
 window.setProdUnitConv = function (productId, packUnit, kgPerPack) {
   if (!productId || !window.STORE || !window.STORE.rmwKv) return;

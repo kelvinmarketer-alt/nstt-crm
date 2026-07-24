@@ -82,7 +82,6 @@
     const c = getCust(o);
     const comp = getCompany();
     const items = o.items || [];
-    const totalRecv = items.reduce((s, it) => s + ((it.received != null && it.received !== '' ? +it.received : +it.qty) || 0), 0);
     const totalAmt = items.reduce((s, it) => s + lineAmt(it), 0);
     let totalKg = 0, hasKg = false;
     items.forEach(it => { const k = kgConv(it); if (k != null) { totalKg += k; hasKg = true; } });
@@ -230,7 +229,7 @@ ${FAV ? `<link rel="icon" type="image/svg+xml" href="${FAV}">` : ''}
     <tfoot>
       <tr>
         <td colspan="3"><b>Tổng cộng</b></td>
-        <td class="c">${totalRecv || ''}</td>
+        <td class="c"></td>
         <td class="c" style="color:#006400">${hasKg ? fmtKg(totalKg) : ''}</td>
         <td></td>
         <td class="r">${fmt(totalAmt)}</td>
