@@ -61,7 +61,7 @@
         <td data-field="title">${e.party}<div style="font-weight:400;font-size:12px;color:var(--muted)">${e.desc}</div></td>
         <td data-field="acct"><span class="staff-pill">${e.account}</span></td>
         <td class="num type-${e.type}" data-field="money"><b>${e.type==='in'?'+':'-'}${window.fmt(e.amount)}</b></td>
-        <td class="hide-xs" style="font-size:12px;color:var(--muted)">${e.staff}</td>
+        <td class="hide-xs" style="font-size:12px;color:var(--muted)">${e.staff || '—'}</td>
       </tr>
     `).join('') || `<tr><td colspan="7" style="padding:40px;text-align:center;color:var(--muted)">Không có phiếu nào.</td></tr>`;
 

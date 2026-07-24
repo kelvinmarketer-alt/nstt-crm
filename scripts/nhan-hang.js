@@ -16,6 +16,17 @@
   const _isGom = p => /^PN-GOM-/.test((p && p.id) || '');
   const supName = id => (getSups().find(s => s.id === id) || {}).name || id;
   const _sel = new Set();   /* id các phiếu 'ordered' đang chọn để thao tác hàng loạt */
+  const _nhOpen = new Set();   /* id các phiếu đang XỔ (accordion) — giữ trạng thái qua re-render */
+
+  /* Xổ/gập 1 phiếu nhận hàng (không re-render → giữ số Thực nhận/Lỗi đã gõ) */
+  window.nhToggleCard = function (pid, head) {
+    const card = head.closest('.nh-pcard'); if (!card) return;
+    const body = card.querySelector('.nh-body'); const caret = head.querySelector('.nh-caret');
+    const willOpen = body.style.display === 'none';
+    body.style.display = willOpen ? '' : 'none';
+    if (caret) caret.textContent = willOpen ? '▾' : '▸';
+    if (willOpen) _nhOpen.add(pid); else _nhOpen.delete(pid);
+  };
 
   function itemRows(p) {
     return (p.items || []).map((it, i) => {
@@ -52,14 +63,17 @@
     const kg = (p.items || []).reduce((s, it) => s + (+it.qty || 0), 0);
     const empty = !(p.items || []).length;
     const _srch = esc((supName(p.supplierId) + ' ' + (p.items || []).map(x => x.name || '').join(' ') + ' ' + p.id).toLowerCase());
-    return `<div class="card" data-nhsearch="${_srch}" style="background:#fff;border:1px solid var(--line);border-radius:12px;overflow:hidden;margin-bottom:14px">
-      <div style="background:linear-gradient(135deg,#1B5E20,#15803D);color:#fff;padding:11px 14px;display:flex;align-items:center;gap:10px;flex-wrap:wrap">
-        <input type="checkbox" class="nh-selphieu" data-pid="${esc(p.id)}" onclick="window.nhToggleSel('${esc(p.id)}',this.checked)" ${_sel.has(p.id) ? 'checked' : ''} title="Chọn phiếu để nhận / xoá hàng loạt" style="width:18px;height:18px;cursor:pointer;accent-color:#E8A33D">
+    const open = empty || _nhOpen.has(p.id);   /* phiếu trống mở sẵn (để thấy nút thêm); còn lại gập cho gọn */
+    return `<div class="card nh-pcard" data-nhsearch="${_srch}" style="background:#fff;border:1px solid var(--line);border-radius:12px;overflow:hidden;margin-bottom:14px">
+      <div class="nh-phead" onclick="window.nhToggleCard('${esc(p.id)}',this)" title="Bấm để ${open ? 'thu gọn' : 'mở ra điều chỉnh hàng lỗi'}" style="background:linear-gradient(135deg,#1B5E20,#15803D);color:#fff;padding:11px 14px;display:flex;align-items:center;gap:10px;flex-wrap:wrap;cursor:pointer">
+        <input type="checkbox" class="nh-selphieu" data-pid="${esc(p.id)}" onclick="event.stopPropagation();window.nhToggleSel('${esc(p.id)}',this.checked)" ${_sel.has(p.id) ? 'checked' : ''} title="Chọn phiếu để nhận / xoá hàng loạt" style="width:18px;height:18px;cursor:pointer;accent-color:#E8A33D">
+        <span class="nh-caret" style="font-size:13px;width:12px;display:inline-block;transition:transform .15s">${open ? '▾' : '▸'}</span>
         <span style="font-size:15px">🏭</span><b style="font-size:14.5px">${esc(supName(p.supplierId))}</b>
         <span style="opacity:.85;font-size:11.5px">${(p.items || []).length} mã · ${_q(kg)}kg đặt · phiếu ${esc(p.id)}</span>
         <div style="flex:1"></div>
-        <button class="btn btn-sm" onclick="window.nhDelPhieu('${esc(p.id)}')" title="Xoá cả phiếu nhập này (gom sai / ấn nhầm)" style="background:rgba(255,255,255,.15);color:#fff;border:1px solid rgba(255,255,255,.35);padding:4px 10px">🗑 Xoá phiếu</button>
+        <button class="btn btn-sm" onclick="event.stopPropagation();window.nhDelPhieu('${esc(p.id)}')" title="Xoá cả phiếu nhập này (gom sai / ấn nhầm)" style="background:rgba(255,255,255,.15);color:#fff;border:1px solid rgba(255,255,255,.35);padding:4px 10px">🗑 Xoá phiếu</button>
       </div>
+      <div class="nh-body" style="display:${open ? '' : 'none'}">
       <table style="width:100%;border-collapse:collapse;font-size:12.5px">
         <thead><tr style="background:#F8FAF8;color:var(--muted);font-size:11px;text-transform:uppercase">
           <th style="padding:6px 9px;text-align:left">Mặt hàng</th><th style="padding:6px 9px;text-align:right">Đặt</th>
@@ -70,6 +84,7 @@
       <div style="padding:10px 14px;display:flex;justify-content:space-between;align-items:center;gap:8px;background:#FAFBFC;border-top:1px solid var(--line);flex-wrap:wrap">
         <button class="btn btn-ghost btn-sm" onclick="window.nhAddItem('${esc(p.id)}')" title="Thêm mặt hàng còn thiếu vào phiếu">➕ Thêm mặt hàng</button>
         <button class="btn btn-primary" ${empty ? 'disabled style="opacity:.5;cursor:not-allowed"' : ''} onclick="window.nhReceive('${esc(p.id)}')">✓ Xác nhận đã nhận kho</button>
+      </div>
       </div>
     </div>`;
   }

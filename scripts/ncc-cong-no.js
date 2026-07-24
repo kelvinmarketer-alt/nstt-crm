@@ -183,7 +183,7 @@
     cash.unshift({
       no: 'PC' + String(pcMax + 1).padStart(4, '0'),
       date: (window.todayVN ? window.todayVN() : new Date().toLocaleDateString('vi-VN')),
-      type: 'out', amount: amt, account: 'Tiền mặt', supplierId: id, party: (s && s.name) || id, desc: 'Thanh toán công nợ NCC ' + id,
+      type: 'out', amount: amt, account: 'Tiền mặt', supplierId: id, party: (s && s.name) || id, desc: 'Thanh toán công nợ NCC ' + id, staff: (window.CURRENT_USER && window.CURRENT_USER.name) || '',
     });
     S().set('cashEntries', cash);
     const remainAfter = _supRemainAll(id);

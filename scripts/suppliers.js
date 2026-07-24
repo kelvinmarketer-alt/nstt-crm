@@ -498,7 +498,7 @@
     if (!(amt > 0)) { window.toast && window.toast('Nhập số tiền > 0', 'warn'); return; }
     const cash = getCash();
     const _pcMax = cash.reduce((m, e) => { const n = parseInt(String(e.no || '').replace(/^PC/, ''), 10); return isNaN(n) ? m : Math.max(m, n); }, 0);
-    cash.unshift({ no: 'PC' + String(_pcMax + 1).padStart(4, '0'), date: window.todayVN(), type: 'out', amount: amt, account: 'Tiền mặt', supplierId: id, party: s.name, desc: 'Thanh toán công nợ NCC ' + id });
+    cash.unshift({ no: 'PC' + String(_pcMax + 1).padStart(4, '0'), date: window.todayVN(), type: 'out', amount: amt, account: 'Tiền mặt', supplierId: id, party: s.name, desc: 'Thanh toán công nợ NCC ' + id, staff: (window.CURRENT_USER && window.CURRENT_USER.name) || '' });
     window.STORE.set('cashEntries', cash);
     if (window.audit) window.audit.log('supplier.pay', `Trả ${window.fmt(amt)} ₫ cho ${s.name}`);
     const remainAfter = _supDebt(id);
