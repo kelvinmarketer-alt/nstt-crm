@@ -26,6 +26,12 @@
       const u = unitNorm(x.unit);
       if (u === 'kg')              { kg += (+x.qty || 0);          has = true; }
       else if (u === 'g' || u === 'gram') { kg += (+x.qty || 0) * 0.001; has = true; }
+      else {
+        /* SP có bảng QUY ĐỔI (vd 20 quả = 1kg) → quy ra kg để cộng vào SẢN LƯỢNG/khối lượng ship.
+           CHỈ ảnh hưởng khối lượng, KHÔNG đụng tiền (giá vẫn tính theo đơn vị & giá gốc). */
+        const c = (window.prodUnitConv && (x.id || x.productId)) ? window.prodUnitConv(x.id || x.productId) : null;
+        if (c && +c.kgPerPack > 0) { kg += (+x.qty || 0) * (+c.kgPerPack); has = true; }
+      }
     });
     return has ? kg : null;
   }

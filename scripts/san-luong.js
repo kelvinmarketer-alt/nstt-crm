@@ -61,8 +61,11 @@
       const per = periodOf(iso, gran);
       nOrders++;
       (Array.isArray(o.items) ? o.items : []).forEach(it => {
-        const qty = +it.qty || 0; if (!qty) return;
-        const unit = unitNorm(it.unit);
+        let qty = +it.qty || 0; if (!qty) return;
+        let unit = unitNorm(it.unit);
+        /* SP có bảng QUY ĐỔI (vd 20 quả=1kg) → quy sản lượng ra KG (cho ship). Không đụng tiền. */
+        const _c = (window.prodUnitConv && it.id) ? window.prodUnitConv(it.id) : null;
+        if (_c && +_c.kgPerPack > 0 && unit !== 'kg') { qty = qty * (+_c.kgPerPack); unit = 'kg'; }
         const name = (it.name || '').trim() || '(không tên)';
         const key = (it.id || ('x:' + name.toLowerCase())) + '|' + unit;
         const r = rows[key] || (rows[key] = { name, unit, off: (it.id == null || it.custom === true), byPeriod: {}, total: 0 });
