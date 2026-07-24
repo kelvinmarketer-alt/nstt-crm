@@ -192,7 +192,7 @@
   let boardDate = maxDate();      // ngày đang xem ở bảng giá
 
   /* Lọc + sắp xếp cho bảng giá (board + marketing) */
-  let boardSearch = '', boardCat = '', boardSort = { col: '', dir: 1 };
+  let boardSearch = '', boardCat = '', boardSort = { col: 'name', dir: 1 };   /* mặc định: xếp theo TÊN A→Z */
   const _norm = s => (s || '').toString().toLowerCase().normalize('NFD').replace(/[̀-ͯ]/g, '').replace(/đ/g, 'd');
   function applyBoardFilter(list) {
     let out = list.slice();
@@ -220,7 +220,7 @@
     return `<div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap;margin-bottom:10px">
         <input id="boardSearch" placeholder="🔍 Tìm tên sản phẩm..." value="${boardSearch.replace(/"/g, '&quot;')}" style="flex:1;min-width:200px;border:1px solid var(--line);border-radius:7px;padding:7px 11px;font-size:13px">
         <select id="boardCatSel" style="border:1px solid var(--line);border-radius:7px;padding:7px 11px;font-size:13px">${opts}</select>
-        ${(boardSearch || boardCat || boardSort.col) ? `<button class="btn btn-ghost btn-sm" onclick="window.boardClearFilter()">✕ Xóa lọc</button>` : ''}
+        ${(boardSearch || boardCat || boardSort.col !== 'name' || boardSort.dir !== 1) ? `<button class="btn btn-ghost btn-sm" onclick="window.boardClearFilter()">✕ Xóa lọc</button>` : ''}
       </div>`;
   }
   function wireBoardToolbar(rerender) {
@@ -230,7 +230,7 @@
     if (c) c.onchange = (e) => { boardCat = e.target.value; rerender(); };
   }
   window.boardClearFilter = function () {
-    boardSearch = ''; boardCat = ''; boardSort = { col: '', dir: 1 };
+    boardSearch = ''; boardCat = ''; boardSort = { col: 'name', dir: 1 };
     const v = document.getElementById('boardView');
     if (v && v.style.display !== 'none') renderBoard(); else renderMkt();
   };

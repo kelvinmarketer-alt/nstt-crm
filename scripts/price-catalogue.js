@@ -201,7 +201,7 @@ footer b{color:#1f7a3d}
 
     let stt = 0;
     const sections = cats.map((cat, ci) => {
-      const items = products.filter(p => p.cat === cat.id);
+      const items = products.filter(p => p.cat === cat.id).sort((a, b) => (a.name || '').localeCompare(b.name || '', 'vi'));   /* A→Z theo tên */
       if (!items.length) return '';
       const [vn, en] = CAT_MAP[cat.id] || [(cat.label || cat.id).toUpperCase(), ''];
       const cards = items.map(p => {
