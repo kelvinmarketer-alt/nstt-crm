@@ -350,6 +350,10 @@
     const _dupBadge = r => _dupAddr.has(r.key)
       ? ` <span title="Trùng địa chỉ với đối tác khác — có thể cùng 1 điểm bán bị tách công nợ, kiểm tra để gộp" style="font-size:9px;background:#FEF3C7;color:#B45309;padding:0 4px;border-radius:6px;font-weight:700;white-space:nowrap">⚠ trùng ĐC</span>`
       : '';
+    /* ④3: phiếu trả hàng CHỜ DUYỆT của KH → công nợ CHƯA trừ (đến khi kế toán duyệt) → cảnh báo để khỏi tưởng nợ đúng. */
+    const _pendRet = {};
+    (S().get('returns', []) || []).forEach(rt => { if (rt && rt.status === 'pending') { const amt = +rt.refundTotal || 0; [rt.cust, rt.custId, rt.custName].forEach(k => { if (k) _pendRet[k] = (_pendRet[k] || 0) + amt; }); } });
+    const _pendBadge = r => { const v = _pendRet[r.key] || _pendRet[r.name]; return v ? ` <span title="Có phiếu TRẢ HÀNG chờ duyệt ${window.fmt(v)}₫ — công nợ CHƯA được trừ. Duyệt ở module Trả hàng." style="font-size:9px;background:#FEF9C3;color:#A16207;padding:0 5px;border-radius:6px;font-weight:700;white-space:nowrap">⚠ trả chờ duyệt</span>` : ''; };
     let body;
     if (cnGroupBrand) {
       const groups = groupByBrand(data.list);
@@ -369,7 +373,7 @@
       }).join('')}</tbody>`;
     } else {
       body = `<tbody>${data.list.map(r => `<tr>
-        <td class="par" title="Bấm để xem Thông báo công nợ — in / copy gửi khách"><a href="javascript:void(0)" onclick="window.cnShowNotice('${(r.key || '').replace(/'/g, "\\'")}')" style="color:var(--navy);font-weight:700;text-decoration:none;border-bottom:1px dotted var(--navy)">${r.name}</a>${_dupBadge(r)}</td>
+        <td class="par" title="Bấm để xem Thông báo công nợ — in / copy gửi khách"><a href="javascript:void(0)" onclick="window.cnShowNotice('${(r.key || '').replace(/'/g, "\\'")}')" style="color:var(--navy);font-weight:700;text-decoration:none;border-bottom:1px dotted var(--navy)">${r.name}</a>${_dupBadge(r)}${_pendBadge(r)}</td>
         ${data.days.map(d => { const v = dailyOf(r)[d] || 0; const kEsc = String(r.key || '').replace(/\\/g, '\\\\').replace(/'/g, "\\'"); return `<td class="num ${v ? 'cn-daycell' : 'z'}"${v ? ` onclick="window.cnDayOrders('${kEsc}','${d}')" style="cursor:pointer" title="Xem đơn + lợi nhuận ngày ${ddmm(d)}"` : ''}>${v ? fmt(v) : '·'}</td>`; }).join('')}
         ${bodyRight(r)}
       </tr>`).join('')}</tbody>`;

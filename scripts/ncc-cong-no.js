@@ -105,7 +105,7 @@
       ${data.days.map(d => { const v = r.daily[d] || 0; return `<td class="num ${v ? '' : 'z'}">${v ? `<a href="javascript:void(0)" onclick="window.ncdDayDetail('${r.key}','${d}')" style="color:var(--navy);text-decoration:none;border-bottom:1px dotted #94A3B8" title="Xem chi tiết mã hàng / phiếu / đơn ngày này">${fmtU(v)}</a>` : '·'}</td>`; }).join('')}
       <td class="num"><b>${fmtU(r.total)}</b></td>
       <td class="num cn-paid">${r.paid ? fmtU(r.paid) : '·'}</td>
-      <td class="num cn-owe">${r.remain ? fmtU(r.remain) : '·'}</td>
+      <td class="num cn-owe">${r.remain ? (r.remain < 0 ? `<span style="color:#16A34A" title="Kỳ này TRẢ nhiều hơn nhập → đang trả bớt nợ cũ (không phải lỗi)">${fmtU(r.remain)}</span>` : fmtU(r.remain)) : '·'}</td>
       <td class="num" style="font-weight:800;color:#DC2626;white-space:nowrap">${r.debtNow ? fmtU(r.debtNow) : '<span style="color:#16A34A;font-weight:700">✓ hết</span>'} <button onclick="window.ncdPayHistory('${r.key}')" title="Lịch sử thanh toán — đã trả bao nhiêu, tuổi nợ" style="background:#fff;border:1px solid var(--line);border-radius:6px;padding:3px 7px;font-size:11px;cursor:pointer">📜</button>${r.debtNow ? ` <button onclick="window.ncdPay('${r.key}')" title="Thanh toán công nợ NCC" style="background:#DC2626;color:#fff;border:none;border-radius:6px;padding:3px 9px;font-size:11px;font-weight:800;cursor:pointer">💵 Trả</button>` : ''}</td>
     </tr>`).join('')}</tbody>`;
     const foot = `<tfoot><tr>
@@ -311,7 +311,14 @@
        Hiện 1 dòng TỔNG trừ trả hàng (không liệt kê từng khoản — chi tiết ở popup ngày). */
     const claimTot = _supClaims(id);
     const conNo = _supRemainAll(id);
+    /* F5: DƯ ĐẦU KỲ = nợ mang sang trước fromISO (nhập − chi − trả hàng trước kỳ) → phiếu khớp con số hiện tại. */
+    const _openNhap = getPur().filter(p => p.supplierId === id && p.status === 'received' && dmyToISO(p.date) < fromISO).reduce((a, p) => a + (+p.total || 0), 0);
+    const _openPaid = getCash().filter(e => e && e.type === 'out' && dmyToISO(e.date) < fromISO && (e.supplierId === id || e.party === nm || (e.desc && String(e.desc).includes(id)))).reduce((a, e) => a + (+e.amount || 0), 0);
+    const _openClaim = getClaims().filter(c => c && c.supplierId === id && c.status !== 'settled' && c.status !== 'cancelled' && dmyToISO(c.date) < fromISO).reduce((a, c) => a + (+c.amount || 0), 0);
+    const opening = _openNhap - _openPaid - _openClaim;
+    const openingRow = opening ? `<tr><td class="c">—</td><td class="c" colspan="2"><b>Dư đầu kỳ (nợ mang sang)</b></td><td class="r">—</td><td class="r">—</td><td class="r"><b>${f(opening)}</b></td></tr>` : '';
     const txt = `ĐỐI CHIẾU CÔNG NỢ NHÀ CUNG CẤP\n${s.name}\nKỳ: ${ddmm(fromISO)} → ${ddmm(toISO)}\n──────────\n`
+      + (opening ? `Dư đầu kỳ (nợ mang sang): ${f(opening)}đ\n` : '')
       + (days.length ? days.map((g, i) => `${i + 1}. ${g.date} (${g.n} phiếu): nhập ${f(g.nhap)}`).join('\n') : '(không có phiếu trong kỳ)')
       + `\n──────────\nTổng nhập kỳ: ${f(tN)}đ · Đã trả (tiền mặt): ${f(tT)}đ${claimTot ? ` · Trừ trả hàng: ${f(claimTot)}đ` : ''} · CÒN NỢ HIỆN TẠI: ${f(conNo)}đ\n— ${comp.name}`;
     const html = `<!doctype html><html lang="vi"><head><meta charset="utf-8"><title>Đối chiếu công nợ - ${escH(s.name)}</title><style>
@@ -327,7 +334,7 @@
       <div class="pg"><div class="hd"><b>${escH(comp.name)}</b><br>${escH(comp.address)} · ĐT: ${escH(comp.phone)}</div>
         <h1>ĐỐI CHIẾU CÔNG NỢ NHÀ CUNG CẤP</h1><div class="sub"><b>${escH(s.name)}</b> · Kỳ: <b>${ddmm(fromISO)} → ${ddmm(toISO)}</b></div>
         <table><thead><tr><th>STT</th><th>Ngày</th><th>Số phiếu</th><th>Tiền nhập</th><th>Đã trả</th><th>Còn nợ</th></tr></thead>
-          <tbody>${rowsHtml || '<tr><td colspan="6" class="c">Không có phiếu trong kỳ</td></tr>'}</tbody>
+          <tbody>${openingRow}${rowsHtml || (opening ? '' : '<tr><td colspan="6" class="c">Không có phiếu trong kỳ</td></tr>')}</tbody>
           <tfoot><tr class="grand"><td colspan="3" class="r">TỔNG NHẬP KỲ</td><td class="r">${f(tN)}</td><td class="r">${f(tT)}</td><td class="r">${f(tN - tT)}</td></tr>
             ${claimTot ? `<tr class="grand"><td colspan="5" class="r">TRỪ TRẢ HÀNG (NCC nhận lại hàng lỗi)</td><td class="r" style="color:#B45309">−${f(claimTot)}</td></tr>` : ''}
             <tr class="grand"><td colspan="5" class="r">CÔNG NỢ PHẢI TRẢ HIỆN TẠI</td><td class="r">${f(conNo)}</td></tr></tfoot></table>
