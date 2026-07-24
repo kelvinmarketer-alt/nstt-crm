@@ -5,7 +5,7 @@
 
 /* Phiên bản app hiển thị (đối chiếu với CACHE_VERSION trong sw.js) — để user tự XÁC NHẬN
    đang chạy bản mới hay còn kẹt JS cũ (hiện ở góc sidebar + log console). */
-window.APP_VERSION = 'v562';
+window.APP_VERSION = 'v563';
 console.log('%c[NSTT] App ' + window.APP_VERSION, 'color:#339B21;font-weight:bold');
 
 /* Gom NGUỒN khách về 3 nhóm chuẩn: 'mkt' / 'sales' / 'sep-gioi-thieu'.
@@ -2792,3 +2792,81 @@ window.buildDailyReport = function (opts) {
 
   return { text: lines.join('\n'), lines, metrics: cfg.metrics, dateVi: TODAY_VI };
 };
+
+/* ============ AUTOCOMPLETE tuỳ chỉnh — thay <datalist> native ("ô đen" macOS) ============
+   Đọc options từ <datalist> mà input trỏ tới (list=) → hiện dropdown TRẮNG có style.
+   Input gắn data-ac-create → khi gõ tên CHƯA CÓ, hiện dòng "＋ Tạo mới «…»". */
+(function autocompleteSetup() {
+  if (typeof document === 'undefined' || !window.HTMLInputElement) return;
+  const NATIVE_SET = Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, 'value').set;
+  const norm = s => String(s || '').toLowerCase().normalize('NFD').replace(/[̀-ͯ]/g, '').replace(/đ/g, 'd').replace(/\s+/g, ' ').trim();
+  const esc = s => String(s == null ? '' : s).replace(/[&<>"]/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]));
+  let box = null, curInput = null, activeIdx = -1;
+  function getBox() {
+    if (box) return box;
+    box = document.createElement('div');
+    box.id = '__acBox';
+    box.style.cssText = 'position:fixed;z-index:10000;background:#fff;border:1px solid #E2E8F0;border-radius:10px;box-shadow:0 12px 32px rgba(15,23,42,.16);max-height:266px;overflow:auto;display:none;font-size:13px;padding:4px;color:#0f172a';
+    box.addEventListener('mousedown', e => e.preventDefault());   /* giữ focus khi click */
+    box.addEventListener('click', e => { const it = e.target.closest('[data-acv]'); if (it && curInput) pick(curInput, it.getAttribute('data-acv')); });
+    document.body.appendChild(box);
+    return box;
+  }
+  function listOf(input) {
+    const id = input.getAttribute('data-ac-list'); const dl = id && document.getElementById(id);
+    return dl ? [...dl.querySelectorAll('option')].map(o => o.value).filter(Boolean) : [];
+  }
+  function position(input) {
+    const r = input.getBoundingClientRect(), b = getBox();
+    b.style.left = r.left + 'px'; b.style.minWidth = r.width + 'px'; b.style.maxWidth = Math.max(r.width, 360) + 'px';
+    const below = window.innerHeight - r.bottom;
+    if (below < 210 && r.top > below) { b.style.top = 'auto'; b.style.bottom = (window.innerHeight - r.top + 4) + 'px'; }
+    else { b.style.bottom = 'auto'; b.style.top = (r.bottom + 4) + 'px'; }
+  }
+  function render(input) {
+    const all = listOf(input), q = (input.value || '').trim(), nq = norm(q);
+    let matches = nq ? all.filter(v => norm(v).includes(nq)) : all.slice();
+    matches.sort((a, b2) => (norm(a).startsWith(nq) ? 0 : 1) - (norm(b2).startsWith(nq) ? 0 : 1));
+    matches = matches.slice(0, 60);
+    const exact = all.some(v => norm(v) === nq);
+    const canCreate = input.hasAttribute('data-ac-create') && q && !exact;
+    if (!matches.length && !canCreate) { close(); return; }
+    const b = getBox();
+    b.innerHTML = matches.map(v => `<div data-acv="${esc(v)}" class="ac-it" style="padding:8px 11px;border-radius:6px;cursor:pointer;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${esc(v)}</div>`).join('')
+      + (canCreate ? `<div data-acv="${esc(q)}" data-accreate="1" class="ac-it" style="padding:8px 11px;border-radius:6px;cursor:pointer;color:#15803D;font-weight:700;background:#F0FDF4;margin-top:2px;border-top:1px solid #DCFCE7">＋ Tạo mới «${esc(q)}»</div>` : '');
+    activeIdx = -1; position(input); b.style.display = 'block'; curInput = input;
+  }
+  function pick(input, val) { NATIVE_SET.call(input, val); close(); input.dispatchEvent(new Event('input', { bubbles: true })); input.dispatchEvent(new Event('change', { bubbles: true })); input.focus(); }
+  function close() { if (box) box.style.display = 'none'; curInput = null; activeIdx = -1; }
+  function move(dir) {
+    const its = [...getBox().querySelectorAll('.ac-it')]; if (!its.length) return;
+    activeIdx = (activeIdx + dir + its.length) % its.length;
+    its.forEach((el, i) => el.style.background = i === activeIdx ? '#EEF2FF' : (el.getAttribute('data-accreate') ? '#F0FDF4' : ''));
+    its[activeIdx].scrollIntoView({ block: 'nearest' });
+  }
+  function enhance(input) {
+    if (!input || input.tagName !== 'INPUT' || input.dataset.acEnhanced) return;
+    const listId = input.getAttribute('list');
+    if (!listId && !input.getAttribute('data-ac-list')) return;
+    input.dataset.acEnhanced = '1';
+    if (listId) { input.setAttribute('data-ac-list', listId); input.removeAttribute('list'); }  /* tắt datalist native */
+    input.setAttribute('autocomplete', 'off');
+    input.addEventListener('focus', () => render(input));
+    input.addEventListener('input', () => render(input));
+    input.addEventListener('keydown', e => {
+      if (!box || box.style.display === 'none') return;
+      if (e.key === 'ArrowDown') { e.preventDefault(); move(1); }
+      else if (e.key === 'ArrowUp') { e.preventDefault(); move(-1); }
+      else if (e.key === 'Enter') { const its = [...box.querySelectorAll('.ac-it')]; if (activeIdx >= 0 && its[activeIdx]) { e.preventDefault(); pick(input, its[activeIdx].getAttribute('data-acv')); } else close(); }
+      else if (e.key === 'Escape') close();
+    });
+    input.addEventListener('blur', () => setTimeout(() => { if (curInput === input) close(); }, 130));
+  }
+  function scan(root) { try { (root || document).querySelectorAll('input[list],input[data-ac-list]').forEach(enhance); } catch (e) {} }
+  document.addEventListener('focusin', e => { if (e.target && e.target.tagName === 'INPUT' && (e.target.getAttribute('list') || e.target.getAttribute('data-ac-list'))) enhance(e.target); }, true);
+  window.addEventListener('scroll', () => { if (curInput) position(curInput); }, true);
+  window.addEventListener('resize', () => { if (curInput) position(curInput); });
+  try { new MutationObserver(ms => { for (const m of ms) for (const n of m.addedNodes) { if (n.nodeType !== 1) continue; if (n.tagName === 'INPUT') enhance(n); else if (n.querySelectorAll) scan(n); } }).observe(document.documentElement, { childList: true, subtree: true }); } catch (e) {}
+  if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', () => scan(document)); else scan(document);
+  window.enhanceAutocomplete = scan;
+})();

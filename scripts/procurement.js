@@ -573,7 +573,7 @@
           body += `<div style="margin-top:8px;background:#EFF6FF;border:1px solid #BFDBFE;border-radius:10px;padding:10px 12px">
             <div style="font-size:11.5px;color:#1D4ED8;font-weight:700;margin-bottom:7px">🏭 Nhà cung cấp cho «${esc(l.name)}»</div>
             <div style="display:flex;gap:7px;align-items:center;flex-wrap:wrap">
-              <input id="pcAddSup_${l.key}" list="pcSupDL" placeholder="Gõ tên NCC…" autocomplete="off"
+              <input id="pcAddSup_${l.key}" list="pcSupDL" data-ac-create placeholder="Gõ tên NCC…" autocomplete="off"
                 onkeydown="if(event.key==='Enter'){event.preventDefault();window.pcConfirmAddSup('${run.id}','${l.key}')}else if(event.key==='Escape'){window.pcCancelAddSup('${run.id}')}"
                 style="flex:1;min-width:160px;font-size:13.5px;border:1.5px solid #93C5FD;border-radius:8px;padding:8px 12px;background:#fff;outline:none">
               <button onclick="window.pcConfirmAddSup('${run.id}','${l.key}')" style="border:none;background:#15803D;color:#fff;border-radius:8px;padding:8px 16px;font-size:13px;font-weight:700;cursor:pointer">✓ Lưu</button>
@@ -605,7 +605,7 @@
       (l.allocations || []).forEach((a, ai) => {
         const supField = a.supplierId
           ? `<span style="display:inline-flex;align-items:center;gap:5px;background:#F0FDF4;border:1px solid #BBF7D0;border-radius:6px;padding:3px 9px;font-size:12px;font-weight:600;color:#166534">🏭 ${esc(a.supplierName)}${a.unitCost ? ` <span style="font-weight:400;color:#6B7280">${money(a.unitCost)}₫</span>` : ''}</span>`
-          : `<input list="pcSupDL" value="${esc(a.supplierName || '')}" placeholder="Gõ tên NCC…" onchange="window.pcSetAllocSup('${run.id}','${l.key}',${ai},this.value)" style="font-size:11.5px;border:1px solid #F59E0B;border-radius:5px;padding:3px 6px;width:160px;background:#FEF9C3">`;
+          : `<input list="pcSupDL" data-ac-create value="${esc(a.supplierName || '')}" placeholder="Gõ tên NCC…" onchange="window.pcSetAllocSup('${run.id}','${l.key}',${ai},this.value)" style="font-size:11.5px;border:1px solid #F59E0B;border-radius:5px;padding:3px 6px;width:160px;background:#FEF9C3">`;
         body += `<div class="pc-alloc" style="display:flex;align-items:center;gap:6px;flex-wrap:wrap;margin:3px 0">
           <span style="color:var(--muted);font-size:11px">↳</span>
           ${supField}
