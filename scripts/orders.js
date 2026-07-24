@@ -813,8 +813,9 @@
   }
 
   window.openOrder = async function(code) {
-    const o = orders.find(x => x.code === code);
-    if (!o) return;
+    let o = orders.find(x => x.code === code);
+    if (!o) { orders = window.STORE.get('orders', window.ORDERS || []); o = orders.find(x => x.code === code); }   /* list có thể cũ/chưa nạp → đọc lại STORE */
+    if (!o) { window.toast && window.toast('Không tìm thấy đơn ' + code + ' (có thể đã xoá / chưa tải xong)', 'warn'); return; }
     /* Danh sách KHÔNG kéo items (nhẹ) → nạp items của ĐƠN NÀY từ cloud trước khi mở chi tiết
        (lần đầu ~0.1-0.3s; lần sau tức thì vì đã ở RAM). */
     if (window.STORE.ensureOrderItems && !(Array.isArray(o.items) && o.items.length)) {
@@ -2613,7 +2614,21 @@ ${o.note ? `\n📝 Ghi chú: ${o.note}` : ''}
   if (prefillCust) setTimeout(() => window.openCreateOrder(prefillCust), 200);
   /* Mở thẳng chi tiết 1 đơn khi tới từ trang khác (vd Gom hàng → ✏️ Sửa) */
   const openCode = urlParams.get('open');
-  if (openCode) setTimeout(() => window.openOrder && window.openOrder(openCode), 300);
+  if (openCode) {
+    /* Chờ đơn tải xong mới mở (đến từ link ngoài lúc list chưa nạp → trước đây mở hụt im lặng). */
+    let _oTries = 0;
+    const _tryOpenCode = () => {
+      const ready = !window.STORE.isPreloaded || window.STORE.isPreloaded('orders');
+      const has = (window.STORE.get('orders', []) || []).some(x => x.code === openCode);
+      if (has || (ready && _oTries > 3) || _oTries > 40) {   /* thấy đơn, hoặc đã tải xong mà không có, hoặc quá ~8s */
+        orders = window.STORE.get('orders', window.ORDERS || []);
+        window.openOrder && window.openOrder(openCode);
+        return;
+      }
+      _oTries++; setTimeout(_tryOpenCode, 200);
+    };
+    setTimeout(_tryOpenCode, 200);
+  }
 
   /* Đếm số đơn web đang chờ duyệt → badge trên nút "🛒 Đơn web chờ duyệt" */
   window.refreshWebPendBadge = async function () {
