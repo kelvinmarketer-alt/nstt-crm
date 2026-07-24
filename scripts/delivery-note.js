@@ -38,6 +38,22 @@
     return window.BRAND_LOGO_DATAURL || ((location.origin || '') + '/assets/logo-name.png?v=486');
   }
   function fmt(n) { return (n || 0).toLocaleString('vi-VN'); }
+  /* Quy đổi 1 dòng hàng → kg (để tính sản lượng cho ship).
+     kg/g quy thẳng; đơn vị khác (quả/bó/thùng…) chỉ quy khi SP có khai bảng quy đổi. */
+  function kgConv(it) {
+    const u = String(it.unit || 'kg').toLowerCase().trim();
+    const q = (it.received != null && it.received !== '' ? +it.received : +it.qty) || 0;
+    if (u === 'kg') return q;
+    if (u === 'g' || u === 'gram') return q * 0.001;
+    const c = (window.prodUnitConv && (it.id || it.productId)) ? window.prodUnitConv(it.id || it.productId) : null;
+    if (c && +c.kgPerPack > 0) return q * (+c.kgPerPack);
+    return null; /* không quy đổi được → hiển thị "—" */
+  }
+  function fmtKg(n) {
+    if (n == null) return '—';
+    const r = Math.round(n * 100) / 100;
+    return r.toLocaleString('vi-VN', { maximumFractionDigits: 2 }) + ' kg';
+  }
   function fmtDate(s) {
     if (!s) return new Date().toLocaleDateString('vi-VN').replace(/\//g, '.');
     /* Hỗ trợ dd/mm/yyyy hoặc yyyy-mm-dd hoặc dd-mm-yyyy → dd.mm.yyyy */
@@ -60,8 +76,10 @@
     const c = getCust(o);
     const comp = getCompany();
     const items = o.items || [];
-    const totalQty = items.reduce((s, it) => s + (+it.qty || 0), 0);
+    const totalRecv = items.reduce((s, it) => s + ((it.received != null && it.received !== '' ? +it.received : +it.qty) || 0), 0);
     const totalAmt = items.reduce((s, it) => s + (+it.total || (+it.price||0) * (+it.qty||0) || 0), 0);
+    let totalKg = 0, hasKg = false;
+    items.forEach(it => { const k = kgConv(it); if (k != null) { totalKg += k; hasKg = true; } });
 
     const FAV = window.NSTT_FAVICON_DATAURL || '';
     /* VietQR chuyển khoản theo ĐÚNG SỐ TIỀN đơn — tách mã NH + STK từ comp.bank (vd "MB 228666669999") */
@@ -86,9 +104,9 @@ ${FAV ? `<link rel="icon" type="image/svg+xml" href="${FAV}">` : ''}
     background:#fff;font-size:12.5px;line-height:1.45;padding:14mm 12mm}
 
   /* === HEADER (3 cột: logo | thông tin DN | QR chuyển khoản) === */
-  .head{display:grid;grid-template-columns:104px 1fr 152px;gap:14px;align-items:flex-start;padding-bottom:6px}
-  .logo-wrap{text-align:center}
-  .logo-wrap img{width:178px;height:auto;object-fit:contain;display:block;margin:0 auto}
+  .head{display:grid;grid-template-columns:118px 1fr 150px;gap:16px;align-items:center;padding-bottom:6px}
+  .logo-wrap{text-align:center;overflow:hidden}
+  .logo-wrap img{width:114px;height:auto;max-width:100%;object-fit:contain;display:block;margin:0 auto}
   .logo-wrap .tag{font-size:9px;color:#008000;font-weight:700;margin-top:4px;line-height:1.25}
   .logo-wrap .tag2{font-size:8px;color:#2c8a48;margin-top:2px;font-style:italic}
 
@@ -184,11 +202,11 @@ ${FAV ? `<link rel="icon" type="image/svg+xml" href="${FAV}">` : ''}
         <th style="width:36px">STT</th>
         <th>Tên sản phẩm</th>
         <th style="width:42px">ĐVT</th>
-        <th class="thbig" style="width:64px">Số lượng<br>xuất kho</th>
-        <th class="thbig" style="width:52px">Thực<br>nhận</th>
-        <th style="width:78px">Giá bán</th>
-        <th style="width:90px">Thành tiền</th>
-        <th style="width:80px">Ghi chú</th>
+        <th class="thbig" style="width:54px">Thực<br>nhận</th>
+        <th class="thbig" style="width:62px">Quy đổi<br>kg</th>
+        <th style="width:76px">Giá bán</th>
+        <th style="width:88px">Thành tiền</th>
+        <th style="width:70px">Ghi chú</th>
       </tr>
     </thead>
     <tbody>
@@ -196,8 +214,8 @@ ${FAV ? `<link rel="icon" type="image/svg+xml" href="${FAV}">` : ''}
         <td class="c">${i+1}</td>
         <td class="l">${it.name || ''}</td>
         <td class="c">${it.unit || 'kg'}</td>
-        <td class="c">${it.qty || ''}</td>
-        <td class="c">${it.received != null ? it.received : it.qty || ''}</td>
+        <td class="c">${it.received != null && it.received !== '' ? it.received : (it.qty || '')}</td>
+        <td class="c">${fmtKg(kgConv(it))}</td>
         <td class="r">${fmt(it.price)}</td>
         <td class="r">${fmt(it.total || (+it.price||0)*(+it.qty||0))}</td>
         <td class="l" style="font-size:10.5px">${it.note || ''}</td>
@@ -206,8 +224,8 @@ ${FAV ? `<link rel="icon" type="image/svg+xml" href="${FAV}">` : ''}
     <tfoot>
       <tr>
         <td colspan="3"><b>Tổng cộng</b></td>
-        <td class="c">${totalQty || ''}</td>
-        <td></td>
+        <td class="c">${totalRecv || ''}</td>
+        <td class="c" style="color:#006400">${hasKg ? fmtKg(totalKg) : ''}</td>
         <td></td>
         <td class="r">${fmt(totalAmt)}</td>
         <td></td>
