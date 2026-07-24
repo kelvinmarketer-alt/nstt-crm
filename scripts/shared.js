@@ -5,7 +5,7 @@
 
 /* Phiên bản app hiển thị (đối chiếu với CACHE_VERSION trong sw.js) — để user tự XÁC NHẬN
    đang chạy bản mới hay còn kẹt JS cũ (hiện ở góc sidebar + log console). */
-window.APP_VERSION = 'v553';
+window.APP_VERSION = 'v554';
 console.log('%c[NSTT] App ' + window.APP_VERSION, 'color:#339B21;font-weight:bold');
 
 /* Gom NGUỒN khách về 3 nhóm chuẩn: 'mkt' / 'sales' / 'sep-gioi-thieu'.
@@ -424,19 +424,30 @@ window.buyPriceOn = function(productId, dateStr) {
     /* Ô tiền có sẵn "0" → coi như CHƯA điền: để TRỐNG + placeholder mờ "0"
        (click là gõ số ngay, khỏi phải xoá số 0 trước). Đọc .value vẫn ra 0. */
     if (raw(NATIVE.get.call(el)) === '0') { if (!el.getAttribute('placeholder')) el.setAttribute('placeholder', '0'); NATIVE.set.call(el, ''); }
-    /* getter trả SỐ SẠCH cho mọi nơi đọc; setter format khi gán (nếu đang gõ thì để RAW, format lúc blur). */
+    /* getter trả SỐ SẠCH cho mọi nơi đọc; setter LUÔN format (hiển thị có dấu chấm nghìn kể cả đang gõ). */
     try {
       Object.defineProperty(el, 'value', {
         configurable: true,
         get() { return raw(NATIVE.get.call(el)); },
-        set(v) { NATIVE.set.call(el, document.activeElement === el ? raw(v) : grp(raw(v))); },
+        set(v) { NATIVE.set.call(el, grp(raw(v))); },
       });
     } catch (e) {}
-    /* KHÔNG format khi đang gõ (input) — vì tự set value + con trỏ giữa lúc gõ gây LẶP KÝ TỰ trên
-       bàn phím ảo mobile (VD 24.000 → 224.000). Chỉ:
-       - focus: bỏ dấu chấm → gõ sạch, con trỏ tự nhiên.
-       - blur : format lại có dấu chấm nghìn. */
-    el.addEventListener('focus', function () { NATIVE.set.call(el, raw(NATIVE.get.call(el))); });
+    /* FORMAT NGAY LÚC GÕ (live) — chèn dấu chấm nghìn tức thì để khỏi phải đếm số 0.
+       An toàn mobile: bỏ qua khi IME đang compose; đặt lại con trỏ theo SỐ CHỮ SỐ bên trái
+       (không theo index ký tự) → thêm/bớt dấu chấm KHÔNG làm nhảy con trỏ / lặp ký tự. */
+    el.addEventListener('input', function (e) {
+      if (e && e.isComposing) return;
+      const cur = NATIVE.get.call(el);
+      const formatted = grp(raw(cur));
+      if (formatted === cur) return;                 /* không đổi → khỏi set, tránh nhiễu con trỏ */
+      let caret = el.selectionStart; if (caret == null) caret = cur.length;
+      let digitsLeft = 0;
+      for (let i = 0; i < caret && i < cur.length; i++) { const c = cur.charCodeAt(i); if (c >= 48 && c <= 57) digitsLeft++; }
+      NATIVE.set.call(el, formatted);
+      let pos = 0, seen = 0;
+      while (pos < formatted.length && seen < digitsLeft) { const c = formatted.charCodeAt(pos); if (c >= 48 && c <= 57) seen++; pos++; }
+      try { el.setSelectionRange(pos, pos); } catch (e2) {}
+    });
     el.addEventListener('blur', function () { fmtNow(el); });
   }
   function scan(root) { try { (root || document).querySelectorAll('input').forEach(enhance); } catch (e) {} }
