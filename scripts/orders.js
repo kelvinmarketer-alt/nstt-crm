@@ -578,7 +578,7 @@
   }
 
   /* Đổi sang trạng thái BẤT KỲ — gọi từ dropdown. Auto adjust doanh thu KH khi cần. */
-  function changeOrderStatus(code, newStatus, skipDeliveryConfirm) {
+  async function changeOrderStatus(code, newStatus, skipDeliveryConfirm) {
     const o = orders.find(x => x.code === code);
     if (!o || !STATUS[newStatus] || o.status === newStatus) return;
     const oldStatus = o.status;
@@ -601,7 +601,7 @@
       let extraNote = '';
       if (newStatus === 'returned') extraNote = '\n\n⚠️ Doanh thu + công nợ KH sẽ bị TRỪ tự động.';
       if (newStatus === 'cancelled' && (oldStatus === 'delivered' || oldStatus === 'reconciled')) extraNote = '\n\n⚠️ KH đã nhận — không nên hủy. Dùng "Đã trả hàng" thì hợp lý hơn.';
-      if (!confirm(`${verb} đơn ${code}?\nTừ "${STATUS[oldStatus].label}" → "${STATUS[newStatus].label}"${extraNote}`)) {
+      if (!await window.uiConfirm(`${verb} đơn ${code}?\nTừ "${STATUS[oldStatus].label}" → "${STATUS[newStatus].label}"${extraNote}`)) {
         /* Revert dropdown UI */
         const sel = document.querySelector(`#tbody select.status-select[data-code="${code}"]`);
         if (sel) sel.value = oldStatus;
@@ -609,7 +609,7 @@
       }
       /* Lấy lý do nếu hủy/trả */
       if (newStatus === 'cancelled' || newStatus === 'returned') {
-        const reason = prompt(`Lý do ${verb}? (để trống nếu không cần)`, '') || '';
+        const reason = await window.uiPrompt(`Lý do ${verb}? (để trống nếu không cần)`, '') || '';
         const reasonKey = newStatus === 'cancelled' ? 'cancelReason' : 'returnReason';
         window.STORE.update('orders', code, { status: newStatus, [reasonKey]: reason, [newStatus + 'At']: new Date().toISOString() });
       } else {
@@ -1453,7 +1453,7 @@
     _itemsMode = quoteLock ? 'view' : (qtyLock ? 'priceOnly' : 'edit');
     if (quoteLock) {
       const when = quoteLock.at ? new Date(quoteLock.at).toLocaleString('vi-VN') : '';
-      const ok = confirm(`🔒 Đơn ${code} ĐÃ CHỐT BÁO GIÁ bởi "${quoteLock.by}"${when ? ' lúc ' + when : ''}.\n\n• OK = MỞ KHOÁ để sửa lại giá (ghi tên bạn: ${meName || 'kế toán'})\n• Cancel = chỉ XEM (tránh sửa nhầm giá đã chốt)`);
+      const ok = await window.uiConfirm(`🔒 Đơn ${code} ĐÃ CHỐT BÁO GIÁ bởi "${quoteLock.by}"${when ? ' lúc ' + when : ''}.\n\n• OK = MỞ KHOÁ để sửa lại giá (ghi tên bạn: ${meName || 'kế toán'})\n• Cancel = chỉ XEM (tránh sửa nhầm giá đã chốt)`);
       if (ok) { window.setOrderQuoteLock(code, false); logOrderEdit(code, `🔓 Mở khoá báo giá để sửa — ${meName || '?'}`); _itemsMode = (window.orderQtyLock && window.orderQtyLock(code)) ? 'priceOnly' : 'edit'; }
     }
     const mode = _itemsMode;
@@ -2157,7 +2157,7 @@ CHỈ TRẢ JSON, không giải thích gì thêm.`;
 
 
   /* ============ Lưu items hiện tại thành đơn định kỳ ============ */
-  window.saveAsRecurring = function() {
+  window.saveAsRecurring = async function() {
     const custId = window.formVal('#oCust');
     if (!custId) { window.toast('Chọn KH trước','warn'); return; }
     if (!orderItems.length) { window.toast('Thêm ít nhất 1 mặt hàng','warn'); return; }
@@ -2168,7 +2168,7 @@ CHỈ TRẢ JSON, không giải thích gì thêm.`;
       items: orderItems.map(it => ({ productId: it.id, name: it.name, qty: it.qty })),
       fromOrder: true,
     }));
-    if (!confirm(`Sẽ chuyển sang trang Đơn định kỳ với:\n- KH: ${c?.name||custId}\n- ${orderItems.length} mặt hàng (đã prefill)\n\nĐi tới bây giờ?`)) return;
+    if (!await window.uiConfirm(`Sẽ chuyển sang trang Đơn định kỳ với:\n- KH: ${c?.name||custId}\n- ${orderItems.length} mặt hàng (đã prefill)\n\nĐi tới bây giờ?`)) return;
     window.location.href = 'recurring.html?fromOrder=1';
   };
 
@@ -2236,7 +2236,7 @@ CHỈ TRẢ JSON, không giải thích gì thêm.`;
     const _dd = window.formVal('#oDeliverDate') || '';
     const _todayISO = (window.todayISO ? window.todayISO() : new Date().toISOString().slice(0, 10));
     const _yst = (function () { const p = _todayISO.split('-').map(Number); const d = new Date(Date.UTC(p[0], p[1] - 1, p[2])); d.setUTCDate(d.getUTCDate() - 1); return d.toISOString().slice(0, 10); })();
-    if (_dd && _dd < _yst && !confirm('⚠️ Ngày giao (' + _dd + ') lùi quá 1 ngày so với hôm nay (' + _todayISO + ').\nKiểm tra lại kẻo lệch gom hàng + công nợ. Vẫn lưu?')) return;
+    if (_dd && _dd < _yst && !await window.uiConfirm('⚠️ Ngày giao (' + _dd + ') lùi quá 1 ngày so với hôm nay (' + _todayISO + ').\nKiểm tra lại kẻo lệch gom hàng + công nợ. Vẫn lưu?')) return;
 
     const drvId = window.formVal('#oDriver');
     const drv = drivers.find(d => d.id === drvId);
@@ -2363,11 +2363,11 @@ CHỈ TRẢ JSON, không giải thích gì thêm.`;
   };
 
   /* ============ IN PHIẾU HÀNG LOẠT (theo filter hiện tại) ============ */
-  window.printFilteredOrders = function () {
+  window.printFilteredOrders = async function () {
     const all = window.STORE.get('orders', window.ORDERS || []);
     const filtered = all.filter(o => match(o));
     if (!filtered.length) { window.toast('Không có đơn nào trong bộ lọc hiện tại', 'warn'); return; }
-    if (filtered.length > 30 && !confirm(`Sẽ in ${filtered.length} phiếu giao hàng (${filtered.length} trang A5). Tiếp tục?`)) return;
+    if (filtered.length > 30 && !await window.uiConfirm(`Sẽ in ${filtered.length} phiếu giao hàng (${filtered.length} trang A5). Tiếp tục?`)) return;
     const customers = window.STORE.get('customers', window.CUSTOMERS || []);
     const company = window.STORE.get('company', { name: 'Nông Sản Tuấn Tú Hà Nội', addr: '36 Tân Mai, Hoàng Mai, Hà Nội', phone: '0903 111 222' });
     const pageHtml = filtered.map(o => {

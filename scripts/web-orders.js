@@ -84,7 +84,7 @@
     if (window.__busyWoConfirm) return; window.__busyWoConfirm = true; setTimeout(() => { window.__busyWoConfirm = false; }, 2500);   /* chống double-click duyệt đơn web → tạo trùng */
     const r = ROWS[id];
     if (!r) return;
-    if (!confirm(`Duyệt đơn của "${r.cust_name}" → tạo Khách hàng (nếu mới) + Đơn hàng chính thức?`)) return;
+    if (!await window.uiConfirm(`Duyệt đơn của "${r.cust_name}" → tạo Khách hàng (nếu mới) + Đơn hàng chính thức?`)) return;
 
     // 1) Khách hàng — tìm theo SĐT, chưa có thì tạo
     const norm = s => (s || '').replace(/\D/g, '');
@@ -152,7 +152,7 @@
   window.woReject = async function (id) {
     const r = ROWS[id];
     if (!r) return;
-    if (!confirm(`Từ chối đơn của "${r.cust_name}"?`)) return;
+    if (!await window.uiConfirm(`Từ chối đơn của "${r.cust_name}"?`)) return;
     const me = (window.CURRENT_USER || {}).name || '';
     const { error } = await window.SB.from('web_orders').update({
       status: 'rejected', handled_by: me, handled_at: new Date().toISOString(),

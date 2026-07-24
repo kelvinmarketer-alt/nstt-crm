@@ -932,8 +932,8 @@
     };
 
     /* === HR/NS gửi CFO duyệt === */
-    window._psSubmit = function () {
-      if (!confirm('Gửi phiếu lương ' + p.staffName + ' cho CFO duyệt?\n\nSau khi gửi anh/chị KHÔNG sửa được nữa — chỉ CFO mới sửa được.')) return;
+    window._psSubmit = async function () {
+      if (!await window.uiConfirm('Gửi phiếu lương ' + p.staffName + ' cho CFO duyệt?\n\nSau khi gửi anh/chị KHÔNG sửa được nữa — chỉ CFO mới sửa được.')) return;
       const d = collect();
       const c = PF.computePayslip(d);
       const user = (window.AUTH && window.AUTH.currentUser()) || {};
@@ -951,8 +951,8 @@
     };
 
     /* === CFO duyệt phiếu === */
-    window._psApprove = function () {
-      if (!confirm('Duyệt phiếu lương cho ' + p.staffName + '?\n\nSau khi duyệt sẽ KHÔNG sửa được (trừ admin).')) return;
+    window._psApprove = async function () {
+      if (!await window.uiConfirm('Duyệt phiếu lương cho ' + p.staffName + '?\n\nSau khi duyệt sẽ KHÔNG sửa được (trừ admin).')) return;
       const d = collect();
       const c = PF.computePayslip(d);
       const user = (window.AUTH && window.AUTH.currentUser()) || {};
@@ -969,8 +969,8 @@
     };
 
     /* === CFO/Admin trả về NS sửa === */
-    window._psReturnDraft = function () {
-      const reason = prompt('Trả về NS sửa lại — Lý do (gửi cho NS biết để sửa):');
+    window._psReturnDraft = async function () {
+      const reason = await window.uiPrompt('Trả về NS sửa lại — Lý do (gửi cho NS biết để sửa):');
       if (!reason) return;
       const d = collect();
       const final = {
@@ -984,8 +984,8 @@
       closeDrawer();
     };
 
-    window._psPay = function () {
-      if (!confirm('Đánh dấu đã TRẢ lương cho ' + p.staffName + '?\n\nSẽ tự tạo phiếu chi vào Sổ quỹ.')) return;
+    window._psPay = async function () {
+      if (!await window.uiConfirm('Đánh dấu đã TRẢ lương cho ' + p.staffName + '?\n\nSẽ tự tạo phiếu chi vào Sổ quỹ.')) return;
       const d = collect();
       const final = { ...d, paid: true, status: 'paid', paidAt: new Date().toISOString() };
       savePayslip(final);
@@ -1113,8 +1113,8 @@
     `;
 
     /* Approve all submitted */
-    window._psApproveAllSubmitted = function (m) {
-      if (!confirm(`Duyệt TẤT CẢ ${submitted.length} phiếu chờ?\n\nTổng: ${PF.formatVND(totalSubmit)} ₫\n\nHành động này KHÔNG thể hoàn tác.`)) return;
+    window._psApproveAllSubmitted = async function (m) {
+      if (!await window.uiConfirm(`Duyệt TẤT CẢ ${submitted.length} phiếu chờ?\n\nTổng: ${PF.formatVND(totalSubmit)} ₫\n\nHành động này KHÔNG thể hoàn tác.`)) return;
       const user = (window.AUTH && window.AUTH.currentUser()) || {};
       const now = new Date().toISOString();
       const count = getPayslips().filter(p => p.month === m && p.status === 'submitted').length;
@@ -1140,7 +1140,7 @@
   /* =========================================================
      BATCH SUBMIT — HR gửi TẤT CẢ phiếu (draft + chưa lập) cho CFO
      ========================================================= */
-  window.submitAllDrafts = function (month) {
+  window.submitAllDrafts = async function (month) {
     month = month || '2026-' + String(new Date().getMonth()+1).padStart(2,'0');
     const hasPerm = (perm) => !!(window.AUTH && window.AUTH.hasPerm && window.AUTH.hasPerm(perm));
     const isAdmin = hasPerm('all');
@@ -1187,7 +1187,7 @@
       '',
       'Sau khi gửi anh/chị KHÔNG sửa được nữa — chỉ CFO mới sửa được.',
     ].filter(Boolean).join('\n');
-    if (!confirm(msg)) return;
+    if (!await window.uiConfirm(msg)) return;
 
     const now = new Date().toISOString();
     const user = (window.AUTH && window.AUTH.currentUser()) || {};

@@ -272,8 +272,8 @@
     window.closeDrawer();
   };
 
-  window.deleteRo = function (id) {
-    if (!confirm('Xóa mẫu định kỳ này? KHÔNG xóa các đơn đã sinh ra trước đó.')) return;
+  window.deleteRo = async function (id) {
+    if (!await window.uiConfirm('Xóa mẫu định kỳ này? KHÔNG xóa các đơn đã sinh ra trước đó.')) return;
     const list = getRO().filter(x => x.id !== id);
     window.STORE.set('recurring_orders', list);
     window.audit && window.audit.log('recurring.delete', id);
@@ -426,7 +426,7 @@ CHỈ TRẢ JSON.`,
   };
 
   /* Copy items từ đơn gần nhất của KH đã chọn */
-  window.roCopyFromLastOrder = function() {
+  window.roCopyFromLastOrder = async function() {
     const custId = document.getElementById('ro_cust')?.value;
     if (!custId) { window.toast('Chọn KH trước','warn'); return; }
     const orders = (window.STORE.get('orders', []) || [])
@@ -434,7 +434,7 @@ CHỈ TRẢ JSON.`,
       .sort((a,b) => (b.date||'').localeCompare(a.date||''));
     if (!orders.length) { window.toast('KH này chưa có đơn nào','warn'); return; }
     const lastOrder = orders[0];
-    if (!confirm(`Copy ${lastOrder.items?.length||0} mặt hàng từ đơn ${lastOrder.code} (${lastOrder.date})?`)) return;
+    if (!await window.uiConfirm(`Copy ${lastOrder.items?.length||0} mặt hàng từ đơn ${lastOrder.code} (${lastOrder.date})?`)) return;
     const items = (lastOrder.items || []).map(it => ({ name: it.name, qty: it.qty }));
     _roApplyBulkItems(items);
   };

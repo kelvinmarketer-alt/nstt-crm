@@ -220,11 +220,11 @@
         </table></div>
     `, { width: '720px', footer: `<button class="btn btn-ghost" onclick="window.closeModal()">Đóng</button>` });
   };
-  window._delImportBatch = function (key, i) {
+  window._delImportBatch = async function (key, i) {
     if (!_canBulkDelete()) { window.toast && window.toast('Không có quyền xoá.', 'warn'); return; }
     const b = _importBatches().find(x => String(x.key) === String(key));
     if (!b) { window.toast && window.toast('Lô không còn tồn tại — reload.', 'warn'); return; }
-    if (!window.confirm(`Xoá LÔ NHẬP này?\n\n• ${b.n} đơn · tổng ${(+b.total).toLocaleString('vi-VN')}đ\n• Xoá cả khách mới tạo từ lô (nếu hết đơn)\n\nKHÔNG hoàn tác được.`)) return;
+    if (!(await window.uiConfirm(`Xoá LÔ NHẬP này?\n\n• ${b.n} đơn · tổng ${(+b.total).toLocaleString('vi-VN')}đ\n• Xoá cả khách mới tạo từ lô (nếu hết đơn)\n\nKHÔNG hoàn tác được.`))) return;
     /* 1) xoá đơn trong lô */
     b.codes.forEach(code => window.STORE.remove('orders', code));
     /* 2) xoá khách import mồ côi (không còn đơn nào tham chiếu) */

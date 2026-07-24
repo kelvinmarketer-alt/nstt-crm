@@ -1216,8 +1216,8 @@
     return el ? el.value.trim() : '';
   };
 
-  window.confirmDelete = function(message, onConfirm) {
-    if (confirm('⚠️ ' + message + '\n\nThao tác này không thể hoàn tác.')) onConfirm();
+  window.confirmDelete = async function(message, onConfirm) {
+    if (await window.uiConfirm('⚠️ ' + message + '\n\nThao tác này không thể hoàn tác.')) onConfirm();
   };
 
   /* Log mode khi load */

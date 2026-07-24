@@ -567,10 +567,10 @@
         </table></div>
     `, { width: '640px', footer: `<button class="btn btn-ghost" onclick="window.closeModal()">Đóng</button>` });
   };
-  window._delAdsBatch = function (bt) {
+  window._delAdsBatch = async function (bt) {
     const ids = all().filter(e => String(e.id || '').startsWith('AD-imp-' + bt + '-')).map(e => e.id);
     if (!ids.length) { window.toast('Lô không còn dòng nào — reload.', 'warn'); return; }
-    if (!window.confirm(`Xoá LÔ này?\n\n• ${ids.length} dòng chi phí\n\nKHÔNG hoàn tác được.`)) return;
+    if (!(await window.uiConfirm(`Xoá LÔ này?\n\n• ${ids.length} dòng chi phí\n\nKHÔNG hoàn tác được.`))) return;
     ids.forEach(id => window.STORE.remove('adspend', id));
     window.toast(`✓ Đã xoá lô ${ids.length} dòng chi phí.`, 'success');
     setTimeout(() => { window.openAdsBatches(); render(); }, 350);
@@ -594,9 +594,9 @@
       sel.dataset.filled = '1';
     }
   };
-  window.adsDeleteSelected = function () {
+  window.adsDeleteSelected = async function () {
     const ids = _adsSelIds(); if (!ids.length) return;
-    if (!window.confirm(`Xoá ${ids.length} dòng chi phí đã chọn?\n\nKHÔNG hoàn tác.`)) return;
+    if (!(await window.uiConfirm(`Xoá ${ids.length} dòng chi phí đã chọn?\n\nKHÔNG hoàn tác.`))) return;
     ids.forEach(id => window.STORE.remove('adspend', id));
     window.toast(`✓ Đã xoá ${ids.length} dòng`, 'success');
     render();

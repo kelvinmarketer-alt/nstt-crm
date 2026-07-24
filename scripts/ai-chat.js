@@ -723,8 +723,8 @@ ${recent}`;
       this.toggleDrawer();
     },
 
-    delConv(id) {
-      if (!confirm('Xoá cuộc trò chuyện này?')) return;
+    async delConv(id) {
+      if (!await window.uiConfirm('Xoá cuộc trò chuyện này?')) return;
       const list = this.listConvs().filter(c => c.id !== id);
       this.saveConvList(list);
       localStorage.removeItem('vty_' + this.convKey(id));
@@ -733,15 +733,15 @@ ${recent}`;
       this.renderMemInfo();
     },
 
-    clearCurrent() {
-      if (!confirm('Xoá hết tin nhắn trong cuộc trò chuyện hiện tại?')) return;
+    async clearCurrent() {
+      if (!await window.uiConfirm('Xoá hết tin nhắn trong cuộc trò chuyện hiện tại?')) return;
       this.hist = []; this._summary = '';
       this.saveConv();
       this.render(); this.renderMemView(); this.renderMemInfo();
     },
 
-    clearFacts() {
-      if (!confirm('Xoá toàn bộ facts AI đã học về bạn? AI sẽ "quên" bạn là ai.')) return;
+    async clearFacts() {
+      if (!await window.uiConfirm('Xoá toàn bộ facts AI đã học về bạn? AI sẽ "quên" bạn là ai.')) return;
       this.saveFacts([]);
       this.renderMemView(); this.renderMemInfo();
     },
@@ -753,8 +753,8 @@ ${recent}`;
       this.renderMemView(); this.renderMemInfo();
     },
 
-    addFactManual() {
-      const text = prompt('Thêm fact AI cần nhớ về bạn (vd "Tôi là chủ DN Tuấn Tú Farm, tập trung B2B nhà hàng"):');
+    async addFactManual() {
+      const text = await window.uiPrompt('Thêm fact AI cần nhớ về bạn (vd "Tôi là chủ DN Tuấn Tú Farm, tập trung B2B nhà hàng"):');
       if (!text) return;
       const facts = this.getFacts();
       facts.push({ text, ts: Date.now(), manual: true });

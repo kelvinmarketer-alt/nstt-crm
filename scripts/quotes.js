@@ -56,7 +56,7 @@
   }
 
   /* === Đổi status từ dropdown — ghi approver tự động === */
-  window.qtChangeStatus = function(id, newSt) {
+  window.qtChangeStatus = async function(id, newSt) {
     const list = getQ();
     const i = list.findIndex(x => x.id === id);
     if (i < 0) return;
@@ -64,7 +64,7 @@
     if (oldSt === newSt) return;
     const q = list[i];
     if (newSt === 'accepted' && !q.convertedOrderId) {
-      if (!confirm(`KH "${q.custName}" duyệt báo giá ${q.id} (${window.fmt(q.total)} ₫)?\n\n→ Hệ thống sẽ tự tạo Đơn hàng mới với items + giá đã báo.`)) {
+      if (!await window.uiConfirm(`KH "${q.custName}" duyệt báo giá ${q.id} (${window.fmt(q.total)} ₫)?\n\n→ Hệ thống sẽ tự tạo Đơn hàng mới với items + giá đã báo.`)) {
         render(); return;
       }
       const orders = window.STORE.get('orders', []) || [];
@@ -83,7 +83,7 @@
       window.toast(`✓ Đã tạo đơn ${code}`,'success');
     }
     if (newSt === 'rejected') {
-      const reason = prompt('Lý do KH từ chối (để rút kinh nghiệm):');
+      const reason = await window.uiPrompt('Lý do KH từ chối (để rút kinh nghiệm):');
       if (reason === null) { render(); return; }
       q.rejectReason = reason;
     }

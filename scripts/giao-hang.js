@@ -476,8 +476,8 @@
     if (window.closeModal) window.closeModal();
     setTimeout(() => window.ghShipLinks(), 200);   /* mở lại modal để hiện link mới */
   };
-  window.ghRemoveGuest = function (id) {
-    if (!confirm('Xoá ship ngoài này? Link của họ sẽ hết hiệu lực.')) return;
+  window.ghRemoveGuest = async function (id) {
+    if (!await window.uiConfirm('Xoá ship ngoài này? Link của họ sẽ hết hiệu lực.')) return;
     S().remove('shippers', id);
     if (S().rmwKv) S().rmwKv('shipperTokens', m => { if (m) delete m[id]; return m || {}; }, {});   /* thu hồi token */
     window.toast && window.toast('Đã xoá ship ngoài', 'info');
@@ -486,8 +486,8 @@
   };
   window._ghCopy = function (t) {
     if (navigator.clipboard && navigator.clipboard.writeText) {
-      navigator.clipboard.writeText(t).then(() => window.toast && window.toast('📋 Đã copy link', 'success'), () => window.prompt('Copy link (Ctrl+C):', t));
-    } else { window.prompt('Copy link (Ctrl+C):', t); }
+      navigator.clipboard.writeText(t).then(() => window.toast && window.toast('📋 Đã copy link', 'success'), () => window.uiPrompt('Copy link (Ctrl+C):', t));
+    } else { window.uiPrompt('Copy link (Ctrl+C):', t); }
   };
 
 

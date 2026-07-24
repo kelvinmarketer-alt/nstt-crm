@@ -1284,10 +1284,10 @@
   }
 
   /* ====== 🧹 LÀM SẠCH chấm công tháng đang xem (up nhầm → xoá, up lại) ====== */
-  window.clearTimesheetMonth = function () {
+  window.clearTimesheetMonth = async function () {
     if (!canUpload()) { window.toast('🔒 Bạn không có quyền làm sạch chấm công (cần payroll.upload)', 'warn'); return; }
     const mth = month;
-    if (!confirm('🧹 Làm sạch TOÀN BỘ chấm công tháng ' + mth + '?\n\n→ Xoá dữ liệu công (X / V / P / đi muộn) của MỌI nhân viên trong tháng này, bảng về mặc định.\nDùng khi lỡ up nhầm file — xoá rồi up lại. KHÔNG ảnh hưởng tháng khác.')) return;
+    if (!await window.uiConfirm('🧹 Làm sạch TOÀN BỘ chấm công tháng ' + mth + '?\n\n→ Xoá dữ liệu công (X / V / P / đi muộn) của MỌI nhân viên trong tháng này, bảng về mặc định.\nDùng khi lỡ up nhầm file — xoá rồi up lại. KHÔNG ảnh hưởng tháng khác.')) return;
     if (window.STORE.rmwKv) {
       window.STORE.rmwKv('timesheet', arr => (Array.isArray(arr) ? arr.filter(t => !(t && t.month === mth)) : []), []);
       window.STORE.rmwKv('timesheetMeta', m => { m = (m && typeof m === 'object' && !Array.isArray(m)) ? m : {}; Object.keys(m).forEach(k => { if (k.endsWith('_' + mth)) delete m[k]; }); return m; }, {});

@@ -161,11 +161,11 @@
 
     /* Khi user trong form tạo đơn TỰ chọn 1 SP cho 1 tên mơ hồ →
        hỏi "Bạn có muốn lưu lại cho lần sau?" và gọi addAlias */
-    promptToLearn(custId, word, productId) {
+    async promptToLearn(custId, word, productId) {
       const p = this.get(custId);
       const n = norm(word);
       if (!n || p.aliases[n]) return;  // đã có rồi thì thôi
-      if (confirm(`💡 Lần sau khi KH này nhắn "${word}", em có nên tự hiểu là "${this._prodName(productId)}" không?`)) {
+      if (await window.uiConfirm(`💡 Lần sau khi KH này nhắn "${word}", em có nên tự hiểu là "${this._prodName(productId)}" không?`)) {
         this.addAlias(custId, word, productId);
         window.toast && window.toast('✓ Đã lưu vào từ điển riêng của KH', 'success');
       }

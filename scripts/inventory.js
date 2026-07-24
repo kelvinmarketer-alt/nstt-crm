@@ -187,8 +187,8 @@
   }
 
   /* Đặt tồn thực tế hàng loạt (kiểm kê) cho các SP đã chọn — có ghi log biến động */
-  window.bulkSetInvStock = function (ids) {
-    const val = prompt(`Đặt TỒN THỰC TẾ cho ${ids.length} SP đã chọn (kiểm kê):`, '');
+  window.bulkSetInvStock = async function (ids) {
+    const val = await window.uiPrompt(`Đặt TỒN THỰC TẾ cho ${ids.length} SP đã chọn (kiểm kê):`, '');
     if (val == null) return;
     const v = parseFloat(String(val).replace(/[^\d.]/g, ''));
     if (isNaN(v) || v < 0) { window.toast('Nhập số hợp lệ', 'warn'); return; }

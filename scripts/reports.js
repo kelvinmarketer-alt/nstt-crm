@@ -70,8 +70,8 @@
     window.toast('↺ Đã reset bộ lọc', 'info');
   };
 
-  window.savePreset = function() {
-    const name = prompt('Đặt tên preset (VD: "Báo cáo tháng - KH VIP"):');
+  window.savePreset = async function() {
+    const name = await window.uiPrompt('Đặt tên preset (VD: "Báo cáo tháng - KH VIP"):');
     if (!name) return;
     const presets = window.STORE.get('reportPresets', []);
     presets.push({ name, savedAt: new Date().toLocaleString('vi-VN'), filters: {...filters} });

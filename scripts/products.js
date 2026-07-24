@@ -81,10 +81,10 @@
 
   window.boardSwitchTier = function (id) { boardTier = +id; renderBoard(); };
   /* GỐC: đặt giá bán = giá nhập × (1+%) cho tất cả SP (link toàn hệ thống) */
-  window.baseApplyMarkup = function () {
+  window.baseApplyMarkup = async function () {
     const x = parseFloat(document.getElementById('baseMarkup').value);
     if (isNaN(x)) { window.toast('Nhập % hợp lệ', 'warn'); return; }
-    if (!confirm(`Đặt GIÁ BÁN GỐC = giá nhập + ${x}% cho TẤT CẢ sản phẩm (ngày ${fmtD(boardDate)})?\nSP chưa có giá nhập sẽ bỏ qua. Vẫn sửa tay lại được.`)) return;
+    if (!await window.uiConfirm(`Đặt GIÁ BÁN GỐC = giá nhập + ${x}% cho TẤT CẢ sản phẩm (ngày ${fmtD(boardDate)})?\nSP chưa có giá nhập sẽ bỏ qua. Vẫn sửa tay lại được.`)) return;
     window.STORE.set('priceBaseMarkup', x);
     const ps = products();
     let n = 0;
@@ -110,11 +110,11 @@
     window.STORE.rmwKv('priceTiers', arr => { const t = arr.find(x => x.id === boardTier); if (t && t.overrides) delete t.overrides[pid]; return arr; });
     renderBoard();
   };
-  window.tierAdd = function () {
+  window.tierAdd = async function () {
     const tiers = getTiers();
     if (tiers.length >= 8) { window.toast('Tối đa 8 nhóm', 'warn'); return; }
     const id = (tiers.reduce((m, t) => Math.max(m, t.id), 0) || 0) + 1;
-    const name = prompt('Tên nhóm bảng giá mới:', 'Nhóm ' + id);
+    const name = await window.uiPrompt('Tên nhóm bảng giá mới:', 'Nhóm ' + id);
     if (name == null) return;
     const nm = name.trim() || ('Nhóm ' + id);
     window.STORE.rmwKv('priceTiers', arr => { if (!arr.find(t => t.id === id)) arr.push({ id, name: nm, markup: 0, overrides: {} }); return arr; });
@@ -122,13 +122,13 @@
     window.toast('✓ Đã thêm nhóm ' + nm, 'success');
   };
   /* NHÂN BẢN 1 nhóm giá → nhóm mới (copy nguyên % + toàn bộ giá override), rồi user chỉnh vài SP. */
-  window.tierClone = function (id) {
+  window.tierClone = async function (id) {
     const tiers = getTiers();
     if (tiers.length >= 8) { window.toast('Tối đa 8 nhóm — xóa bớt rồi nhân bản', 'warn'); return; }
     const src = tiers.find(t => t.id === +id);
     if (!src) return;
     const nOv = Object.keys(src.overrides || {}).length;
-    const name = prompt(`Nhân bản "${src.name}" (copy % + ${nOv} giá riêng). Tên nhóm mới:`, src.name + ' (bản sao)');
+    const name = await window.uiPrompt(`Nhân bản "${src.name}" (copy % + ${nOv} giá riêng). Tên nhóm mới:`, src.name + ' (bản sao)');
     if (name == null) return;
     const newId = (tiers.reduce((m, t) => Math.max(m, t.id), 0) || 0) + 1;
     const snap = { id: newId, name: name.trim() || (src.name + ' (bản sao)'), markup: src.markup, overrides: Object.assign({}, src.overrides || {}) };
@@ -162,8 +162,8 @@
     window.closeModal(); renderBoard();
     window.toast('✓ Đã lưu tên nhóm bảng giá', 'success');
   };
-  window.tierDelete = function (id) {
-    if (!confirm('Xóa nhóm bảng giá này? (giá gốc + nhóm khác không ảnh hưởng)')) return;
+  window.tierDelete = async function (id) {
+    if (!await window.uiConfirm('Xóa nhóm bảng giá này? (giá gốc + nhóm khác không ảnh hưởng)')) return;
     window.STORE.rmwKv('priceTiers', arr => arr.filter(t => t.id !== +id));
     if (boardTier === +id) boardTier = 0;
     window.closeModal(); renderBoard();
@@ -534,10 +534,10 @@
     renderMkt();
     window.toast(giaNum === 0 ? '↺ Giá MKT = giá thật' : `⚡ Giá MKT = giá thật ${giaNum>0?'+':'−'} ${Math.abs(giaNum)} giá`, 'success');
   };
-  window._mktApplyBulk = function () {
+  window._mktApplyBulk = async function () {
     const op = parseInt(document.getElementById('mktOp').value, 10) || 1;
     const gia = parseFloat(document.getElementById('mktGia').value) || 0;
-    if (gia > 50) { if (!confirm(`Bạn nhập ${gia} giá = ${(gia*1000).toLocaleString('vi-VN')}đ — số khá lớn. Chắc chắn?`)) return; }
+    if (gia > 50) { if (!await window.uiConfirm(`Bạn nhập ${gia} giá = ${(gia*1000).toLocaleString('vi-VN')}đ — số khá lớn. Chắc chắn?`)) return; }
     _mktSetOffset(op * Math.round(gia * 1000));
     renderMkt();
     window.toast(`⚡ Đã áp dụng giá MKT = giá thật ${op>0?'+':'−'} ${gia} giá`, 'success');
@@ -557,8 +557,8 @@
     try { await window.PriceCatalogue.export(window.todayISO(), { priceFn: (p) => mktPriceOf(p, c), noSend: true }); }
     catch (e) { window.toast('Lỗi tạo file: ' + e.message, 'warn'); }
   };
-  window._mktReset = function () {
-    if (!confirm('Reset bảng giá Marketing về đúng giá bán thật? (xóa công thức + mọi sửa tay)')) return;
+  window._mktReset = async function () {
+    if (!await window.uiConfirm('Reset bảng giá Marketing về đúng giá bán thật? (xóa công thức + mọi sửa tay)')) return;
     saveMkt({ offset: 0, override: {} });
     renderMkt();
     window.toast('↺ Đã reset giá MKT = giá thật', 'success');
@@ -805,9 +805,9 @@
   };
 
   /* Đặt GIÁ BÁN hàng loạt trong Bảng giá — Gốc: set giá bán; Nhóm: ghi đè giá nhóm */
-  window.bulkSetBoardPrice = function (ids) {
+  window.bulkSetBoardPrice = async function (ids) {
     const tier = boardTier ? tierById(boardTier) : null;
-    const val = prompt(`Đặt ${tier ? 'GIÁ NHÓM "' + tier.name + '"' : 'GIÁ BÁN'} cho ${ids.length} SP đã chọn (đ):`, '');
+    const val = await window.uiPrompt(`Đặt ${tier ? 'GIÁ NHÓM "' + tier.name + '"' : 'GIÁ BÁN'} cho ${ids.length} SP đã chọn (đ):`, '');
     if (val == null) return;
     const v = parseInt(String(val).replace(/[^\d]/g, ''), 10);
     if (isNaN(v) || v < 0) { window.toast('Nhập số hợp lệ', 'warn'); return; }
@@ -830,8 +830,8 @@
   };
 
   /* Đặt GIÁ NHẬP hàng loạt cho các SP đã chọn (ngày hôm nay) */
-  window.bulkSetBuyPrice = function (ids) {
-    const val = prompt(`Đặt GIÁ NHẬP cho ${ids.length} SP đã chọn (đ/đvt):`, '');
+  window.bulkSetBuyPrice = async function (ids) {
+    const val = await window.uiPrompt(`Đặt GIÁ NHẬP cho ${ids.length} SP đã chọn (đ/đvt):`, '');
     if (val == null) return;
     const v = parseInt(String(val).replace(/[^\d]/g, ''), 10);
     if (isNaN(v) || v < 0) { window.toast('Nhập số hợp lệ', 'warn'); return; }

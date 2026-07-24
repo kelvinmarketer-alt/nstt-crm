@@ -5,7 +5,7 @@
 
 /* Phiên bản app hiển thị (đối chiếu với CACHE_VERSION trong sw.js) — để user tự XÁC NHẬN
    đang chạy bản mới hay còn kẹt JS cũ (hiện ở góc sidebar + log console). */
-window.APP_VERSION = 'v563';
+window.APP_VERSION = 'v564';
 console.log('%c[NSTT] App ' + window.APP_VERSION, 'color:#339B21;font-weight:bold');
 
 /* Gom NGUỒN khách về 3 nhóm chuẩn: 'mkt' / 'sales' / 'sep-gioi-thieu'.
@@ -1210,12 +1210,12 @@ window.attachBulkOps = function (opts) {
     `;
     /* Wire bulk status change */
     const statusSel = document.getElementById(`bulk-status-${store}`);
-    if (statusSel) statusSel.onchange = () => {
+    if (statusSel) statusSel.onchange = async () => {
       if (!statusSel.value) return;
       const ids = getSelectedIds();
       if (!ids.length) return;
       const fieldName = (opts.actions && opts.actions.changeStatus && opts.actions.changeStatus.field) || 'status';
-      if (!confirm(`Đổi ${fieldName === 'status' ? 'trạng thái' : fieldName} của ${ids.length} ${label} thành "${statusSel.value}"?`)) return;
+      if (!await window.uiConfirm(`Đổi ${fieldName === 'status' ? 'trạng thái' : fieldName} của ${ids.length} ${label} thành "${statusSel.value}"?`)) return;
       const list = window.STORE.get(store, []) || [];
       let count = 0;
       ids.forEach(id => {
@@ -1238,10 +1238,10 @@ window.attachBulkOps = function (opts) {
     });
     updateToolbar();
   };
-  window[`_bulkDelete_${store}`] = function () {
+  window[`_bulkDelete_${store}`] = async function () {
     const ids = getSelectedIds();
     if (!ids.length) return;
-    if (!confirm(`⚠️ Xóa ${ids.length} ${label}? Hành động này KHÔNG THỂ HOÀN TÁC.`)) return;
+    if (!await window.uiConfirm(`⚠️ Xóa ${ids.length} ${label}? Hành động này KHÔNG THỂ HOÀN TÁC.`)) return;
     ids.forEach(id => window.STORE.remove(store, id));
     window.toast?.(`🗑 Đã xóa ${ids.length} ${label}`, 'danger');
     window[`_bulkClear_${store}`]();
@@ -2115,6 +2115,55 @@ window.uiConfirm = function (message, opts = {}) {
     setTimeout(() => { const b = el.querySelector('#uicf-ok'); if (b) b.focus(); }, 30);
   });
 };
+
+/* ============ uiAlert / uiPrompt — popup thay alert()/prompt() native "ô đen" ============ */
+window.uiAlert = function (message, opts = {}) {
+  opts = opts || {};
+  return new Promise(resolve => {
+    const old = document.getElementById('ui-alert-bg'); if (old) old.remove();
+    const msg = String(message == null ? '' : message).replace(/[&<>]/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;' }[c])).replace(/\n/g, '<br>');
+    const el = document.createElement('div');
+    el.id = 'ui-alert-bg'; el.className = 'modal-bg open'; el.style.zIndex = 4001;
+    el.innerHTML = `<div class="modal" style="width:min(92vw,420px);max-width:92vw">
+        <div class="modal-head"><h3>${opts.icon != null ? opts.icon + ' ' : 'ℹ️ '}${opts.title || 'Thông báo'}</h3></div>
+        <div class="modal-body" style="font-size:14.5px;line-height:1.65;color:var(--text)">${msg}</div>
+        <div class="modal-foot" style="display:flex;justify-content:flex-end"><button class="btn btn-primary" id="uia-ok">${opts.okText || 'Đóng'}</button></div></div>`;
+    document.body.appendChild(el);
+    const done = () => { el.remove(); document.removeEventListener('keydown', onKey); resolve(true); };
+    const onKey = e => { if (e.key === 'Escape' || e.key === 'Enter') { e.preventDefault(); done(); } };
+    document.addEventListener('keydown', onKey);
+    el.querySelector('#uia-ok').onclick = done;
+    el.onclick = e => { if (e.target === el) done(); };
+    setTimeout(() => { const b = el.querySelector('#uia-ok'); if (b) b.focus(); }, 30);
+  });
+};
+window.uiPrompt = function (message, defVal = '', opts = {}) {
+  opts = opts || {};
+  return new Promise(resolve => {
+    const old = document.getElementById('ui-prompt-bg'); if (old) old.remove();
+    const msg = String(message == null ? '' : message).replace(/[&<>]/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;' }[c])).replace(/\n/g, '<br>');
+    const el = document.createElement('div');
+    el.id = 'ui-prompt-bg'; el.className = 'modal-bg open'; el.style.zIndex = 4001;
+    el.innerHTML = `<div class="modal" style="width:min(92vw,440px);max-width:92vw">
+        <div class="modal-head"><h3>${opts.icon != null ? opts.icon + ' ' : '✏️ '}${opts.title || 'Nhập'}</h3></div>
+        <div class="modal-body" style="font-size:14px;line-height:1.6;color:var(--text)"><div style="margin-bottom:9px">${msg}</div>
+          <input id="uip-inp" value="${String(defVal == null ? '' : defVal).replace(/"/g, '&quot;')}" placeholder="${(opts.placeholder || '').replace(/"/g, '&quot;')}" style="width:100%;box-sizing:border-box;border:1px solid var(--line);border-radius:8px;padding:9px 11px;font-size:14px"></div>
+        <div class="modal-foot" style="display:flex;gap:10px;justify-content:flex-end">
+          <button class="btn btn-ghost" id="uip-cancel">${opts.cancelText || 'Huỷ'}</button>
+          <button class="btn btn-primary" id="uip-ok">${opts.okText || 'OK'}</button></div></div>`;
+    document.body.appendChild(el);
+    const inp = el.querySelector('#uip-inp');
+    const done = v => { el.remove(); document.removeEventListener('keydown', onKey); resolve(v); };
+    const onKey = e => { if (e.key === 'Escape') done(null); else if (e.key === 'Enter' && document.activeElement === inp) { e.preventDefault(); done(inp.value); } };
+    document.addEventListener('keydown', onKey);
+    el.querySelector('#uip-ok').onclick = () => done(inp.value);
+    el.querySelector('#uip-cancel').onclick = () => done(null);
+    el.onclick = e => { if (e.target === el) done(null); };
+    setTimeout(() => { inp.focus(); inp.select(); }, 30);
+  });
+};
+/* alert() native → popup (không giá trị trả về nên override toàn cục an toàn) */
+try { window.alert = m => { window.uiAlert(m); }; } catch (e) {}
 
 /* ============ HELP GUIDES ============ */
 window.HELP_GUIDES = {

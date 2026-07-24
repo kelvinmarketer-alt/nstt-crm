@@ -438,8 +438,8 @@
       money == null && n ? 'warn' : 'success');
     rerender();
   }
-  function _clear(date) {
-    if (!confirm('Xoá toàn bộ lịch trực ngày này?')) return;
+  async function _clear(date) {
+    if (!await window.uiConfirm('Xoá toàn bộ lịch trực ngày này?')) return;
     setDay(date, null);
     window.closeModal?.();
     window.toast?.('✓ Đã xoá lịch trực', 'success');

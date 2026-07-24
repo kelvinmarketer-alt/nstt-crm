@@ -471,8 +471,8 @@
     renderBonusTab();
     window.renderPayrollPublic && window.renderPayrollPublic();
   }
-  function delEntry(id) {
-    if (!confirm('Xoá khoản thưởng này?')) return;
+  async function delEntry(id) {
+    if (!await window.uiConfirm('Xoá khoản thưởng này?')) return;
     removeEntry(id);
     window.toast?.('🗑 Đã xoá', 'danger');
     renderBonusTab();
@@ -750,9 +750,9 @@
     const list = document.getElementById('qcList-' + group);
     if (list) list.innerHTML = arr.map((p, i) => _polCard(p, group, i, i === arr.length - 1)).join('');
   }
-  function _polRemove(group, i) {
+  async function _polRemove(group, i) {
     if (_cards(group).length <= 1) { window.toast?.('Mỗi khối phải còn ít nhất 1 quy chế', 'warn'); return; }
-    if (!confirm('Xoá quy chế này? Các khoản rơi vào giai đoạn đó sẽ thành 0đ nếu không quy chế nào phủ.')) return;
+    if (!await window.uiConfirm('Xoá quy chế này? Các khoản rơi vào giai đoạn đó sẽ thành 0đ nếu không quy chế nào phủ.')) return;
     const arr = _readPolicies(group);
     arr.splice(i, 1);
     _repaint(group, arr);

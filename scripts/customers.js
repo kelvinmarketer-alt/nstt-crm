@@ -1501,9 +1501,9 @@
       <button class="btn btn-sm btn-ghost" style="color:var(--danger)" onclick="window.removeCustomerFile('${f.id}')">🗑</button>
     </div>`).join('');
   }
-  window.removeCustomerFile = function (fid) {
+  window.removeCustomerFile = async function (fid) {
     const id = window._currentDrawerCust; if (!id) return;
-    if (!confirm('Xóa file này?')) return;
+    if (!await window.uiConfirm('Xóa file này?')) return;
     const c = customers.find(x => x.id === id); if (!c) return;
     const attachments = (c.attachments || []).filter(f => f.id !== fid);
     window.STORE.update('customers', id, { attachments });

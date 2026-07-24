@@ -132,11 +132,11 @@
   };
 
   /* === Khóa / Mở khóa === */
-  window.akToggleLock = function (sid) {
+  window.akToggleLock = async function (sid) {
     const s = staffList().find(x => (x.id || x.code) === sid) || {};
     const locked = (s.status === 'off' || s.status === 'inactive');
     const next = locked ? 'active' : 'off';
-    if (!confirm((locked ? 'Mở khóa' : 'Khóa') + ' tài khoản "' + (s.name || sid) + '"?\n' + (locked ? 'NV đăng nhập lại bình thường.' : 'NV sẽ KHÔNG đăng nhập được cho đến khi mở khóa.'))) return;
+    if (!await window.uiConfirm((locked ? 'Mở khóa' : 'Khóa') + ' tài khoản "' + (s.name || sid) + '"?\n' + (locked ? 'NV đăng nhập lại bình thường.' : 'NV sẽ KHÔNG đăng nhập được cho đến khi mở khóa.'))) return;
     window.STORE.update('staff', sid, { status: next });
     window.akRender();
     window.toast(locked ? '✓ Đã mở khóa' : '✓ Đã khóa tài khoản', locked ? 'success' : 'warn');
@@ -146,7 +146,7 @@
   window.akBulkReset = async function () {
     const ids = [...document.querySelectorAll('.ak-cb:checked')].map(cb => cb.getAttribute('data-id'));
     if (!ids.length) { window.toast('Chọn ít nhất 1 NV (tick ô đầu dòng)', 'warn'); return; }
-    if (!confirm('Đặt lại mật khẩu MẶC ĐỊNH (Tuantu@2026) cho ' + ids.length + ' NV đã chọn?')) return;
+    if (!await window.uiConfirm('Đặt lại mật khẩu MẶC ĐỊNH (Tuantu@2026) cho ' + ids.length + ' NV đã chọn?')) return;
     for (const sid of ids) { try { await window.AUTH.resetStaffAuth(sid); } catch (e) {} }
     window.akRender();
     window.toast('✓ Đã reset ' + ids.length + ' tài khoản về Tuantu@2026', 'success');

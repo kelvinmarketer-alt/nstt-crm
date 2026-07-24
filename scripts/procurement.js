@@ -325,9 +325,9 @@
   window._pcClearRunSel = function () { window._pcRunSel.clear(); renderRuns(); renderRunHistory(); };
 
   /* Xoá 1 phiên gom → trả các đơn về giai đoạn ① (chọn đơn → gom) */
-  window.pcDeleteRun = function (runId, skipConfirm) {
+  window.pcDeleteRun = async function (runId, skipConfirm) {
     const runs = getRuns(); const run = runs.find(r => r.id === runId); if (!run) return;
-    if (!skipConfirm && !confirm(`Xoá phiên ${runId}?\nCác đơn trong phiên sẽ trả về giai đoạn ① (chọn đơn → gom).`)) return;
+    if (!skipConfirm && !await window.uiConfirm(`Xoá phiên ${runId}?\nCác đơn trong phiên sẽ trả về giai đoạn ① (chọn đơn → gom).`)) return;
     const orders = getOrders(); let och = false;
     (run.orderCodes || []).forEach(code => {
       const o = orders.find(x => x.code === code);
@@ -339,25 +339,25 @@
     if (window._pcActiveRun === runId) { window._pcActiveRun = null; window.pcCloseDetail && window.pcCloseDetail(); }
     if (!skipConfirm) { window.toast?.('🗑 Đã xoá phiên ' + runId + ' · đơn trả về giai đoạn ①', 'danger'); renderAll(); }
   };
-  window.pcBulkDeleteRuns = function () {
+  window.pcBulkDeleteRuns = async function () {
     const ids = [...window._pcRunSel];
     if (!ids.length) return;
-    if (!confirm(`Xoá ${ids.length} phiên đã chọn?\nTất cả đơn trong các phiên này sẽ trả về giai đoạn ①.`)) return;
+    if (!await window.uiConfirm(`Xoá ${ids.length} phiên đã chọn?\nTất cả đơn trong các phiên này sẽ trả về giai đoạn ①.`)) return;
     ids.forEach(id => window.pcDeleteRun(id, true));
     window._pcRunSel.clear();
     window.toast?.(`🗑 Đã xoá ${ids.length} phiên · đơn trả về giai đoạn ①`, 'danger');
     renderAll();
   };
   /* Trả 1 đơn từ ③ Xuất kho về ② Phiên gom (gán lại NCC) */
-  window.pcReturnToGom = function (code) {
+  window.pcReturnToGom = async function (code) {
     const orders = getOrders(); const o = orders.find(x => x.code === code); if (!o) return;
     const runs = getRuns(); const run = runs.find(r => Array.isArray(r.orderCodes) && r.orderCodes.includes(code));
     if (run) {
-      if (!confirm(`Trả đơn ${code} về giai đoạn ② (phiên ${run.id}) để gán lại NCC?`)) return;
+      if (!await window.uiConfirm(`Trả đơn ${code} về giai đoạn ② (phiên ${run.id}) để gán lại NCC?`)) return;
       run.status = 'draft'; saveRuns(runs);
       o.whStatus = 'gathering';
     } else {
-      if (!confirm(`Đơn ${code} không còn thuộc phiên gom nào.\nTrả về giai đoạn ① (chọn đơn → gom)?`)) return;
+      if (!await window.uiConfirm(`Đơn ${code} không còn thuộc phiên gom nào.\nTrả về giai đoạn ① (chọn đơn → gom)?`)) return;
       o.whStatus = '';
     }
     S().set('orders', orders);
@@ -367,9 +367,9 @@
 
   /* Trả CẢ PHIÊN đã chốt về bước gán NCC để kiểm/sửa (lỡ tay chốt).
      Đơn về "đang gom"; gỡ các phiếu nhập nháp (chưa nhận) mà phiên tự tạo. Phiếu ĐÃ NHẬN giữ nguyên. */
-  window.pcReopenRun = function (runId, skipConfirm) {
+  window.pcReopenRun = async function (runId, skipConfirm) {
     const runs = getRuns(); const run = runs.find(r => r.id === runId); if (!run) return;
-    if (!skipConfirm && !confirm(`Trả phiên ${run.id} về bước gán NCC để sửa?\n• Đơn về trạng thái "đang gom".\n• Các phiếu nhập nháp phiên tự tạo (CHƯA nhận) sẽ được gỡ, chốt lại sẽ tạo mới.\n• Phiếu đã "✓ Đã nhận" vẫn giữ nguyên.`)) return;
+    if (!skipConfirm && !await window.uiConfirm(`Trả phiên ${run.id} về bước gán NCC để sửa?\n• Đơn về trạng thái "đang gom".\n• Các phiếu nhập nháp phiên tự tạo (CHƯA nhận) sẽ được gỡ, chốt lại sẽ tạo mới.\n• Phiếu đã "✓ Đã nhận" vẫn giữ nguyên.`)) return;
     run.status = 'draft'; saveRuns(runs);
     const orders = getOrders();
     (run.orderCodes || []).forEach(code => { const o = orders.find(x => x.code === code); if (o && o.whStatus === 'confirmed') o.whStatus = 'gathering'; });

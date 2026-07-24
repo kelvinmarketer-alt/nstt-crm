@@ -71,7 +71,7 @@
   };
 
   window._osDel = async function (id) {
-    if (!confirm('Xoá mẫu nét chữ này? AI sẽ không dùng mẫu này nữa.')) return;
+    if (!await window.uiConfirm('Xoá mẫu nét chữ này? AI sẽ không dùng mẫu này nữa.')) return;
     try { await window.OrderSamples.delete(id); } catch (e) {}
     _all = _all.filter(s => s.id !== id);
     renderStats(); buildFilter();

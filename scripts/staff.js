@@ -463,18 +463,18 @@
     if (r.success) { window.closeModal(); window.toast('✓ Đã đặt mật khẩu cho ' + (name || staffId) + '. Báo NV đăng nhập bằng: ' + pw, 'success'); }
     else window.toast('❌ ' + (r.error || 'Lỗi'), 'danger');
   };
-  window._resetStaffToDefault = function(staffId, name) {
-    if (!confirm('Reset mật khẩu của ' + (name || staffId) + ' về mặc định Tuantu@2026?')) return;
+  window._resetStaffToDefault = async function(staffId, name) {
+    if (!await window.uiConfirm('Reset mật khẩu của ' + (name || staffId) + ' về mặc định Tuantu@2026?')) return;
     window.AUTH.resetStaffAuth(staffId);
     window.closeModal();
     window.toast('✓ Đã reset về mặc định. NV đăng nhập bằng Tuantu@2026', 'success');
   };
 
   /* === Toggle khóa/mở tài khoản === */
-  window.toggleStaffStatus = function(staffId, currentStatus) {
+  window.toggleStaffStatus = async function(staffId, currentStatus) {
     const newStatus = currentStatus === 'active' ? 'off' : 'active';
     const verb = newStatus === 'active' ? 'MỞ KHÓA' : 'KHÓA';
-    if (!confirm(`${verb} tài khoản này?\n\n${newStatus === 'off' ? 'NV sẽ KHÔNG đăng nhập được nữa cho đến khi mở khóa lại.' : 'NV có thể đăng nhập lại bình thường.'}`)) return;
+    if (!await window.uiConfirm(`${verb} tài khoản này?\n\n${newStatus === 'off' ? 'NV sẽ KHÔNG đăng nhập được nữa cho đến khi mở khóa lại.' : 'NV có thể đăng nhập lại bình thường.'}`)) return;
     window.STORE.update('staff', staffId, { status: newStatus });
     window.closeModal();
     window.toast(`✓ Đã ${verb.toLowerCase()} tài khoản`, newStatus === 'active' ? 'success' : 'warn');
