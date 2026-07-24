@@ -141,7 +141,7 @@
     /* 📅 LỊCH SỬ NHẬN HÀNG — gộp theo NGÀY (accordion, mới→cũ) */
     const done = list.filter(p => p.status === 'wh_received' || p.status === 'received');
     if (done.length) {
-      const _dOf = p => { const iso = p.whReceivedAt || p.wh_received_at; if (iso) { const d = new Date(iso); if (!isNaN(d)) return d.toLocaleDateString('vi-VN'); } return p.date || '—'; };
+      const _dOf = p => (window.fmtDay ? window.fmtDay(p.whReceivedAt || p.wh_received_at || p.date) : (p.date || '—'));
       const _dk = d => { const m = String(d).match(/(\d{1,2})\/(\d{1,2})\/(\d{2,4})/); return m ? (m[3].length === 2 ? '20' + m[3] : m[3]) + m[2].padStart(2, '0') + m[1].padStart(2, '0') : '00000000'; };
       const byDay = {};
       done.forEach(p => { const dd = _dOf(p); (byDay[dd] = byDay[dd] || []).push(p); });

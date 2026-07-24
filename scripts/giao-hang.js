@@ -136,7 +136,7 @@
     const delivered = ordList().filter(o => (o.status === 'delivered' || o.status === 'reconciled') && mineOnly(o))
       .sort((a, b) => String(b.deliveredAt || b.date || '').localeCompare(String(a.deliveredAt || a.date || '')));
     if (!delivered.length) return '';
-    const dOf = o => { const iso = o.deliveredAt; if (iso) { const d = new Date(iso); if (!isNaN(d)) return d.toLocaleDateString('vi-VN'); } return o.date || '—'; };
+    const dOf = o => (window.fmtDay ? window.fmtDay(o.deliveredAt || o.date) : (o.date || '—'));
     const dk = d => { const m = String(d).match(/(\d{1,2})\/(\d{1,2})\/(\d{2,4})/); return m ? (m[3].length === 2 ? '20' + m[3] : m[3]) + m[2].padStart(2, '0') + m[1].padStart(2, '0') : '0'; };
     const byDay = {}; delivered.forEach(o => { const dd = dOf(o); (byDay[dd] = byDay[dd] || []).push(o); });
     const days = Object.keys(byDay).sort((a, b) => dk(b).localeCompare(dk(a)));

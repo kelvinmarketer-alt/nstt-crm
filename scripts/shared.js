@@ -5,7 +5,7 @@
 
 /* Phiên bản app hiển thị (đối chiếu với CACHE_VERSION trong sw.js) — để user tự XÁC NHẬN
    đang chạy bản mới hay còn kẹt JS cũ (hiện ở góc sidebar + log console). */
-window.APP_VERSION = 'v565';
+window.APP_VERSION = 'v566';
 console.log('%c[NSTT] App ' + window.APP_VERSION, 'color:#339B21;font-weight:bold');
 
 /* Gom NGUỒN khách về 3 nhóm chuẩn: 'mkt' / 'sales' / 'sep-gioi-thieu'.
@@ -2164,6 +2164,18 @@ window.uiPrompt = function (message, defVal = '', opts = {}) {
 };
 /* alert() native → popup (không giá trị trả về nên override toàn cục an toàn) */
 try { window.alert = m => { window.uiAlert(m); }; } catch (e) {}
+
+/* ============ fmtDay — chuẩn hoá MỌI ngày về dd/mm/yyyy (bỏ giờ) ============ */
+window.fmtDay = function (v) {
+  if (v == null || v === '') return '—';
+  const s = String(v).trim();
+  const p2 = n => String(n).padStart(2, '0');
+  const fromDate = d => (isNaN(d) ? null : `${p2(d.getDate())}/${p2(d.getMonth() + 1)}/${d.getFullYear()}`);
+  if (/^\d{4}-\d{1,2}-\d{1,2}/.test(s) || /T\d/.test(s)) { const r = fromDate(new Date(s)); if (r) return r; }
+  const m = s.match(/^(\d{1,2})[\/\-.](\d{1,2})[\/\-.](\d{2,4})/);   /* dd/mm/yyyy [giờ] */
+  if (m) { const yy = m[3].length === 2 ? '20' + m[3] : m[3]; return `${p2(m[1])}/${p2(m[2])}/${yy}`; }
+  const r = fromDate(new Date(s)); return r || s;
+};
 
 /* ============ HELP GUIDES ============ */
 window.HELP_GUIDES = {

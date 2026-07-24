@@ -67,6 +67,7 @@
   function supOrder(s) { const m = String(s && s.id || '').match(/(\d+)/); return m ? +m[1] : 1e9; }
   function render() {
     renderKpis();
+    const _tab = window.__supTab === 'le' ? 'le' : 'si';   /* tab đang chọn: Sỉ / Lẻ */
     const pur = getPur();
     const all = getSup().slice().sort((a, b) => supOrder(a) - supOrder(b));
     const si = all.filter(s => groupOf(s) === 'si');
@@ -85,12 +86,8 @@
       const prodSummary = prods.length
         ? prods.map(p => escH(p.name)).join(' · ')
         : '<span style="opacity:.65;font-style:italic">chưa gán sản phẩm</span>';
-      const prodLine = prods.length
-        ? prods.map(p => `<span style="display:inline-block;background:#fff;border:1px solid var(--line);border-radius:6px;padding:1px 8px;margin:2px 4px 0 0;font-size:12px">${escH(p.name)}${p.price ? `<span style="color:var(--muted)"> · ${window.fmtShort(p.price)}</span>` : ''}</span>`).join('')
-        : '<span style="color:var(--muted);font-size:12px;font-style:italic">Chưa gán sản phẩm — bấm “Chi tiết & Sửa” để chọn</span>';
-      return `<details class="sup-acc" data-search="${escH(search)}" style="border-bottom:1px solid #EFF2EE">
-        <summary style="display:flex;align-items:center;gap:12px;padding:9px 14px;cursor:pointer;list-style:none">
-          <span class="sup-caret" style="color:#94A3B8;font-size:11px;flex:0 0 12px">▸</span>
+      /* Bấm cả dòng → mở drawer chi tiết + sửa luôn (không xổ dropdown) */
+      return `<div class="sup-acc" data-search="${escH(search)}" onclick="window.openSupDrawer('${s.id}')" title="Bấm để xem chi tiết & sửa" style="display:flex;align-items:center;gap:12px;padding:11px 14px;cursor:pointer;border-bottom:1px solid #EFF2EE">
           <span style="flex:1;min-width:0">
             <div style="font-weight:700;color:var(--navy);white-space:nowrap;overflow:hidden;text-overflow:ellipsis">
               ${has(s.name) ? escH(tcName(s.name)) : '(chưa đặt tên)'}
@@ -101,15 +98,9 @@
           <span style="flex:0 0 58px;text-align:center">
             <span style="display:inline-block;min-width:22px;padding:1px 7px;background:${prods.length ? '#EFF6FF' : '#F1F5F9'};color:${prods.length ? '#1E40AF' : '#94A3B8'};border-radius:20px;font-weight:700;font-size:12px;font-variant-numeric:tabular-nums">${prods.length}</span>
           </span>
-          <span style="flex:0 0 128px;font-variant-numeric:tabular-nums;color:var(--muted);font-size:12.5px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${has(s.phone) ? escH(s.phone) : dash}</span>
-          <span style="flex:0 0 150px;text-align:right;font-variant-numeric:tabular-nums;white-space:nowrap;font-weight:${_supDebt(s.id) > 0 ? '700' : '400'};color:${_supDebt(s.id) > 0 ? '#DC2626' : 'var(--muted)'}">${money(_supDebt(s.id))} <button onclick="event.stopPropagation();event.preventDefault();window.supPayHistory('${s.id}')" title="Lịch sử thanh toán NCC — đã trả bao nhiêu, tuổi nợ" style="background:#fff;border:1px solid var(--line);border-radius:6px;padding:2px 6px;font-size:11px;cursor:pointer;vertical-align:middle">📜</button></span>
-        </summary>
-        <div style="padding:2px 14px 13px 38px;background:#FAFBFA">
-          <div style="font-size:10.5px;color:var(--muted);text-transform:uppercase;font-weight:700;letter-spacing:.3px;margin-bottom:4px">Sản phẩm cung cấp (${prods.length})</div>
-          <div style="line-height:1.95">${prodLine}</div>
-          <button class="btn btn-ghost btn-sm" style="margin-top:10px" onclick="window.openSupDrawer('${s.id}')">Chi tiết &amp; Sửa →</button>
-        </div>
-      </details>`;
+          <span class="mobile-hide" style="flex:0 0 128px;font-variant-numeric:tabular-nums;color:var(--muted);font-size:12.5px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${has(s.phone) ? escH(s.phone) : dash}</span>
+          <span style="flex:0 0 150px;text-align:right;font-variant-numeric:tabular-nums;white-space:nowrap;font-weight:${_supDebt(s.id) > 0 ? '700' : '400'};color:${_supDebt(s.id) > 0 ? '#DC2626' : 'var(--muted)'}">${money(_supDebt(s.id))} <button onclick="event.stopPropagation();event.preventDefault();window.supPayHistory('${s.id}')" title="Lịch sử thanh toán NCC" style="background:#fff;border:1px solid var(--line);border-radius:6px;padding:2px 6px;font-size:11px;cursor:pointer;vertical-align:middle">📜</button></span>
+        </div>`;
     };
 
     /* Panel full-width: header (tiêu đề + ô tìm riêng) · hàng cột · danh sách accordion */
@@ -150,9 +141,15 @@
              <a href="javascript:void 0" onclick="window.supOpenUnassigned()" style="color:#B45309;font-weight:700;white-space:nowrap">Xếp ngay →</a>
            </div>`
         : `<div style="background:#F0FDF4;border:1px solid #BBF7D0;border-radius:8px;padding:6px 12px;margin-bottom:13px;font-size:12px;color:#15803D">✓ Tất cả nhà cung cấp đã được xếp nhóm.</div>`}
-      ${panel('si', '📦 NHÀ CUNG CẤP SỈ', 'Giao cả lô theo tổng — kho tự chia cho từng khách', '#1E40AF', '#EFF6FF', si)}
-      ${panel('le', '🛵 NHÀ CUNG CẤP LẺ', 'Chia mô sẵn theo từng khách — nhận về là túi có tên', '#15803D', '#F0FDF4', le)}`;
+      <div style="display:flex;gap:8px;margin-bottom:13px">
+        <button onclick="window.supSetTab('si')" style="flex:1;padding:11px 8px;border-radius:9px;border:1.5px solid ${_tab === 'si' ? '#1E40AF' : 'var(--line)'};background:${_tab === 'si' ? '#EFF6FF' : '#fff'};color:${_tab === 'si' ? '#1E40AF' : '#64748B'};font-weight:800;font-size:13.5px;cursor:pointer">📦 NCC Sỉ <span style="background:${_tab === 'si' ? '#1E40AF' : '#94A3B8'};color:#fff;border-radius:20px;padding:1px 8px;font-size:11.5px;margin-left:4px">${si.length}</span></button>
+        <button onclick="window.supSetTab('le')" style="flex:1;padding:11px 8px;border-radius:9px;border:1.5px solid ${_tab === 'le' ? '#15803D' : 'var(--line)'};background:${_tab === 'le' ? '#F0FDF4' : '#fff'};color:${_tab === 'le' ? '#15803D' : '#64748B'};font-weight:800;font-size:13.5px;cursor:pointer">🛵 NCC Lẻ <span style="background:${_tab === 'le' ? '#15803D' : '#94A3B8'};color:#fff;border-radius:20px;padding:1px 8px;font-size:11.5px;margin-left:4px">${le.length}</span></button>
+      </div>
+      ${_tab === 'si'
+        ? panel('si', '📦 NHÀ CUNG CẤP SỈ', 'Giao cả lô theo tổng — kho tự chia cho từng khách', '#1E40AF', '#EFF6FF', si)
+        : panel('le', '🛵 NHÀ CUNG CẤP LẺ', 'Chia mô sẵn theo từng khách — nhận về là túi có tên', '#15803D', '#F0FDF4', le)}`;
   }
+  window.supSetTab = function (t) { window.__supTab = (t === 'le' ? 'le' : 'si'); render(); };
 
   /* Tìm trong 1 nhóm — lọc tại chỗ (không dựng lại cả trang, giữ ô đang gõ + accordion đang mở) */
   window.supFilterPanel = function (group, q) {
@@ -160,7 +157,7 @@
     const body = document.getElementById('supBody-' + group);
     if (!body) return;
     let shown = 0;
-    body.querySelectorAll('details.sup-acc').forEach(d => {
+    body.querySelectorAll(".sup-acc").forEach(d => {
       const hit = !q || (d.getAttribute('data-search') || '').includes(q);
       d.style.display = hit ? '' : 'none';
       if (hit) shown++;
@@ -429,14 +426,14 @@
         <div><label style="font-size:12px;color:var(--muted)">Người liên hệ</label><input id="sf_contact" value="${s.contact}" style="width:100%;border:1px solid var(--line);border-radius:6px;padding:7px;font-size:13px"></div>
         <div><label style="font-size:12px;color:var(--muted)">SĐT</label><input id="sf_phone" value="${s.phone}" style="width:100%;border:1px solid var(--line);border-radius:6px;padding:7px;font-size:13px"></div>
         <div style="grid-column:span 2"><label style="font-size:12px;color:var(--muted)">Địa chỉ</label><input id="sf_addr" value="${s.address}" style="width:100%;border:1px solid var(--line);border-radius:6px;padding:7px;font-size:13px"></div>
-        <div><label style="font-size:12px;color:var(--muted)">Điều khoản TT ${window.helpTip('COD=trả ngay · NET 7/14/30 = trả trong 7/14/30 ngày sau nhận hàng.')}</label><select id="sf_term" style="width:100%;border:1px solid var(--line);border-radius:6px;padding:7px;font-size:13px"><option ${s.paymentTerm==='COD'?'selected':''}>COD</option><option ${s.paymentTerm==='NET 7'?'selected':''}>NET 7</option><option ${s.paymentTerm==='NET 14'?'selected':''}>NET 14</option><option ${s.paymentTerm==='NET 30'?'selected':''}>NET 30</option></select></div>
+        <div><label style="font-size:12px;color:var(--muted)">Điều khoản TT ${window.helpTip('Công nợ 30/45 ngày = trả trong 30/45 ngày sau khi nhận hàng.')}</label><select id="sf_term" style="width:100%;border:1px solid var(--line);border-radius:6px;padding:7px;font-size:13px"><option value="NET 30" ${s.paymentTerm !== 'NET 45' ? 'selected' : ''}>Công nợ 30 ngày</option><option value="NET 45" ${s.paymentTerm === 'NET 45' ? 'selected' : ''}>Công nợ 45 ngày</option></select></div>
         <div><label style="font-size:12px;color:var(--muted)">Trạng thái nhập hàng ${window.helpTip('Ngừng nhập = KHÔNG hiện ở lệnh gọi hàng của Kho. Lịch sử và công nợ giữ nguyên.')}</label>
           <select id="sf_supplyStatus" style="width:100%;border:1px solid var(--line);border-radius:6px;padding:7px;font-size:13px">
             ${[['active','Đang nhập hàng'],['paused','Ngừng nhập hàng']].map(([v,lb])=>`<option value="${v}" ${supplyStatusOf(s.id)===v?'selected':''}>${lb}</option>`).join('')}
           </select></div>
-        <div style="grid-column:span 2"><label style="font-size:12px;color:var(--muted)">Loại cung cấp ${window.helpTip('Sỉ = đóng 1 lô lớn theo tổng (vd gom 100kg → đóng 100kg). Lẻ = chia sẵn theo từng khách (vd khách A 20kg, B 30kg...). Cả hai = linh hoạt.')}</label>
+        <div style="grid-column:span 2"><label style="font-size:12px;color:var(--muted)">Loại cung cấp ${window.helpTip('Sỉ = đóng 1 lô lớn theo tổng (vd gom 100kg → đóng 100kg). Lẻ = chia sẵn theo từng khách (vd khách A 20kg, B 30kg...).')}</label>
           <select id="sf_supplyType" style="width:100%;border:1px solid var(--line);border-radius:6px;padding:7px;font-size:13px">
-            ${[['both', 'Cả sỉ và lẻ'], ['si', 'Chỉ Sỉ (đóng 1 lô theo tổng)'], ['le', 'Chỉ Lẻ (chia sẵn theo từng khách)']].map(([v, lb]) => `<option value="${v}" ${supplyTypeOf(s.id) === v ? 'selected' : ''}>${lb}</option>`).join('')}
+            ${[['si', '📦 Sỉ (đóng 1 lô theo tổng)'], ['le', '🛵 Lẻ (chia sẵn theo từng khách)']].map(([v, lb]) => `<option value="${v}" ${supplyTypeOf(s.id) === v ? 'selected' : ''}>${lb}</option>`).join('')}
           </select></div>
         <div style="grid-column:span 2"><label style="font-size:12px;color:var(--muted)">Sản phẩm cung cấp <span style="color:var(--navy);font-weight:600">(${prods.length} SP từ "Sản phẩm &amp; Giá")</span> ${window.helpTip('Danh sách này LẤY TRỰC TIẾP từ module Sản phẩm & Giá. Thêm/bớt SP ở đó thì danh sách này tự cập nhật. Tick SP + nhập giá nhập riêng nếu muốn.')}</label>
           <input id="sf_prodSearch" placeholder="🔍 Gõ tên SP để lọc nhanh..." oninput="window._supFilterProds(this.value)" style="width:100%;border:1px solid var(--line);border-radius:6px;padding:7px;font-size:13px;margin-top:4px">
@@ -448,6 +445,12 @@
             <input type="number" id="sf_bulkPrice" min="0" step="100" placeholder="giá nhập" style="width:92px;border:1px solid var(--line);border-radius:5px;padding:4px 6px;font-size:12px">
             <button type="button" class="btn btn-ghost btn-sm" style="font-size:11.5px;padding:3px 8px" onclick="window._supBulkPrice()" title="Áp giá nhập cho mọi SP đã tick">💲 Đặt giá cho SP đã tick</button>
             <button type="button" class="btn btn-ghost btn-sm" style="font-size:11.5px;padding:3px 8px;color:var(--danger)" onclick="window._supClearProds()" title="Bỏ tick toàn bộ">✕ Bỏ tick tất cả</button>
+            <button type="button" class="btn btn-ghost btn-sm" style="font-size:11.5px;padding:3px 8px;color:#1E40AF;border:1px solid #93C5FD" onclick="window._supModalBulkPaste()" title="Dán 1 cột tên SP từ Sheet → tự tick SP khớp">📋 Dán hàng loạt</button>
+          </div>
+          <div id="sf_pasteBox" style="display:none;margin-top:8px;background:#EFF6FF;border:1px solid #BFDBFE;border-radius:8px;padding:9px">
+            <div style="font-size:11.5px;color:#1E40AF;margin-bottom:6px">Dán 1 cột tên SP từ Google Sheet (mỗi dòng 1 SP) → tự <b>tick</b> SP khớp trong danh mục.</div>
+            <textarea id="sf_pasteTA" rows="4" placeholder="Cà Chua Đại&#10;Xà Lách Xoăn&#10;..." style="width:100%;box-sizing:border-box;border:1px solid var(--line);border-radius:6px;padding:7px;font-size:13px;resize:vertical"></textarea>
+            <div style="display:flex;gap:8px;align-items:center;margin-top:6px"><button type="button" class="btn btn-primary btn-sm" onclick="window._supModalBulkApply()">✓ Tick SP khớp</button><span id="sf_pasteResult" style="font-size:12px"></span></div>
           </div>
           <div id="sf_prodList" style="max-height:210px;overflow:auto;border:1px solid var(--line);border-radius:6px;margin-top:6px;padding:4px">
             ${prods.length ? prods.map(p => {
@@ -501,6 +504,28 @@
   window._supClearProds = function () {
     document.querySelectorAll('#sf_prodList input[data-prod]:checked').forEach(cb => { cb.checked = false; });
     window._supUpdateProdCount();
+  };
+  /* Dán hàng loạt trong modal Sửa NCC → tự TICK SP khớp tên (không phân biệt hoa/dấu) */
+  window._supModalBulkPaste = function () {
+    const b = document.getElementById('sf_pasteBox'); if (!b) return;
+    b.style.display = b.style.display === 'none' ? 'block' : 'none';
+    if (b.style.display === 'block') { const t = document.getElementById('sf_pasteTA'); if (t) t.focus(); }
+  };
+  window._supModalBulkApply = function () {
+    const ta = document.getElementById('sf_pasteTA'); if (!ta) return;
+    const names = ta.value.split(/[\n\r]+/).map(x => x.replace(/\t.*$/, '').trim()).filter(Boolean);
+    if (!names.length) return;
+    const want = new Set(names.map(_pn));
+    const matched = new Set();
+    let ticked = 0, already = 0;
+    document.querySelectorAll('#sf_prodList .sf-prow input[data-prod]').forEach(cb => {
+      const rn = _pn(cb.getAttribute('data-pname') || '');
+      if (want.has(rn)) { matched.add(rn); if (cb.checked) already++; else { cb.checked = true; ticked++; } }
+    });
+    const notfound = names.filter(n => !matched.has(_pn(n)));
+    window._supUpdateProdCount && window._supUpdateProdCount();
+    const res = document.getElementById('sf_pasteResult');
+    if (res) res.innerHTML = `<b style="color:#15803D">✓ Tick thêm ${ticked}</b>${already ? ` · sẵn ${already}` : ''}${notfound.length ? ` · <b style="color:#B45309">${notfound.length} ngoài danh mục</b>` : ''}`;
   };
   /* Đặt 1 giá nhập cho MỌI SP đã tick (để trống ô giá = xoá giá) */
   window._supBulkPrice = function () {
