@@ -581,7 +581,7 @@
           Mã Số Thuế: ${comp.tax}<br>
           Địa Chỉ: ${comp.address}<br>
           Số Tài Khoản: ${comp.bank} &nbsp;·&nbsp; Chủ TK: ${comp.bankOwner}<br>
-          Email: ${comp.email} &nbsp;·&nbsp; GĐĐH: ${comp.director}
+          Email: ${comp.email} &nbsp;·&nbsp; SĐT: ${comp.director}
         </div>
         <div class="qrbox" style="flex:0 0 auto;text-align:center;min-width:138px">
           <img src="${qrUrl}" alt="VietQR chuyển khoản" crossorigin="anonymous" style="width:132px;height:132px;object-fit:contain;border:1px solid #1B5E20;border-radius:8px;padding:3px;background:#fff" onerror="this.style.opacity='0.15'">
@@ -810,7 +810,7 @@
       <div class="hd">
         <img class="logo" src="${location.origin}/assets/logo-name.png?v=486" crossorigin="anonymous" onerror="this.style.display='none'">
         <div class="cinfo"><b>${comp.name}</b><br>Mã Số Thuế: ${comp.tax}<br>Địa Chỉ: ${comp.address}<br>
-          Số Tài Khoản: ${comp.bank} &nbsp;·&nbsp; Chủ TK: ${comp.bankOwner}<br>Email: ${comp.email} &nbsp;·&nbsp; GĐĐH: ${comp.director}</div>
+          Số Tài Khoản: ${comp.bank} &nbsp;·&nbsp; Chủ TK: ${comp.bankOwner}<br>Email: ${comp.email} &nbsp;·&nbsp; SĐT: ${comp.director}</div>
         <div style="flex:0 0 auto;text-align:center;min-width:132px">
           <img src="${qrUrl}" crossorigin="anonymous" style="width:126px;height:126px;object-fit:contain;border:1px solid #1B5E20;border-radius:8px;padding:3px" onerror="this.style.opacity='0.15'">
           <div style="font-size:10px;color:#1B5E20;font-weight:700;margin-top:2px">Quét QR chuyển khoản</div></div>

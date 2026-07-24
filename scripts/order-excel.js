@@ -129,7 +129,7 @@
     const val = t => ({ font: { name: TNR, size: 10.5 }, text: t });
     infoLine(2, [lbl('Mã Số Thuế: '), val((comp.tax || '') + '     '), lbl('Địa Chỉ: '), val(comp.address || '')]);
     infoLine(3, [lbl('Số Tài Khoản: '), val((comp.bank || '') + '     '), lbl('Chủ TK: '), val(comp.bankOwner || '')]);
-    infoLine(4, [lbl('Email: '), val((comp.email || '') + '     '), lbl('GĐĐH: '), val(comp.director || comp.hotline || '')]);
+    infoLine(4, [lbl('Email: '), val((comp.email || '') + '     '), lbl('SĐT: '), val(comp.director || comp.hotline || '')]);
     ws.getRow(5).height = 5;
 
     /* ===== TIÊU ĐỀ ===== */

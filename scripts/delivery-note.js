@@ -109,7 +109,7 @@ ${FAV ? `<link rel="icon" type="image/svg+xml" href="${FAV}">` : ''}
     background:#fff;font-size:12.5px;line-height:1.45;padding:14mm 12mm}
 
   /* === HEADER (3 cột: logo | thông tin DN | QR chuyển khoản) === */
-  .head{display:grid;grid-template-columns:118px 1fr 150px;gap:16px;align-items:center;padding-bottom:6px}
+  .head{display:grid;grid-template-columns:120px 1fr 150px;gap:28px;align-items:center;padding-bottom:6px}
   .logo-wrap{text-align:center;overflow:hidden}
   .logo-wrap img{width:114px;height:auto;max-width:100%;object-fit:contain;display:block;margin:0 auto}
   .logo-wrap .tag{font-size:9px;color:#008000;font-weight:700;margin-top:4px;line-height:1.25}
@@ -174,7 +174,7 @@ ${FAV ? `<link rel="icon" type="image/svg+xml" href="${FAV}">` : ''}
       <div class="row"><b>Địa Chỉ:</b> ${comp.address || '36/147A Tân Mai, Hoàng Mai, Hà Nội'}</div>
       <div class="row"><b>Số Tài Khoản:</b> ${comp.bank || 'Techcombank 6699399999'}</div>
       <div class="row"><b>Chủ TK:</b> ${comp.bankOwner || 'Nguyễn Tuấn Anh'}</div>
-      <div class="row"><b>Email:</b> ${comp.email || 'nongsantuantuhanoi@gmail.com'} &nbsp;·&nbsp; <b>GĐĐH:</b> ${comp.director || comp.hotline || '0836676086'}</div>
+      <div class="row"><b>Email:</b> ${comp.email || 'nongsantuantuhanoi@gmail.com'} &nbsp;·&nbsp; <b>SĐT:</b> ${comp.director || comp.hotline || '0836676086'}</div>
     </div>
     <div class="qrbox">
       <img src="${qrUrl}" alt="VietQR chuyển khoản" crossorigin="anonymous" onerror="this.style.opacity='0.12'">
