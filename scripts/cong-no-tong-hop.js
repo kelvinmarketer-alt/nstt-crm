@@ -124,6 +124,11 @@
     const ledger = S().get('debtLedger', []) || [];
     const products = S().get('products', window.PRODUCTS || []) || [];
     const custById = {}; customers.forEach(c => custById[c.id] = c);
+    /* Map TÊN → mã KH (chỉ khi tên DUY NHẤT) → đơn cũ/nhập thiếu mã vẫn gom đúng key với phiếu thu
+       (phiếu thu keyed theo mã) → hết lệch "còn phải thu" phồng. Tên trùng → giữ theo tên (không đoán). */
+    const _nameToId = {}, _nameDup = {};
+    customers.forEach(c => { const n = (c.name || '').trim().toLowerCase(); if (!n) return; if (_nameToId[n] != null) _nameDup[n] = true; else _nameToId[n] = c.id; });
+    const _custKey = o => o.cust || ((o.custName && !_nameDup[(o.custName || '').trim().toLowerCase()]) ? _nameToId[(o.custName || '').trim().toLowerCase()] : null) || o.custName || '—';
     const prodById = {}; products.forEach(p => prodById[p.id] = p);
     const days = dayList(fromISO, toISO);
     const daySet = new Set(days);
@@ -160,7 +165,7 @@
       if (o.status === 'draft' || o.status === 'cancelled' || o.status === 'returned') return;   /* bỏ nháp/huỷ/đã trả (khỏi thổi doanh thu) */
       const iso = orderISO(o);
       if (!daySet.has(iso)) return;
-      const key = o.cust || o.custName || '—';
+      const key = _custKey(o);
       const name = o.custName || (custById[o.cust] && custById[o.cust].name) || key;
       const amt = +o.freight || 0;
       if (!amt) return;
@@ -193,7 +198,7 @@
       if (!_isCongNo(o)) return;
       const amt = +o.freight || 0; if (!amt) return;
       const iso = orderISO(o); if (!iso || iso >= fromISO) return;
-      const key = o.cust || o.custName || '—';
+      const key = _custKey(o);
       openCharge[key] = (openCharge[key] || 0) + amt;
       _pnAdd(key, kyOfCust(iso, o.cust), amt);        /* cộng nợ vào KỲ phát sinh (theo chu kỳ tính công nợ của KH) */
     });

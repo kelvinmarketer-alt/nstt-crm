@@ -13,7 +13,7 @@
   const _dmyToISO = dmy => { const m = String(dmy || '').match(/(\d{1,2})\/(\d{1,2})\/(\d{4})/); return m ? `${m[3]}-${String(m[2]).padStart(2, '0')}-${String(m[1]).padStart(2, '0')}` : ''; };
   /* CÔNG NỢ NCC = DẪN XUẤT: Σ nhập(received) − Σ phiếu chi tiền mặt − Σ trả hàng. (suppliers KHÔNG có cột debt) */
   function _supNhap(id) { return getPur().filter(p => p.status === 'received' && p.supplierId === id && p.supplierId !== 'EXT-MARKET').reduce((s, p) => s + (+p.total || 0), 0); }
-  function _supPaidCash(id) { const nm = (getSup().find(s => s.id === id) || {}).name || ''; return getCash().filter(e => e && e.type === 'out' && (e.party === nm || (e.desc && String(e.desc).includes(id)))).reduce((s, e) => s + (+e.amount || 0), 0); }
+  function _supPaidCash(id) { const nm = (getSup().find(s => s.id === id) || {}).name || ''; return getCash().filter(e => e && e.type === 'out' && (e.supplierId === id || e.party === nm || (e.desc && String(e.desc).includes(id)))).reduce((s, e) => s + (+e.amount || 0), 0); }
   function _supClaims(id) { return getClaims().filter(c => c && c.supplierId === id && c.status !== 'settled' && c.status !== 'cancelled').reduce((s, c) => s + (+c.amount || 0), 0); }
   function _supDebt(id) { return Math.max(0, _supNhap(id) - _supPaidCash(id) - _supClaims(id)); }
   /* Loại NCC (sỉ/lẻ/cả hai) — cloud suppliers không có cột → lưu kv 'supplierMeta' */
@@ -498,7 +498,7 @@
     if (!(amt > 0)) { window.toast && window.toast('Nhập số tiền > 0', 'warn'); return; }
     const cash = getCash();
     const _pcMax = cash.reduce((m, e) => { const n = parseInt(String(e.no || '').replace(/^PC/, ''), 10); return isNaN(n) ? m : Math.max(m, n); }, 0);
-    cash.unshift({ no: 'PC' + String(_pcMax + 1).padStart(4, '0'), date: window.todayVN(), type: 'out', amount: amt, account: 'Tiền mặt', party: s.name, desc: 'Thanh toán công nợ NCC ' + id });
+    cash.unshift({ no: 'PC' + String(_pcMax + 1).padStart(4, '0'), date: window.todayVN(), type: 'out', amount: amt, account: 'Tiền mặt', supplierId: id, party: s.name, desc: 'Thanh toán công nợ NCC ' + id });
     window.STORE.set('cashEntries', cash);
     if (window.audit) window.audit.log('supplier.pay', `Trả ${window.fmt(amt)} ₫ cho ${s.name}`);
     const remainAfter = _supDebt(id);
@@ -511,7 +511,7 @@
   window.supPayHistory = function (id) {
     const s = getSup().find(x => x.id === id) || { name: id };
     const nm = s.name, f = v => (Math.round(+v || 0)).toLocaleString('vi-VN');
-    const cash = getCash().filter(e => e && e.type === 'out' && (e.party === nm || (e.desc && String(e.desc).includes(id)))).sort((a, b) => (_dmyToISO(a.date) < _dmyToISO(b.date) ? 1 : -1));
+    const cash = getCash().filter(e => e && e.type === 'out' && (e.supplierId === id || e.party === nm || (e.desc && String(e.desc).includes(id)))).sort((a, b) => (_dmyToISO(a.date) < _dmyToISO(b.date) ? 1 : -1));
     const nhap = _supNhap(id), paid = _supPaidCash(id), claims = _supClaims(id), remain = _supDebt(id);
     const phieu = getPur().filter(p => p.status === 'received' && p.supplierId === id).sort((a, b) => (_dmyToISO(a.date) < _dmyToISO(b.date) ? -1 : 1));
     const today = window.todayISO ? window.todayISO() : new Date().toISOString().slice(0, 10);

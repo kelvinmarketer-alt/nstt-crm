@@ -22,7 +22,7 @@
   /* TỔNG ĐÃ TRẢ = phiếu chi TIỀN MẶT thật cho NCC (all-time) — nguồn DUY NHẤT (không dùng field paid trên phiếu, dễ lệch) */
   function _supPaidCashAll(id) {
     const nm = (getSup().find(s => s.id === id) || {}).name || '';
-    return getCash().filter(e => e && e.type === 'out' && (e.party === nm || (e.desc && String(e.desc).includes(id))))
+    return getCash().filter(e => e && e.type === 'out' && (e.supplierId === id || e.party === nm || (e.desc && String(e.desc).includes(id))))
       .reduce((s, e) => s + (+e.amount || 0), 0);
   }
   /* CÔNG NỢ NCC nội bộ (CFO) = Σ nhập − Σ phiếu chi tiền mặt − Σ trả hàng. Đối chiếu gửi NCC thì KHÔNG trừ trả hàng. */
@@ -42,7 +42,7 @@
     return out;
   }
   /* Phiếu chi cho NCC này: khớp party = tên NCC (payPur/ncdPay/paySupplier đều set party=tên NCC) hoặc desc chứa id */
-  const cashForSup = (e, r) => e && e.type === 'out' && (e.party === r.name || (e.desc && String(e.desc).includes(r.key)));
+  const cashForSup = (e, r) => e && e.type === 'out' && (e.supplierId === r.key || e.party === r.name || (e.desc && String(e.desc).includes(r.key)));
 
   function build(fromISO, toISO) {
     const sups = getSup(); const byId = {}; sups.forEach(s => byId[s.id] = s);
@@ -183,7 +183,7 @@
     cash.unshift({
       no: 'PC' + String(pcMax + 1).padStart(4, '0'),
       date: (window.todayVN ? window.todayVN() : new Date().toLocaleDateString('vi-VN')),
-      type: 'out', amount: amt, account: 'Tiền mặt', party: (s && s.name) || id, desc: 'Thanh toán công nợ NCC ' + id,
+      type: 'out', amount: amt, account: 'Tiền mặt', supplierId: id, party: (s && s.name) || id, desc: 'Thanh toán công nợ NCC ' + id,
     });
     S().set('cashEntries', cash);
     const remainAfter = _supRemainAll(id);
@@ -198,7 +198,7 @@
     const sup = getSup().find(s => s.id === id) || { name: id };
     const nm = sup.name;
     const f = v => (Math.round(+v || 0)).toLocaleString('vi-VN');
-    const cash = getCash().filter(e => e && e.type === 'out' && (e.party === nm || (e.desc && String(e.desc).includes(id))))
+    const cash = getCash().filter(e => e && e.type === 'out' && (e.supplierId === id || e.party === nm || (e.desc && String(e.desc).includes(id))))
       .sort((a, b) => (dmyToISO(a.date) < dmyToISO(b.date) ? 1 : -1));
     const nhap = _supNhapAll(id), paid = _supPaidCashAll(id), claims = _supClaims(id), remain = _supRemainAll(id);
     const phieu = getPur().filter(p => p.status === 'received' && p.supplierId === id).sort((a, b) => (dmyToISO(a.date) < dmyToISO(b.date) ? -1 : 1));
@@ -264,7 +264,7 @@
         </div>`; }).join('')}
       </div>` : '';
     /* Phiếu chi tiền mặt cho NCC trong ngày → để tổng khớp: còn = nhập − đã chi − trả hàng */
-    const cashDay = getCash().filter(e => e && e.type === 'out' && dmyToISO(e.date) === iso && (e.party === sup.name || (e.desc && String(e.desc).includes(supId))));
+    const cashDay = getCash().filter(e => e && e.type === 'out' && dmyToISO(e.date) === iso && (e.supplierId === supId || e.party === sup.name || (e.desc && String(e.desc).includes(supId))));
     let paidTot = 0;
     const cashHtml = cashDay.length ? `<div style="border:1px solid #BBF7D0;background:#F0FDF4;border-radius:10px;padding:10px 12px;margin-bottom:12px">
         <div style="font-size:11.5px;font-weight:800;color:#15803D;text-transform:uppercase;margin-bottom:6px">💵 Đã chi tiền mặt trong ngày</div>
@@ -295,7 +295,7 @@
     const f = v => (Math.round(+v || 0)).toLocaleString('vi-VN');
     /* Đã trả = phiếu chi TIỀN MẶT thật trong kỳ (không dùng field paid trên phiếu). Phân bổ FIFO vào từng phiếu để "còn" từng dòng cộng khớp. */
     const nm = s.name;
-    const paidPeriod = getCash().filter(e => e && e.type === 'out' && _inPeriod(e.date, fromISO, toISO) && (e.party === nm || (e.desc && String(e.desc).includes(id)))).reduce((a, e) => a + (+e.amount || 0), 0);
+    const paidPeriod = getCash().filter(e => e && e.type === 'out' && _inPeriod(e.date, fromISO, toISO) && (e.supplierId === id || e.party === nm || (e.desc && String(e.desc).includes(id)))).reduce((a, e) => a + (+e.amount || 0), 0);
     /* GỘP THEO NGÀY — không liệt kê từng phiếu (10 phiếu/ngày sẽ quá dài). Chi tiết bấm ô ngày ở bảng ma trận. */
     const byDay = {};
     phieu.forEach(p => { const d = p.date; (byDay[d] = byDay[d] || { date: d, iso: dmyToISO(p.date), nhap: 0, n: 0 }); byDay[d].nhap += (+p.total || 0); byDay[d].n++; });

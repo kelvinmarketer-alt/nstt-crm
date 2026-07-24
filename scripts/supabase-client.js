@@ -142,9 +142,9 @@
     },
     cashEntries: {
       to:   { date:'entry_date', type:'entry_type', desc:'description',
-              relatedOrder:'related_order', relatedInvoice:'related_invoice' },
+              relatedOrder:'related_order', relatedInvoice:'related_invoice', supplierId:'supplier_id' },
       from: { entry_date:'date', entry_type:'type', description:'desc',
-              related_order:'relatedOrder', related_invoice:'relatedInvoice' },
+              related_order:'relatedOrder', related_invoice:'relatedInvoice', supplier_id:'supplierId' },
     },
     /* === 6 bảng phụ trợ (đợt 2) === */
     inventory: {
@@ -154,10 +154,11 @@
               avg_daily:'avgDaily', last_in:'lastIn', last_out:'lastOut' },
     },
     purchases: {
-      /* whReceivedAt/whBy = metadata KHO nhận (bước 2) — KHÔNG có cột DB → drop (gửi lên = 400 báo đỏ lỗi cloud).
-         Trạng thái (ordered→wh_received→received) lưu ở cột `status`; SL nhận/lỗi/dư lưu trong `items` (jsonb) → vẫn bền. */
-      to:   { supplierId:'supplier_id', whReceivedAt: null, whBy: null, whStatus: null },
-      from: { supplier_id:'supplierId' },
+      /* whReceivedAt/whBy = metadata KHO nhận (bước 2); noStock = cờ không cộng kho.
+         Sau migration v542 (thêm cột wh_received_at/wh_by/no_stock) → persist bền. Nếu CỘT CHƯA CÓ,
+         lớp sync tự strip cột lạ + retry → không lỗi (chỉ chưa lưu). whStatus vẫn không có cột → null. */
+      to:   { supplierId:'supplier_id', whReceivedAt:'wh_received_at', whBy:'wh_by', noStock:'no_stock', whStatus: null },
+      from: { supplier_id:'supplierId', wh_received_at:'whReceivedAt', wh_by:'whBy', no_stock:'noStock' },
     },
     quotes: {
       to:   { custId:'cust_id', custName:'cust_name', validUntil:'valid_until',
