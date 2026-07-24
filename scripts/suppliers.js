@@ -264,6 +264,10 @@
 
         <button class="btn btn-primary" style="width:100%;margin-top:18px" onclick="window.openSupModal('${s.id}')">✏️ Sửa nhà cung cấp</button>
         ${_supDebt(s.id) > 0 ? `<button class="btn btn-ghost" style="width:100%;margin-top:8px;color:var(--ok)" onclick="window.paySupplier('${s.id}')">💰 Ghi thanh toán NCC</button>` : ''}
+        <div style="display:flex;gap:8px;margin-top:8px">
+          <button class="btn btn-ghost" style="flex:1;border:1px solid var(--line);color:${paused ? '#15803D' : '#B45309'};font-weight:700" onclick="window.supTogglePause('${s.id}')" title="${paused ? 'Mở lại — NCC hiện trở lại ở lệnh gọi hàng' : 'Ngừng nhập — ẩn khỏi lệnh gọi hàng, giữ lịch sử & công nợ'}">${paused ? '▶ Mở lại nhập hàng' : '⏸ Ngừng nhập hàng'}</button>
+          <button class="btn btn-ghost" style="flex:1;border:1px solid #FECACA;color:var(--danger);font-weight:700" onclick="window.supDelete('${s.id}')" title="Xoá hẳn nhà cung cấp này (không hoàn tác)">🗑 Xoá NCC</button>
+        </div>
       </div>`;
     document.getElementById('drawer').classList.add('open');
     document.getElementById('drawerBg').classList.add('open');
@@ -318,6 +322,33 @@
   window.closeDrawer = function () {
     document.getElementById('drawer').classList.remove('open');
     document.getElementById('drawerBg').classList.remove('open');
+  };
+
+  /* ===== NGỪNG NHẬP / MỞ LẠI (đóng NCC không nhập hàng — giữ lịch sử & công nợ) ===== */
+  window.supTogglePause = async function (id) {
+    const s = getSup().find(x => x.id === id); if (!s) return;
+    const paused = supplyStatusOf(id) === 'paused';
+    if (!paused && window.uiConfirm && !(await window.uiConfirm(
+      `Ngừng nhập hàng từ "${tcName(s.name)}"?\n\n→ NCC này sẽ KHÔNG hiện ở lệnh gọi hàng của Kho.\nLịch sử nhập & công nợ GIỮ NGUYÊN. Mở lại bất cứ lúc nào.`,
+      { title: '⏸ Ngừng nhập hàng', okText: 'Ngừng nhập' }))) return;
+    saveSupplyMeta(id, { status: paused ? 'active' : 'paused' });
+    window.toast && window.toast(paused ? '▶ Đã mở lại nhập từ ' + tcName(s.name) : '⏸ Đã ngừng nhập từ ' + tcName(s.name), 'success');
+    render();
+    window.openSupDrawer(id);   /* vẽ lại drawer để đổi nhãn nút + badge */
+  };
+
+  /* ===== XOÁ NCC (không hoàn tác) — cảnh báo nếu còn nợ ===== */
+  window.supDelete = async function (id) {
+    const s = getSup().find(x => x.id === id); if (!s) return;
+    const debt = _supDebt(id);
+    let msg = `Xoá hẳn nhà cung cấp "${tcName(s.name)}"?\n\n⚠️ Thao tác KHÔNG hoàn tác.`;
+    if (debt > 0) msg += `\n\n❗ NCC này ĐANG CÒN NỢ ${window.fmt(debt)}₫ — nên thanh toán/đối chiếu trước. Cân nhắc "Ngừng nhập" thay vì xoá.`;
+    if (window.uiConfirm && !(await window.uiConfirm(msg, { title: '🗑 Xoá nhà cung cấp', okText: 'Xoá hẳn' }))) return;
+    window.STORE.remove('suppliers', id);
+    window.STORE.rmwKv('supplierMeta', m => { if (m && typeof m === 'object') delete m[id]; return m || {}; }, {});   /* dọn meta nhóm/trạng thái */
+    window.closeDrawer && window.closeDrawer();
+    window.toast && window.toast('🗑 Đã xoá NCC ' + tcName(s.name), 'success');
+    render();
   };
 
   window.openSupModal = function (id) {
