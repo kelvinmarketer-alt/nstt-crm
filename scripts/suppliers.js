@@ -235,7 +235,10 @@
           </div>
         </div>
 
-        <h3 style="margin:0 0 8px;font-size:12px;color:var(--muted);text-transform:uppercase;letter-spacing:.5px">🥬 Sản phẩm cung cấp (${prods.length}) <span style="text-transform:none;font-weight:400;color:#94A3B8">— sửa tên/giá tại chỗ · ✕ để xoá</span></h3>
+        <div style="display:flex;align-items:center;gap:8px;margin:0 0 8px">
+          <h3 style="margin:0;flex:1;font-size:12px;color:var(--muted);text-transform:uppercase;letter-spacing:.5px">🥬 Sản phẩm cung cấp (${prods.length}) <span style="text-transform:none;font-weight:400;color:#94A3B8">— sửa tên/giá · ✕ xoá</span></h3>
+          <button onclick="window.supBulkPaste('${s.id}')" title="Dán danh sách tên SP từ Google Sheet (mỗi dòng 1 SP) — tự báo SP nào đã có, thêm SP mới" style="border:1px solid #93C5FD;background:#EFF6FF;color:#1E40AF;border-radius:7px;padding:6px 11px;font-size:12px;font-weight:700;cursor:pointer;white-space:nowrap">📋 Dán hàng loạt</button>
+        </div>
         <datalist id="supProdDL_${s.id}">${_catalogProds().map(p => `<option value="${escH(p.name)}">`).join('')}</datalist>
         <div style="border:1px solid var(--line);border-radius:9px;overflow:hidden">
           ${prods.map((p, i) => `<div style="display:flex;align-items:center;gap:6px;padding:6px 8px;border-bottom:1px solid #F1F5F9">
@@ -317,6 +320,64 @@
     }
     prods.push({ id: cat ? cat.id : '', name: cat ? cat.name : name, price });
     _saveSupProds(id, prods, true);
+  };
+
+  /* ===== DÁN HÀNG LOẠT SP cho NCC (copy 1 cột tên SP từ Sheet) — báo đã có / thêm mới ===== */
+  window.supBulkPaste = function (id) {
+    const s = getSup().find(x => x.id === id); if (!s) return;
+    window.openModal('📋 Dán hàng loạt SP — ' + tcName(s.name), `
+      <div style="font-size:12.5px;color:var(--muted);margin-bottom:8px">Copy <b>1 cột tên SP</b> từ Google Sheet → dán vào ô dưới (mỗi dòng 1 SP). Hệ tự báo SP nào <b style="color:#94A3B8">đã có</b> (bỏ qua), SP nào <b style="color:#15803D">mới</b> để thêm.</div>
+      <textarea id="supBulkTA" rows="9" placeholder="Cà Chua Đại&#10;Xà Lách Xoăn&#10;Bắp Cải Đà Lạt&#10;..." style="width:100%;box-sizing:border-box;border:1px solid var(--line);border-radius:8px;padding:9px;font-size:13px;resize:vertical"></textarea>
+      <div id="supBulkResult" style="margin-top:10px"></div>
+    `, {
+      width: '520px',
+      footer: `<button class="btn btn-ghost" onclick="window.closeModal()">Đóng</button>
+               <button class="btn btn-primary" onclick="window._supBulkPreview('${id}')">🔍 Kiểm tra</button>`,
+    });
+    setTimeout(() => { const t = document.getElementById('supBulkTA'); if (t) t.focus(); }, 60);
+  };
+  window._supBulkPreview = function (id) {
+    const s = getSup().find(x => x.id === id); if (!s) return;
+    const ta = document.getElementById('supBulkTA');
+    const raw = (ta ? ta.value : '').split(/[\n\r]+/).map(x => x.replace(/\t.*$/, '').trim()).filter(Boolean);
+    const seen = new Set(), uniq = [];
+    raw.forEach(n => { const k = _pn(n); if (k && !seen.has(k)) { seen.add(k); uniq.push(n); } });
+    const have = new Set((s.products || []).map(p => _pn(p.name)));
+    const catByName = {}; _catalogProds().forEach(p => { catByName[_pn(p.name)] = p; });
+    const dup = [], newInCat = [], newFree = [];
+    uniq.forEach(n => {
+      const k = _pn(n);
+      if (have.has(k)) dup.push(n);
+      else if (catByName[k]) newInCat.push({ name: catByName[k].name, id: catByName[k].id });
+      else newFree.push(n);
+    });
+    window._supBulkPending = { id, newInCat, newFree };
+    const nNew = newInCat.length + newFree.length;
+    const chip = (t, color, bg) => `<span style="display:inline-block;background:${bg};color:${color};border-radius:5px;padding:2px 7px;font-size:11.5px;margin:2px 3px 0 0">${t}</span>`;
+    const box = document.getElementById('supBulkResult'); if (!box) return;
+    box.innerHTML = `
+      <div style="font-size:12.5px;line-height:1.7">
+        <div><b style="color:#15803D">➕ Thêm mới: ${nNew}</b>${newFree.length ? ` <span style="color:#B45309">(${newFree.length} ngoài danh mục SP — vẫn thêm được)</span>` : ''}</div>
+        <div><b style="color:#94A3B8">⏭ Đã có (bỏ qua): ${dup.length}</b> · Tổng dán: ${uniq.length}</div>
+      </div>
+      ${nNew ? `<div style="margin-top:6px;max-height:130px;overflow:auto;border:1px solid #DCFCE7;border-radius:7px;padding:6px;background:#F0FDF4">${newInCat.map(p => chip(escH(p.name), '#166534', '#DCFCE7')).join('')}${newFree.map(n => chip('⚠ ' + escH(n), '#92400E', '#FEF3C7')).join('')}</div>
+        <button class="btn btn-primary" style="width:100%;margin-top:10px" onclick="window._supBulkAdd('${id}')">➕ Thêm ${nNew} SP mới vào NCC</button>`
+        : '<div style="margin-top:6px;color:var(--muted);font-size:12px">✓ Tất cả SP dán vào đều đã có — không cần thêm.</div>'}
+      ${dup.length ? `<details style="margin-top:8px"><summary style="cursor:pointer;font-size:12px;color:var(--muted)">Xem ${dup.length} SP đã có</summary><div style="margin-top:4px;max-height:90px;overflow:auto">${dup.map(n => chip(escH(n), '#64748B', '#F1F5F9')).join('')}</div></details>` : ''}
+    `;
+  };
+  window._supBulkAdd = function (id) {
+    const P = window._supBulkPending; if (!P || P.id !== id) return;
+    const s = getSup().find(x => x.id === id); if (!s) return;
+    const prods = (s.products || []).slice();
+    const have = new Set(prods.map(p => _pn(p.name)));
+    let n = 0;
+    P.newInCat.forEach(p => { if (!have.has(_pn(p.name))) { prods.push({ id: p.id, name: p.name, price: 0 }); have.add(_pn(p.name)); n++; } });
+    P.newFree.forEach(nm => { if (!have.has(_pn(nm))) { prods.push({ id: '', name: nm, price: 0 }); have.add(_pn(nm)); n++; } });
+    delete window._supBulkPending;
+    window.closeModal && window.closeModal();
+    _saveSupProds(id, prods, true);   /* lưu + vẽ lại drawer */
+    window.toast && window.toast(`➕ Đã thêm ${n} SP cho ${tcName(s.name)}`, 'success');
   };
 
   window.closeDrawer = function () {
