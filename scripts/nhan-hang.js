@@ -138,9 +138,45 @@
           </tr></thead><tbody>${waiting.map(waitingRow).join('')}</tbody>
         </table></div>`;
     }
+    /* 📅 LỊCH SỬ NHẬN HÀNG — gộp theo NGÀY (accordion, mới→cũ) */
+    const done = list.filter(p => p.status === 'wh_received' || p.status === 'received');
+    if (done.length) {
+      const _dOf = p => { const iso = p.whReceivedAt || p.wh_received_at; if (iso) { const d = new Date(iso); if (!isNaN(d)) return d.toLocaleDateString('vi-VN'); } return p.date || '—'; };
+      const _dk = d => { const m = String(d).match(/(\d{1,2})\/(\d{1,2})\/(\d{2,4})/); return m ? (m[3].length === 2 ? '20' + m[3] : m[3]) + m[2].padStart(2, '0') + m[1].padStart(2, '0') : '00000000'; };
+      const byDay = {};
+      done.forEach(p => { const dd = _dOf(p); (byDay[dd] = byDay[dd] || []).push(p); });
+      const days = Object.keys(byDay).sort((a, b) => _dk(b).localeCompare(_dk(a)));
+      html += `<div style="font-weight:800;color:#1B5E20;font-size:13px;margin:24px 0 8px">📅 Lịch sử nhận hàng (${done.length} phiếu · ${days.length} ngày) <span style="font-weight:400;color:var(--muted);font-size:11.5px">— bấm ngày để xổ chi tiết</span></div>`;
+      html += days.map((d, di) => {
+        const rows = byDay[d]; const k = _dk(d);
+        const nSup = new Set(rows.map(r => r.supplierId || r.supplier_id)).size;
+        const totAmt = rows.reduce((s, r) => s + (+r.total || 0), 0);
+        return `<div style="border:1px solid var(--line);border-radius:10px;margin-bottom:8px;overflow:hidden;background:#fff">
+          <div onclick="window.nhToggleDay('${k}')" style="display:flex;align-items:center;gap:10px;padding:10px 13px;cursor:pointer;background:#F8FAF8">
+            <span id="nhdc-${k}" style="display:inline-block;width:12px;font-size:12px">${di === 0 ? '▾' : '▸'}</span>
+            <b style="color:#1B5E20">${d}</b>
+            <span style="color:var(--muted);font-size:12px">${rows.length} phiếu · ${nSup} NCC</span>
+            <div style="flex:1"></div>
+            <b style="color:var(--navy);font-size:12.5px">${window.fmt(totAmt)}₫</b>
+          </div>
+          <div id="nhdi-${k}" style="display:${di === 0 ? 'block' : 'none'}">
+            ${rows.map(p => `<div style="display:flex;align-items:center;gap:10px;padding:9px 14px;border-top:1px solid #F1F5F9;font-size:12.5px">
+              <div style="flex:1;min-width:0"><b>${esc(supName(p.supplierId || p.supplier_id))}</b> <span style="color:var(--muted)">· ${(p.items || []).length} mã · ${p.status === 'received' ? '✓ đã chốt công nợ' : '⏳ chờ KT chốt'}</span></div>
+              <b style="color:var(--navy)">${window.fmt(p.total)}₫</b>
+            </div>`).join('')}
+          </div>
+        </div>`;
+      }).join('');
+    }
+
     host.innerHTML = html;
     _applyFilter();   /* giữ bộ lọc tìm kiếm sau mỗi lần vẽ lại */
   }
+  window.nhToggleDay = function (k) {
+    const el = document.getElementById('nhdi-' + k), c = document.getElementById('nhdc-' + k);
+    if (!el) return; const open = el.style.display !== 'none';
+    el.style.display = open ? 'none' : 'block'; if (c) c.textContent = open ? '▸' : '▾';
+  };
 
   /* ===== Kho xác nhận nhận hàng: cập nhật TỒN KHO (phần dư) + lưu SL/lỗi, KHÔNG chốt công nợ =====
      _receiveOne đọc ô Thực nhận / Hàng lỗi đang hiển thị + cộng kho phần dư; KHÔNG gọi S().set

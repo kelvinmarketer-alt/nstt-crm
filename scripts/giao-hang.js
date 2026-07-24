@@ -121,15 +121,53 @@
     const nOpen = isShipper ? list.filter(o => _unclaimed(o)).length : 0;
     const tabsEl = document.getElementById('ghTabs');
     if (tabsEl) tabsEl.innerHTML = `<div class="gh-count">🚚 Đang giao: <b>${list.length}</b> đơn${isShipper ? ` · của tôi <b>${nMine}</b> · chưa ai nhận <b style="color:#B45309">${nOpen}</b>` : (me.name ? ' · ' + esc(me.name) : '')}</div>`;
-    if (!list.length) {
-      host.innerHTML = `<div class="gh-empty">${me.name
-        ? `Không có đơn đang giao cho "<b>${esc(me.name)}</b>", cũng chưa có đơn nào chờ nhận.`
-        : '✓ Không có đơn nào đang giao.<br><span style="font-size:12px">Kho giao shipper ở <b>Gom hàng → ③ Xuất kho</b>, đơn sẽ hiện ở đây.</span>'}</div>`;
-      return;
-    }
-    host.innerHTML = list.map(o => cardHtml(o, me)).join('');
+    const boardHtml = list.length
+      ? list.map(o => cardHtml(o, me)).join('')
+      : `<div class="gh-empty">${me.name
+          ? `Không có đơn đang giao cho "<b>${esc(me.name)}</b>", cũng chưa có đơn nào chờ nhận.`
+          : '✓ Không có đơn nào đang giao.<br><span style="font-size:12px">Kho giao shipper ở <b>Gom hàng → ③ Xuất kho</b>, đơn sẽ hiện ở đây.</span>'}</div>`;
+    host.innerHTML = boardHtml + ghHistoryHtml(me);
   }
   window._ghRender = render;
+
+  /* ===== 📅 LỊCH SỬ GIAO HÀNG (đã giao) — gộp theo ngày, thu gọn mặc định =====
+     Phân quyền qua mineOnly(): shipper (link) chỉ thấy đơn CỦA MÌNH đã giao; kho/admin thấy TẤT CẢ. */
+  function ghHistoryHtml(me) {
+    const delivered = ordList().filter(o => (o.status === 'delivered' || o.status === 'reconciled') && mineOnly(o))
+      .sort((a, b) => String(b.deliveredAt || b.date || '').localeCompare(String(a.deliveredAt || a.date || '')));
+    if (!delivered.length) return '';
+    const dOf = o => { const iso = o.deliveredAt; if (iso) { const d = new Date(iso); if (!isNaN(d)) return d.toLocaleDateString('vi-VN'); } return o.date || '—'; };
+    const dk = d => { const m = String(d).match(/(\d{1,2})\/(\d{1,2})\/(\d{2,4})/); return m ? (m[3].length === 2 ? '20' + m[3] : m[3]) + m[2].padStart(2, '0') + m[1].padStart(2, '0') : '0'; };
+    const byDay = {}; delivered.forEach(o => { const dd = dOf(o); (byDay[dd] = byDay[dd] || []).push(o); });
+    const days = Object.keys(byDay).sort((a, b) => dk(b).localeCompare(dk(a)));
+    const scope = (SHIP_MODE && me.name) ? 'đơn bạn đã giao' : 'tất cả đơn đã giao';
+    return `<div style="margin-top:20px;border-top:1px solid #E5EFE1;padding-top:12px">
+      <div onclick="window.ghToggleHist()" style="display:flex;align-items:center;gap:8px;cursor:pointer;font-weight:800;color:#1B5E20;font-size:14px;padding:6px 2px">
+        📅 Lịch sử giao hàng (${delivered.length}) <span style="font-weight:400;color:var(--muted);font-size:11.5px">— ${scope}</span>
+        <div style="flex:1"></div><span id="ghHistCr" style="font-size:13px">▸</span>
+      </div>
+      <div id="ghHistBody" style="display:none;margin-top:6px">
+        ${days.map((d, di) => { const rows = byDay[d]; const k = dk(d); return `
+          <div style="border:1px solid var(--line);border-radius:9px;margin-bottom:7px;overflow:hidden;background:#fff">
+            <div onclick="window.ghToggleHistDay('${k}')" style="display:flex;align-items:center;gap:9px;padding:9px 12px;cursor:pointer;background:#F6FBF4">
+              <span id="ghhc-${k}" style="width:11px;font-size:12px">${di === 0 ? '▾' : '▸'}</span>
+              <b style="color:#1B5E20">${d}</b><span style="color:var(--muted);font-size:12px">${rows.length} đơn</span>
+            </div>
+            <div id="ghhd-${k}" style="display:${di === 0 ? 'block' : 'none'}">
+              ${rows.map(o => `<div style="display:flex;align-items:center;gap:8px;padding:8px 13px;border-top:1px solid #F1F5F9;font-size:12.5px;flex-wrap:wrap">
+                <span style="color:#94A3B8;font-weight:700">#${esc(o.code)}</span><b>${esc(o.custName || o.custId || '')}</b>
+                ${o.driverName ? `<span style="color:#0EA5E9;font-size:11.5px">🛵 ${esc(o.driverName)}</span>` : ''}
+                <div style="flex:1"></div>
+                ${o.freight ? `<span style="color:var(--navy);font-weight:700">${fmt(o.freight)}₫</span>` : ''}
+                <span style="color:#15803D;font-size:11px;font-weight:700">${o.status === 'reconciled' ? '💰 đã soát' : '✓ đã giao'}</span>
+              </div>`).join('')}
+            </div>
+          </div>`; }).join('')}
+      </div>
+    </div>`;
+  }
+  window.ghToggleHist = function () { const b = document.getElementById('ghHistBody'), c = document.getElementById('ghHistCr'); if (b) { const o = b.style.display !== 'none'; b.style.display = o ? 'none' : 'block'; if (c) c.textContent = o ? '▸' : '▾'; } };
+  window.ghToggleHistDay = function (k) { const el = document.getElementById('ghhd-' + k), c = document.getElementById('ghhc-' + k); if (el) { const o = el.style.display !== 'none'; el.style.display = o ? 'none' : 'block'; if (c) c.textContent = o ? '▸' : '▾'; } };
 
   /* ===== SHIPPER TỰ NHẬN đơn chưa ai nhận → gán mình làm shipper ===== */
   window.ghClaim = async function (code) {
