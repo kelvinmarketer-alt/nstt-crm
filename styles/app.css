@@ -441,6 +441,8 @@ select.status-select[title]:hover::before {
   transform:translateX(100%);
   transition:transform 0.25s cubic-bezier(.2,.8,.2,1);
   display:flex; flex-direction:column;
+  overflow-y:auto;              /* nội dung dài (NCC nhiều SP) cuộn được — tránh ô "Thêm SP" bị cắt */
+  overscroll-behavior:contain;
 }
 .drawer.open{transform:translateX(0)}
 .drawer-head{
