@@ -86,6 +86,12 @@ window.PRODUCT_CATEGORIES = [
     "label": "Khác",
     "icon": "📦",
     "color": "#6B7280"
+  },
+  {
+    "id": "do-kho",
+    "label": "Đồ khô",
+    "icon": "🥫",
+    "color": "#B45309"
   }
 ];
 
